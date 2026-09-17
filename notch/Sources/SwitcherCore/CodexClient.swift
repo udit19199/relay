@@ -411,8 +411,10 @@ public struct CodexExecutableLocator: Sendable {
         throw CodexClientError.executableNotFound
     }
 
-    public func launchConfiguration() throws -> (executable: URL, environment: [String: String]) {
-        var environment = ProcessInfo.processInfo.environment
+    public func launchConfiguration(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) throws -> (executable: URL, environment: [String: String]) {
+        var environment = environment
         #if !os(Windows)
         if explicitURL == nil {
             // GUI apps do not inherit the terminal's login PATH. Read the same shell settings
@@ -420,7 +422,10 @@ public struct CodexExecutableLocator: Sendable {
             let shell = Process()
             let output = Pipe()
             shell.executableURL = URL(fileURLWithPath: environment["SHELL"] ?? "/bin/zsh")
-            shell.arguments = ["-l", "-c", "printf '\\0%s\\0%s\\0' \"$PATH\" \"${CODEX_CLI_PATH:-codex}\""]
+            // Quoted PATH is colon-separated in fish too. Keep defaulting in locate()
+            // because fish does not support POSIX ${VAR:-default} expansion.
+            shell.arguments = ["-l", "-c", "printf '\\0%s\\0%s\\0' \"$PATH\" \"$CODEX_CLI_PATH\""]
+            shell.environment = environment
             shell.standardOutput = output
             shell.standardError = FileHandle.nullDevice
             try shell.run()
@@ -460,7 +465,7 @@ public struct CodexClient: AccountClient {
     private let openBrowser: @Sendable (URL) async throws -> Void
 
     public init(locator: CodexExecutableLocator = .init(), requestTimeout: Duration = .seconds(20),
-                clientVersion: String = "0.1.12",
+                clientVersion: String = "0.1.13",
                 openBrowser: @escaping @Sendable (URL) async throws -> Void = CodexClient.defaultOpenBrowser) {
         self.locator = locator
         self.requestTimeout = requestTimeout
