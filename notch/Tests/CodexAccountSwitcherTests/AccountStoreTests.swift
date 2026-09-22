@@ -354,16 +354,14 @@ struct AccountStoreTests {
             withIntermediateDirectories: true
         )
         let settingsURL = fixture.support.appending(path: "settings.json")
-        try Data(#"{"language":"english"}"#.utf8).write(to: settingsURL)
+        try Data(#"{"language":"english","showsMenuBarPercentage":true}"#.utf8).write(to: settingsURL)
 
         let legacySettings = try await fixture.store.loadSettings()
-        #expect(legacySettings.language == .english)
         #expect(legacySettings.showsMenuBarPercentage)
         #expect(!legacySettings.showsFiveHourUsage)
         #expect(!AppSettings.default.showsFiveHourUsage)
 
         let updatedSettings = AppSettings(
-            language: .simplifiedChinese,
             showsMenuBarPercentage: false,
             showsFiveHourUsage: true
         )

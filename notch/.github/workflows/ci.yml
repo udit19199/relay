@@ -2,32 +2,20 @@ name: CI
 
 on:
   pull_request:
-    paths-ignore:
-      - "windows/**"
-      - "scripts/package-windows.ps1"
-      - "scripts/generate-windows-icons.py"
-      - ".github/workflows/windows.yml"
   push:
     branches:
       - main
-    paths-ignore:
-      - "windows/**"
-      - "scripts/package-windows.ps1"
-      - "scripts/generate-windows-icons.py"
-      - ".github/workflows/windows.yml"
 
 permissions:
   contents: read
 
 jobs:
-  site:
+  scripts:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Check SEO and GEO consistency
-        run: node scripts/check-site-geo.mjs
-      - name: Check platform release routing
+      - name: Check release routing
         run: node --test scripts/tests/*.test.mjs
 
   test:

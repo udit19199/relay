@@ -24,7 +24,7 @@ test('feed validation rejects another platform, unsigned assets and mixed enclos
   assert.throws(() => validateMacFeed(feed('macos-v1.0.0') + '<enclosure url="other.exe"/>', 'macos-v1.0.0'));
 });
 
-test('site deployment searches beyond 100 Windows releases and copies the Mac feed unchanged', async () => {
+test('feed lookup searches beyond 100 Windows releases and copies the Mac feed unchanged', async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'switcher-feed-'));
   const output = path.join(directory, 'updates', 'appcast.xml');
   const requests = [];

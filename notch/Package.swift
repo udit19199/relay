@@ -65,18 +65,10 @@ let testingCompatibilitySettings: ([SwiftSetting], [LinkerSetting]) = {
 
 var products: [Product] = [
     .library(name: "SwitcherCore", targets: ["SwitcherCore"]),
-    .executable(name: "SwitcherHost", targets: ["SwitcherHost"]),
 ]
 var dependencies: [Package.Dependency] = []
 var targets: [Target] = [
-    .target(name: "SwitcherPlatform", linkerSettings: [
-        .linkedLibrary("advapi32", .when(platforms: [.windows])),
-        .linkedLibrary("ole32", .when(platforms: [.windows])),
-    ]),
-    .target(name: "SwitcherCore", dependencies: [
-        .target(name: "SwitcherPlatform", condition: .when(platforms: [.windows])),
-    ]),
-    .executableTarget(name: "SwitcherHost", dependencies: ["SwitcherCore"]),
+    .target(name: "SwitcherCore"),
     .testTarget(name: "SwitcherCoreTests", dependencies: ["SwitcherCore"],
                 swiftSettings: testingCompatibilitySettings.0,
                 linkerSettings: testingCompatibilitySettings.1),

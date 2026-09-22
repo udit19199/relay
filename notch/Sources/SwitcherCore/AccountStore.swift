@@ -2,9 +2,6 @@ import Foundation
 #if canImport(Darwin)
 import Darwin
 #endif
-#if os(Windows)
-import SwitcherPlatform
-#endif
 
 public protocol AccountStoring: Sendable {
     func loadRegistry() async throws -> AccountRegistry
@@ -34,15 +31,10 @@ public actor AccountStore: AccountStoring {
         fileManager: FileManager = .default
     ) {
         self.fileManager = fileManager
-        #if os(Windows)
-        let applicationSupportURL = URL(fileURLWithPath: ProcessInfo.processInfo.environment["LOCALAPPDATA"]
-            ?? fileManager.homeDirectoryForCurrentUser.appendingPathComponent("AppData/Local").path)
-        #else
         let applicationSupportURL = fileManager.urls(
             for: .applicationSupportDirectory,
             in: .userDomainMask
         )[0]
-        #endif
         if let baseURL {
             self.baseURL = baseURL
             self.legacyBaseURL = legacyBaseURL
@@ -135,7 +127,6 @@ public actor AccountStore: AccountStoring {
     public func createProfileDirectory(id: UUID) throws -> URL {
         try prepareDirectories()
         let directory = profileHome(id: id)
-        try checkPath(directory)
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: false)
         try restrictPermissions(directory, directory: true)
         return directory
@@ -239,7 +230,6 @@ public actor AccountStore: AccountStoring {
     }
 
     public func clearActiveCredential() throws {
-        try checkPath(activeHomeURL.appending(path: "auth.json"))
         try fileManager.removeItem(at: activeHomeURL.appending(path: "auth.json"))
     }
 
@@ -254,7 +244,6 @@ public actor AccountStore: AccountStoring {
             throw AccountStoreError.targetCredentialMissing
         }
 
-        try checkPath(activeHomeURL)
         try fileManager.createDirectory(at: activeHomeURL, withIntermediateDirectories: true)
         let destination = activeHomeURL.appending(path: "auth.json")
         let bytes = try readChecked(source)
@@ -282,12 +271,9 @@ public actor AccountStore: AccountStoring {
     }
 
     private func prepareDirectories() throws {
-        try checkPath(baseURL)
-        try checkPath(profilesURL)
         if !fileManager.fileExists(atPath: baseURL.path),
            let legacyBaseURL,
            fileManager.fileExists(atPath: legacyBaseURL.path) {
-            try checkPath(legacyBaseURL)
             try fileManager.moveItem(at: legacyBaseURL, to: baseURL)
         }
         try fileManager.createDirectory(at: baseURL, withIntermediateDirectories: true)
@@ -301,39 +287,15 @@ public actor AccountStore: AccountStoring {
         try secureAtomicWrite(bytes, to: destination)
     }
 
-    private func checkPath(_ path: URL) throws {
-        #if os(Windows)
-        let error = switcher_check_path(path.path)
-        guard error == 0 else { throw windowsError(error) }
-        #endif
-    }
-
     private func readChecked(_ path: URL) throws -> Data {
-        try checkPath(path)
-        return try Data(contentsOf: path)
+        try Data(contentsOf: path)
     }
 
     private func removeProfileDirectory(_ path: URL) throws {
-        #if os(Windows)
-        func checkTree(_ directory: URL) throws {
-            try checkPath(directory)
-            for child in try fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.isDirectoryKey]) {
-                try checkPath(child)
-                if try child.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true { try checkTree(child) }
-            }
-        }
-        try checkTree(path)
-        #endif
         try fileManager.removeItem(at: path)
     }
 
     private func secureAtomicWrite(_ bytes: Data, to destination: URL) throws {
-        #if os(Windows)
-        let error = bytes.withUnsafeBytes { buffer in
-            switcher_atomic_write(destination.path, buffer.baseAddress, buffer.count)
-        }
-        guard error == 0 else { throw windowsError(error) }
-        #else
         let temporary = destination
             .deletingLastPathComponent()
             .appending(path: "\(destination.lastPathComponent).switcher-\(UUID().uuidString).tmp")
@@ -371,29 +333,15 @@ public actor AccountStore: AccountStoring {
             try? fileManager.removeItem(at: temporary)
             throw error
         }
-        #endif
     }
 
     private func restrictPermissions(_ path: URL, directory: Bool) throws {
-        #if os(Windows)
-        let error = switcher_restrict_path(path.path, directory ? 1 : 0)
-        guard error == 0 else { throw windowsError(error) }
-        #else
         try fileManager.setAttributes([.posixPermissions: directory ? 0o700 : 0o600], ofItemAtPath: path.path)
-        #endif
     }
 
-    #if os(Windows)
-    private func windowsError(_ code: UInt32) -> NSError {
-        NSError(domain: "CodexAccountSwitcher.Windows", code: Int(code), userInfo: [
-            NSLocalizedDescriptionKey: "Windows could not access private account storage (error \(code)).",
-        ])
-    }
-    #else
     private func currentPOSIXError() -> POSIXError {
         POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
     }
-    #endif
 
     private func writeJSON<T: Encodable>(_ value: T, to destination: URL) throws {
         let bytes = try Self.encoder.encode(value)

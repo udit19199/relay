@@ -37,14 +37,9 @@ jobs:
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
-      - name: Check release routing and site metadata
+      - name: Check release routing and feed metadata
         run: |
           node --test scripts/tests/*.test.mjs
-          node scripts/check-site-geo.mjs
-
-  windows:
-    needs: validate
-    uses: ./.github/workflows/windows.yml
 
   macos:
     needs: validate
@@ -238,7 +233,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    needs: [validate, macos, windows]
+    needs: [validate, macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -258,8 +253,6 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             dist/Codex-Account-Switcher-macos-arm64.dmg \
             dist/Codex-Account-Switcher-macos-arm64.dmg.sha256 \
-            dist/Codex-Account-Switcher-windows-x64.exe \
-            dist/Codex-Account-Switcher-windows-x64.exe.sha256 \
             dist/appcast.xml \
             --title "$GITHUB_REF_NAME" --notes-file .github/release-notes.md \
             --draft --verify-tag

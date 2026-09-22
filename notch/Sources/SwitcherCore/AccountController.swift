@@ -38,7 +38,7 @@ open class AccountController {
     }
 
     public func text(_ key: String) -> String {
-        L10n.string(key, language: settings.language)
+        L10n.string(key)
     }
 
     public func format(_ key: String, _ argument: String) -> String {
@@ -270,15 +270,6 @@ open class AccountController {
             try await store.removeAccount(id: id)
             apply(try await store.loadRegistry())
             usageStates[id] = nil
-        } catch {
-            showError(error)
-        }
-    }
-
-    public func setLanguage(_ language: AppLanguage) async {
-        settings.language = language
-        do {
-            try await store.saveSettings(settings)
         } catch {
             showError(error)
         }

@@ -114,20 +114,19 @@ macOS 使用菜单栏界面，应用与 DMG 均已签名并通过 Apple 公证�
 
 ## 发布状态
 
-macOS 与 Windows 使用统一版本号和 **`v<版本号>`** tag。每次从同一提交重新编译、测试并打包两端，全部通过后统一发布。当前 MVP 不复用上版安装包，不启用跨次构建缓存。
+macOS 发布使用统一版本号和 **`v<版本号>`** tag。每次从同一提交重新编译、测试并打包 macOS。当前 MVP 不复用上版安装包，不启用跨次构建缓存。
 
-| 平台 | 安装包 | 更新方式 |
-| --- | --- | --- |
-| macOS | 已签名、公证的 DMG 与 SHA-256 校验文件 | Sparkle 检查、下载并安装更新 |
-| Windows | 免安装 EXE 与 SHA-256 校验文件，EXE 尚未签名 | 检查新版本并打开下载页，手动替换 EXE |
+| 安装包 | 更新方式 |
+| --- | --- |
+| 已签名、公证的 DMG 与 SHA-256 校验文件 | Sparkle 检查、下载并安装更新 |
 
-每个 Release 都提供完整的双平台下载，标题直接显示版本号，说明只记录本次改动。详见[发布管理](docs/platform-releases.md)与 [Windows 开发文档](windows/README.md)。
+每个 Release 都提供 macOS 下载，标题直接显示版本号，说明只记录本次改动。详见[发布管理](docs/platform-releases.md)。
 
 ## 开发
 
 <a href="https://github.com/liuzhao1225/codex-account-switcher/actions/workflows/release.yml"><img alt="Release workflow" src="https://github.com/liuzhao1225/codex-account-switcher/actions/workflows/release.yml/badge.svg"></a>
 
-两端共享 Swift 6.2 账号核心，分别使用 macOS SwiftUI 和 Windows WPF 原生界面。以下为 macOS 构建步骤；Windows 步骤见 [Windows 开发文档](windows/README.md)。
+共享 Swift 6.2 账号核心，在 macOS 上使用原生 SwiftUI 界面。以下为 macOS 构建步骤。
 
 ```bash
 git clone https://github.com/liuzhao1225/codex-account-switcher.git
@@ -147,18 +146,15 @@ swift test
 
 ### 自动发布
 
-从已通过测试的 main 提交推送匹配的 `v*` tag 后发布。`CITATION.cff`、Mac 打包默认版本、Codex 客户端和 `windows/Directory.Build.props` 的版本必须一致。普通 main push 只运行 CI。
+从已通过测试的 main 提交推送匹配的 `v*` tag 后发布。`CITATION.cff`、Mac 打包默认版本和 Codex 客户端的版本必须一致。普通 main push 只运行 CI。
 
-GitHub Actions 从同一个 tag 分别测试、打包两端。汇总任务等待双方成功，核对校验文件和 Mac 签名更新源，将 DMG、EXE 上传到草稿后一次公开为 Latest。macOS 保留 Developer ID 签名、Apple 公证和 Sparkle 更新。Release notes 只写本次改动。详见[发布管理](docs/platform-releases.md)。
+GitHub Actions 从同一个 tag 测试、打包 macOS。汇总任务核对校验文件和 Mac 签名更新源，将 DMG 上传到草稿后一次公开为 Latest。macOS 保留 Developer ID 签名、Apple 公证和 Sparkle 更新。Release notes 只写本次改动。详见[发布管理](docs/platform-releases.md)。
 
 ### 项目结构
 
 ```text
 Sources/CodexAccountSwitcher/   macOS 原生 SwiftUI 界面与系统适配
-Sources/SwitcherCore/           两端共享的账号状态、切换、额度、RPC 和文案
-Sources/SwitcherHost/           Windows 原生界面使用的私有 stdio 核心进程
-Sources/SwitcherPlatform/       Windows 文件权限与原子替换
-windows/                       Windows 托盘界面、系统适配、检查与打包
+Sources/SwitcherCore/           共享的账号状态、切换、额度、RPC 和文案
 Tests/                              存储、客户端、切换和登录项的 Swift 测试
 Checks/                             独立的核心行为检查
 scripts/                            本地打包和验证命令

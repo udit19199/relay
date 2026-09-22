@@ -7,6 +7,3 @@ DerivedData/
 env.txt
 .venv/
 .secrets/
-windows/**/bin/
-windows/**/obj/
-windows/artifacts/

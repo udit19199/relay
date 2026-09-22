@@ -5,7 +5,6 @@ struct AccountRow: View {
     let account: AccountProfile
     let usageState: UsageViewState
     let isActive: Bool
-    let language: AppLanguage
     let showsFiveHourUsage: Bool
     @State private var isHovering = false
 
@@ -63,11 +62,11 @@ struct AccountRow: View {
     private var usageContent: some View {
         switch usageState {
         case .idle:
-            Text("\(L10n.string("usage", language: language)) -")
+            Text("\(L10n.string("usage")) -")
                 .font(.system(size: 10.5))
                 .foregroundStyle(.secondary)
         case let .unavailable(message):
-            Text(L10n.string("usage_unavailable", language: language))
+            Text(L10n.string("usage_unavailable"))
                 .font(.system(size: 10.5))
                 .foregroundStyle(.secondary)
                 .help(message)
@@ -82,7 +81,7 @@ struct AccountRow: View {
 
     private func compactWeeklyUsageContent(_ usage: WeeklyUsage) -> some View {
         HStack(spacing: 7) {
-            Text(L10n.string("usage", language: language))
+            Text(L10n.string("usage"))
                 .font(.system(size: 10.5))
                 .foregroundStyle(.secondary)
 
@@ -95,10 +94,10 @@ struct AccountRow: View {
             }
 
             UsageBar(remainingPercent: usage.remainingPercent)
-                .accessibilityLabel(L10n.string("usage", language: language))
-                .accessibilityValue("\(usage.remainingPercent)\(L10n.string("left", language: language))")
+                .accessibilityLabel(L10n.string("usage"))
+                .accessibilityValue("\(usage.remainingPercent)\(L10n.string("left"))")
 
-            Text("\(usage.remainingPercent)\(L10n.string("left", language: language))")
+            Text("\(usage.remainingPercent)\(L10n.string("left"))")
                 .font(.system(size: 10.5).monospacedDigit())
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: true, vertical: false)
@@ -110,14 +109,14 @@ struct AccountRow: View {
             if let remaining = usage.fiveHourRemainingPercent,
                let resetsAt = usage.fiveHourResetsAt {
                 limitRow(
-                    title: L10n.string("five_hour", language: language),
+                    title: L10n.string("five_hour"),
                     remainingPercent: remaining,
                     resetsAt: resetsAt,
                     includesDate: false
                 )
             }
             limitRow(
-                title: L10n.string("weekly", language: language),
+                title: L10n.string("weekly"),
                 remainingPercent: usage.remainingPercent,
                 resetsAt: usage.resetsAt,
                 includesDate: true
@@ -140,7 +139,7 @@ struct AccountRow: View {
 
             UsageBar(remainingPercent: remainingPercent)
                 .accessibilityLabel(title)
-                .accessibilityValue("\(remainingPercent)\(L10n.string("left", language: language))")
+                .accessibilityValue("\(remainingPercent)\(L10n.string("left"))")
 
             Text("\(remainingPercent)%")
                 .font(.system(size: 10.5).monospacedDigit())
@@ -170,7 +169,7 @@ struct AccountRow: View {
         let date = includesDate
             ? resetsAt.formatted(.dateTime.month(.abbreviated).day().hour().minute())
             : resetsAt.formatted(.dateTime.hour().minute())
-        return "\(L10n.string("resets", language: language)) \(date)"
+        return "\(L10n.string("resets")) \(date)"
     }
 }
 

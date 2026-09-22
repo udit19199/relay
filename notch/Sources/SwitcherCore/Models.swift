@@ -35,38 +35,25 @@ public struct AccountRegistry: Codable, Equatable, Sendable {
     public static let empty = AccountRegistry(activeAccountID: nil, accounts: [])
 }
 
-public enum AppLanguage: String, Codable, CaseIterable, Identifiable, Sendable {
-    case system
-    case english
-    case simplifiedChinese
-
-    public var id: String { rawValue }
-}
-
 public struct AppSettings: Codable, Equatable, Sendable {
-    public var language: AppLanguage
     public var showsMenuBarPercentage: Bool
     public var showsFiveHourUsage: Bool
 
     public static let `default` = AppSettings(
-        language: .system,
         showsMenuBarPercentage: true,
         showsFiveHourUsage: false
     )
 
     public init(
-        language: AppLanguage,
         showsMenuBarPercentage: Bool = true,
         showsFiveHourUsage: Bool = false
     ) {
-        self.language = language
         self.showsMenuBarPercentage = showsMenuBarPercentage
         self.showsFiveHourUsage = showsFiveHourUsage
     }
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        language = try container.decodeIfPresent(AppLanguage.self, forKey: .language) ?? .system
         showsMenuBarPercentage = try container.decodeIfPresent(
             Bool.self,
             forKey: .showsMenuBarPercentage
@@ -182,7 +169,7 @@ public struct OperationError: LocalizedError, Equatable, Sendable {
     }
 
     public var errorDescription: String? {
-        let title = L10n.string(titleKey, language: .english)
+        let title = L10n.string(titleKey)
         if let stage {
             return "\(title) (\(stage.rawValue)): \(message)"
         }

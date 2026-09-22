@@ -365,34 +365,6 @@ public struct CodexExecutableLocator: Sendable {
         }
         let command = environment["CODEX_CLI_PATH"]?.trimmingCharacters(in: .whitespacesAndNewlines)
         let executable = command.flatMap { $0.isEmpty ? nil : $0 } ?? "codex"
-        #if os(Windows)
-        if executable.contains("/") || executable.contains("\\") {
-            guard URL(fileURLWithPath: executable).path == executable.replacingOccurrences(of: "\\", with: "/")
-                    || (executable.count > 2 && executable[executable.index(after: executable.startIndex)] == ":") else {
-                throw CodexClientError.executableNotFound
-            }
-            guard isExecutable(executable) else { throw CodexClientError.executableNotFound }
-            return URL(fileURLWithPath: executable)
-        }
-        for directory in (environment["Path"] ?? environment["PATH"] ?? "").split(separator: ";") {
-            let candidate = URL(fileURLWithPath: String(directory)).appendingPathComponent(
-                executable.lowercased().hasSuffix(".exe") ? executable : executable + ".exe")
-            if isExecutable(candidate.path) { return candidate }
-        }
-        if let local = environment["LOCALAPPDATA"] {
-            let bin = URL(fileURLWithPath: local).appendingPathComponent("OpenAI/Codex/bin")
-            let versions = (try? FileManager.default.contentsOfDirectory(at: bin,
-                includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
-            for version in versions.sorted(by: {
-                let left = (try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
-                let right = (try? $1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
-                return left > right
-            }) {
-                let candidate = version.appendingPathComponent("codex.exe")
-                if isExecutable(candidate.path) { return candidate }
-            }
-        }
-        #else
         if executable.contains("/") {
             guard executable.hasPrefix("/"), isExecutable(executable) else {
                 throw CodexClientError.processLaunchFailed("CODEX_CLI_PATH is not executable: \(executable)")
@@ -407,7 +379,6 @@ public struct CodexExecutableLocator: Sendable {
         {
             return URL(fileURLWithPath: path)
         }
-        #endif
         throw CodexClientError.executableNotFound
     }
 
@@ -415,7 +386,6 @@ public struct CodexExecutableLocator: Sendable {
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) throws -> (executable: URL, environment: [String: String]) {
         var environment = environment
-        #if !os(Windows)
         if explicitURL == nil {
             // GUI apps do not inherit the terminal's login PATH. Read the same shell settings
             // Desktop uses, and pass that PATH to npm's `#!/usr/bin/env node` launcher as well.
@@ -438,18 +408,11 @@ public struct CodexExecutableLocator: Sendable {
             environment["PATH"] = String(fields[fields.count - 3])
             environment["CODEX_CLI_PATH"] = String(fields[fields.count - 2])
         }
-        #endif
         return (try locate(environment: environment), environment)
     }
 
     private func isExecutable(_ path: String) -> Bool {
-        #if os(Windows)
-        var isDirectory: ObjCBool = false
-        return path.lowercased().hasSuffix(".exe")
-            && FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) && !isDirectory.boolValue
-        #else
         FileManager.default.isExecutableFile(atPath: path)
-        #endif
     }
 }
 

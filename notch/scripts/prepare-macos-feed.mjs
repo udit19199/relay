@@ -29,7 +29,7 @@ export function validateMacFeed(xml, tag) {
   }
 }
 
-export async function prepareMacFeed(fetcher = fetch, output = 'site/updates/macos/appcast.xml') {
+export async function prepareMacFeed(fetcher = fetch, output = '.build/artifacts/appcast.xml') {
   const releases = [];
   for (let page = 1; ; page++) {
     const response = await fetcher(`https://api.github.com/repos/${repository}/releases?per_page=100&page=${page}`, {

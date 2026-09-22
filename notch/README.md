@@ -114,20 +114,19 @@ Comparisons with other account switchers are welcome. Please describe the workfl
 
 ## Release status
 
-macOS and Windows share one version and **`v<version>`** tag. Every release rebuilds, tests, and packages both platforms from the same commit, then publishes once both pass. The current MVP reuses neither older packages nor build caches across runs.
+macOS releases use one version and **`v<version>`** tag. Every release rebuilds, tests, and packages macOS from the same commit. The current MVP reuses neither older packages nor build caches across runs.
 
-| Platform | Package | Updates |
-| --- | --- | --- |
-| macOS | Signed, notarized DMG and SHA-256 checksum | Sparkle checks, downloads, and installs updates |
-| Windows | Portable EXE and SHA-256 checksum; EXE currently unsigned | Checks for a new version and opens its download page for manual replacement |
+| Package | Updates |
+| --- | --- |
+| Signed, notarized DMG and SHA-256 checksum | Sparkle checks, downloads, and installs updates |
 
-Every Release includes both platform downloads, uses the version as its title, and lists only changes in its notes. See [release management](docs/platform-releases.md) and [Windows development](windows/README.md).
+Every Release includes the macOS download, uses the version as its title, and lists only changes in its notes. See [release management](docs/platform-releases.md).
 
 ## Development
 
 <a href="https://github.com/liuzhao1225/codex-account-switcher/actions/workflows/release.yml"><img alt="Release workflow" src="https://github.com/liuzhao1225/codex-account-switcher/actions/workflows/release.yml/badge.svg"></a>
 
-Both apps share a Swift 6.2 account core, with native SwiftUI on macOS and WPF on Windows. The commands below build macOS; see [Windows development](windows/README.md) for Windows.
+The app shares a Swift 6.2 account core with a native SwiftUI interface on macOS. The commands below build macOS.
 
 ```bash
 git clone https://github.com/liuzhao1225/codex-account-switcher.git
@@ -147,18 +146,15 @@ The bundle is written to `.build/release/Codex Account Switcher.app`.
 
 ### Automated releases
 
-Push a matching `v*` tag from a tested main commit to publish. The version in `CITATION.cff`, the Mac packaging default, the Codex client, and `windows/Directory.Build.props` must agree. Ordinary main pushes run CI only.
+Push a matching `v*` tag from a tested main commit to publish. The version in `CITATION.cff`, the Mac packaging default, and the Codex client must agree. Ordinary main pushes run CI only.
 
-GitHub Actions tests and packages both platforms from the same tag. The publish job waits for both, verifies checksums and the signed Mac feed, uploads the DMG and EXE to a draft, then publishes one Latest release. macOS retains Developer ID signing, Apple notarization and Sparkle updates. Release notes list only changes. See [release management](docs/platform-releases.md).
+GitHub Actions tests and packages macOS from the same tag. The publish job verifies checksums and the signed Mac feed, uploads the DMG to a draft, then publishes one Latest release. macOS retains Developer ID signing, Apple notarization and Sparkle updates. Release notes list only changes. See [release management](docs/platform-releases.md).
 
 ### Project map
 
 ```text
 Sources/CodexAccountSwitcher/   Native macOS SwiftUI app and system adapters
 Sources/SwitcherCore/           Shared account state, switching, usage, RPC and localization
-Sources/SwitcherHost/           Private stdio host for the Windows native client
-Sources/SwitcherPlatform/       Windows filesystem permissions and atomic replacement
-windows/                       Native Windows tray UI, adapters, checks and packaging
 Tests/                              Swift tests for storage, client, switching, and login items
 Checks/                             Standalone core behavior checks
 scripts/                            Local packaging and verification commands

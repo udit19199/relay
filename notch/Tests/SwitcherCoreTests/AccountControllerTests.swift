@@ -102,11 +102,9 @@ struct AccountControllerTests {
         let fixture = try ControllerFixture()
         defer { fixture.clean() }
         await fixture.model.start()
-        await fixture.model.setLanguage(.simplifiedChinese)
         await fixture.model.setShowsMenuBarPercentage(false)
         await fixture.model.setShowsFiveHourUsage(true)
         let saved = try await fixture.store.loadSettings()
-        #expect(saved.language == .simplifiedChinese)
         #expect(!saved.showsMenuBarPercentage)
         #expect(saved.showsFiveHourUsage)
     }

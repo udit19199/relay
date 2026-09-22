@@ -49,19 +49,6 @@ struct SettingsView: View {
                 ))
             }
             rowDivider
-            settingRow("language") {
-                Picker(model.text("language"), selection: Binding(
-                    get: { model.settings.language },
-                    set: { language in Task { await model.setLanguage(language) } }
-                )) {
-                    Text(model.text("system_default")).tag(AppLanguage.system)
-                    Text(model.text("english")).tag(AppLanguage.english)
-                    Text(model.text("simplified_chinese")).tag(AppLanguage.simplifiedChinese)
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .fixedSize()
-            }
 
             sectionLabel("settings_updates")
             settingRow("automatically_check_updates") {

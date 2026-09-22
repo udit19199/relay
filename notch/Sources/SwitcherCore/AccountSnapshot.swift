@@ -32,7 +32,7 @@ extension AccountController {
             isMutating: isMutating, isAddingAccount: isAddingAccount,
             activeIdentityConfirmed: activeIdentityConfirmed,
             error: visibleError.map { $0.messageKey.map(text) ?? $0.message },
-            strings: L10n.allStrings(language: settings.language)
+            strings: L10n.allStrings()
         )
     }
 }

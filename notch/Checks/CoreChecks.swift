@@ -148,12 +148,8 @@ struct CoreChecks {
             "four-hour and six-hour windows are not five-hour usage"
         )
         try require(
-            L10n.string("show_five_hour_usage", language: .english) == "Show 5-hour Usage",
+            L10n.string("show_five_hour_usage") == "Show 5-hour Usage",
             "English five-hour setting label"
-        )
-        try require(
-            L10n.string("show_five_hour_usage", language: .simplifiedChinese) == "显示 5 小时用量",
-            "Simplified Chinese five-hour setting label"
         )
 
         let fileManager = FileManager.default
@@ -224,9 +220,8 @@ struct CoreChecks {
         )
 
         let settingsURL = support.appending(path: "settings.json")
-        try Data(#"{"language":"english"}"#.utf8).write(to: settingsURL)
+        try Data(#"{"language":"english","showsMenuBarPercentage":true}"#.utf8).write(to: settingsURL)
         let legacySettings = try await store.loadSettings()
-        try require(legacySettings.language == .english, "legacy settings language")
         try require(
             legacySettings.showsMenuBarPercentage,
             "legacy settings enable menu bar percentage"
@@ -236,7 +231,6 @@ struct CoreChecks {
             "legacy settings hide five-hour usage"
         )
         let hiddenPercentageSettings = AppSettings(
-            language: .simplifiedChinese,
             showsMenuBarPercentage: false,
             showsFiveHourUsage: true
         )
