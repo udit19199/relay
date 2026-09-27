@@ -108,7 +108,6 @@ Sources/CodexAccountSwitcher/
 └── DesktopController.swift
 
 Tests/CodexAccountSwitcherTests/
-Checks/CoreChecks.swift
 ```
 
 Avoid adding protocol layers until a second implementation actually exists. Small concrete types are preferable for the MVP.

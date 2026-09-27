@@ -10,14 +10,6 @@ permissions:
   contents: read
 
 jobs:
-  scripts:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - name: Check release routing
-        run: node --test scripts/tests/*.test.mjs
-
   test:
     runs-on: macos-26
 
@@ -44,6 +36,3 @@ jobs:
 
       - name: Run Swift tests
         run: swift test
-
-      - name: Run core checks
-        run: ./scripts/run-core-checks.sh

@@ -6,7 +6,7 @@ public struct AccountProfile: Codable, Identifiable, Equatable, Hashable, Sendab
     public let id: UUID
     public var displayName: String
     public let email: String?
-    public let accountID: String?
+    public var accountID: String?
     public let createdAt: Date
     public var lastUsedAt: Date?
 
@@ -138,8 +138,14 @@ public struct AccountIdentity: Equatable, Sendable {
 
     public func matches(_ profile: AccountProfile) -> Bool {
         if let expected = profile.accountID, let actual = accountID {
-            return expected == actual
+            guard expected == actual else { return false }
+            if let expectedEmail = profile.email, let actualEmail = email {
+                return expectedEmail.caseInsensitiveCompare(actualEmail) == .orderedSame
+            }
+            return true
         }
+        // Known workspace IDs must never merge with an email-only profile.
+        guard profile.accountID == nil, accountID == nil else { return false }
         if let expected = profile.email, let actual = email {
             return expected.caseInsensitiveCompare(actual) == .orderedSame
         }
@@ -195,6 +201,7 @@ public enum AccountStoreError: LocalizedError, Equatable, Sendable {
     case targetCredentialMissing
     case duplicateAccount
     case cannotRemoveActiveAccount
+    case accountLimitReached
 
     public var errorDescription: String? {
         switch self {
@@ -212,6 +219,8 @@ public enum AccountStoreError: LocalizedError, Equatable, Sendable {
             "This account is already saved. Select the existing account instead."
         case .cannotRemoveActiveAccount:
             "The active account cannot be removed."
+        case .accountLimitReached:
+            "Only two accounts are supported. Remove one before adding another."
         }
     }
 }

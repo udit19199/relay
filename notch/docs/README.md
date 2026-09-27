@@ -1,19 +1,14 @@
 # Documentation
 
-- [Official project identity and primary sources](project-identity.md)
-
-This directory defines the MVP for Codex Account Switcher.
+Personal fork notes. Public release, website, and auto-update docs were removed.
 
 ## Documents
 
 | Document | Purpose |
 | --- | --- |
-| [Product positioning and messaging](positioning-and-messaging.md) | Shared audience, promise, proof, SEO terms, and claim boundaries |
-| [SEO and GEO maintenance](seo-geo.md) | Page intent, crawler policy, structured-data consistency checks and measurement |
 | [Product decisions](product-decisions.md) | Binding product and architecture decisions |
 | [Product requirements](product-requirements.md) | User-visible behavior and acceptance criteria |
 | [System design](system-design.md) | Components, storage, flows, interfaces, and failure behavior |
-| [Implementation plan](implementation-plan.md) | Concrete milestones and suggested source layout |
 | [Testing](testing.md) | Small, failure-oriented MVP test plan |
 
 ## Product definition
@@ -43,7 +38,3 @@ Preflight
 ```
 
 The sequence is deliberately linear. Every step either succeeds or returns an error. Verification and registry-commit failures after activation restore the validated original profile credential; the implementation does not add a general recovery state machine around the switch.
-
-## Platform releases
-
-- [macOS versions and tags](platform-releases.md)

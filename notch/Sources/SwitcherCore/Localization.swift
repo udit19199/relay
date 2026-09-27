@@ -12,15 +12,6 @@ public enum L10n {
 
     private static let strings: [String: String] = [
             "settings_general": "General",
-            "settings_updates": "Software Update",
-            "update_available": "Version %@ available",
-            "update_action": "Update…",
-            "update_installing": "Installing…",
-            "current_version": "Version %@",
-            "check_for_updates": "Check for Updates",
-            "automatically_check_updates": "Check for updates automatically",
-            "update_check_hint": "Checks hourly. A blue dot indicates a new version.",
-            "update_check_failed": "Update check failed.",
             "usage": "Usage",
             "five_hour": "5h",
             "weekly": "7d",

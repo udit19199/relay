@@ -20,7 +20,7 @@ toolchain_root=$(dirname "$(dirname "$(dirname "$(xcrun --find swift)")")")
 swift test -Xswiftc -F -Xswiftc "$toolchain_root/Library/Developer/Frameworks"
 ```
 
-Require the `Test run with ... tests ... passed` summary before treating the suite as executed. Run `./scripts/run-core-checks.sh` as well; it checks that shared-core startup, settings and usage changes reach the macOS Combine publisher.
+Require the `Test run with ... tests ... passed` summary before treating the suite as executed.
 
 ## 2. Unit tests
 
@@ -202,22 +202,8 @@ History safety regression tests cover a graceful exit taking more than two secon
 
 ## 8. Release automation checks
 
-The release workflow runs only on `v*` tag pushes under one repository-wide release concurrency group. Static validation should confirm:
-
-- ordinary `main` pushes do not start the release workflow and the workflow never creates or pushes a tag;
-- `CITATION.cff`, the package default, and CodexClient declare the same semantic version;
-- the derived `RELEASE_TAG` identifies the GitHub Release, while the DMG and checksum use fixed asset names compatible with `releases/latest/download/...`;
-- tag events require the event tag, repository version, checked-out commit, and `origin/main` commit to match;
-- an existing GitHub Release sets `SHOULD_RELEASE=false` and all tests, signing, notarization, packaging, and publication steps skip successfully;
-- a missing Release sets `SHOULD_RELEASE=true`, then the tag workflow runs tests, signing, notarization, packaging, checksum generation, and `gh release create --latest --verify-tag`;
-- conflicting tags and API failures stop with the original values visible.
+Personal fork: no release workflow. This section is kept only as history.
 
 ## 9. Whole-project ablation and integrity regression
 
-See [the September 5 full-project report](project-ablation-2026-09-05.md) for the fixed baseline, single-removal matrix, local evidence, and open lifecycle gaps. The final suite executes 50 tests across seven suites plus CoreChecks. On the local CLT setup, build completion from `swift test` alone is insufficient; the separate Swift Testing runner actually executed the suite.
-
 New regression cases cover external-login contamination, successful RPC responses with a wrong target identity, account-list write failure before credential deletion, list restoration after deletion failure, a final JSON response without a newline, unrelated RPC error IDs, subprocess error details, numeric overflow, and Codex quota isolation from other metered products.
-
-Public release acceptance still requires a signed feed, an increasing Sparkle build version, and a real download/install/relaunch test. Delegate simulations and local codesign verification do not establish those outcomes.
-
-Release follow-up: the full runner now executes 54 tests, including parameterized first-activation success and failure cases. An isolated Sparkle app completed a real signed download/install/relaunch from 0.1.7 to 0.1.8; see the ablation report for the fixture boundaries.

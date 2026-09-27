@@ -107,7 +107,7 @@ struct ManageAccountsView: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .disabled(model.isMutating)
+                    .disabled(model.isMutating || model.accounts.count >= 2)
                 }
 
                 Button {

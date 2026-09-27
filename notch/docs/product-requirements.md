@@ -336,11 +336,9 @@ The MVP is accepted when:
 20. launch-at-login registration reflects the current macOS Login Item status and exposes approval requirements directly;
 21. only `main` is required for the repository's steady state.
 
-## 13. Switcher updates (September 5 development candidate)
+## 13. Switcher updates
 
-Sparkle checks hourly, with a manual check and automatic-check toggle in Settings. A blue menu-bar dot and a version/action row between the account list and footer indicate availability. Background checks remain quiet. Installation is initiated by the user and uses Sparkle download, validation, installation, and Switcher relaunch. Final relaunch waits until an account operation completes. Codex Desktop is outside this updater’s target scope.
-
-The tag workflow publishes the signed feed. See the ablation reports and release evidence for verification boundaries.
+Personal fork: no auto-update. Updates are `git pull` plus a local build.
 
 ## 14. First activation and external sign-in
 

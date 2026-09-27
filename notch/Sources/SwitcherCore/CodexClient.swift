@@ -352,11 +352,25 @@ private actor JSONRPCSession {
     }
 }
 
+private final class ShellPathCache: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: (path: String, cliPath: String)?
+    func get() -> (path: String, cliPath: String)? { lock.lock(); defer { lock.unlock() }; return value }
+    func set(path: String, cliPath: String) { lock.lock(); defer { lock.unlock() }; value = (path, cliPath) }
+    func clear() { lock.lock(); defer { lock.unlock() }; value = nil }
+}
+
 public struct CodexExecutableLocator: Sendable {
     public let explicitURL: URL?
+    private let desktopApplicationURLs: [URL]
+    private let shellCache = ShellPathCache()
 
-    public init(explicitURL: URL? = nil) {
+    public init(explicitURL: URL? = nil, desktopApplicationURLs: [URL] = [
+        URL(fileURLWithPath: "/Applications/ChatGPT.app"),
+        URL(fileURLWithPath: "/Applications/Codex.app"),
+    ]) {
         self.explicitURL = explicitURL
+        self.desktopApplicationURLs = desktopApplicationURLs
     }
 
     public func locate(environment: [String: String] = ProcessInfo.processInfo.environment) throws -> URL {
@@ -379,6 +393,17 @@ public struct CodexExecutableLocator: Sendable {
         {
             return URL(fileURLWithPath: path)
         }
+        if command == nil || command == "" {
+            for applicationURL in desktopApplicationURLs {
+                for relativePath in [
+                    "Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+                    "Contents/Resources/codex",
+                ] {
+                    let bundledCLI = applicationURL.appendingPathComponent(relativePath)
+                    if isExecutable(bundledCLI.path) { return bundledCLI }
+                }
+            }
+        }
         throw CodexClientError.executableNotFound
     }
 
@@ -386,7 +411,7 @@ public struct CodexExecutableLocator: Sendable {
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) throws -> (executable: URL, environment: [String: String]) {
         var environment = environment
-        if explicitURL == nil {
+        if explicitURL == nil, shellCache.get() == nil {
             // GUI apps do not inherit the terminal's login PATH. Read the same shell settings
             // Desktop uses, and pass that PATH to npm's `#!/usr/bin/env node` launcher as well.
             let shell = Process()
@@ -405,10 +430,22 @@ public struct CodexExecutableLocator: Sendable {
             guard shell.terminationStatus == 0, fields.count >= 4 else {
                 throw CodexClientError.processLaunchFailed("Could not read the login shell's Codex path.")
             }
-            environment["PATH"] = String(fields[fields.count - 3])
-            environment["CODEX_CLI_PATH"] = String(fields[fields.count - 2])
+            let resolvedPATH = String(fields[fields.count - 3])
+            let resolvedCLIPath = String(fields[fields.count - 2])
+            environment["PATH"] = resolvedPATH
+            environment["CODEX_CLI_PATH"] = resolvedCLIPath
+            shellCache.set(path: resolvedPATH, cliPath: resolvedCLIPath)
         }
-        return (try locate(environment: environment), environment)
+        if explicitURL == nil, let cached = shellCache.get() {
+            environment["PATH"] = cached.path
+            environment["CODEX_CLI_PATH"] = cached.cliPath
+        }
+        do {
+            return (try locate(environment: environment), environment)
+        } catch {
+            shellCache.clear()
+            throw error
+        }
     }
 
     private func isExecutable(_ path: String) -> Bool {
@@ -428,7 +465,7 @@ public struct CodexClient: AccountClient {
     private let openBrowser: @Sendable (URL) async throws -> Void
 
     public init(locator: CodexExecutableLocator = .init(), requestTimeout: Duration = .seconds(20),
-                clientVersion: String = "0.1.14",
+                clientVersion: String = "0.1.16",
                 openBrowser: @escaping @Sendable (URL) async throws -> Void = CodexClient.defaultOpenBrowser) {
         self.locator = locator
         self.requestTimeout = requestTimeout
@@ -455,7 +492,7 @@ public struct CodexClient: AccountClient {
                 timeout: requestTimeout
             )
         }
-        return try parseIdentity(result)
+        return try parseIdentity(result, profileHome: profileHome)
     }
 
     public func readWeeklyUsage(profileHome: URL) async throws -> WeeklyUsage {
@@ -507,7 +544,7 @@ public struct CodexClient: AccountClient {
                     params: ["refreshToken": false],
                     timeout: requestTimeout
                 )
-                let identity = try parseIdentity(identityValue)
+                let identity = try parseIdentity(identityValue, profileHome: profileHome)
                 await session.stop()
                 return identity
             } catch {
@@ -526,26 +563,40 @@ public struct CodexClient: AccountClient {
     ) async throws -> T {
         let launch = try locator.launchConfiguration()
         let session = try JSONRPCSession(executableURL: launch.executable, profileHome: profileHome, environment: launch.environment)
-        do {
-            try await session.initialize(timeout: requestTimeout, clientVersion: clientVersion)
-            let result = try await operation(session)
-            await session.stop()
-            return result
-        } catch {
-            await session.stop()
-            throw error
+        return try await withTaskCancellationHandler {
+            do {
+                try Task.checkCancellation()
+                try await session.initialize(timeout: requestTimeout, clientVersion: clientVersion)
+                let result = try await operation(session)
+                await session.stop()
+                try Task.checkCancellation()
+                return result
+            } catch {
+                await session.stop()
+                if Task.isCancelled { throw CancellationError() }
+                throw error
+            }
+        } onCancel: {
+            Task { await session.stop() }
         }
     }
 
-    private func parseIdentity(_ value: JSONValue) throws -> AccountIdentity {
+    private func parseIdentity(_ value: JSONValue, profileHome: URL) throws -> AccountIdentity {
         guard let account = value["account"]?.objectValue else {
             throw CodexClientError.identityUnavailable
         }
-        let accountID = account["accountId"]?.stringValue
+        var accountID = account["accountId"]?.stringValue
             ?? account["accountID"]?.stringValue
             ?? account["chatgptAccountId"]?.stringValue
             ?? account["id"]?.stringValue
         let email = account["email"]?.stringValue
+        if accountID == nil, let credential = try CredentialIdentity.read(from: profileHome) {
+            if let email, let credentialEmail = credential.email,
+               email.caseInsensitiveCompare(credentialEmail) != .orderedSame {
+                throw CodexClientError.identityUnavailable
+            }
+            accountID = credential.accountID
+        }
         guard accountID != nil || email != nil else {
             throw CodexClientError.identityUnavailable
         }
