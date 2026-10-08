@@ -98,17 +98,6 @@ struct AccountControllerTests {
         #expect(try await fixture.store.loadUsageCache().entries.first?.usage.remainingPercent == 72)
     }
 
-    @Test func settingsAreSavedImmediately() async throws {
-        let fixture = try ControllerFixture()
-        defer { fixture.clean() }
-        await fixture.model.start()
-        await fixture.model.setShowsMenuBarPercentage(false)
-        await fixture.model.setShowsFiveHourUsage(true)
-        let saved = try await fixture.store.loadSettings()
-        #expect(!saved.showsMenuBarPercentage)
-        #expect(saved.showsFiveHourUsage)
-    }
-
     @Test func activeProfileCannotBeRemoved() async throws {
         let fixture = try ControllerFixture()
         defer { fixture.clean() }

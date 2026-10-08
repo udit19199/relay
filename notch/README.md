@@ -10,12 +10,11 @@ Menu-bar app to switch Codex accounts on this Mac. Personal use only. No auto-up
 
 Saved accounts stay on this Mac in `~/Library/Application Support/Codex Account Switcher/`.
 
-## Settings kept
+## Behavior
 
-- Start at login.
-- Show percent in menu bar.
-- Show 5-hour use.
-- Background use refresh.
+- Percent in menu bar: always on.
+- 5-hour use line: always on.
+- Use refresh runs in the background.
 
 ## Build
 

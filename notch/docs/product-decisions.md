@@ -106,7 +106,6 @@ The MVP uses ordinary local files with user-only permissions.
 
 - Codex active credential: `~/.codex/auth.json`
 - Switcher registry: `~/Library/Application Support/Codex Account Switcher/accounts.json`
-- Switcher settings: `~/Library/Application Support/Codex Account Switcher/settings.json`
 - Usage cache: `~/Library/Application Support/Codex Account Switcher/usage-cache.json`
 - Saved account credential: `~/Library/Application Support/Codex Account Switcher/accounts/<profile-id>/auth.json`
 
@@ -126,18 +125,11 @@ Removing an account deletes only the switcher's local profile directory and meta
 
 Removal uses an in-popover confirmation page. Cancel and Back return to the account list, keep the popover open, and perform no deletion.
 
-## 8. Settings
+## 8. Main screen
 
-Settings contains:
+The main screen has no settings page. The menu-bar percentage and the 5-hour usage line are always on.
 
-- `Launch at Login`: register or unregister the main app through macOS Service Management;
-- `Show Percentage in Menu Bar`: show or hide the active account's remaining percentage;
-- `Show 5-hour Usage`: show or hide the optional 5-hour line in account rows;
-- `Language`: `System Default`, `English`, `简体中文`.
-
-`Show 5-hour Usage` defaults to off and persists immediately in `settings.json`. It affects account rows only. The menu-bar percentage remains the active account's weekly percentage.
-
-The launch-at-login control reads the current macOS Login Item status directly. It does not duplicate that state in `settings.json`. A registered item that requires approval shows a direct link to the Login Items section in System Settings.
+The app does not register a macOS Login Item and cannot start itself at login. Users who want it to launch automatically add it themselves in System Settings → General → Login Items.
 
 The following controls are intentionally absent:
 

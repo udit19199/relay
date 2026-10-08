@@ -82,7 +82,6 @@ targets += [
         resources: [.process("Resources")],
         linkerSettings: [
             .linkedFramework("AppKit"),
-            .linkedFramework("ServiceManagement"),
         ]
     ),
     .testTarget(name: "CodexAccountSwitcherTests", dependencies: ["CodexAccountSwitcher", "SwitcherCore"],

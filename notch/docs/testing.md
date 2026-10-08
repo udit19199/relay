@@ -51,7 +51,6 @@ Test:
 - delete inactive profile;
 - reject deleting active profile;
 - persist normalized Usage with mode `0600`;
-- load old settings without `showsFiveHourUsage` as false and persist later changes;
 - remove cached Usage with its inactive profile;
 - surface read, write, atomic replacement, and delete errors.
 
@@ -138,8 +137,8 @@ Verify:
 - footer contains equal-width Manage Accounts, Settings, and Quit actions;
 - Manage Accounts and Settings navigate inside the popover;
 - reopening after closing a secondary page starts on the account list;
-- Settings contains Launch at Login, Show Percentage in Menu Bar, Show 5-hour Usage, and Language in that order;
-- Login Item status maps `notRegistered`, `enabled`, `requiresApproval`, and `notFound` to disabled, enabled, approval-required, and unavailable UI states;
+- Settings contains Show Percentage in Menu Bar, Show 5-hour Usage, and Language in that order;
+- no Login Item registration is created by the app;
 - all three Settings toggles expose localized accessibility labels;
 - switch confirmation describes Desktop and CLI consequences;
 - canceling switch or removal keeps the popover open and performs no mutation;
@@ -151,14 +150,6 @@ Verify:
 - the menu-bar percentage remains weekly when 5-hour display is enabled.
 
 ## 6. Manual test matrix
-
-With the packaged application:
-
-1. open Settings and enable Launch at Login;
-2. confirm `sfltool dumpbtm` contains `com.liuzhao.codex-account-switcher`;
-3. if macOS reports approval required, use the displayed System Settings link, approve the item, and confirm the Toggle becomes enabled after reopening Settings;
-4. quit the app, sign out and back in, and confirm the menu-bar item appears automatically;
-5. disable Launch at Login and confirm the system registration is removed.
 
 With two real test accounts:
 
@@ -194,7 +185,7 @@ no general rollback state machine
 no credential backup file
 no transaction journal
 no Keychain implementation
-launch-at-login state comes from macOS Service Management
+no login-item or launch-at-login support
 no account-rename UI or model operation
 ```
 

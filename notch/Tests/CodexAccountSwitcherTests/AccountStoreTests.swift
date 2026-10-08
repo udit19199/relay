@@ -346,34 +346,6 @@ struct AccountStoreTests {
         #expect(try permissions(fixture.support.appending(path: "usage-cache.json")) == 0o600)
     }
 
-    @Test func persistsSettingsAndLoadsLegacyDefaults() async throws {
-        let fixture = try StoreFixture()
-        defer { fixture.remove() }
-        try FileManager.default.createDirectory(
-            at: fixture.support,
-            withIntermediateDirectories: true
-        )
-        let settingsURL = fixture.support.appending(path: "settings.json")
-        try Data(#"{"language":"english","showsMenuBarPercentage":true}"#.utf8).write(to: settingsURL)
-
-        let legacySettings = try await fixture.store.loadSettings()
-        #expect(legacySettings.showsMenuBarPercentage)
-        #expect(!legacySettings.showsFiveHourUsage)
-        #expect(!AppSettings.default.showsFiveHourUsage)
-
-        let updatedSettings = AppSettings(
-            showsMenuBarPercentage: false,
-            showsFiveHourUsage: true
-        )
-        try await fixture.store.saveSettings(updatedSettings)
-        let reloadedStore = AccountStore(
-            baseURL: fixture.support,
-            activeHomeURL: fixture.activeHome
-        )
-        #expect(try await reloadedStore.loadSettings() == updatedSettings)
-        #expect(try permissions(settingsURL) == 0o600)
-    }
-
     @Test func decodesLegacyWeeklyOnlyUsageCache() async throws {
         let fixture = try StoreFixture()
         defer { fixture.remove() }

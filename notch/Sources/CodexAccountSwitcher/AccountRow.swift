@@ -5,7 +5,6 @@ struct AccountRow: View {
     let account: AccountProfile
     let usageState: UsageViewState
     let isActive: Bool
-    let showsFiveHourUsage: Bool
     @State private var isHovering = false
 
     private var accountTitle: String {
@@ -27,13 +26,7 @@ struct AccountRow: View {
                         .truncationMode(.tail)
                         .help(accountTitle)
                     Spacer(minLength: 4)
-                    if let usage = usageState.displayedUsage, !showsFiveHourUsage {
-                        Text(resetText(for: usage))
-                            .font(.system(size: 10.5))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .fixedSize(horizontal: true, vertical: false)
-                    } else if let message = usageState.refreshError {
+                    if let message = usageState.refreshError {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .font(.system(size: 9))
                             .foregroundStyle(.orange)
@@ -71,36 +64,7 @@ struct AccountRow: View {
                 .foregroundStyle(.secondary)
                 .help(message)
         case let .loaded(usage), let .stale(usage, _):
-            if showsFiveHourUsage {
-                expandedUsageContent(usage)
-            } else {
-                compactWeeklyUsageContent(usage)
-            }
-        }
-    }
-
-    private func compactWeeklyUsageContent(_ usage: WeeklyUsage) -> some View {
-        HStack(spacing: 7) {
-            Text(L10n.string("usage"))
-                .font(.system(size: 10.5))
-                .foregroundStyle(.secondary)
-
-            if let message = usageState.refreshError {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.orange)
-                    .help(message)
-                    .accessibilityLabel(message)
-            }
-
-            UsageBar(remainingPercent: usage.remainingPercent)
-                .accessibilityLabel(L10n.string("usage"))
-                .accessibilityValue("\(usage.remainingPercent)\(L10n.string("left"))")
-
-            Text("\(usage.remainingPercent)\(L10n.string("left"))")
-                .font(.system(size: 10.5).monospacedDigit())
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: true, vertical: false)
+            expandedUsageContent(usage)
         }
     }
 
@@ -159,10 +123,6 @@ struct AccountRow: View {
             return Color.accentColor.opacity(0.10)
         }
         return Color.primary.opacity(isHovering ? 0.055 : 0)
-    }
-
-    private func resetText(for usage: WeeklyUsage) -> String {
-        resetText(for: usage.resetsAt, includesDate: true)
     }
 
     private func resetText(for resetsAt: Date, includesDate: Bool) -> String {

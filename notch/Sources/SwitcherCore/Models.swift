@@ -35,36 +35,6 @@ public struct AccountRegistry: Codable, Equatable, Sendable {
     public static let empty = AccountRegistry(activeAccountID: nil, accounts: [])
 }
 
-public struct AppSettings: Codable, Equatable, Sendable {
-    public var showsMenuBarPercentage: Bool
-    public var showsFiveHourUsage: Bool
-
-    public static let `default` = AppSettings(
-        showsMenuBarPercentage: true,
-        showsFiveHourUsage: false
-    )
-
-    public init(
-        showsMenuBarPercentage: Bool = true,
-        showsFiveHourUsage: Bool = false
-    ) {
-        self.showsMenuBarPercentage = showsMenuBarPercentage
-        self.showsFiveHourUsage = showsFiveHourUsage
-    }
-
-    public init(from decoder: any Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        showsMenuBarPercentage = try container.decodeIfPresent(
-            Bool.self,
-            forKey: .showsMenuBarPercentage
-        ) ?? true
-        showsFiveHourUsage = try container.decodeIfPresent(
-            Bool.self,
-            forKey: .showsFiveHourUsage
-        ) ?? false
-    }
-}
-
 public struct WeeklyUsage: Codable, Equatable, Sendable {
     public let remainingPercent: Int
     public let resetsAt: Date

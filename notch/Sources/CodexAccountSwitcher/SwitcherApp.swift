@@ -12,8 +12,7 @@ struct SwitcherApp: App {
         } label: {
             HStack(spacing: 4) {
                 MenuBarLogo()
-                if model.settings.showsMenuBarPercentage,
-                   let remainingPercent = model.activeRemainingPercent {
+                if let remainingPercent = model.activeRemainingPercent {
                     Text("\(remainingPercent)%")
                         .monospacedDigit()
                 }
@@ -31,8 +30,7 @@ struct SwitcherApp: App {
     }
 
     private var menuBarAccessibilityLabel: String {
-        guard model.settings.showsMenuBarPercentage,
-              let remainingPercent = model.activeRemainingPercent
+        guard let remainingPercent = model.activeRemainingPercent
         else {
             return "Codex Account Switcher"
         }

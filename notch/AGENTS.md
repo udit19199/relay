@@ -7,6 +7,7 @@ Mac-only build for one user. Keep it trimmed on every upstream pull.
 - No auto-update: no Sparkle dependency, no `AppUpdater`, no update UI, no feed or signing scripts.
 - No release automation: no `release.yml`, no tag/artifact/feed check scripts.
 - No public docs or promo assets: short README, `docs/` stays at index, requirements, design, testing, decisions.
+- No settings page: menu-bar percent and 5-hour usage are always on, and there is no launch-at-login control.
 - Tests run with `swift test` only.
 
 ## Upstream pulls

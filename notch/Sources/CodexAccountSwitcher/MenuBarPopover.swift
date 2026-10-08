@@ -26,10 +26,6 @@ struct MenuBarPopover: View {
                     ManageAccountsView(model: model) {
                         page = .accounts
                     }
-                case .settings:
-                    SettingsView(model: model) {
-                        page = .accounts
-                    }
                 case let .confirmSwitch(account):
                     SwitchConfirmationPage(
                         model: model,
@@ -91,8 +87,7 @@ struct MenuBarPopover: View {
                             AccountRow(
                                 account: account,
                                 usageState: model.usageStates[account.id] ?? .idle,
-                                isActive: account.id == model.activeAccountID,
-                                showsFiveHourUsage: model.settings.showsFiveHourUsage
+                                isActive: account.id == model.activeAccountID
                             )
                         }
                         .buttonStyle(.plain)
@@ -113,14 +108,6 @@ struct MenuBarPopover: View {
                 .disabled(model.isMutating)
 
                 FooterAction(
-                    title: model.text("settings"),
-                    systemImage: "gearshape"
-                ) {
-                    page = .settings
-                }
-                .disabled(model.isMutating)
-
-                FooterAction(
                     title: model.text("quit"),
                     systemImage: "power",
                     shortcut: KeyboardShortcut("q", modifiers: .command)
@@ -137,7 +124,6 @@ struct MenuBarPopover: View {
 private enum PopoverPage {
     case accounts
     case manageAccounts
-    case settings
     case confirmSwitch(AccountProfile)
 }
 

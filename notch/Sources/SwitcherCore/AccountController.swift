@@ -11,7 +11,6 @@ open class AccountController {
     public private(set) var accounts: [AccountProfile] = [] { didSet { onChange?() } }
     public private(set) var activeAccountID: UUID? { didSet { onChange?() } }
     public private(set) var usageStates: [UUID: UsageViewState] = [:] { didSet { onChange?() } }
-    public private(set) var settings: AppSettings = .default { didSet { onChange?() } }
     public private(set) var isMutating = false { didSet { onChange?() } }
     public private(set) var isAddingAccount = false { didSet { onChange?() } }
     public var visibleError: OperationError? { didSet { onChange?() } }
@@ -56,7 +55,6 @@ open class AccountController {
         isMutating = true
         defer { isMutating = false }
         do {
-            settings = try await store.loadSettings()
             var registry = try await store.loadRegistry()
             if registry.accounts.isEmpty, await store.activeCredentialExists() {
                 let activeHome = await store.activeCodexHome()
@@ -295,24 +293,6 @@ open class AccountController {
             try await store.removeAccount(id: id)
             apply(try await store.loadRegistry())
             usageStates[id] = nil
-        } catch {
-            showError(error)
-        }
-    }
-
-    public func setShowsMenuBarPercentage(_ enabled: Bool) async {
-        settings.showsMenuBarPercentage = enabled
-        do {
-            try await store.saveSettings(settings)
-        } catch {
-            showError(error)
-        }
-    }
-
-    public func setShowsFiveHourUsage(_ enabled: Bool) async {
-        settings.showsFiveHourUsage = enabled
-        do {
-            try await store.saveSettings(settings)
         } catch {
             showError(error)
         }

@@ -54,7 +54,6 @@ public actor AccountStore: AccountStoring {
     }
 
     private var accountsURL: URL { baseURL.appending(path: "accounts.json") }
-    private var settingsURL: URL { baseURL.appending(path: "settings.json") }
     private var usageCacheURL: URL { baseURL.appending(path: "usage-cache.json") }
     private var profilesURL: URL { baseURL.appending(path: "accounts", directoryHint: .isDirectory) }
 
@@ -82,17 +81,6 @@ public actor AccountStore: AccountStoring {
         if changed { try saveRegistry(mutable) }
         registry = mutable
         return mutable
-    }
-
-    public func loadSettings() throws -> AppSettings {
-        try prepareDirectories()
-        guard fileManager.fileExists(atPath: settingsURL.path) else { return .default }
-        return try Self.decoder.decode(AppSettings.self, from: readChecked(settingsURL))
-    }
-
-    public func saveSettings(_ settings: AppSettings) throws {
-        try prepareDirectories()
-        try writeJSON(settings, to: settingsURL)
     }
 
     public func loadUsageCache() throws -> UsageCache {

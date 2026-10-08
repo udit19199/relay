@@ -11,7 +11,6 @@ public struct AccountSnapshot: Encodable, Sendable {
     }
     public let accounts: [Row]
     public let activeAccountID: UUID?
-    public let settings: AppSettings
     public let isMutating: Bool
     public let isAddingAccount: Bool
     public let activeIdentityConfirmed: Bool
@@ -28,7 +27,7 @@ extension AccountController {
                     usageError: usageStates[account.id]?.presentationError,
                     usageStatus: usageStates[account.id]?.presentationStatus ?? "idle")
             },
-            activeAccountID: activeAccountID, settings: settings,
+            activeAccountID: activeAccountID,
             isMutating: isMutating, isAddingAccount: isAddingAccount,
             activeIdentityConfirmed: activeIdentityConfirmed,
             error: visibleError.map { $0.messageKey.map(text) ?? $0.message },

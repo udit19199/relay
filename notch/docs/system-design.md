@@ -56,7 +56,6 @@ Recommended stack:
 - SwiftUI for UI;
 - `MenuBarExtra` for the status item and popover;
 - AppKit for process discovery and application lifecycle;
-- Service Management for the main app's Login Item registration and authorization state;
 - Foundation `FileManager`, `Process`, and JSON coding;
 - Codex app-server JSON-RPC over stdio for identity and Usage reads.
 
@@ -72,14 +71,12 @@ flowchart LR
     Switch[SwitchService]
     Codex[CodexClient]
     Desktop[DesktopController]
-    Login[macOS Login Items]
     FS[Local files]
 
     UI --> VM
     VM --> Store
     VM --> Switch
     VM --> Codex
-    VM --> Login
     Switch --> Store
     Switch --> Desktop
     Switch --> Codex
@@ -174,8 +171,6 @@ The implementation sets these permissions when creating files. It does not build
 ```
 
 When `showsFiveHourUsage` is absent from an older file, decoding defaults it to `false`. This preserves the existing compact account-row layout after an upgrade. Setting changes are saved immediately.
-
-Launch-at-login state is owned by macOS Service Management and is read from `SMAppService.mainApp.status`. It is never copied into `settings.json`.
 
 `usage-cache.json` stores `profileID`, normalized weekly Usage, optional 5-hour Usage, and `fetchedAt` for each last successful response. The optional fields allow older weekly-only cache entries to decode. No switch phase, rollback reference, or recovery journal is stored.
 
@@ -656,7 +651,6 @@ A registry-write failure leaves the credential directory intact. The bounded lis
 @Published private(set) var activeAccountID: UUID?
 @Published private(set) var usageStates: [UUID: UsageViewState] = [:]
 @Published private(set) var settings: AppSettings = .default
-@Published private(set) var launchAtLoginState: LaunchAtLoginState = .disabled
 @Published private(set) var isMutating = false
 @Published private(set) var isAddingAccount = false
 @Published var visibleError: OperationError?
