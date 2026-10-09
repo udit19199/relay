@@ -151,6 +151,7 @@ struct MenuBarPopover: View {
             }
             .buttonStyle(.plain)
             .disabled(model.isMutating && !model.isAddingAccount)
+            .disabled(!model.isAddingAccount && model.accounts.count >= 2)
         }
         .padding(5)
     }
