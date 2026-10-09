@@ -14,7 +14,6 @@ open class AccountController {
     public private(set) var isMutating = false { didSet { onChange?() } }
     public private(set) var isAddingAccount = false { didSet { onChange?() } }
     public var visibleError: OperationError? { didSet { onChange?() } }
-    public private(set) var activeIdentityConfirmed = true { didSet { onChange?() } }
 
     private let store: AccountStore
     private let codex: any AccountClient
@@ -76,7 +75,6 @@ open class AccountController {
             } catch {
                 showError(error)
             }
-            await confirmActiveIdentity()
         } catch {
             showError(error)
         }
@@ -130,12 +128,10 @@ open class AccountController {
         guard !Task.isCancelled else { return }
         if let id = activeAccountID {
             do {
-                let matches = try await store.syncActiveCredentialIfMatching(id: id)
+                _ = try await store.syncActiveCredentialIfMatching(id: id)
                 guard !Task.isCancelled else { return }
-                activeIdentityConfirmed = matches
             } catch {
                 guard !Task.isCancelled else { return }
-                activeIdentityConfirmed = false
                 showError(error)
                 return
             }
@@ -193,12 +189,10 @@ open class AccountController {
         do {
             try await switchService.switchAccount(to: id)
             apply(try await store.loadRegistry())
-            activeIdentityConfirmed = true
         } catch let error as OperationError {
             if error.stage == .reopenDesktop {
                 do {
                     apply(try await store.loadRegistry())
-                    activeIdentityConfirmed = true
                 } catch {
                     showError(error)
                     return
@@ -211,7 +205,6 @@ open class AccountController {
                     underlyingDescription: error.underlyingDescription
                 )
             } else {
-                if error.stage == .saveCurrentCredential { activeIdentityConfirmed = false }
                 visibleError = error
             }
         } catch {
@@ -303,18 +296,6 @@ open class AccountController {
         let validAccountIDs = Set(accounts.map(\.id))
         for entry in cache.entries where validAccountIDs.contains(entry.profileID) {
             usageStates[entry.profileID] = .loaded(entry.usage)
-        }
-    }
-
-    private func confirmActiveIdentity() async {
-        guard let activeID = activeAccountID,
-              let profile = accounts.first(where: { $0.id == activeID })
-        else { return }
-        do {
-            let identity = try await codex.readIdentity(profileHome: await store.activeCodexHome())
-            activeIdentityConfirmed = identity.matches(profile)
-        } catch {
-            activeIdentityConfirmed = false
         }
     }
 

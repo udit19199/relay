@@ -3,9 +3,6 @@ import Foundation
 // Shared product copy; platform names are adapted by the native presentation layer.
 
 public enum L10n {
-    public static func allStrings() -> [String: String] {
-        strings
-    }
     public static func string(_ key: String) -> String {
         strings[key] ?? key
     }

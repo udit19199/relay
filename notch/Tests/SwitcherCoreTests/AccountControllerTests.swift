@@ -59,7 +59,11 @@ struct AccountControllerTests {
         await fixture.model.start()
         #expect(fixture.model.accounts.count == 1)
         #expect(fixture.model.activeAccountID == fixture.model.accounts.first?.id)
-        #expect(fixture.model.activeIdentityConfirmed)
+        let id = try #require(fixture.model.accounts.first?.id)
+        let saved = await fixture.store.profileHome(id: id)
+        let imported = try Data(contentsOf: saved.appendingPathComponent("auth.json"))
+        let live = try Data(contentsOf: fixture.active.appendingPathComponent("auth.json"))
+        #expect(imported == live)
     }
 
     @Test func emptyStartupDoesNotCreateAnAccount() async throws {
@@ -98,16 +102,6 @@ struct AccountControllerTests {
         #expect(fixture.model.visibleError != nil)
     }
 
-    @Test func snapshotContainsPresentationButNoCredentialContents() async throws {
-        let fixture = try ControllerFixture()
-        defer { fixture.clean() }
-        try fixture.writeActiveCredential()
-        await fixture.model.start()
-        let data = try JSONEncoder().encode(fixture.model.snapshot)
-        let json = String(decoding: data, as: UTF8.self)
-        #expect(!json.contains("fixture-secret-token"))
-        #expect(json.contains("demo@example.test"))
-    }
 }
 
 @MainActor

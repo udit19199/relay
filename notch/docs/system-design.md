@@ -94,8 +94,6 @@ Sources/CodexAccountSwitcher/
 ├── AppModel.swift
 ├── MenuBarPopover.swift
 ├── AccountRow.swift
-├── ManageAccountsView.swift
-├── SettingsView.swift
 ├── Models.swift
 ├── Localization.swift
 ├── AccountStore.swift
@@ -119,7 +117,6 @@ Avoid adding protocol layers until a second implementation actually exists. Smal
 
 ~/Library/Application Support/Codex Account Switcher/
 ├── accounts.json                     # profile metadata and active account ID
-├── settings.json                     # language and Usage display settings
 ├── usage-cache.json                  # last successful normalized Usage per profile
 └── accounts/
     ├── <profile-id>/
@@ -134,7 +131,7 @@ Directory permissions:
 Codex Account Switcher directory 0700
 accounts/<profile-id>                 0700
 auth.json                             0600
-accounts.json / settings.json         0600
+accounts.json                         0600
 usage-cache.json                      0600
 ```
 
@@ -160,17 +157,7 @@ The implementation sets these permissions when creating files. It does not build
 
 `accountID` and `email` are metadata returned by Codex when available. The login identity supplies the local display name; the MVP has no rename operation.
 
-### 6.3 `settings.json`
-
-```json
-{
-  "language": "system",
-  "showsMenuBarPercentage": true,
-  "showsFiveHourUsage": false
-}
-```
-
-When `showsFiveHourUsage` is absent from an older file, decoding defaults it to `false`. This preserves the existing compact account-row layout after an upgrade. Setting changes are saved immediately.
+### 6.3 Usage cache
 
 `usage-cache.json` stores `profileID`, normalized weekly Usage, optional 5-hour Usage, and `fetchedAt` for each last successful response. The optional fields allow older weekly-only cache entries to decode. No switch phase, rollback reference, or recovery journal is stored.
 
@@ -650,7 +637,6 @@ A registry-write failure leaves the credential directory intact. The bounded lis
 @Published private(set) var accounts: [AccountProfile] = []
 @Published private(set) var activeAccountID: UUID?
 @Published private(set) var usageStates: [UUID: UsageViewState] = [:]
-@Published private(set) var settings: AppSettings = .default
 @Published private(set) var isMutating = false
 @Published private(set) var isAddingAccount = false
 @Published var visibleError: OperationError?
@@ -670,26 +656,9 @@ Browser sign-in uses `isAddingAccount` and a separately retained task. It does n
 
 ## 17. Localization
 
-Use string catalogs for:
+All product copy lives in a single English string table in `Localization.swift`, keyed by short identifiers such as `usage`, `switch_body`, or `remove_title`. `AccountController.text(_:)` looks up a key, and unmatched keys fall back to the key itself so a missing entry is visible instead of blank.
 
-- account actions;
-- confirmation copy;
-- progress stages;
-- Usage unavailable state;
-- reset formatting labels;
-- errors produced by switcher-owned validation.
-
-System errors may retain English technical details underneath a localized summary.
-
-Language preference values:
-
-```swift
-enum AppLanguage: String, Codable {
-    case system
-    case english
-    case simplifiedChinese
-}
-```
+Errors produced by switcher-owned validation use message keys; underlying system errors keep their English technical details underneath.
 
 ## 18. Observability
 

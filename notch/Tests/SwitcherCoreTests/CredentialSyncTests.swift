@@ -74,7 +74,10 @@ struct CredentialSyncTests {
         await model.waitForWeeklyUsageRefresh()
         #expect(model.usageStates[profile.id]?.displayedUsage?.remainingPercent == 59)
         #expect(model.usageStates[profile.id]?.refreshError == nil)
-        #expect(model.activeIdentityConfirmed)
+        let saved = await fixture.store.profileHome(id: profile.id)
+        let expected = try fixture.bytes("personal", token: "fresh")
+        let stored = try? Data(contentsOf: saved.appending(path: "auth.json"))
+        #expect(stored == expected)
     }
 
     @Test @MainActor func switchingDrainsOldRefreshBeforeChangingCredentials() async throws {
@@ -99,7 +102,10 @@ struct CredentialSyncTests {
         await switching.value
         await model.waitForWeeklyUsageRefresh()
         #expect(model.activeAccountID == second.id)
-        #expect(model.activeIdentityConfirmed)
+        let savedSecond = await fixture.store.profileHome(id: second.id)
+        let expectedSecond = try fixture.bytes("workspace", token: "fresh")
+        let storedSecond = try? Data(contentsOf: savedSecond.appending(path: "auth.json"))
+        #expect(storedSecond == expectedSecond)
         #expect(try CredentialIdentity.read(from: fixture.active)?.accountID == "workspace")
         #expect(try await fixture.store.loadUsageCache().entries.allSatisfy { $0.usage.remainingPercent == 59 })
         #expect(model.usageStates[first.id]?.displayedUsage?.remainingPercent == 59)
@@ -124,7 +130,9 @@ private struct CredentialFixture {
         AccountProfile(id: UUID(), displayName: "Same", email: "same@example.test", accountID: accountID, createdAt: Date())
     }
     func bytes(_ id: String, token: String) throws -> Data {
-        try JSONSerialization.data(withJSONObject: ["tokens": ["account_id": id, "access_token": token]])
+        // Serialize by hand: JSONSerialization on a dictionary has no stable key order,
+        // so two calls with equal content could produce different bytes.
+        Data("{\"tokens\":{\"account_id\":\"\(id)\",\"access_token\":\"\(token)\"}}".utf8)
     }
     func writeLive(_ id: String, token: String) throws { try bytes(id, token: token).write(to: auth) }
     func clean() { try? FileManager.default.removeItem(at: root) }

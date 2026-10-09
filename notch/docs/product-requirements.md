@@ -17,7 +17,7 @@ The user should understand the product after opening the menu once. The main pat
 - account switching;
 - add account;
 - remove inactive account;
-- English and Simplified Chinese UI.
+- English UI.
 
 ### Out of scope
 
@@ -49,10 +49,6 @@ As a user, I can add another ChatGPT account through Codex login from the main s
 ### US-4: Remove an account
 
 As a user, I can remove an inactive local profile from the account row’s context menu.
-
-### US-5: Change language
-
-As a user, I can choose System Default, English, or Simplified Chinese.
 
 ## 4. Menu-bar trigger
 
@@ -91,7 +87,7 @@ With `Show 5-hour Usage` enabled and exact 5-hour data available, the row expand
           7d   [========--------]  42%  Resets Aug 25, 9:20 AM
 ```
 
-The 5-hour line is omitted when its data is absent. The UI does not show an unavailable placeholder for that line. English and Simplified Chinese window labels remain fully visible.
+The 5-hour line is omitted when its data is absent. The UI does not show an unavailable placeholder for that line. Window labels remain fully visible.
 
 ### 5.2 Usage-window normalization
 
@@ -263,32 +259,7 @@ The active profile's remove control is disabled.
 
 Remove first opens a confirmation page inside the popover. Cancel and the header Back action return to the account list without closing the popover or calling the remove operation.
 
-## 9. Settings
-
-The 326-point Settings page groups general preferences and software updates:
-
-```text
-Show Percentage in Menu Bar   [toggle]
-Show 5-hour Usage             [toggle]
-Language  [System Default ▾]
-
-Software Update
-Check for updates automatically [toggle]
-Hourly update description
-Version 0.1.10      [Check for Updates]
-```
-
-All setting rows use 13-point system text, 14-point horizontal insets, a minimum 44-point height, and small native controls aligned to the right. Group captions and supporting descriptions use 11-point system text. Row separators share the text insets. Approval messages and update failures wrap below the relevant row using the same description layout.
-
-Show Percentage in Menu Bar, Show 5-hour Usage, and Language persist in `settings.json`. The 5-hour setting defaults to false when the field is absent from an older file. Language options are:
-
-- System Default;
-- English;
-- 简体中文.
-
-Changing any persisted setting updates the visible switcher UI immediately. Show 5-hour Usage affects account rows only; the menu-bar percentage continues to show weekly Usage.
-
-## 10. Accessibility
+## 9. Accessibility
 
 - account rows are keyboard-focusable buttons;
 - current row exposes selected state through accessibility APIs;
@@ -297,7 +268,7 @@ Changing any persisted setting updates the visible switcher UI immediately. Show
 - color is not the only selected-state signal: selected state must also be exposed semantically;
 - text remains readable at standard macOS accessibility text sizes.
 
-## 11. Performance
+## 10. Performance
 
 - popover should appear immediately from local metadata;
 - persisted weekly and optional 5-hour Usage is rendered before refresh subprocesses complete;
@@ -309,18 +280,18 @@ Changing any persisted setting updates the visible switcher UI immediately. Show
 - one failed account does not prevent other rows from rendering;
 - switch actions are disabled while one switch is in progress.
 
-## 12. Acceptance criteria
+## 11. Acceptance criteria
 
 The MVP is accepted when:
 
 1. three saved accounts can be displayed in the popover;
-2. each row keeps the current weekly layout while Show 5-hour Usage is disabled;
-3. enabling Show 5-hour Usage displays separate 5h and 7d lines when both values exist, and omits the 5h line when it is absent;
+2. each row shows the weekly 7d layout;
+3. rows display separate 5h and 7d lines when both values exist, and omit the 5h line when it is absent;
 4. the progress bar exactly matches `NN% left`;
 5. the current row is highlighted without a checkmark;
 6. the footer contains a single Quit action, with Add Account above it;
 7. the popover is 326 points wide and all secondary pages navigate inside it;
-8. Settings contains menu-bar percentage, 5-hour Usage, and language controls inside the popover;
+8. the main screen shows Add Account with its sign-in hint, and an inactive row’s context menu offers Remove;
 9. every popover opening starts on the account list;
 10. canceling switch or removal performs no mutation and keeps the popover open;
 11. Quit and Command-Q terminate the application and remain available during mutations;
@@ -334,11 +305,11 @@ The MVP is accepted when:
 19. inactive accounts can be added and removed; active accounts cannot be removed;
 20. only `main` is required for the repository's steady state.
 
-## 13. Switcher updates
+## 12. Switcher updates
 
 Personal fork: no auto-update. Updates are `git pull` plus a local build.
 
-## 14. First activation and external sign-in
+## 13. First activation and external sign-in
 
 With no registered active account and no active auth.json, selecting a saved account activates it directly after Desktop exits normally. Verification or registry persistence failure removes the newly installed active credential and leaves the app signed out. Existing unregistered credentials are never overwritten by this path.
 
