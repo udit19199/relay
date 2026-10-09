@@ -150,8 +150,7 @@ The footer contains exactly one full-width action:
 
 Account lifecycle actions sit above the footer, below the account list:
 
-- `Add Account`, with its browser sign-in hint on the same line;
-- `Register Current Account`.
+- `Add Account`, with its browser sign-in hint on the same line.
 
 Both are ordinary in-line buttons; they do not replace the popover content and provide no Back action.
 
@@ -319,7 +318,7 @@ The MVP is accepted when:
 3. enabling Show 5-hour Usage displays separate 5h and 7d lines when both values exist, and omits the 5h line when it is absent;
 4. the progress bar exactly matches `NN% left`;
 5. the current row is highlighted without a checkmark;
-6. the footer contains a single Quit action, with Add Account and Register Current Account above it;
+6. the footer contains a single Quit action, with Add Account above it;
 7. the popover is 326 points wide and all secondary pages navigate inside it;
 8. Settings contains menu-bar percentage, 5-hour Usage, and language controls inside the popover;
 9. every popover opening starts on the account list;
@@ -343,4 +342,4 @@ Personal fork: no auto-update. Updates are `git pull` plus a local build.
 
 With no registered active account and no active auth.json, selecting a saved account activates it directly after Desktop exits normally. Verification or registry persistence failure removes the newly installed active credential and leaves the app signed out. Existing unregistered credentials are never overwritten by this path.
 
-The main screen provides Register Current Account below Add Account. It reads the current shared login identity, updates that same identity’s saved credential or imports a new profile, and records it as active. A mismatch during switching is fixed with the Register action on the main screen. Other profiles remain unchanged.
+With no saved accounts and an active `auth.json`, the first launch imports that login once. After that, the app never re-imports an external login: an account signed in outside the app is added again with `Add Account`. Existing unregistered credentials are never overwritten by this path.

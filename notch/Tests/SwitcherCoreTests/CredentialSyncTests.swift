@@ -36,20 +36,6 @@ struct CredentialSyncTests {
         #expect(try await restarted.loadRegistry().accounts.first?.accountID == "personal")
     }
 
-    @Test func registrationRejectsACredentialChangedAfterIdentityRead() async throws {
-        let fixture = try CredentialFixture()
-        defer { fixture.clean() }
-        let profile = fixture.profile("personal")
-        try fixture.writeLive("personal", token: "old")
-        try await fixture.store.importCurrentProfile(profile)
-        try fixture.writeLive("workspace", token: "other")
-        await #expect(throws: AccountStoreError.activeCredentialMismatch) {
-            try await fixture.store.registerActiveIdentity(.init(accountID: "personal", email: "same@example.test"))
-        }
-        #expect(try await fixture.store.loadRegistry().accounts.count == 1)
-        #expect(try await fixture.store.loadRegistry().activeAccountID == profile.id)
-    }
-
     @Test func workspaceIdentityDoesNotMatchAnEmailOnlyProfile() {
         let known = AccountIdentity(accountID: "personal", email: "same@example.test")
         let unknown = AccountIdentity(accountID: nil, email: "same@example.test")

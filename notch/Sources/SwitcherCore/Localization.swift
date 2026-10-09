@@ -22,7 +22,6 @@ public enum L10n {
             "switch_body": "Codex Desktop will close and reopen. Finish or stop running Desktop tasks first. If Desktop asks to quit, complete its quit dialog. Switching stops if Desktop cannot exit normally. Existing CLI sessions stay open; new CLI sessions use the selected account.",
             "cancel": "Cancel",
             "switch": "Switch Account",
-            "register": "Register",
             "add_account": "Add Account",
             "cancel_add_account": "Cancel Adding Account",
             "remove": "Remove",
@@ -34,8 +33,6 @@ public enum L10n {
             "ok": "OK",
             "operation_failed": "Operation failed",
             "switch_failed": "Account switch failed",
-            "register_current_account": "Register Current Account",
-            "active_unconfirmed": "Active account could not be confirmed",
             "switched_reopen_title": "Account switched",
             "switched_reopen_message": "The selected account is active, but Codex Desktop could not be reopened. Open Codex manually to continue.",
     ]

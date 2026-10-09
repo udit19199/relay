@@ -56,22 +56,6 @@ struct AccountStoreTests {
         #expect(try await fixture.store.loadRegistry().accounts.count == 3)
     }
 
-    @Test func registeringExternalLoginReusesIdentityAndPreservesOtherProfiles() async throws {
-        let fixture = try StoreFixture()
-        defer { fixture.remove() }
-        let profiles = try await prepareSwitchProfiles(fixture)
-        let bytes = Data(#"{"tokens":{"account_id":"target-id","refresh_token":"test-only-new"}}"#.utf8)
-        try bytes.write(to: fixture.activeHome.appending(path: "auth.json"))
-        try await fixture.store.registerActiveIdentity(AccountIdentity(accountID: "target-id", email: "target@example.com"))
-        let current = try await fixture.store.loadRegistry()
-        #expect(current.accounts.count == 2)
-        #expect(current.activeAccountID == profiles.target.id)
-        let target = await fixture.store.profileHome(id: profiles.target.id)
-        let original = await fixture.store.profileHome(id: profiles.original.id)
-        #expect(try Data(contentsOf: target.appending(path: "auth.json")) == bytes)
-        #expect(try Data(contentsOf: original.appending(path: "auth.json")) == profiles.originalBytes)
-    }
-
     @Test @MainActor func failedLoginRemovesOnlyItsUnregisteredProfile() async throws {
         let fixture = try StoreFixture()
         defer { fixture.remove() }

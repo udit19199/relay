@@ -731,4 +731,4 @@ Do not add the following unless a new product decision explicitly requires it:
 
 First activation skips saving an original credential when both active ID and shared auth are absent; recheck file absence after Desktop closes. If verification or commit fails, clear only the newly installed active auth and preserve the saved target profile. Normal switches retain the existing original-credential restoration path.
 
-AccountStore rejects duplicate identities on add. Register Current Account explicitly associates the shared login with a matching saved profile or imports a new one. Login cleanup checks the registry before deleting the attempt directory. The updater uses the semantic release version as CFBundleVersion, eliminating a separately maintained build number.
+AccountStore rejects duplicate identities on add. Login cleanup checks the registry before deleting the attempt directory. The updater uses the semantic release version as CFBundleVersion, eliminating a separately maintained build number.

@@ -63,21 +63,6 @@ struct MenuBarPopover: View {
 
     private var accountPage: some View {
         VStack(spacing: 0) {
-            if !model.activeIdentityConfirmed {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(model.text("active_unconfirmed"))
-                    Button(model.text("register")) {
-                        Task { await model.registerCurrentAccount() }
-                    }
-                    .disabled(model.isMutating || model.isAddingAccount)
-                }
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(10)
-                    .background(.orange.opacity(0.08))
-            }
-
             if model.accounts.isEmpty {
                 Text(model.text("no_accounts"))
                     .foregroundStyle(.secondary)
@@ -163,23 +148,6 @@ struct MenuBarPopover: View {
             }
             .buttonStyle(.plain)
             .disabled(model.isMutating && !model.isAddingAccount)
-
-            Button {
-                Task { await model.registerCurrentAccount() }
-            } label: {
-                HStack(spacing: 7) {
-                    Image(systemName: "person.crop.circle.badge.checkmark")
-                        .frame(width: 14)
-                    Text(model.text("register_current_account"))
-                    Spacer()
-                }
-                .font(.system(size: 12, weight: .medium))
-                .padding(.horizontal, 8)
-                .frame(height: 30)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .disabled(model.isMutating || model.isAddingAccount)
         }
         .padding(5)
     }

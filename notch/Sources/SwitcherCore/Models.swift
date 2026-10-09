@@ -182,7 +182,7 @@ public enum AccountStoreError: LocalizedError, Equatable, Sendable {
         case .activeCredentialMissing:
             "The active Codex auth.json file is missing."
         case .activeCredentialMismatch:
-            "Codex is signed in to a different account than Switcher expects. No saved credential was overwritten. Use Register Current Account to associate the current login before switching."
+            "Codex is signed in to a different account than Switcher expects. No saved credential was overwritten. Sign in to the expected account, or add the current login again with Add Account."
         case .targetCredentialMissing:
             "The selected account has no saved auth.json file."
         case .duplicateAccount:

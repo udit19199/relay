@@ -34,8 +34,7 @@ The current account is represented by a highlighted row. It does not use:
 
 The footer contains a single full-width `Quit` action. Account lifecycle actions sit above the footer on the main screen itself:
 
-- `Add Account`, with its browser sign-in hint on the same line, which becomes a cancel action with a progress indicator while sign-in is pending;
-- `Register Current Account`.
+- `Add Account`, with its browser sign-in hint on the same line, which becomes a cancel action with a progress indicator while sign-in is pending.
 
 Removal is available from the context menu of an inactive account row and opens an in-popover confirmation page. Cancel returns to the account list, keeps the popover open, and performs no deletion.
 
@@ -115,7 +114,6 @@ macOS Keychain is not used in the MVP. It adds implementation complexity without
 The main screen owns account lifecycle operations:
 
 - add account through browser sign-in;
-- register the current shared login as a profile;
 - remove an inactive account.
 
 The active account cannot be removed because the meaning of the active Codex authentication file would otherwise be ambiguous. The user first selects another account and then removes the old one.
@@ -126,7 +124,7 @@ Removing an account deletes only the switcher's local profile directory and meta
 
 The main screen has no settings page. The menu-bar percentage and the 5-hour usage line are always on.
 
-Add, register, and remove actions live directly on the main screen; there is no separate manage page.
+Add and remove actions live directly on the main screen; there is no separate manage page.
 
 The app does not register a macOS Login Item and cannot start itself at login. Users who want it to launch automatically add it themselves in System Settings → General → Login Items.
 

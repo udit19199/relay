@@ -70,17 +70,6 @@ struct AccountControllerTests {
         #expect(fixture.model.visibleError == nil)
     }
 
-    @Test func registerUsesExistingIdentityAndPreservesProfile() async throws {
-        let fixture = try ControllerFixture()
-        defer { fixture.clean() }
-        try fixture.writeActiveCredential()
-        await fixture.model.start()
-        let id = fixture.model.activeAccountID
-        await fixture.model.registerCurrentAccount()
-        #expect(fixture.model.accounts.count == 1)
-        #expect(fixture.model.activeAccountID == id)
-    }
-
     @Test func refreshKeepsLastGoodUsageWhenTheServerFails() async throws {
         let fixture = try ControllerFixture()
         defer { fixture.clean() }

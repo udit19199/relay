@@ -270,20 +270,6 @@ open class AccountController {
         }
     }
 
-    public func registerCurrentAccount() async {
-        guard !isMutating, !isAddingAccount else { return }
-        isMutating = true
-        await cancelUsageRefresh()
-        defer { isMutating = false; refreshWeeklyUsage() }
-        do {
-            let identity = try await codex.readIdentity(profileHome: await store.activeCodexHome())
-            try await store.registerActiveIdentity(identity)
-            apply(try await store.loadRegistry())
-            activeIdentityConfirmed = true
-            visibleError = nil
-        } catch { showError(error) }
-    }
-
     public func removeAccount(id: UUID) async {
         guard !isMutating else { return }
         isMutating = true

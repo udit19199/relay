@@ -169,26 +169,6 @@ public actor AccountStore: AccountStoring {
         if fileManager.fileExists(atPath: directory.path) { try removeProfileDirectory(directory) }
     }
 
-    public func registerActiveIdentity(_ identity: AccountIdentity) throws {
-        var current = try loadRegistry()
-        let bytes = try readChecked(activeHomeURL.appending(path: "auth.json"))
-        let candidate = AccountProfile(id: UUID(), displayName: identity.suggestedDisplayName,
-            email: identity.email, accountID: identity.accountID, createdAt: Date(), lastUsedAt: Date())
-        guard let credentialIdentity = try CredentialIdentity.decode(bytes), credentialIdentity.matches(candidate) else {
-            throw AccountStoreError.activeCredentialMismatch
-        }
-        if let profile = current.accounts.first(where: { identity.matches($0) }) {
-            try secureAtomicWrite(bytes, to: profileHome(id: profile.id).appending(path: "auth.json"))
-            try commitActiveAccountID(profile.id)
-        } else {
-            let home = try createProfileDirectory(id: candidate.id)
-            try secureAtomicWrite(bytes, to: home.appending(path: "auth.json"))
-            current.accounts.append(candidate)
-            current.activeAccountID = candidate.id
-            try saveRegistry(current)
-        }
-    }
-
     /// Verify and copy the same bytes, so an external login cannot overwrite another saved account.
     public func syncActiveCredentialIfMatching(id: UUID) throws -> Bool {
         let current = try loadRegistry()
