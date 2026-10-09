@@ -78,31 +78,46 @@ struct AccountRow: View {
         resetsAt: Date,
         includesDate: Bool
     ) -> some View {
-        HStack(spacing: 8) {
-            VStack(alignment: .leading, spacing: 1) {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
                 Text(title)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.secondary)
+                    .frame(width: 46, alignment: .leading)
 
                 Text("\(remainingPercent)% left")
-                    .font(.system(size: 22, weight: .semibold).monospacedDigit())
+                    .font(.system(size: 16, weight: .semibold).monospacedDigit())
                     .lineLimit(1)
                     .fixedSize(horizontal: true, vertical: false)
+
+                Spacer(minLength: 4)
+
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(ResetCountdown.text(until: resetsAt, now: now))
+                        .font(.system(size: 12, weight: .medium).monospacedDigit())
+
+                    Text(ResetCountdown.timestampText(until: resetsAt, includesDate: includesDate))
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(.secondary)
+                        .help(ResetCountdown.absoluteText(until: resetsAt, includesDate: includesDate))
+                }
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
             }
 
-            Spacer(minLength: 4)
+            GeometryReader { geometry in
+                let fraction = min(max(Double(remainingPercent) / 100, 0), 1)
 
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(ResetCountdown.text(until: resetsAt, now: now))
-                    .font(.system(size: 12, weight: .medium).monospacedDigit())
-
-                Text(ResetCountdown.timestampText(until: resetsAt, includesDate: includesDate))
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(.secondary)
-                    .help(ResetCountdown.absoluteText(until: resetsAt, includesDate: includesDate))
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.primary.opacity(0.10))
+                    Capsule()
+                        .fill(Color.accentColor.opacity(0.78))
+                        .frame(width: geometry.size.width * fraction)
+                }
             }
-            .lineLimit(1)
-            .minimumScaleFactor(0.85)
+            .frame(height: 3)
+            .accessibilityHidden(true)
         }
     }
 }

@@ -6,6 +6,7 @@ struct MenuBarPopover: View {
     @ObservedObject var model: AppModel
     @State private var page: PopoverPage = .accounts
     @State private var hoveredAccountID: UUID?
+    @State private var hoveredResetAccountID: UUID?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -121,9 +122,35 @@ struct MenuBarPopover: View {
                                     .foregroundStyle(.secondary)
                                     .padding(.horizontal, 8)
                                     .frame(minWidth: 44, minHeight: 32)
-                                    .background(Color.primary.opacity(0.06), in: Capsule())
+                                    .background {
+                                        Capsule()
+                                            .fill(
+                                                LinearGradient(
+                                                    colors: [
+                                                        Color.primary.opacity(hoveredResetAccountID == account.id ? 0.12 : 0.075),
+                                                        Color.primary.opacity(hoveredResetAccountID == account.id ? 0.065 : 0.04),
+                                                    ],
+                                                    startPoint: .top,
+                                                    endPoint: .bottom
+                                                )
+                                            )
+                                            .shadow(
+                                                color: .black.opacity(hoveredResetAccountID == account.id ? 0.16 : 0.10),
+                                                radius: hoveredResetAccountID == account.id ? 2.5 : 1.5,
+                                                x: 0,
+                                                y: hoveredResetAccountID == account.id ? 2 : 1
+                                            )
+                                            .animation(.easeOut(duration: 0.12), value: hoveredResetAccountID == account.id)
+                                    }
                                 }
                                 .buttonStyle(.plain)
+                                .onHover { isHovering in
+                                    if isHovering {
+                                        hoveredResetAccountID = account.id
+                                    } else if hoveredResetAccountID == account.id {
+                                        hoveredResetAccountID = nil
+                                    }
+                                }
                                 .accessibilityLabel("Use a banked usage reset for \(account.displayName)")
                                 .accessibilityValue("\(count) available")
                                 .help(resetExpiryHelp(usage: usage))
