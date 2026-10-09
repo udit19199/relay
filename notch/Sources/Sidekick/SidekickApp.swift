@@ -1,80 +1,29 @@
 import SidekickCore
 import AppKit
-import SwiftUI
 
 @main
-struct SidekickApp: App {
-    @StateObject private var model = AppModel.live()
-
-    var body: some Scene {
-        MenuBarExtra {
-            MenuBarPopover(model: model)
-        } label: {
-            HStack(spacing: 4) {
-                MenuBarLogo()
-                if let remainingPercent = model.activeRemainingPercent {
-                    Text("\(remainingPercent)%")
-                        .monospacedDigit()
-                }
-            }
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel(menuBarAccessibilityLabel)
-                .task {
-                    await model.startBackgroundUsageRefresh()
-                }
-        }
-        .menuBarExtraStyle(.window)
-        .commands {
-            QuitApplicationCommands(title: "Quit")
-        }
-    }
-
-    private var menuBarAccessibilityLabel: String {
-        guard let remainingPercent = model.activeRemainingPercent
-        else {
-            return "Sidekick"
-        }
-        return "Sidekick, \(remainingPercent)%"
+@MainActor
+enum SidekickApp {
+    static func main() {
+        let application = NSApplication.shared
+        let delegate = SidekickAppDelegate()
+        application.delegate = delegate
+        application.setActivationPolicy(.accessory)
+        application.run()
     }
 }
 
-private struct MenuBarLogo: View {
-    private static let logicalSize = NSSize(width: 17.5, height: 17.5)
+@MainActor
+final class SidekickAppDelegate: NSObject, NSApplicationDelegate {
+    private var model: AppModel?
+    private var islandPanelController: DynamicIslandPanelController?
 
-    private static let image: NSImage = {
-        let resourceBundleName = "Sidekick_Sidekick.bundle"
-        let resourceBundle = [Bundle.main.resourceURL, Bundle.main.bundleURL]
-            .compactMap { $0 }
-            .map { $0.appending(path: resourceBundleName) }
-            .compactMap { Bundle(url: $0) }
-            .first
-        guard let url = resourceBundle?.url(
-            forResource: "account-switcher-logo",
-            withExtension: "png"
-        ), let image = NSImage(contentsOf: url) else {
-            preconditionFailure("Missing account-switcher-logo.png")
-        }
-        image.size = logicalSize
-        image.isTemplate = true
-        return image
-    }()
-
-    var body: some View {
-        Image(nsImage: Self.image)
-            .frame(width: 17.5, height: 17.5)
-            .accessibilityHidden(true)
-    }
-}
-
-private struct QuitApplicationCommands: Commands {
-    let title: String
-
-    var body: some Commands {
-        CommandGroup(replacing: .appTermination) {
-            Button(title) {
-                NSApp.terminate(nil)
-            }
-            .keyboardShortcut("q", modifiers: .command)
-        }
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        let model = AppModel.live()
+        let controller = DynamicIslandPanelController(model: model)
+        self.model = model
+        islandPanelController = controller
+        controller.show()
+        Task { await model.startBackgroundUsageRefresh() }
     }
 }

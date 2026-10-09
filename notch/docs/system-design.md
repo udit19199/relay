@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-Sidekick is a native macOS menu-bar application that manages multiple local Codex authentication snapshots.
+Sidekick is a native macOS app whose only interface is a notch island. It manages multiple local Codex authentication snapshots.
 
 The system has one core operation:
 
@@ -54,10 +54,11 @@ Recommended stack:
 - macOS 14+;
 - Swift 6;
 - SwiftUI for UI;
-- `MenuBarExtra` for the status item and popover;
+- SwiftUI for the single expanded island screen and its native confirmation dialogs;
+- `NSPanel` for notch geometry, screen placement, and Spaces behavior;
 - AppKit for process discovery and application lifecycle;
 - Foundation `FileManager`, `Process`, and JSON coding;
-- Codex app-server JSON-RPC over stdio for identity and Usage reads.
+- Codex app-server JSON-RPC for sign-in and identity; direct authenticated HTTP for Usage reads.
 
 No third-party runtime dependency is required beyond the installed Codex executable.
 
@@ -65,7 +66,7 @@ No third-party runtime dependency is required beyond the installed Codex executa
 
 ```mermaid
 flowchart LR
-    UI[SwiftUI menu-bar UI]
+    UI[SwiftUI notch island]
     VM[AppModel @MainActor]
     Store[AccountStore actor]
     Switch[SwitchService]
@@ -92,7 +93,11 @@ The application is a single process. There is no daemon and no local network ser
 Sources/Sidekick/
 ├── SidekickApp.swift
 ├── AppModel.swift
-├── MenuBarPopover.swift
+├── IslandAccountManager.swift
+├── DynamicIslandPanel.swift
+├── VorssaintNotchSupport.swift
+├── NotchShape.swift
+├── NotchMenuBarSpace.swift
 ├── AccountRow.swift
 └── DesktopController.swift
 
@@ -254,7 +259,7 @@ Lookup order:
 2. the login shell's shared `CODEX_CLI_PATH`, resolved through its `PATH` when it is a command name;
 3. the login shell's `codex` command when no shared override is set.
 
-The runtime version is never pinned. Each operation resolves the current system command. The same login-shell PATH is passed to app-server so npm launchers can resolve Node. A missing command or invalid explicit path is an error; Sidekick does not silently start another bundled version.
+The runtime version is never pinned. Each CLI operation resolves the current system command. The same login-shell PATH is passed to app-server so npm launchers can resolve Node. A missing command or invalid explicit path is an error; Sidekick does not silently start another bundled version.
 
 If not found, show one direct error:
 
@@ -263,6 +268,8 @@ Codex CLI was not found. Install Codex and reopen Sidekick.
 ```
 
 Do not add download automation or multiple package-manager fallbacks in the MVP.
+
+The island joins Vorssaint’s dedicated overlay Space before the panel first appears. This prevents desktop-switch animations from carrying the island with the wallpaper. The macOS Space functions are resolved at runtime; if unavailable, the stationary AppKit window behavior remains. Windows leave the overlay before it is destroyed.
 
 ## 9. Codex app-server client
 
@@ -307,7 +314,7 @@ There is no fallback to local display name or file hash.
 
 ### 9.3 Usage read
 
-Call `account/rateLimits/read`. Select `rateLimitsByLimitId["codex"]` when present, otherwise the legacy `rateLimits`. Normalize only that bucket’s `primary` and `secondary`; never merge other metered products:
+Read the saved profile’s access token and account ID, then GET `https://chatgpt.com/backend-api/wham/usage`. Normalize `rate_limit.primary_window` and `secondary_window`, converting `limit_window_seconds` to minutes. There is no CLI fallback or automatic token renewal. Authentication failures require signing in again.
 
 ```text
 fiveHour = first window where windowDurationMins == 300
@@ -319,7 +326,7 @@ The client intentionally ignores:
 - any short-duration window other than exactly 300 minutes;
 - windows outside six through eight days.
 
-Read `rateLimitResetCredits.availableCount` and optional `credits` details from the same response. The count is authoritative and detail rows may be capped. Cache available credit IDs and optional expiry dates with the usage data so old cache entries remain decodable; the menu only offers redemption when the count is positive.
+GET `https://chatgpt.com/backend-api/wham/rate-limit-reset-credits` with the same account-scoped credentials. Read `available_count` and available `credits` details. If either request fails, retain the previous complete snapshot. The count is authoritative and detail rows may be capped. Cache available credit IDs and optional expiry dates with the usage data so old cache entries remain decodable; the menu only offers redemption when the count is positive.
 
 Normalized output:
 
@@ -329,13 +336,13 @@ WeeklyUsage(
     resetsAt: weekly.resetsAt,
     fiveHourRemainingPercent: fiveHour.map { clamp(round(100 - $0.usedPercent), 0, 100) },
     fiveHourResetsAt: fiveHour?.resetsAt,
-    availableResetCount: result.rateLimitResetCredits?.availableCount
+    availableResetCount: inventory.available_count
 )
 ```
 
 Optional available reset-credit IDs and expiry dates are carried alongside that normalized usage value when Codex returns detail rows.
 
-If no six-to-eight-day window exists, return `weeklyUsageUnavailable`. Missing 5-hour data leaves the optional fields empty. A 4-hour or 6-hour window never populates them. The client makes one `account/rateLimits/read` request and parses both windows from the same response whether the display setting is on or off.
+If no six-to-eight-day window exists, return `weeklyUsageUnavailable`. Missing 5-hour data leaves the optional fields empty. A 4-hour or 6-hour window never populates them. Both windows come from the same HTTP usage response.
 
 ### 9.4 Timeouts
 
@@ -361,25 +368,25 @@ Each account directory acts as a minimal Codex home for identity and Usage calls
 ~/Library/Application Support/Sidekick/accounts/<profile-id>/auth.json
 ```
 
-Sidekick starts app-server with `CODEX_HOME` set to that directory. This lets it read Usage without changing the active `~/.codex/auth.json`.
+Sidekick reads that directory’s saved credentials for HTTP Usage requests. Sign-in and identity CLI calls use it as `CODEX_HOME`. Usage requests do not change the active `~/.codex/auth.json`.
 
 ### 10.2 Refresh behavior
 
-At application launch, when the pending five-minute timer fires, and whenever the popover opens:
+At application launch, when the pending 30-second timer fires, and when the user manually refreshes:
 
 1. load account metadata and persisted weekly and optional 5-hour Usage;
 2. render cached values immediately without replacing them with a loading state;
 3. refresh all accounts concurrently;
-4. replace the pending timer with one scheduled five minutes after the latest trigger;
-5. share one active refresh task when launch, timer, and popover triggers overlap;
+4. replace the pending timer with one scheduled 30 seconds after the latest trigger;
+5. share one active refresh task when launch, timer, and manual refresh triggers overlap;
 6. publish and persist each successful result as it completes;
 7. retain cached Usage with a warning on failure, or show unavailable when no cache exists.
 
-The app owns one pending timer while it runs. Every launch, timer, or popover trigger cancels the previous timer and schedules the next deadline five minutes later. The timer remains active while the popover is closed. There is no helper daemon, exponential backoff, or silent retry.
+The app owns one pending timer while it runs. Every launch, timer, or manual refresh cancels the previous timer and schedules the next deadline 30 seconds later. There is no helper daemon, exponential backoff, or silent retry.
 
 ### 10.3 Persisting refreshed credentials
 
-Codex may refresh the profile's token while app-server runs. Because that app-server uses the profile directory directly, any updated `auth.json` remains in the correct profile directory. No extra copy-back stage is required.
+Routine Usage reads never renew or write tokens. Codex may refresh the profile's token during sign-in or other CLI operations. Because that app-server uses the profile directory directly, any updated `auth.json` remains in the correct profile directory. No extra copy-back stage is required.
 
 ## 11. Desktop controller
 
@@ -665,7 +672,7 @@ This is a simple in-process UI invariant, not a cross-process lock service.
 
 Browser sign-in uses `isAddingAccount` and a separately retained task. It does not hold the mutation lock while waiting for the browser callback. The main screen replaces Add Account with a cancel action during this wait; canceling terminates the app-server session and restores the normal button without showing an error.
 
-`MenuBarPopover` owns an in-memory page enum for the account list, switch confirmation, and removal confirmation. All secondary pages render inside the same 300-point popover. Cancel and Back change only page state. The root view resets the page to the account list on every popover appearance.
+`IslandAccountManager` shows all saved accounts in one scrollable list, with compact per-account Usage rows and reset-credit counts when available. The expanded panel grows with the account count up to the available screen height. Its Add Account and Quit footer stays visible while the list scrolls. Switch, reset, and removal use native confirmation dialogs. Cancel performs no mutation.
 
 ## 17. Product copy
 
@@ -673,7 +680,7 @@ Product copy lives as inline English string literals at the call site. There is 
 
 ## 18. Observability
 
-The current MVP surfaces operation failures directly in the popover and retains the underlying diagnostic description in memory. It does not log auth file contents or access tokens.
+The current MVP surfaces operation failures directly in the island and retains the underlying diagnostic description in memory. It does not log auth file contents or access tokens.
 
 There is no remote telemetry, support bundle, analytics pipeline, or automatic diagnostics upload.
 
@@ -702,7 +709,7 @@ Do not add the following unless a new product decision explicitly requires it:
 - SQLite;
 - daemon;
 - helper process that stays resident;
-- Usage details panel;
+- separate Usage or account-management screens;
 - switch-behavior settings;
 - CLI process control;
 - automatic account selection.

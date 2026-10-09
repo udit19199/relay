@@ -5,19 +5,27 @@ struct AccountRow: View {
     let account: AccountProfile
     let usageState: UsageViewState
     let now: Date
+    var isActive = false
+    var hasResetControl = false
 
     private var accountTitle: String {
         account.email.flatMap { $0.isEmpty ? nil : $0 } ?? account.displayName
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 9) {
             HStack(alignment: .firstTextBaseline, spacing: 7) {
                 Text(verbatim: accountTitle)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .help(accountTitle)
+                if isActive {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel("Active account")
+                }
                 Spacer(minLength: 4)
                 if let message = usageState.refreshError {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -27,11 +35,13 @@ struct AccountRow: View {
                         .accessibilityLabel(message)
                 }
             }
+            .padding(.trailing, hasResetControl ? 76 : 0)
+            .frame(height: 28)
 
             usageContent
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 9)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
         .contentShape(Rectangle())
     }
 
@@ -53,7 +63,7 @@ struct AccountRow: View {
     }
 
     private func expandedUsageContent(_ usage: WeeklyUsage) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             if let remaining = usage.fiveHourRemainingPercent,
                let resetsAt = usage.fiveHourResetsAt {
                 limitRow(
@@ -78,46 +88,27 @@ struct AccountRow: View {
         resetsAt: Date,
         includesDate: Bool
     ) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
-                Text(title)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 46, alignment: .leading)
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(title)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 48, alignment: .leading)
 
-                Text("\(remainingPercent)% left")
-                    .font(.system(size: 16, weight: .semibold).monospacedDigit())
-                    .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
-
-                Spacer(minLength: 4)
-
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(ResetCountdown.text(until: resetsAt, now: now))
-                        .font(.system(size: 12, weight: .medium).monospacedDigit())
-
-                    Text(ResetCountdown.timestampText(until: resetsAt, includesDate: includesDate))
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(.secondary)
-                        .help(ResetCountdown.absoluteText(until: resetsAt, includesDate: includesDate))
-                }
+            Text("\(remainingPercent)% left")
+                .font(.system(size: 12, weight: .medium).monospacedDigit())
+                .foregroundStyle(UsageTint.color(for: remainingPercent))
                 .lineLimit(1)
-                .minimumScaleFactor(0.85)
-            }
+                .frame(width: 72, alignment: .leading)
 
-            GeometryReader { geometry in
-                let fraction = min(max(Double(remainingPercent) / 100, 0), 1)
+            Spacer(minLength: 4)
 
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color.primary.opacity(0.10))
-                    Capsule()
-                        .fill(Color.accentColor.opacity(0.78))
-                        .frame(width: geometry.size.width * fraction)
-                }
-            }
-            .frame(height: 3)
-            .accessibilityHidden(true)
+            Text(ResetCountdown.text(until: resetsAt, now: now))
+                .font(.system(size: 11, weight: .medium).monospacedDigit())
+                .lineLimit(1)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .minimumScaleFactor(0.8)
+                .help(ResetCountdown.absoluteText(until: resetsAt, includesDate: includesDate))
         }
     }
 }
@@ -150,5 +141,14 @@ enum ResetCountdown {
         let days = hours / 24
         let remainderHours = hours % 24
         return remainderHours == 0 ? "\(days)d" : "\(days)d \(remainderHours)h"
+    }
+}
+
+enum UsageTint {
+    static func color(for remainingPercent: Int?) -> Color {
+        guard let remainingPercent else { return .secondary }
+        if remainingPercent <= 30 { return Color(red: 0.91, green: 0.43, blue: 0.42) }
+        if remainingPercent <= 70 { return Color(red: 0.91, green: 0.72, blue: 0.34) }
+        return Color(red: 0.43, green: 0.81, blue: 0.55)
     }
 }

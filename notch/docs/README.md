@@ -7,13 +7,12 @@ Personal fork notes. Public release, website, and auto-update docs were removed.
 | Document | Purpose |
 | --- | --- |
 | [Product decisions](product-decisions.md) | Binding product and architecture decisions |
-| [Product requirements](product-requirements.md) | User-visible behavior and acceptance criteria |
 | [System design](system-design.md) | Components, storage, flows, interfaces, and failure behavior |
 | [Testing](testing.md) | Small, failure-oriented MVP test plan |
 
 ## Product definition
 
-Sidekick is a personal macOS menu-bar companion for Codex account switching and Usage. Add accounts through browser sign-in once, then switch accounts or check Usage from the menu bar. The app manages local authentication snapshots and activates the selected snapshot for Codex.
+Sidekick is a personal macOS notch companion for Codex account switching and Usage. The notch island is the only interface. Add accounts through browser sign-in, switch accounts, and check Usage there. The app manages local authentication snapshots and activates the selected snapshot for Codex.
 
 The intended user flow is:
 

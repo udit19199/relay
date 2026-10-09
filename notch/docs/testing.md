@@ -121,28 +121,29 @@ invalid overrides, startup output, paths containing spaces, and PATH inheritance
 
 Verify:
 
+- every saved account appears in the expanded island list, with compact per-account Usage rows and available reset-credit counts;
+- the panel height follows the account count within the screen bounds, while Add Account and Quit remain visible and long lists scroll;
 - current row highlight spans the account and reset action;
-- both account lists use the full saved email, including its domain, as the primary title;
-- account titles remain on one line with tail ellipsis, and hovering reveals the full title in a floating tooltip;
+- account rows use the full saved email, including its domain, as the primary title;
+- account titles fall back to the display name when no email is available;
 - missing or empty emails use the display name;
 - Add Account has no inline hint, and pending sign-in shows Cancel Sign-In with a progress indicator;
 - accounts with matching email prefixes and different domains remain distinguishable;
-- no checkmark or `Current` label exists;
-- the banked-reset action is a neutral capsule with reset icon and count, without a visible `Reset` label;
-- rows display unlabeled 5-hour then weekly lines, each with a compact visual bar, percentage, and reset countdown;
-- reset countdowns tick while the popover is open, and hovering one reveals the exact reset timestamp;
+- the current account row is highlighted;
+- available reset credits show a count and open a confirmation dialog;
+- rows show labeled 5-hour and weekly percentages with reset countdowns;
+- reset countdowns tick while the island is expanded, and hovering one reveals the exact reset timestamp;
 - the 5h row is omitted when data is absent;
-- the compact usage bars match their adjacent remaining percentages;
 - footer shows Add Account and Quit side by side;
-- switch and removal confirmations navigate inside the popover;
-- reopening after closing a secondary page starts on the account list;
+- switch, removal, and reset confirmations use native macOS dialogs;
 - switch confirmation describes Desktop and CLI consequences;
-- canceling switch or removal keeps the popover open and performs no mutation;
-- closing the browser during Add Account leaves the rest of the popover interactive, and Cancel Sign-In stops the pending login;
+- canceling switch or removal keeps the island open and performs no mutation;
+- closing the browser during Add Account leaves the island interactive, and Cancel Sign-In stops the pending login;
 - account rows display cached Usage while refresh runs;
 - a short-interval timer test proves that a manual refresh postpones the previous deadline and cancellation stops later rounds;
 - active profile remove button is disabled;
-- the menu-bar percentage always shows weekly usage alongside available 5-hour and weekly rows.
+- the compact island shows weekly percentage only when menu-bar clearance leaves room for its wings;
+- the expanded island shows available 5-hour and weekly rows.
 
 ## 6. Manual test matrix
 
@@ -150,9 +151,9 @@ With two real test accounts:
 
 1. add Account A;
 2. add Account B;
-3. open menu and confirm the existing weekly layout for both;
-4. confirm available 5-hour data appears above the weekly line without visible window labels, and an account without 5-hour data shows only the weekly line;
-5. confirm the menu-bar percentage still matches weekly Usage;
+3. expand the island and confirm the weekly Usage row appears for both;
+4. confirm available 5-hour data appears in its own row above weekly Usage, and an account without 5-hour data shows only the weekly row;
+5. confirm the compact island percentage matches weekly Usage when its wings are visible;
 6. start a Codex CLI under A;
 7. switch A → B;
 8. with an active local chat, leave Desktop's native quit dialog pending and confirm a close-stage error after 30 seconds, with account A still active and Desktop still running; then finish or stop the task and close Desktop normally;
@@ -162,7 +163,7 @@ With two real test accounts:
 12. switch B → A;
 13. disconnect network and confirm cached Usage remains visible with a warning;
 14. remove the cache, disconnect network, and confirm Usage unavailable appears;
-15. close the popover, wait five minutes, and confirm `usage-cache.json` receives a newer successful value;
+15. collapse the island, wait 30 seconds, and confirm `usage-cache.json` receives a newer successful value;
 16. force identity mismatch and confirm the original `auth.json` is restored while the mismatch remains visible;
 17. make `accounts.json` unwritable and confirm the original `auth.json` is restored while the state-write failure remains visible;
 18. make restoration fail and confirm both errors are shown.

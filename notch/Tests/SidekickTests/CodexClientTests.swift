@@ -4,6 +4,24 @@ import Testing
 @testable import Sidekick
 
 struct CodexClientTests {
+    @Test func usageFailureDoesNotLaunchCodex() async throws {
+        let fixture = try ScriptFixture(body: "touch \"$CODEX_HOME/launched\"")
+        defer { fixture.remove() }
+        let client = CodexClient(locator: .init(explicitURL: fixture.executable))
+        await #expect(throws: DirectUsageError.self) {
+            try await client.readWeeklyUsage(profileHome: fixture.root)
+        }
+        #expect(!FileManager.default.fileExists(atPath: fixture.root.appending(path: "launched").path))
+    }
+
+    @Test func readsHTTPWindowDurationsInSeconds() throws {
+        let data = Data(#"{"used_percent":58,"limit_window_seconds":604800,"reset_at":1750000000}"#.utf8)
+        let value = try JSONDecoder().decode(JSONValue.self, from: data)
+        let usage = try WeeklyUsageNormalizer.normalize([try #require(DirectUsageReader.window(value))])
+        #expect(usage.remainingPercent == 42)
+        #expect(usage.resetsAt == Date(timeIntervalSince1970: 1_750_000_000))
+    }
+
     @Test func fillsMissingWorkspaceIDFromTheSameProfileCredential() async throws {
         let fixture = try ScriptFixture(body: #"""
         while IFS= read -r line; do
@@ -21,47 +39,6 @@ struct CodexClientTests {
         let identity = try await client.readIdentity(profileHome: fixture.root)
         #expect(identity.accountID == "workspace")
         #expect(identity.email == "same@example.test")
-    }
-
-    @Test func usageReadCanBeCancelledBeforeItsRequestTimeout() async throws {
-        let fixture = try ScriptFixture(body: #"""
-        while IFS= read -r line; do
-          case "$line" in
-            *initialized*) ;;
-            *initialize*) printf '%s\n' '{"id":0,"result":{}}' ;;
-            *rateLimits*) touch "$CODEX_HOME/reading" ;;
-          esac
-        done
-        """#)
-        defer { fixture.remove() }
-        let client = CodexClient(locator: .init(explicitURL: fixture.executable), requestTimeout: .seconds(20))
-        let read = Task { try await client.readWeeklyUsage(profileHome: fixture.root) }
-        for _ in 0..<100 {
-            if FileManager.default.fileExists(atPath: fixture.root.appending(path: "reading").path) { break }
-            try await Task.sleep(for: .milliseconds(20))
-        }
-        #expect(FileManager.default.fileExists(atPath: fixture.root.appending(path: "reading").path))
-        let started = ContinuousClock.now
-        read.cancel()
-        await #expect(throws: CancellationError.self) { try await read.value }
-        #expect(ContinuousClock.now - started < .seconds(2))
-    }
-
-    @Test func keepsCodexQuotaSeparateFromOtherMeteredBuckets() async throws {
-        let fixture = try ScriptFixture(body: #"""
-        while IFS= read -r line; do
-          case "$line" in
-            *initialized*) ;;
-            *initialize*) printf '%s\n' '{"id":0,"result":{}}' ;;
-            *rateLimits*) printf '%s\n' '{"id":1,"result":{"rateLimits":{"secondary":{"usedPercent":50,"windowDurationMins":10080,"resetsAt":100}},"rateLimitsByLimitId":{"codex":{"primary":{"usedPercent":10,"windowDurationMins":300,"resetsAt":100},"secondary":{"usedPercent":20,"windowDurationMins":10080,"resetsAt":100}},"other-product":{"primary":{"usedPercent":99,"windowDurationMins":300,"resetsAt":100},"secondary":{"usedPercent":95,"windowDurationMins":11520,"resetsAt":100}}}}}' ;;
-          esac
-        done
-        """#)
-        defer { fixture.remove() }
-        let client = CodexClient(locator: .init(explicitURL: fixture.executable), requestTimeout: .seconds(2))
-        let usage = try await client.readWeeklyUsage(profileHome: fixture.root)
-        #expect(usage.remainingPercent == 80)
-        #expect(usage.fiveHourRemainingPercent == 90)
     }
 
     @Test func preservesFinalResponseWithoutNewline() async throws {
@@ -176,39 +153,6 @@ struct CodexClientTests {
                 "CODEX_CLI_PATH": "/nonexistent/sidekick-test",
             ])
         }
-    }
-
-    @Test func performsHandshakeBeforeReadingFiveHourAndWeeklyUsage() async throws {
-        let fixture = try ScriptFixture(body: """
-        state=0
-        while IFS= read -r line; do
-          case "$line" in
-            *initialized*)
-              test "$state" -eq 1 || exit 11
-              state=2
-              ;;
-            *initialize*)
-              state=1
-              printf '%s\n' '{"id":0,"result":{}}'
-              ;;
-            *rateLimits*)
-              test "$state" -eq 2 || exit 12
-              printf '%s\n' '{"id":1,"result":{"rateLimitsByLimitId":{"codex":{"primary":{"usedPercent":80,"windowDurationMins":300,"resetsAt":100},"secondary":{"usedPercent":58,"windowDurationMins":10080,"resetsAt":1750000000}}}}}'
-              ;;
-          esac
-        done
-        """)
-        defer { fixture.remove() }
-        let client = CodexClient(
-            locator: CodexExecutableLocator(explicitURL: fixture.executable),
-            requestTimeout: .seconds(2)
-        )
-
-        let usage = try await client.readWeeklyUsage(profileHome: fixture.root)
-        #expect(usage.remainingPercent == 42)
-        #expect(usage.resetsAt == Date(timeIntervalSince1970: 1_750_000_000))
-        #expect(usage.fiveHourRemainingPercent == 20)
-        #expect(usage.fiveHourResetsAt == Date(timeIntervalSince1970: 100))
     }
 
     @Test func decodesAccountIdentity() async throws {

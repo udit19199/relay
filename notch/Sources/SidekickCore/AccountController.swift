@@ -22,7 +22,7 @@ open class AccountController {
     private var usageRefreshTask: Task<Void, Never>?
     private var nextUsageRefreshTask: Task<Void, Never>?
     private var addAccountTask: Task<Void, Never>?
-    private var backgroundUsageRefreshInterval: Duration = .seconds(300)
+    private var backgroundUsageRefreshInterval: Duration = .seconds(30)
     private var isBackgroundUsageRefreshEnabled = false
 
     public init(
@@ -88,7 +88,7 @@ open class AccountController {
         await usageRefreshTask?.value
     }
 
-    public func startBackgroundUsageRefresh(every interval: Duration = .seconds(300)) async {
+    public func startBackgroundUsageRefresh(every interval: Duration = .seconds(30)) async {
         backgroundUsageRefreshInterval = interval
         isBackgroundUsageRefreshEnabled = true
         await start()

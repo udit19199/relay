@@ -26,6 +26,7 @@ chmod 0755 "$MACOS_DIR/Sidekick"
 ditto "$BUILD_DIR/$RESOURCE_BUNDLE" "$RESOURCES_DIR/$RESOURCE_BUNDLE"
 ditto "$APP_ICON" "$RESOURCES_DIR/AppIcon.icns"
 cp "$PROJECT_DIR/LICENSE" "$RESOURCES_DIR/LICENSE.txt"
+cp "$PROJECT_DIR/LICENSE-GPL-3.0-or-later" "$RESOURCES_DIR/GPL-3.0-or-later.txt"
 
 /usr/bin/plutil -create xml1 "$CONTENTS_DIR/Info.plist"
 /usr/bin/plutil -insert CFBundleDevelopmentRegion -string en "$CONTENTS_DIR/Info.plist"

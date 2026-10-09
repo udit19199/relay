@@ -490,18 +490,7 @@ public struct CodexClient: AccountClient {
     }
 
     public func readWeeklyUsage(profileHome: URL) async throws -> WeeklyUsage {
-        let result = try await withSession(profileHome: profileHome) { session in
-            try await session.request(
-                method: "account/rateLimits/read",
-                id: 1,
-                timeout: requestTimeout
-            )
-        }
-        return try WeeklyUsageNormalizer.normalize(
-            parseWindows(result),
-            availableResetCount: Self.parseResetCreditCount(result),
-            availableResetCredits: Self.parseResetCredits(result)
-        )
+        try await DirectUsageReader(timeout: requestTimeout).read(profileHome: profileHome)
     }
 
     public func redeemBankedReset(profileHome: URL) async throws {
@@ -612,13 +601,6 @@ public struct CodexClient: AccountClient {
         return AccountIdentity(accountID: accountID, email: email)
     }
 
-    private func parseWindows(_ value: JSONValue) -> [RateLimitWindow] {
-        guard let bucket = value["rateLimitsByLimitId"]?["codex"] else {
-            return []
-        }
-        return [bucket["primary"], bucket["secondary"]].compactMap(parseWindow)
-    }
-
     private static func parseResetCreditCount(_ value: JSONValue) -> Int? {
         guard let count = value["rateLimitResetCredits"]?["availableCount"]?.intValue,
               count >= 0
@@ -648,19 +630,4 @@ public struct CodexClient: AccountClient {
         }
     }
 
-    private func parseWindow(_ value: JSONValue?) -> RateLimitWindow? {
-        guard let value,
-              let used = value["usedPercent"]?.doubleValue,
-              let duration = value["windowDurationMins"]?.intValue
-                ?? value["durationMinutes"]?.intValue,
-              let reset = value["resetsAt"]?.doubleValue
-        else {
-            return nil
-        }
-        return RateLimitWindow(
-            usedPercent: used,
-            windowDurationMins: duration,
-            resetsAt: reset
-        )
-    }
 }
