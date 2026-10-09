@@ -130,7 +130,8 @@ Verify:
 - accounts with matching email prefixes and different domains remain distinguishable;
 - no checkmark or `Current` label exists;
 - reset text remains on the name line in the default compact layout;
-- rows display separate 5h and 7d rows with percentages and reset times when both values exist;
+- rows display separate 5h and 7d rows with percentages and reset countdowns when both values exist;
+- reset countdowns tick while the popover is open, and hovering one reveals the exact reset timestamp;
 - the 5h row is omitted when data is absent;
 - Usage labels remain fully visible;
 - progress-bar accessibility value equals `NN% left`;

@@ -13,7 +13,7 @@ The user should understand the product after opening the menu once. The main pat
 - macOS menu-bar application;
 - saved local account profiles;
 - one weekly Usage value and an optional exact 5-hour Usage value per account;
-- reset times for available Usage windows;
+- reset countdowns for available Usage windows;
 - account switching;
 - add account;
 - remove inactive account;
@@ -36,7 +36,7 @@ The user should understand the product after opening the menu once. The main pat
 
 ### US-1: Inspect accounts
 
-As a user, I can open the menu-bar popover and immediately see saved accounts, weekly Usage, and reset time. I can optionally enable a 5-hour row.
+As a user, I can open the menu-bar popover and immediately see saved accounts, weekly Usage, and a reset countdown. I can optionally see a 5-hour row.
 
 ### US-2: Switch accounts
 
@@ -60,31 +60,31 @@ The popover content width is 326 points.
 
 ### 5.1 Layout
 
-With `Show 5-hour Usage` disabled, each row keeps the compact layout:
+Each row keeps the compact layout:
 
 ```text
-[avatar]  Email Address                    Resets Aug 25, 9:20 AM
-          Usage  [================----]                 42% left
+[avatar]  Email Address
+          7d   [================----]     42%   Resets in 3d 4h
 ```
 
 Constraints:
 
 - use the full saved email as the title, falling back to the display name when email is missing or empty;
 - keep the title on one line with tail ellipsis and show its full text in a floating tooltip on hover;
-- reset time is on the name line;
-- `Usage` is the only quota label;
+- each Usage line ends with its reset countdown;
+- `7d` is the weekly quota label;
 - the percentage is remaining percentage;
 - the progress bar width equals the displayed percentage;
 - the current account is a row highlight;
 - no checkmark is shown;
 - no `Current` text is shown.
 
-With `Show 5-hour Usage` enabled and exact 5-hour data available, the row expands:
+With exact 5-hour data available, the row expands:
 
 ```text
 [avatar]  Email Address
-          5h   [==========------]  65%  Resets 2:20 PM
-          7d   [========--------]  42%  Resets Aug 25, 9:20 AM
+          5h   [==========------]        65%   Resets in 2h 14m
+          7d   [========--------]         42%   Resets in 3d 4h
 ```
 
 The 5-hour line is omitted when its data is absent. The UI does not show an unavailable placeholder for that line. Window labels remain fully visible.
@@ -126,17 +126,17 @@ Examples:
 
 ### 5.4 Reset formatting
 
-If `resetsAt` is available, render it in the user's locale and timezone:
+Each Usage line shows how long until that window resets, so the popover answers "when can I code again" without mental math:
 
 ```text
-Resets Aug 25, 9:20 AM
+Resets in 2h 14m
+Resets in 3d 4h
+Resets in 45m
+Resets in a moment
+Resets now
 ```
 
-If it is absent:
-
-```text
-Reset unknown
-```
+The countdown ticks while the popover is open. Hovering the countdown reveals the exact reset timestamp, with the weekday-level date included for the weekly window and omitted for the 5-hour window. An unavailable Usage window shows the unavailable state instead of a reset placeholder.
 
 ## 6. Main-menu footer
 

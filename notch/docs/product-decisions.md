@@ -19,12 +19,12 @@ With the default settings, each saved account row shows:
 
 - avatar or initials;
 - display name;
-- `Resets …` on the same line as the name;
+- a reset countdown at the end of the Usage line;
 - the label `Usage`;
 - one progress bar;
 - one `NN% left` value.
 
-When `Show 5-hour Usage` is enabled and an exact five-hour window is available, the row expands to separate `5h` and `7d` lines. Each line contains its own progress bar, remaining percentage, and reset time. If the 5-hour window is missing, the row shows only `7d` and does not show an unavailable placeholder.
+When an exact five-hour window is available, the row expands to separate `5h` and `7d` lines. Each line contains its own progress bar, remaining percentage, and reset countdown. If the 5-hour window is missing, the row shows only `7d` and does not show an unavailable placeholder.
 
 The current account is represented by a highlighted row. It does not use:
 

@@ -5,6 +5,7 @@ struct AccountRow: View {
     let account: AccountProfile
     let usageState: UsageViewState
     let isActive: Bool
+    let now: Date
     @State private var isHovering = false
 
     private var accountTitle: String {
@@ -110,11 +111,12 @@ struct AccountRow: View {
                 .foregroundStyle(.secondary)
                 .frame(width: 31, alignment: .trailing)
 
-            Text(resetText(for: resetsAt, includesDate: includesDate))
+            Text(ResetCountdown.text(until: resetsAt, now: now))
                 .font(.system(size: 9.5).monospacedDigit())
                 .foregroundStyle(.tertiary)
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
+                .help(ResetCountdown.absoluteText(until: resetsAt, includesDate: includesDate))
         }
     }
 
@@ -124,12 +126,32 @@ struct AccountRow: View {
         }
         return Color.primary.opacity(isHovering ? 0.055 : 0)
     }
+}
 
-    private func resetText(for resetsAt: Date, includesDate: Bool) -> String {
+/// Codex-bar style reset countdowns: how long until this window comes back.
+enum ResetCountdown {
+    static func text(until resetsAt: Date, now: Date) -> String {
+        guard resetsAt > now else { return L10n.string("resets_now") }
+        return String(format: L10n.string("resets_in"), duration(resetsAt.timeIntervalSince(now)))
+    }
+
+    /// The exact timestamp, shown on hover so the countdown keeps the row compact.
+    static func absoluteText(until resetsAt: Date, includesDate: Bool) -> String {
         let date = includesDate
             ? resetsAt.formatted(.dateTime.month(.abbreviated).day().hour().minute())
             : resetsAt.formatted(.dateTime.hour().minute())
         return "\(L10n.string("resets")) \(date)"
+    }
+
+    private static func duration(_ interval: TimeInterval) -> String {
+        let totalMinutes = Int(interval / 60)
+        if totalMinutes < 1 { return L10n.string("duration_moment") }
+        if totalMinutes < 60 { return "\(totalMinutes)m" }
+        let hours = totalMinutes / 60
+        if hours < 24 { return "\(hours)h \(totalMinutes % 60)m" }
+        let days = hours / 24
+        let remainderHours = hours % 24
+        return remainderHours == 0 ? "\(days)d" : "\(days)d \(remainderHours)h"
     }
 }
 

@@ -78,11 +78,14 @@ struct MenuBarPopover: View {
                                 page = .confirmSwitch(account)
                             }
                         } label: {
-                            AccountRow(
-                                account: account,
-                                usageState: model.usageStates[account.id] ?? .idle,
-                                isActive: account.id == model.activeAccountID
-                            )
+                            TimelineView(.periodic(from: .now, by: 30)) { context in
+                                AccountRow(
+                                    account: account,
+                                    usageState: model.usageStates[account.id] ?? .idle,
+                                    isActive: account.id == model.activeAccountID,
+                                    now: context.date
+                                )
+                            }
                         }
                         .buttonStyle(.plain)
                         .disabled(model.isMutating)
