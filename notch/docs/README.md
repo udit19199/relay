@@ -13,7 +13,7 @@ Personal fork notes. Public release, website, and auto-update docs were removed.
 
 ## Product definition
 
-Codex Account Switcher is a simple local menu-bar app for ordinary Mac users. The public workflow is: add accounts through browser sign-in once, choose from the menu bar, and let the app complete the confirmed Codex Desktop handoff. It requires no Terminal commands or config-file editing. Internally, the app manages a small set of authentication snapshots and activates the selected snapshot for Codex.
+Sidekick is a personal macOS menu-bar companion for Codex account switching and Usage. Add accounts through browser sign-in once, then switch accounts or check Usage from the menu bar. The app manages local authentication snapshots and activates the selected snapshot for Codex.
 
 The intended user flow is:
 

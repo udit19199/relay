@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-Codex Account Switcher is a native macOS menu-bar application that manages multiple local Codex authentication snapshots.
+Sidekick is a native macOS menu-bar application that manages multiple local Codex authentication snapshots.
 
 The system has one core operation:
 
@@ -89,20 +89,23 @@ The application is a single process. There is no daemon and no local network ser
 ## 5. Source layout
 
 ```text
-Sources/CodexAccountSwitcher/
-├── SwitcherApp.swift
+Sources/Sidekick/
+├── SidekickApp.swift
 ├── AppModel.swift
 ├── MenuBarPopover.swift
 ├── AccountRow.swift
-├── Models.swift
-├── Localization.swift
-├── AccountStore.swift
-├── CodexClient.swift
-├── WeeklyUsageNormalizer.swift
-├── SwitchService.swift
 └── DesktopController.swift
 
-Tests/CodexAccountSwitcherTests/
+Sources/SidekickCore/
+├── AccountController.swift
+├── AccountStore.swift
+├── CodexClient.swift
+├── CredentialIdentity.swift
+├── Models.swift
+├── SwitchService.swift
+└── WeeklyUsageNormalizer.swift
+
+Tests/SidekickTests/
 ```
 
 Avoid adding protocol layers until a second implementation actually exists. Small concrete types are preferable for the MVP.
@@ -115,7 +118,7 @@ Avoid adding protocol layers until a second implementation actually exists. Smal
 ~/.codex/
 └── auth.json                         # active credential used by Codex
 
-~/Library/Application Support/Codex Account Switcher/
+~/Library/Application Support/Sidekick/
 ├── accounts.json                     # profile metadata and active account ID
 ├── usage-cache.json                  # last successful normalized Usage per profile
 └── accounts/
@@ -128,7 +131,7 @@ Avoid adding protocol layers until a second implementation actually exists. Smal
 Directory permissions:
 
 ```text
-Codex Account Switcher directory 0700
+Sidekick directory 0700
 accounts/<profile-id>                 0700
 auth.json                             0600
 accounts.json                         0600
@@ -136,6 +139,8 @@ usage-cache.json                      0600
 ```
 
 The implementation sets these permissions when creating files. It does not build a separate permission-audit or repair subsystem.
+
+On first launch, Sidekick moves `~/Library/Application Support/Codex Account Switcher/` to the new data path. If both folders exist, it leaves both unchanged and reports a migration conflict rather than overwrite either set of account data.
 
 ### 6.2 `accounts.json`
 
@@ -166,7 +171,7 @@ The implementation sets these permissions when creating files. It does not build
 Credential activation uses a temp file and rename in the same directory:
 
 ```text
-copy target auth bytes to ~/.codex/auth.json.switcher-<uuid>.tmp
+copy target auth bytes to ~/.codex/auth.json.sidekick-<uuid>.tmp
 → chmod 0600
 → rename the temporary file to auth.json
 ```
@@ -249,12 +254,12 @@ Lookup order:
 2. the login shell's shared `CODEX_CLI_PATH`, resolved through its `PATH` when it is a command name;
 3. the login shell's `codex` command when no shared override is set.
 
-The runtime version is never pinned. Each operation resolves the current system command. The same login-shell PATH is passed to app-server so npm launchers can resolve Node. A missing command or invalid explicit path is an error; the switcher does not silently start another bundled version.
+The runtime version is never pinned. Each operation resolves the current system command. The same login-shell PATH is passed to app-server so npm launchers can resolve Node. A missing command or invalid explicit path is an error; Sidekick does not silently start another bundled version.
 
 If not found, show one direct error:
 
 ```text
-Codex CLI was not found. Install Codex and reopen Account Switcher.
+Codex CLI was not found. Install Codex and reopen Sidekick.
 ```
 
 Do not add download automation or multiple package-manager fallbacks in the MVP.
@@ -274,7 +279,7 @@ The client communicates with newline-delimited JSON-RPC messages over stdin/stdo
 Basic handshake:
 
 ```json
-{"method":"initialize","id":1,"params":{"clientInfo":{"name":"codex_account_switcher","title":"Codex Account Switcher","version":"0.1.7"}}}
+{"method":"initialize","id":1,"params":{"clientInfo":{"name":"sidekick","title":"Sidekick","version":"0.1.7"}}}
 {"method":"initialized","params":{}}
 ```
 
@@ -312,8 +317,9 @@ weekly = longest window where 8640 <= windowDurationMins <= 11520
 The client intentionally ignores:
 
 - any short-duration window other than exactly 300 minutes;
-- reset-credit details;
 - windows outside six through eight days.
+
+Read `rateLimitResetCredits.availableCount` and optional `credits` details from the same response. The count is authoritative and detail rows may be capped. Cache available credit IDs and optional expiry dates with the usage data so old cache entries remain decodable; the menu only offers redemption when the count is positive.
 
 Normalized output:
 
@@ -322,9 +328,12 @@ WeeklyUsage(
     remainingPercent: clamp(round(100 - weekly.usedPercent), 0, 100),
     resetsAt: weekly.resetsAt,
     fiveHourRemainingPercent: fiveHour.map { clamp(round(100 - $0.usedPercent), 0, 100) },
-    fiveHourResetsAt: fiveHour?.resetsAt
+    fiveHourResetsAt: fiveHour?.resetsAt,
+    availableResetCount: result.rateLimitResetCredits?.availableCount
 )
 ```
+
+Optional available reset-credit IDs and expiry dates are carried alongside that normalized usage value when Codex returns detail rows.
 
 If no six-to-eight-day window exists, return `weeklyUsageUnavailable`. Missing 5-hour data leaves the optional fields empty. A 4-hour or 6-hour window never populates them. The client makes one `account/rateLimits/read` request and parses both windows from the same response whether the display setting is on or off.
 
@@ -338,6 +347,10 @@ Use one fixed 20-second process/request timeout. Login completion has a separate
 
 This prevents a blocked row refresh from hanging indefinitely without creating a retry framework.
 
+### 9.5 Banked reset redemption
+
+After the user confirms, start a Codex app-server in the selected account's profile home, read `account/rateLimits/read` again, and fail closed if reset-credit availability is missing or zero. Redeem one existing credit using `account/rateLimitResetCredit/consume` with a fresh `idempotencyKey` and the earliest-expiring returned `creditId`; omit the ID when details are unavailable so Codex selects a credit. The action never uses a paid-reset purchase path. On completion, refresh usage for every saved account.
+
 ## 10. Usage service
 
 ### 10.1 Profile-specific `CODEX_HOME`
@@ -345,10 +358,10 @@ This prevents a blocked row refresh from hanging indefinitely without creating a
 Each account directory acts as a minimal Codex home for identity and Usage calls:
 
 ```text
-~/Library/Application Support/Codex Account Switcher/accounts/<profile-id>/auth.json
+~/Library/Application Support/Sidekick/accounts/<profile-id>/auth.json
 ```
 
-The switcher starts app-server with `CODEX_HOME` set to that directory. This lets it read Usage without changing the active `~/.codex/auth.json`.
+Sidekick starts app-server with `CODEX_HOME` set to that directory. This lets it read Usage without changing the active `~/.codex/auth.json`.
 
 ### 10.2 Refresh behavior
 
@@ -383,7 +396,7 @@ Use `NSRunningApplication` for the Codex Desktop bundle identifier and call `ter
 
 Codex Desktop can display a quit confirmation while work is active. Allow up to 30 seconds for its normal exit, including its history and settings flush. Never force-terminate Desktop. If the quit request is rejected or Desktop remains running, report a close-stage error before saving or replacing credentials. The user can finish or stop active tasks, close Desktop, and switch again. Cancellation also stops the wait.
 
-The switcher only observes the Desktop application's exit; it does not terminate CLI processes or claim to repair Codex's history database. Account RPCs read the login shell's `PATH` and shared `CODEX_CLI_PATH` setting. A bare command such as `codex` resolves through that PATH; an explicit absolute path must be executable. The child receives the same PATH so npm launchers can find Node. There is no switcher-specific override or automatic selection of another bundled CLI.
+Sidekick only observes the Desktop application's exit; it does not terminate CLI processes or claim to repair Codex's history database. Account RPCs read the login shell's `PATH` and shared `CODEX_CLI_PATH` setting. A bare command such as `codex` resolves through that PATH; an explicit absolute path must be executable. The child receives the same PATH so npm launchers can find Node. There is no Sidekick-specific override or automatic selection of another bundled CLI.
 
 If Desktop is not running, `close()` succeeds immediately.
 
@@ -395,7 +408,7 @@ If launch fails, return the AppKit error. The account switch remains at whatever
 
 ### 11.3 CLI processes
 
-The switcher never enumerates, terminates, signals, or restarts `codex` CLI processes.
+Sidekick never enumerates, terminates, signals, or restarts `codex` CLI processes.
 
 An existing CLI process may have already loaded credentials into memory. Therefore:
 
@@ -496,7 +509,7 @@ The registry must identify one active account. After Desktop exits, read the sha
 
 ```text
 copy ~/.codex/auth.json
-→ accounts/<activeAccountID>/auth.json.switcher-<uuid>.tmp
+→ accounts/<activeAccountID>/auth.json.sidekick-<uuid>.tmp
 → rename to accounts/<activeAccountID>/auth.json
 ```
 
@@ -506,7 +519,7 @@ If the active file is missing or unreadable, stop and show the error. Do not con
 
 ```text
 copy accounts/<targetID>/auth.json
-→ ~/.codex/auth.json.switcher-<uuid>.tmp
+→ ~/.codex/auth.json.sidekick-<uuid>.tmp
 → chmod 0600
 → rename the temporary file to ~/.codex/auth.json
 ```
@@ -652,13 +665,11 @@ This is a simple in-process UI invariant, not a cross-process lock service.
 
 Browser sign-in uses `isAddingAccount` and a separately retained task. It does not hold the mutation lock while waiting for the browser callback. The main screen replaces Add Account with a cancel action during this wait; canceling terminates the app-server session and restores the normal button without showing an error.
 
-`MenuBarPopover` owns an in-memory page enum for the account list, switch confirmation, and removal confirmation. All secondary pages render inside the same 326-point popover. Cancel and Back change only page state. The root view resets the page to the account list on every popover appearance.
+`MenuBarPopover` owns an in-memory page enum for the account list, switch confirmation, and removal confirmation. All secondary pages render inside the same 300-point popover. Cancel and Back change only page state. The root view resets the page to the account list on every popover appearance.
 
-## 17. Localization
+## 17. Product copy
 
-All product copy lives in a single English string table in `Localization.swift`, keyed by short identifiers such as `usage`, `switch_body`, or `remove_title`. `AccountController.text(_:)` looks up a key, and unmatched keys fall back to the key itself so a missing entry is visible instead of blank.
-
-Errors produced by switcher-owned validation use message keys; underlying system errors keep their English technical details underneath.
+Product copy lives as inline English string literals at the call site. There is one user and one language, so no key table or localization layer exists.
 
 ## 18. Observability
 
@@ -700,4 +711,4 @@ Do not add the following unless a new product decision explicitly requires it:
 
 First activation skips saving an original credential when both active ID and shared auth are absent; recheck file absence after Desktop closes. If verification or commit fails, clear only the newly installed active auth and preserve the saved target profile. Normal switches retain the existing original-credential restoration path.
 
-AccountStore rejects duplicate identities on add. Login cleanup checks the registry before deleting the attempt directory. The updater uses the semantic release version as CFBundleVersion, eliminating a separately maintained build number.
+AccountStore rejects duplicate identities on add. Login cleanup checks the registry before deleting the attempt directory. The app bundle's `CFBundleShortVersionString` and `CFBundleVersion` both come from `RELEASE_VERSION` in `scripts/package-local-app.sh` (default `0.1.17`), so there is no separately maintained build number.

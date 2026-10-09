@@ -1,6 +1,6 @@
-# Codex Account Switcher (personal fork)
+# Sidekick (personal fork)
 
-Menu-bar app to switch Codex accounts on this Mac. Personal use only. No auto-update, no releases.
+A personal macOS menu-bar companion for Codex. Switch accounts and check Usage without opening a settings page. No auto-update or releases.
 
 ## Use
 
@@ -8,7 +8,7 @@ Menu-bar app to switch Codex accounts on this Mac. Personal use only. No auto-up
 2. Add each account once through browser sign-in.
 3. Pick an account, confirm, and let it close, switch, verify, and reopen Codex Desktop.
 
-Saved accounts stay on this Mac in `~/Library/Application Support/Codex Account Switcher/`.
+Saved accounts stay on this Mac in `~/Library/Application Support/Sidekick/`. On first launch, Sidekick moves existing data from `~/Library/Application Support/Codex Account Switcher/`.
 
 ## Behavior
 
@@ -24,7 +24,7 @@ swift test
 ./scripts/package-local-app.sh
 ```
 
-The app bundle is written to `.build/release/Codex Account Switcher.app`.
+The app bundle is written to `.build/release/Sidekick.app`.
 
 ## Docs
 

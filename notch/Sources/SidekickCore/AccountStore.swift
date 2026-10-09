@@ -26,28 +26,26 @@ public actor AccountStore: AccountStoring {
 
     public init(
         baseURL: URL? = nil,
-        legacyBaseURL: URL? = nil,
         activeHomeURL: URL? = nil,
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        legacyBaseURL: URL? = nil
     ) {
         self.fileManager = fileManager
         let applicationSupportURL = fileManager.urls(
             for: .applicationSupportDirectory,
             in: .userDomainMask
         )[0]
-        if let baseURL {
-            self.baseURL = baseURL
-            self.legacyBaseURL = legacyBaseURL
-        } else {
-            self.baseURL = applicationSupportURL.appending(
+        self.baseURL = baseURL
+            ?? applicationSupportURL.appending(
+                path: "Sidekick",
+                directoryHint: .isDirectory
+            )
+        self.legacyBaseURL = legacyBaseURL ?? (baseURL == nil
+            ? applicationSupportURL.appending(
                 path: "Codex Account Switcher",
                 directoryHint: .isDirectory
             )
-            self.legacyBaseURL = applicationSupportURL.appending(
-                path: "Codex Account Switcher Lite",
-                directoryHint: .isDirectory
-            )
-        }
+            : nil)
         self.activeHomeURL = activeHomeURL
             ?? ProcessInfo.processInfo.environment["CODEX_HOME"].map { URL(fileURLWithPath: $0) }
             ?? fileManager.homeDirectoryForCurrentUser.appending(path: ".codex", directoryHint: .isDirectory)
@@ -204,7 +202,7 @@ public actor AccountStore: AccountStoring {
             do {
                 try saveRegistry(original)
             } catch {
-                throw NSError(domain: "CodexAccountSwitcher.AccountStore", code: 1, userInfo: [
+                throw NSError(domain: "Sidekick.AccountStore", code: 1, userInfo: [
                     NSLocalizedDescriptionKey: "\(removalError.localizedDescription) Restoring the account list also failed: \(error.localizedDescription)",
                 ])
             }
@@ -273,9 +271,10 @@ public actor AccountStore: AccountStoring {
     }
 
     private func prepareDirectories() throws {
-        if !fileManager.fileExists(atPath: baseURL.path),
-           let legacyBaseURL,
-           fileManager.fileExists(atPath: legacyBaseURL.path) {
+        if let legacyBaseURL, fileManager.fileExists(atPath: legacyBaseURL.path) {
+            guard !fileManager.fileExists(atPath: baseURL.path) else {
+                throw AccountStoreError.storageMigrationConflict
+            }
             try fileManager.moveItem(at: legacyBaseURL, to: baseURL)
         }
         try fileManager.createDirectory(at: baseURL, withIntermediateDirectories: true)
@@ -300,7 +299,7 @@ public actor AccountStore: AccountStoring {
     private func secureAtomicWrite(_ bytes: Data, to destination: URL) throws {
         let temporary = destination
             .deletingLastPathComponent()
-            .appending(path: "\(destination.lastPathComponent).switcher-\(UUID().uuidString).tmp")
+            .appending(path: "\(destination.lastPathComponent).sidekick-\(UUID().uuidString).tmp")
         let descriptor = Darwin.open(
             temporary.path,
             O_WRONLY | O_CREAT | O_EXCL,

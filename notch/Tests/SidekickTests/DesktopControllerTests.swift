@@ -1,7 +1,7 @@
-@testable import SwitcherCore
+@testable import SidekickCore
 import Foundation
 import Testing
-@testable import CodexAccountSwitcher
+@testable import Sidekick
 
 struct DesktopControllerTests {
     @Test func allowsHistoryFlushToTakeLongerThanTwoSeconds() async throws {

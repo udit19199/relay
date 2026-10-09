@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import SwitcherCore
+@testable import SidekickCore
 
 struct CodexExecutableLocatorTests {
     @Test(arguments: [
@@ -54,24 +54,12 @@ struct CodexExecutableLocatorTests {
         try checkLoginShell(shell)
     }
 
-    @Test(.enabled(if: fishPath != nil, "Install fish to run its login-shell regression check"))
-    func readsFishLoginShellConfiguration() throws {
-        try checkLoginShell(#require(Self.fishPath))
-    }
-
-    private static var fishPath: String? {
-        ["/opt/homebrew/bin/fish", "/usr/local/bin/fish", "/usr/bin/fish"]
-            .first { FileManager.default.isExecutableFile(atPath: $0) }
-    }
-
     private func checkLoginShell(_ shell: String) throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("codex-shell-tests-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
         let bin = root.appendingPathComponent("bin with spaces")
-        let fishConfig = root.appendingPathComponent(".config/fish")
         try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: fishConfig, withIntermediateDirectories: true)
         for name in ["codex", "custom-codex"] {
             let executable = bin.appendingPathComponent(name)
             // The child must inherit the login PATH, including paths containing spaces.
@@ -79,24 +67,18 @@ struct CodexExecutableLocatorTests {
             try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
         }
 
-        let isFish = shell.hasSuffix("/fish")
-        let startupName = isFish ? ".config/fish/config.fish"
-            : shell.hasSuffix("/zsh") ? ".zprofile"
+        let startupName = shell.hasSuffix("/zsh") ? ".zprofile"
             : shell.hasSuffix("/bash") ? ".bash_profile" : ".profile"
         let environment = [
             "SHELL": shell, "HOME": root.path, "ZDOTDIR": root.path,
-            "XDG_CONFIG_HOME": root.appendingPathComponent(".config").path,
             "PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "FIXTURE_BIN": bin.path,
         ]
         for override in [nil, "", "custom-codex", bin.appendingPathComponent("custom-codex").path,
                          "/nonexistent/codex-shell-test"] as [String?] {
-            var startup = isFish
-                ? "set -gx PATH \"$FIXTURE_BIN\" /usr/bin /bin /usr/sbin /sbin\n"
-                : "export PATH=\"$FIXTURE_BIN:/usr/bin:/bin:/usr/sbin:/sbin\"\n"
+            var startup = "export PATH=\"$FIXTURE_BIN:/usr/bin:/bin:/usr/sbin:/sbin\"\n"
             if let override {
                 // Deliberately leave the override unexported, as a shell-local setting.
-                startup += isFish ? "set -g CODEX_CLI_PATH '\(override)'\n"
-                    : "CODEX_CLI_PATH='\(override)'\n"
+                startup += "CODEX_CLI_PATH='\(override)'\n"
             }
             startup += "printf 'login startup output\\n'\n"
             try Data(startup.utf8).write(to: root.appendingPathComponent(startupName))

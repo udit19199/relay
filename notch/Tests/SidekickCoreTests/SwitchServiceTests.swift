@@ -1,19 +1,10 @@
-@testable import SwitcherCore
+@testable import SidekickCore
 import Foundation
 import Testing
 
 
 struct SwitchServiceTests {
-    @Test func quitFailureLeavesBothAccountsUntouched() async {
-        let fixture = SwitchFixture(failure: .closeDesktop)
-        await expectFailure(fixture, stage: .closeDesktop)
-        #expect(await fixture.recorder.snapshot() == [.closeDesktop])
-        #expect(await fixture.store.credentialOwner() == fixture.original.id)
-        #expect(await fixture.store.activeAccountID() == fixture.original.id)
-        #expect(await fixture.store.restoredProfileIDs().isEmpty)
-    }
-
-    @Test func executesTheSixSwitchStagesInOrder() async throws {
+    @Test func executesTheFourSwitchStagesInOrder() async throws {
         let fixture = SwitchFixture(failure: nil)
 
         try await fixture.service.switchAccount(to: fixture.target.id)
@@ -83,16 +74,6 @@ struct SwitchServiceTests {
         #expect(await fixture.store.restoredProfileIDs().isEmpty)
     }
 
-    @Test func reopenFailureAfterCommitKeepsTargetAccount() async {
-        let fixture = SwitchFixture(failure: .reopenDesktop)
-
-        await expectFailure(fixture, stage: .reopenDesktop)
-
-        #expect(await fixture.store.credentialOwner() == fixture.target.id)
-        #expect(await fixture.store.activeAccountID() == fixture.target.id)
-        #expect(await fixture.store.restoredProfileIDs().isEmpty)
-    }
-
     @Test func reportsRestorationFailureAlongsideOriginalFailure() async {
         let fixture = SwitchFixture(failure: .verifyTargetIdentity, restoreFails: true)
 
@@ -138,19 +119,6 @@ private actor CallRecorder {
     private var values: [SwitchStage] = []
     func append(_ value: SwitchStage) { values.append(value) }
     func snapshot() -> [SwitchStage] { values }
-}
-
-private struct FakeDesktop: DesktopControlling {
-    let recorder: CallRecorder
-    let failure: SwitchStage?
-    func closeDesktop() async throws {
-        await recorder.append(.closeDesktop)
-        if failure == .closeDesktop { throw InjectedFailure(stage: .closeDesktop) }
-    }
-    func reopenDesktop() async throws {
-        await recorder.append(.reopenDesktop)
-        if failure == .reopenDesktop { throw InjectedFailure(stage: .reopenDesktop) }
-    }
 }
 
 private actor FakeStore: AccountStoring {
@@ -278,7 +246,6 @@ private struct SwitchFixture {
         )
         self.store = store
         service = SwitchService(
-            desktop: FakeDesktop(recorder: recorder, failure: failure),
             store: store,
             codex: FakeCodex(recorder: recorder, failure: failure, store: store, target: target)
         )

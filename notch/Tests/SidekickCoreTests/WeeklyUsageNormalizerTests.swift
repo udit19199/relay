@@ -1,4 +1,4 @@
-@testable import SwitcherCore
+@testable import SidekickCore
 import Foundation
 import Testing
 

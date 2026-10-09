@@ -1,4 +1,4 @@
-// swift-tools-version: 6.2
+// swift-tools-version: 6.4
 
 import Foundation
 import PackageDescription
@@ -64,34 +64,34 @@ let testingCompatibilitySettings: ([SwiftSetting], [LinkerSetting]) = {
 }()
 
 var products: [Product] = [
-    .library(name: "SwitcherCore", targets: ["SwitcherCore"]),
+    .library(name: "SidekickCore", targets: ["SidekickCore"]),
 ]
 var dependencies: [Package.Dependency] = []
 var targets: [Target] = [
-    .target(name: "SwitcherCore"),
-    .testTarget(name: "SwitcherCoreTests", dependencies: ["SwitcherCore"],
+    .target(name: "SidekickCore"),
+    .testTarget(name: "SidekickCoreTests", dependencies: ["SidekickCore"],
                 swiftSettings: testingCompatibilitySettings.0,
                 linkerSettings: testingCompatibilitySettings.1),
 ]
 #if os(macOS)
-products.append(.executable(name: "CodexAccountSwitcher", targets: ["CodexAccountSwitcher"]))
+products.append(.executable(name: "Sidekick", targets: ["Sidekick"]))
 targets += [
     .executableTarget(
-        name: "CodexAccountSwitcher",
-        dependencies: ["SwitcherCore"],
+        name: "Sidekick",
+        dependencies: ["SidekickCore"],
         resources: [.process("Resources")],
         linkerSettings: [
             .linkedFramework("AppKit"),
         ]
     ),
-    .testTarget(name: "CodexAccountSwitcherTests", dependencies: ["CodexAccountSwitcher", "SwitcherCore"],
+    .testTarget(name: "SidekickTests", dependencies: ["Sidekick", "SidekickCore"],
                 swiftSettings: testingCompatibilitySettings.0,
                 linkerSettings: testingCompatibilitySettings.1),
 ]
 #endif
 
 let package = Package(
-    name: "CodexAccountSwitcher",
+    name: "Sidekick",
     defaultLocalization: "en",
     platforms: [
         .macOS(.v14),

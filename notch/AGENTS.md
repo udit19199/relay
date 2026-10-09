@@ -1,4 +1,4 @@
-# Codex Account Switcher — personal fork
+# Sidekick — personal fork
 
 Mac-only build for one user. Keep it trimmed on every upstream pull.
 
@@ -9,6 +9,7 @@ Mac-only build for one user. Keep it trimmed on every upstream pull.
 - No public docs or promo assets: short README, `docs/` stays at index, requirements, design, testing, decisions.
 - No settings page: menu-bar percent and 5-hour usage are always on, and there is no launch-at-login control.
 - Tests run with `swift test` only.
+- After every app code/UI change, run `./scripts/package-local-app.sh`, replace `/Applications/Sidekick.app` with the built bundle, and relaunch it; a build alone does not update the local instance.
 
 ## Upstream pulls
 

@@ -29,7 +29,6 @@ The user should understand the product after opening the menu once. The main pat
 - automatic switching when Usage is low;
 - general rollback and recovery state machines;
 - server-side session revocation;
-- Windows and Linux releases;
 - syncing profiles between Macs.
 
 ## 3. Primary user stories
@@ -54,7 +53,7 @@ As a user, I can remove an inactive local profile from the account row’s conte
 
 The menu-bar item uses a compact account-group icon with an accessibility label. It does not wait for account or Usage data before appearing.
 
-The popover content width is 326 points.
+The popover content width is 300 points.
 
 ## 5. Account row
 
@@ -63,31 +62,34 @@ The popover content width is 326 points.
 Each row keeps the compact layout:
 
 ```text
-[avatar]  Email Address
-          7d   [================----]     42%   Resets in 3d 4h
+Email Address
+[================----]     42%   Resets in 3d 4h
 ```
 
 Constraints:
 
+- do not show a per-account avatar or initials; keep the bars compact and use the freed horizontal space to make the percentages and countdowns easier to scan;
 - use the full saved email as the title, falling back to the display name when email is missing or empty;
 - keep the title on one line with tail ellipsis and show its full text in a floating tooltip on hover;
 - each Usage line ends with its reset countdown;
-- `7d` is the weekly quota label;
+- show no separate visible `5h`/`7d` label column; the 5-hour row appears above the weekly row;
 - the percentage is remaining percentage;
 - the progress bar width equals the displayed percentage;
-- the current account is a row highlight;
+- the current account is highlighted across the full row, including its reset action when present;
 - no checkmark is shown;
 - no `Current` text is shown.
 
 With exact 5-hour data available, the row expands:
 
 ```text
-[avatar]  Email Address
-          5h   [==========------]        65%   Resets in 2h 14m
-          7d   [========--------]         42%   Resets in 3d 4h
+Email Address
+[==========------]        65%   Resets in 2h 14m
+[========--------]         42%   Resets in 3d 4h
 ```
 
-The 5-hour line is omitted when its data is absent. The UI does not show an unavailable placeholder for that line. Window labels remain fully visible.
+The 5-hour line is first and is omitted when its data is absent; the weekly line remains. The UI does not show a visible window-label column or an unavailable placeholder for the missing 5-hour line. Usage bars are short visual indicators; the percentage text carries the value.
+
+When an account has one or more banked reset credits, show a neutral capsule button beside the account with the reset icon and available-credit count only; do not repeat `Reset` as visible text. The active-row highlight spans behind both the account and reset action. Expose the available expiry dates in the button's help and confirmation. It redeems one existing credit only; it never opens a paid checkout. Require an in-popover confirmation that explains the eligible usage windows refresh immediately, the next weekly reset date may move, and the credit cannot be restored. The action uses that saved account's Codex profile, not whichever account happens to be active.
 
 ### 5.2 Usage-window normalization
 
@@ -140,13 +142,10 @@ The countdown ticks while the popover is open. Hovering the countdown reveals th
 
 ## 6. Main-menu footer
 
-The footer contains exactly one full-width action:
+The footer is a single horizontal row with two equal-width actions:
 
-1. `Quit`
-
-Account lifecycle actions sit above the footer, below the account list:
-
-- `Add Account`, with its browser sign-in hint on the same line.
+1. `Add Account` on the left, without an inline browser sign-in hint; while sign-in is pending, it becomes `Cancel Sign-In` with a compact progress indicator.
+2. `Quit` on the right.
 
 Both are ordinary in-line buttons; they do not replace the popover content and provide no Back action.
 
@@ -184,7 +183,7 @@ After confirmation, disable additional account actions while the six-stage opera
 - `Saving selected account…`
 - `Opening Codex Desktop…`
 
-If Codex Desktop displays its quit warning for active local chats, the user handles that native dialog. The switcher waits up to 30 seconds for normal exit and never force-quits Desktop. A rejected quit request or timeout stops the switch before credentials change, preserving Desktop's opportunity to flush task history. The user can finish or stop tasks and close Desktop before switching again.
+If Codex Desktop displays its quit warning for active local chats, the user handles that native dialog. Sidekick waits up to 30 seconds for normal exit and never force-quits Desktop. A rejected quit request or timeout stops the switch before credentials change, preserving Desktop's opportunity to flush task history. The user can finish or stop tasks and close Desktop before switching again.
 
 The stages are not configurable. A failure banner identifies the failed stage and retains the underlying diagnostic message.
 
@@ -216,7 +215,7 @@ This bounded repair does not add a general rollback state machine, credential ba
 
 The main screen lists every saved account:
 
-- avatar or initials;
+- no per-account avatar or initials; use the freed horizontal space for a cleaner scan of the account title and Usage rows;
 - full email as a single-line title with tail ellipsis and a floating full-text tooltip;
 - local display name when email is missing or empty;
 - active-state highlight;
@@ -226,7 +225,7 @@ The main screen lists every saved account:
 
 `Add Account` starts a Codex login using a new profile directory.
 
-The browser sign-in hint sits to the right of the action on the same line. Long hints use tail ellipsis and expose the full text on hover, including while browser sign-in is pending.
+There is no inline browser sign-in hint beside `Add Account`.
 
 Expected flow:
 
@@ -240,7 +239,7 @@ create profile directory
 
 Adding an account creates no current-account credential backup or rollback flow.
 
-The browser sign-in wait is tracked separately from profile mutations so the account list and existing account actions remain interactive. While sign-in is pending, the main screen shows a direct cancel action. Canceling stops the app-server login session without presenting an operation error.
+The browser sign-in wait is tracked separately from profile mutations so the account list and existing account actions remain interactive. While sign-in is pending, the `Add Account` button becomes `Cancel Sign-In` and shows a compact progress indicator. Canceling stops the app-server login session without presenting an operation error.
 
 If login fails, show the original Codex login error and remove only this attempt’s unregistered profile directory. Cancellation performs the same cleanup without a login error. If cleanup fails, expose that failure alongside the original error. Already registered profiles are never removed by this cleanup. Duplicate identities are rejected; distinct account IDs remain separate even when their emails match.
 
@@ -259,13 +258,11 @@ The active profile's remove control is disabled.
 
 Remove first opens a confirmation page inside the popover. Cancel and the header Back action return to the account list without closing the popover or calling the remove operation.
 
-## 9. Accessibility
+## 9. Native controls
 
 - account rows are keyboard-focusable buttons;
-- current row exposes selected state through accessibility APIs;
-- progress bars expose `remainingPercent`;
-- buttons have explicit labels;
-- color is not the only selected-state signal: selected state must also be exposed semantically;
+- controls use their standard macOS button behavior and labels;
+- usage bars are decorative; the adjacent percentage text carries the value;
 - text remains readable at standard macOS accessibility text sizes.
 
 ## 10. Performance
@@ -284,14 +281,14 @@ Remove first opens a confirmation page inside the popover. Cancel and the header
 
 The MVP is accepted when:
 
-1. three saved accounts can be displayed in the popover;
-2. each row shows the weekly 7d layout;
-3. rows display separate 5h and 7d lines when both values exist, and omit the 5h line when it is absent;
+1. three saved accounts can be displayed without per-account avatars or initials, with the freed horizontal space used for a cleaner scan of account titles and Usage rows;
+2. each row shows its weekly usage line with a compact visual bar, percentage, and reset countdown;
+3. when both values exist, rows show an unlabeled 5-hour line above the weekly line, and omit the 5-hour line when its data is absent;
 4. the progress bar exactly matches `NN% left`;
-5. the current row is highlighted without a checkmark;
-6. the footer contains a single Quit action, with Add Account above it;
-7. the popover is 326 points wide and all secondary pages navigate inside it;
-8. the main screen shows Add Account with its sign-in hint, and an inactive row’s context menu offers Remove;
+5. the current row is indicated by its highlight alone, without a checkmark or `Current` label;
+6. the footer places Add Account and Quit side by side, with Command-Q also quitting the app;
+7. the popover is 300 points wide and all secondary pages navigate inside it;
+8. the main screen shows Add Account without an inline sign-in hint, pending sign-in shows Cancel Sign-In with a compact progress indicator, and an inactive row’s context menu offers Remove;
 9. every popover opening starts on the account list;
 10. canceling switch or removal performs no mutation and keeps the popover open;
 11. Quit and Command-Q terminate the application and remain available during mutations;
@@ -305,7 +302,7 @@ The MVP is accepted when:
 19. inactive accounts can be added and removed; active accounts cannot be removed;
 20. only `main` is required for the repository's steady state.
 
-## 12. Switcher updates
+## 12. Sidekick updates
 
 Personal fork: no auto-update. Updates are `git pull` plus a local build.
 

@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import SwitcherCore
+@testable import SidekickCore
 
 @MainActor
 struct AccountControllerTests {
@@ -12,7 +12,7 @@ struct AccountControllerTests {
         let home = try await fixture.store.createProfileDirectory(id: id)
         try Data("saved-fixture".utf8).write(to: home.appendingPathComponent("auth.json"))
         try await fixture.store.addProfile(profile)
-        let service = SwitchService(desktop: FixtureDesktop(), store: fixture.store, codex: fixture.client)
+        let service = SwitchService(store: fixture.store, codex: fixture.client)
         try await service.switchAccount(to: id)
         #expect(try await fixture.store.loadRegistry().activeAccountID == id)
         #expect(try String(contentsOf: fixture.active.appendingPathComponent("auth.json"), encoding: .utf8) == "saved-fixture")
@@ -26,29 +26,12 @@ struct AccountControllerTests {
         let home = try await fixture.store.createProfileDirectory(id: id)
         try Data("saved-other-fixture".utf8).write(to: home.appendingPathComponent("auth.json"))
         try await fixture.store.addProfile(profile)
-        let service = SwitchService(desktop: FixtureDesktop(), store: fixture.store, codex: fixture.client)
+        let service = SwitchService(store: fixture.store, codex: fixture.client)
         do { try await service.switchAccount(to: id); Issue.record("Identity mismatch should fail.") }
         catch { #expect((error as? OperationError)?.stage == .verifyTargetIdentity) }
         #expect(try await fixture.store.loadRegistry().activeAccountID == nil)
         #expect(await !fixture.store.activeCredentialExists())
         #expect(try String(contentsOf: home.appendingPathComponent("auth.json"), encoding: .utf8) == "saved-other-fixture")
-    }
-
-    @Test func firstActivationRechecksForCredentialsCreatedDuringDesktopExit() async throws {
-        let fixture = try ControllerFixture()
-        defer { fixture.clean() }
-        let id = UUID()
-        let profile = AccountProfile(id: id, displayName: "Demo", email: "demo@example.test", accountID: "demo-account", createdAt: Date())
-        let home = try await fixture.store.createProfileDirectory(id: id)
-        try Data("saved-fixture".utf8).write(to: home.appendingPathComponent("auth.json"))
-        try await fixture.store.addProfile(profile)
-        let active = fixture.active
-        let desktop = CredentialCreatingDesktop(active: active)
-        let service = SwitchService(desktop: desktop, store: fixture.store, codex: fixture.client)
-        do { try await service.switchAccount(to: id); Issue.record("An unexpected active login should stop switching.") }
-        catch { #expect((error as? OperationError)?.stage == .saveCurrentCredential) }
-        #expect(try String(contentsOf: active.appendingPathComponent("auth.json"), encoding: .utf8) == "unexpected-fixture")
-        #expect(try await fixture.store.loadRegistry().activeAccountID == nil)
     }
 
     @Test func startupImportsCurrentLoginOnce() async throws {
@@ -112,13 +95,13 @@ private struct ControllerFixture {
     let client: FixtureClient
     let model: AccountController
     init() throws {
-        root = FileManager.default.temporaryDirectory.appendingPathComponent("switcher-core-test-\(UUID())")
+        root = FileManager.default.temporaryDirectory.appendingPathComponent("sidekick-core-test-\(UUID())")
         active = root.appendingPathComponent("active")
         try FileManager.default.createDirectory(at: active, withIntermediateDirectories: true)
         store = AccountStore(baseURL: root.appendingPathComponent("store"), activeHomeURL: active)
         client = FixtureClient()
         model = AccountController(store: store, codex: client,
-            switchService: SwitchService(desktop: FixtureDesktop(), store: store, codex: client))
+            switchService: SwitchService(store: store, codex: client))
     }
     func writeActiveCredential() throws {
         try Data(#"{"tokens":{"account_id":"demo-account","access_token":"fixture-secret-token"}}"#.utf8)
@@ -137,20 +120,8 @@ private actor FixtureClient: AccountClient {
         if usageFails { throw CodexClientError.connectionClosed }
         return WeeklyUsage(remainingPercent: 72, resetsAt: Date(timeIntervalSince1970: 2_000_000_000))
     }
+    func redeemBankedReset(profileHome: URL) async throws {}
     func login(profileHome: URL) async throws -> AccountIdentity {
         throw CodexClientError.loginFailed("Fixture login is disabled.")
     }
-}
-
-private struct FixtureDesktop: DesktopControlling {
-    func closeDesktop() async throws {}
-    func reopenDesktop() async throws {}
-}
-
-private struct CredentialCreatingDesktop: DesktopControlling {
-    let active: URL
-    func closeDesktop() async throws {
-        try Data("unexpected-fixture".utf8).write(to: active.appendingPathComponent("auth.json"))
-    }
-    func reopenDesktop() async throws {}
 }

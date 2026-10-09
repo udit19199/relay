@@ -2,11 +2,6 @@ import Foundation
 
 // The same ordered handoff and bounded restoration run on both platforms.
 
-public protocol DesktopControlling: Sendable {
-    func closeDesktop() async throws
-    func reopenDesktop() async throws
-}
-
 public protocol CodexIdentityReading: Sendable {
     func readIdentity(profileHome: URL) async throws -> AccountIdentity
 }
@@ -16,12 +11,11 @@ public protocol SwitchServicing: Sendable {
 }
 
 public struct SwitchService: SwitchServicing {
-    public let desktop: any DesktopControlling
     public let store: any AccountStoring
     public let codex: any CodexIdentityReading
 
-    public init(desktop: any DesktopControlling, store: any AccountStoring, codex: any CodexIdentityReading) {
-        self.desktop = desktop; self.store = store; self.codex = codex
+    public init(store: any AccountStoring, codex: any CodexIdentityReading) {
+        self.store = store; self.codex = codex
     }
 
     public func switchAccount(to targetID: UUID) async throws {
@@ -50,12 +44,6 @@ public struct SwitchService: SwitchServicing {
             }
         } catch {
             throw OperationError.stage(.saveCurrentCredential, error)
-        }
-
-        do {
-            try await desktop.closeDesktop()
-        } catch {
-            throw OperationError.stage(.closeDesktop, error)
         }
 
         do {
@@ -100,12 +88,6 @@ public struct SwitchService: SwitchServicing {
                 originalError: error
             )
         }
-
-        do {
-            try await desktop.reopenDesktop()
-        } catch {
-            throw OperationError.stage(.reopenDesktop, error)
-        }
     }
 
     private func restoringOriginalCredential(
@@ -123,8 +105,7 @@ public struct SwitchService: SwitchServicing {
         } catch let restorationError {
             return OperationError(
                 stage: failedStage,
-                titleKey: "switch_failed",
-                messageKey: nil,
+                title: "Account switch failed",
                 message: """
                 \(originalError.localizedDescription) Restoring the previous credential also failed: \
                 \(restorationError.localizedDescription)

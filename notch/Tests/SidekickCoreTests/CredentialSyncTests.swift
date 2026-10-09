@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import SwitcherCore
+@testable import SidekickCore
 
 struct CredentialSyncTests {
     @Test func refreshCopiesOnlyTheMatchingActiveCredential() async throws {
@@ -170,6 +170,7 @@ private actor CredentialClient: AccountClient {
         }
         return WeeklyUsage(remainingPercent: 59, resetsAt: Date(timeIntervalSince1970: 2_000_000_000))
     }
+    func redeemBankedReset(profileHome: URL) async throws {}
     func waitForRead() async {
         if !readStarted { await withCheckedContinuation { observer = $0 } }
     }

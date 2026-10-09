@@ -1,10 +1,60 @@
-@testable import SwitcherCore
+@testable import SidekickCore
 import Darwin
 import Foundation
 import Testing
-@testable import CodexAccountSwitcher
+@testable import Sidekick
 
 struct AccountStoreTests {
+    @Test func migratesSavedAccountsAndUsageFromOldFolder() async throws {
+        let fixture = try StoreFixture()
+        defer { fixture.remove() }
+        let oldURL = fixture.root.appending(path: "Codex Account Switcher")
+        let newURL = fixture.root.appending(path: "Sidekick")
+        let oldStore = AccountStore(baseURL: oldURL, activeHomeURL: fixture.activeHome)
+        let profile = AccountProfile(
+            id: UUID(), displayName: "Personal", email: "personal@example.test",
+            accountID: "personal-account", createdAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        try await oldStore.importCurrentProfile(profile)
+        let usage = WeeklyUsage(remainingPercent: 73, resetsAt: Date(timeIntervalSince1970: 1_750_000_000))
+        try await oldStore.cacheWeeklyUsage(usage, profileID: profile.id)
+
+        let store = AccountStore(
+            baseURL: newURL,
+            activeHomeURL: fixture.activeHome,
+            legacyBaseURL: oldURL
+        )
+        #expect(try await store.loadRegistry().accounts == [profile])
+        #expect(try await store.loadUsageCache().entries.first?.usage == usage)
+        #expect(try Data(contentsOf: newURL.appending(path: "accounts/\(profile.id.uuidString)/auth.json"))
+            == Data("{\"account\":\"first\"}".utf8))
+        #expect(!FileManager.default.fileExists(atPath: oldURL.path))
+    }
+
+    @Test func doesNotOverwriteDataWhenBothStorageFoldersExist() async throws {
+        let fixture = try StoreFixture()
+        defer { fixture.remove() }
+        let oldURL = fixture.root.appending(path: "Codex Account Switcher")
+        let newURL = fixture.root.appending(path: "Sidekick")
+        try FileManager.default.createDirectory(at: oldURL, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: newURL, withIntermediateDirectories: true)
+        let oldMarker = oldURL.appending(path: "keep-old")
+        let newMarker = newURL.appending(path: "keep-new")
+        try Data("old".utf8).write(to: oldMarker)
+        try Data("new".utf8).write(to: newMarker)
+        let store = AccountStore(
+            baseURL: newURL,
+            activeHomeURL: fixture.activeHome,
+            legacyBaseURL: oldURL
+        )
+
+        await #expect(throws: AccountStoreError.storageMigrationConflict) {
+            try await store.loadRegistry()
+        }
+        #expect(try Data(contentsOf: oldMarker) == Data("old".utf8))
+        #expect(try Data(contentsOf: newMarker) == Data("new".utf8))
+    }
+
     @Test(arguments: ["success", "wrong-identity", "commit-failure"])
     func firstActivationHandlesSuccessAndFailure(outcome: String) async throws {
         let fixture = try StoreFixture()
@@ -21,7 +71,7 @@ struct AccountStoreTests {
             guard Darwin.chflags(registry.path, UInt32(UF_IMMUTABLE)) == 0 else { throw POSIXError(.EIO) }
         }
         defer { _ = Darwin.chflags(registry.path, 0) }
-        let service = SwitchService(desktop: StoreTestDesktop(), store: fixture.store, codex: StoreTestMatchingCodex())
+        let service = SwitchService(store: fixture.store, codex: StoreTestMatchingCodex())
         if outcome == "success" {
             try await service.switchAccount(to: profile.id)
             #expect(try await fixture.store.loadRegistry().activeAccountID == profile.id)
@@ -69,7 +119,7 @@ struct AccountStoreTests {
         """#.utf8).write(to: executable)
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
         let model = AppModel(store: fixture.store, codex: CodexClient(locator: .init(explicitURL: executable)),
-            switchService: SwitchService(desktop: StoreTestDesktop(), store: fixture.store, codex: StoreTestMatchingCodex()))
+            switchService: SwitchService(store: fixture.store, codex: StoreTestMatchingCodex()))
         model.addAccount()
         for _ in 0..<200 where model.isAddingAccount { try await Task.sleep(for: .milliseconds(10)) }
         #expect(!model.isAddingAccount)
@@ -85,7 +135,7 @@ struct AccountStoreTests {
         let external = Data(#"{"accountId":"external","email":"external@example.com"}"#.utf8)
         try external.write(to: fixture.activeHome.appending(path: "auth.json"))
         do {
-            try await SwitchService(desktop: StoreTestDesktop(), store: fixture.store, codex: StoreTestMatchingCodex())
+            try await SwitchService(store: fixture.store, codex: StoreTestMatchingCodex())
                 .switchAccount(to: profiles.target.id)
             Issue.record("An external login must not be saved under the original account")
         } catch let error as OperationError {
@@ -105,7 +155,7 @@ struct AccountStoreTests {
         try Data(#"{"accountId":"wrong","email":"wrong@example.com"}"#.utf8)
             .write(to: targetHome.appending(path: "auth.json"))
         do {
-            try await SwitchService(desktop: StoreTestDesktop(), store: fixture.store, codex: StoreTestMatchingCodex())
+            try await SwitchService(store: fixture.store, codex: StoreTestMatchingCodex())
                 .switchAccount(to: profiles.target.id)
             Issue.record("A successful RPC with the wrong identity must not commit the target")
         } catch let error as OperationError {
@@ -156,7 +206,7 @@ struct AccountStoreTests {
         }
         for target in [profiles.target, profiles.original] {
             try await SwitchService(
-                desktop: StoreTestDesktop(), store: fixture.store,
+                store: fixture.store,
                 codex: StoreTestMatchingCodex()
             ).switchAccount(to: target.id)
             for path in paths {
@@ -224,7 +274,7 @@ struct AccountStoreTests {
         #expect(try Data(contentsOf: activeAuth) == secondBytes)
         #expect(try permissions(activeAuth) == 0o600)
         let credentialTemps = try FileManager.default.contentsOfDirectory(atPath: fixture.activeHome.path)
-            .filter { $0.hasPrefix("auth.json.switcher-") }
+            .filter { $0.hasPrefix("auth.json.sidekick-") }
         #expect(credentialTemps.isEmpty)
         let unexpected = try FileManager.default.contentsOfDirectory(atPath: fixture.activeHome.path)
             .filter { $0.contains("backup") || $0.contains("rollback") || $0.contains("journal") }
@@ -250,7 +300,6 @@ struct AccountStoreTests {
         defer { fixture.remove() }
         let profiles = try await prepareSwitchProfiles(fixture)
         let service = SwitchService(
-            desktop: StoreTestDesktop(),
             store: fixture.store,
             codex: StoreTestFailingCodex()
         )
@@ -284,7 +333,6 @@ struct AccountStoreTests {
         }
         defer { _ = Darwin.chflags(accountsURL.path, 0) }
         let service = SwitchService(
-            desktop: StoreTestDesktop(),
             store: fixture.store,
             codex: StoreTestMatchingCodex()
         )
@@ -352,30 +400,6 @@ struct AccountStoreTests {
         #expect(cache.entries[0].usage.fiveHourResetsAt == nil)
     }
 
-    @Test func migratesLegacyApplicationSupportDirectory() async throws {
-        let root = FileManager.default.temporaryDirectory
-            .appending(path: "codex-switcher-migration-\(UUID().uuidString)", directoryHint: .isDirectory)
-        defer { try? FileManager.default.removeItem(at: root) }
-        let legacy = root.appending(path: "Codex Account Switcher Lite", directoryHint: .isDirectory)
-        let current = root.appending(path: "Codex Account Switcher", directoryHint: .isDirectory)
-        let activeHome = root.appending(path: "active", directoryHint: .isDirectory)
-        try FileManager.default.createDirectory(at: legacy, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: activeHome, withIntermediateDirectories: true)
-        try Data(#"{"accounts":[],"version":1}"#.utf8).write(
-            to: legacy.appending(path: "accounts.json")
-        )
-
-        let store = AccountStore(
-            baseURL: current,
-            legacyBaseURL: legacy,
-            activeHomeURL: activeHome
-        )
-        _ = try await store.loadRegistry()
-
-        #expect(FileManager.default.fileExists(atPath: current.appending(path: "accounts.json").path))
-        #expect(!FileManager.default.fileExists(atPath: legacy.path))
-    }
-
     private func permissions(_ url: URL) throws -> Int {
         let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
         return (attributes[.posixPermissions] as? NSNumber)?.intValue ?? -1
@@ -406,11 +430,6 @@ struct AccountStoreTests {
     }
 }
 
-private struct StoreTestDesktop: DesktopControlling {
-    func closeDesktop() async throws {}
-    func reopenDesktop() async throws {}
-}
-
 private struct StoreTestFailingCodex: CodexIdentityReading {
     func readIdentity(profileHome: URL) async throws -> AccountIdentity {
         let identity = try await StoreTestMatchingCodex().readIdentity(profileHome: profileHome)
@@ -434,7 +453,7 @@ private struct StoreFixture {
 
     init() throws {
         root = FileManager.default.temporaryDirectory
-            .appending(path: "codex-switcher-tests-\(UUID().uuidString)", directoryHint: .isDirectory)
+            .appending(path: "sidekick-tests-\(UUID().uuidString)", directoryHint: .isDirectory)
         activeHome = root.appending(path: "active", directoryHint: .isDirectory)
         support = root.appending(path: "support", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: activeHome, withIntermediateDirectories: true)

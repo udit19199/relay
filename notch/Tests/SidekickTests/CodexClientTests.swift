@@ -1,7 +1,7 @@
-@testable import SwitcherCore
+@testable import SidekickCore
 import Foundation
 import Testing
-@testable import CodexAccountSwitcher
+@testable import Sidekick
 
 struct CodexClientTests {
     @Test func fillsMissingWorkspaceIDFromTheSameProfileCredential() async throws {
@@ -157,13 +157,13 @@ struct CodexClientTests {
         #expect(located == fixture.executable)
     }
 
-    @Test func resolvesSystemCommandFromPATHWithoutSwitcherSpecificOverride() throws {
+    @Test func resolvesSystemCommandFromPATHWithoutSidekickSpecificOverride() throws {
         let fixture = try ScriptFixture(body: "exit 0")
         defer { fixture.remove() }
         #expect(try CodexExecutableLocator().locate(environment: [
             "CODEX_CLI_PATH": fixture.executable.lastPathComponent,
             "PATH": fixture.executable.deletingLastPathComponent().path,
-            "CODEX_SWITCHER_CODEX_PATH": "/bin/sh",
+            "SIDEKICK_CODEX_PATH": "/bin/sh",
         ]) == fixture.executable)
         #expect(throws: CodexClientError.self) {
             try CodexExecutableLocator(desktopApplicationURLs: []).locate(environment: ["PATH": "/nonexistent"])
@@ -173,7 +173,7 @@ struct CodexClientTests {
     @Test func invalidDesktopOverrideDoesNotSilentlyUseAnotherRuntime() throws {
         #expect(throws: CodexClientError.self) {
             try CodexExecutableLocator().locate(environment: [
-                "CODEX_CLI_PATH": "/nonexistent/codex-switcher-test",
+                "CODEX_CLI_PATH": "/nonexistent/sidekick-test",
             ])
         }
     }
@@ -193,7 +193,7 @@ struct CodexClientTests {
               ;;
             *rateLimits*)
               test "$state" -eq 2 || exit 12
-              printf '%s\n' '{"id":1,"result":{"rateLimits":{"primary":{"usedPercent":80,"windowDurationMins":300,"resetsAt":100},"secondary":{"usedPercent":58,"windowDurationMins":10080,"resetsAt":1750000000}}}}'
+              printf '%s\n' '{"id":1,"result":{"rateLimitsByLimitId":{"codex":{"primary":{"usedPercent":80,"windowDurationMins":300,"resetsAt":100},"secondary":{"usedPercent":58,"windowDurationMins":10080,"resetsAt":1750000000}}}}}'
               ;;
           esac
         done

@@ -1,4 +1,4 @@
-import SwitcherCore
+import SidekickCore
 import AppKit
 import Foundation
 
@@ -40,7 +40,7 @@ struct DesktopQuitWaiter: Sendable {
     }
 }
 
-struct DesktopController: DesktopControlling {
+struct DesktopController {
     private let bundleIdentifiers = ["com.openai.codex"]
     private let applicationPaths = ["/Applications/ChatGPT.app", "/Applications/Codex.app"]
 

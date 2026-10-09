@@ -2,7 +2,7 @@
 
 ## 1. Product principle
 
-Codex Account Switcher is a simple switcher. Every persistent control must directly support one of four jobs:
+Sidekick is a personal Codex companion. Every persistent control must directly support one of four jobs:
 
 1. inspect account Usage;
 2. select an account;
@@ -13,28 +13,30 @@ Personal fork: no auto-update. Updates are `git pull` plus a local build. Other 
 
 ## 2. Main menu
 
-The popover uses a compact 326-point content width. Account rows keep the density and visual hierarchy of the accepted HTML prototype.
+The popover uses a compact 300-point content width. Account rows keep the density and visual hierarchy of the accepted HTML prototype.
 
 With the default settings, each saved account row shows:
 
-- avatar or initials;
-- display name;
-- a reset countdown at the end of the Usage line;
-- the label `Usage`;
-- one progress bar;
-- one `NN% left` value.
+- the full saved email as its title, falling back to the display name if the email is missing or empty;
+- no per-account avatar or initials;
+- ordered 5-hour and weekly Usage lines, each with a compact visual bar, remaining percentage, and reset countdown; there is no separate window-label column.
 
-When an exact five-hour window is available, the row expands to separate `5h` and `7d` lines. Each line contains its own progress bar, remaining percentage, and reset countdown. If the 5-hour window is missing, the row shows only `7d` and does not show an unavailable placeholder.
+Rows begin at the leading edge without an avatar column. Usage bars stay compact, while the freed horizontal space keeps percentages and countdowns easy to scan.
 
-The current account is represented by a highlighted row. It does not use:
+When an exact five-hour window is available, its unlabeled row appears above the unlabeled weekly row. Each line contains its own compact visual bar, remaining percentage, and reset countdown. If the 5-hour window is missing, only the weekly row appears, without an unavailable placeholder. The percentage text carries the value; bars are decorative.
+
+The current account is represented by a highlight spanning the full row, including any reset action. It does not use:
 
 - a checkmark;
 - a `Current` label;
 - a second status column.
 
-The footer contains a single full-width `Quit` action. Account lifecycle actions sit above the footer on the main screen itself:
+The footer is one horizontal row with two equal-width actions:
 
-- `Add Account`, with its browser sign-in hint on the same line, which becomes a cancel action with a progress indicator while sign-in is pending.
+- `Add Account` on the left, with no inline browser sign-in hint; while sign-in is pending, it becomes a `Cancel Sign-In` action with a compact progress indicator.
+- `Quit` on the right, also available through Command-Q.
+
+Each account with a saved reset credit also has a neutral capsule button beside it, showing only the reset icon and available-credit count. Its help and confirmation show the available expiry dates. Confirmation says it consumes one credit, immediately refreshes eligible usage windows, may move the weekly reset date, and makes no purchase.
 
 Removal is available from the context menu of an inactive account row and opens an in-popover confirmation page. Cancel returns to the account list, keeps the popover open, and performs no deletion.
 
@@ -103,9 +105,9 @@ When a step fails, execution stops and the exact original error is shown. If the
 The MVP uses ordinary local files with user-only permissions.
 
 - Codex active credential: `~/.codex/auth.json`
-- Switcher registry: `~/Library/Application Support/Codex Account Switcher/accounts.json`
-- Usage cache: `~/Library/Application Support/Codex Account Switcher/usage-cache.json`
-- Saved account credential: `~/Library/Application Support/Codex Account Switcher/accounts/<profile-id>/auth.json`
+- Sidekick registry: `~/Library/Application Support/Sidekick/accounts.json`
+- Usage cache: `~/Library/Application Support/Sidekick/usage-cache.json`
+- Saved account credential: `~/Library/Application Support/Sidekick/accounts/<profile-id>/auth.json`
 
 macOS Keychain is not used in the MVP. It adds implementation complexity without adding user-visible switching value.
 
@@ -118,7 +120,7 @@ The main screen owns account lifecycle operations:
 
 The active account cannot be removed because the meaning of the active Codex authentication file would otherwise be ambiguous. The user first selects another account and then removes the old one.
 
-Removing an account deletes only the switcher's local profile directory and metadata. It does not claim to revoke every OpenAI server session.
+Removing an account deletes only Sidekick's local profile directory and metadata. It does not claim to revoke every OpenAI server session.
 
 ## 8. Main screen
 

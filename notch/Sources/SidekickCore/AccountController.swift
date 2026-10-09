@@ -35,14 +35,6 @@ open class AccountController {
         self.switchService = switchService
     }
 
-    public func text(_ key: String) -> String {
-        L10n.string(key)
-    }
-
-    public func format(_ key: String, _ argument: String) -> String {
-        String(format: text(key), argument)
-    }
-
     public var activeRemainingPercent: Int? {
         guard let activeAccountID else { return nil }
         return usageStates[activeAccountID]?.displayedUsage?.remainingPercent
@@ -190,23 +182,7 @@ open class AccountController {
             try await switchService.switchAccount(to: id)
             apply(try await store.loadRegistry())
         } catch let error as OperationError {
-            if error.stage == .reopenDesktop {
-                do {
-                    apply(try await store.loadRegistry())
-                } catch {
-                    showError(error)
-                    return
-                }
-                visibleError = OperationError(
-                    stage: .reopenDesktop,
-                    titleKey: "switched_reopen_title",
-                    messageKey: "switched_reopen_message",
-                    message: text("switched_reopen_message"),
-                    underlyingDescription: error.underlyingDescription
-                )
-            } else {
-                visibleError = error
-            }
+            visibleError = error
         } catch {
             showError(error)
         }
@@ -214,10 +190,6 @@ open class AccountController {
 
     public func addAccount() {
         guard !isMutating, !isAddingAccount else { return }
-        guard accounts.count < 2 else {
-            showError(AccountStoreError.accountLimitReached)
-            return
-        }
         visibleError = nil
         isAddingAccount = true
         addAccountTask = Task { [weak self] in
@@ -230,6 +202,19 @@ open class AccountController {
 
     public func cancelAddingAccount() {
         addAccountTask?.cancel()
+    }
+
+    public func redeemBankedReset(for id: UUID) async {
+        guard !isMutating, accounts.contains(where: { $0.id == id }) else { return }
+        isMutating = true
+        await cancelUsageRefresh()
+        defer { isMutating = false; refreshWeeklyUsage() }
+        visibleError = nil
+        do {
+            try await codex.redeemBankedReset(profileHome: await store.profileHome(id: id))
+        } catch {
+            showError(error)
+        }
     }
 
     private func performAddAccount() async {
@@ -254,7 +239,7 @@ open class AccountController {
             do {
                 try await store.discardUnregisteredProfile(id: id)
             } catch {
-                showError(NSError(domain: "CodexAccountSwitcher.Login", code: 1, userInfo: [
+                showError(NSError(domain: "Sidekick.Login", code: 1, userInfo: [
                     NSLocalizedDescriptionKey: "\(loginError.localizedDescription) Removing the incomplete profile also failed: \(error.localizedDescription)",
                 ]))
                 return
@@ -302,8 +287,7 @@ open class AccountController {
     private func showError(_ error: any Error) {
         visibleError = OperationError(
             stage: nil,
-            titleKey: "operation_failed",
-            messageKey: nil,
+            title: "Operation failed",
             message: error.localizedDescription,
             underlyingDescription: String(describing: error)
         )

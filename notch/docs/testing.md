@@ -11,7 +11,7 @@ It should test the documented verification/commit restoration and confirm that n
 
 ### Local toolchains
 
-Xcode and GitHub-hosted macOS runners use SwiftPM's normal `Testing` module discovery. Some standalone Command Line Tools distributions place `Testing.framework` and `lib_TestingInterop.dylib` outside SwiftPM's default search paths. For that CLT layout, `Package.swift` derives the selected toolchain root from `xcrun --find swift` and adds only the required framework and runtime search paths when both files exist. The repository contains no fixed developer-directory path.
+Xcode uses SwiftPM's normal `Testing` module discovery. Some standalone Command Line Tools distributions place `Testing.framework` and `lib_TestingInterop.dylib` outside SwiftPM's default search paths. For that CLT layout, `Package.swift` derives the selected toolchain root from `xcrun --find swift` and adds only the required framework and runtime search paths when both files exist. The repository contains no fixed developer-directory path.
 
 If `swift test` prints only `Build complete!`, the generated test entry point also needs the framework search path. On that CLT layout, run:
 
@@ -114,7 +114,6 @@ Create a fake JSON-RPC child process that returns:
 Assert that the client does not retry, makes one rate-limit request per read, and does not convert one duration into another Usage window.
 
 `CodexExecutableLocatorTests` starts real sh, bash, and zsh login shells with isolated startup files.
-Install fish to enable the fish regression check (it is explicitly skipped when fish is unavailable).
 Each shell covers unset and empty `CODEX_CLI_PATH`, shell-local command and absolute-path overrides,
 invalid overrides, startup output, paths containing spaces, and PATH inheritance by the launched child.
 
@@ -122,31 +121,28 @@ invalid overrides, startup output, paths containing spaces, and PATH inheritance
 
 Verify:
 
-- current row is highlighted;
+- current row highlight spans the account and reset action;
 - both account lists use the full saved email, including its domain, as the primary title;
 - account titles remain on one line with tail ellipsis, and hovering reveals the full title in a floating tooltip;
 - missing or empty emails use the display name;
-- the add-account hint sits to the right of its action on one line, with its full text available on hover;
+- Add Account has no inline hint, and pending sign-in shows Cancel Sign-In with a progress indicator;
 - accounts with matching email prefixes and different domains remain distinguishable;
 - no checkmark or `Current` label exists;
-- reset text remains on the name line in the default compact layout;
-- rows display separate 5h and 7d rows with percentages and reset countdowns when both values exist;
+- the banked-reset action is a neutral capsule with reset icon and count, without a visible `Reset` label;
+- rows display unlabeled 5-hour then weekly lines, each with a compact visual bar, percentage, and reset countdown;
 - reset countdowns tick while the popover is open, and hovering one reveals the exact reset timestamp;
 - the 5h row is omitted when data is absent;
-- Usage labels remain fully visible;
-- progress-bar accessibility value equals `NN% left`;
-- footer contains a single Quit action, with Add Account above it;
+- the compact usage bars match their adjacent remaining percentages;
+- footer shows Add Account and Quit side by side;
 - switch and removal confirmations navigate inside the popover;
 - reopening after closing a secondary page starts on the account list;
-- no Login Item registration is created by the app;
 - switch confirmation describes Desktop and CLI consequences;
 - canceling switch or removal keeps the popover open and performs no mutation;
-- closing the browser during Add Account leaves the rest of the popover interactive, and Cancel Adding Account stops the pending login;
+- closing the browser during Add Account leaves the rest of the popover interactive, and Cancel Sign-In stops the pending login;
 - account rows display cached Usage while refresh runs;
 - a short-interval timer test proves that a manual refresh postpones the previous deadline and cancellation stops later rounds;
 - active profile remove button is disabled;
-- disabling Show 5-hour Usage restores the existing weekly row layout;
-- the menu-bar percentage remains weekly when 5-hour display is enabled.
+- the menu-bar percentage always shows weekly usage alongside available 5-hour and weekly rows.
 
 ## 6. Manual test matrix
 
@@ -155,7 +151,7 @@ With two real test accounts:
 1. add Account A;
 2. add Account B;
 3. open menu and confirm the existing weekly layout for both;
-4. enable Show 5-hour Usage and confirm available 5h and 7d rows, then verify an account without 5-hour data omits only the 5h row;
+4. confirm available 5-hour data appears above the weekly line without visible window labels, and an account without 5-hour data shows only the weekly line;
 5. confirm the menu-bar percentage still matches weekly Usage;
 6. start a Codex CLI under A;
 7. switch A → B;
@@ -177,7 +173,7 @@ Before release:
 
 ```text
 only main branch remains
-5-hour Usage defaults off and affects account rows only
+5-hour Usage is always shown on account rows
 4-hour and 6-hour windows are never labeled as 5-hour Usage
 only the bounded verification/commit credential restoration exists
 no general rollback state machine

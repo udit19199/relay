@@ -238,15 +238,15 @@ private actor JSONRPCSession {
         }
     }
 
-    public func initialize(timeout: Duration, clientVersion: String) async throws {
+    public func initialize(timeout: Duration) async throws {
         try send([
             "method": "initialize",
             "id": 0,
             "params": [
                 "clientInfo": [
-                    "name": "codex_account_switcher",
-                    "title": "Codex Account Switcher",
-                    "version": clientVersion,
+                    "name": "sidekick",
+                    "title": "Sidekick",
+                    "version": CodexClient.version,
                 ],
             ],
         ])
@@ -413,8 +413,6 @@ public struct CodexExecutableLocator: Sendable {
             let shell = Process()
             let output = Pipe()
             shell.executableURL = URL(fileURLWithPath: environment["SHELL"] ?? "/bin/zsh")
-            // Quoted PATH is colon-separated in fish too. Keep defaulting in locate()
-            // because fish does not support POSIX ${VAR:-default} expansion.
             shell.arguments = ["-l", "-c", "printf '\\0%s\\0%s\\0' \"$PATH\" \"$CODEX_CLI_PATH\""]
             shell.environment = environment
             shell.standardOutput = output
@@ -451,21 +449,21 @@ public struct CodexExecutableLocator: Sendable {
 
 public protocol AccountClient: CodexIdentityReading {
     func readWeeklyUsage(profileHome: URL) async throws -> WeeklyUsage
+    func redeemBankedReset(profileHome: URL) async throws
     func login(profileHome: URL) async throws -> AccountIdentity
 }
 
 public struct CodexClient: AccountClient {
     public let locator: CodexExecutableLocator
     public let requestTimeout: Duration
-    public let clientVersion: String
     private let openBrowser: @Sendable (URL) async throws -> Void
 
+    static let version = "0.1.17"
+
     public init(locator: CodexExecutableLocator = .init(), requestTimeout: Duration = .seconds(20),
-                clientVersion: String = "0.1.16",
                 openBrowser: @escaping @Sendable (URL) async throws -> Void = CodexClient.defaultOpenBrowser) {
         self.locator = locator
         self.requestTimeout = requestTimeout
-        self.clientVersion = clientVersion
         self.openBrowser = openBrowser
     }
 
@@ -499,7 +497,35 @@ public struct CodexClient: AccountClient {
                 timeout: requestTimeout
             )
         }
-        return try WeeklyUsageNormalizer.normalize(parseWindows(result))
+        return try WeeklyUsageNormalizer.normalize(
+            parseWindows(result),
+            availableResetCount: Self.parseResetCreditCount(result),
+            availableResetCredits: Self.parseResetCredits(result)
+        )
+    }
+
+    public func redeemBankedReset(profileHome: URL) async throws {
+        _ = try await withSession(profileHome: profileHome) { session in
+            let limits = try await session.request(
+                method: "account/rateLimits/read",
+                id: 1,
+                timeout: requestTimeout
+            )
+            guard let count = Self.parseResetCreditCount(limits) else {
+                throw CodexClientError.bankedResetAvailabilityUnavailable
+            }
+            guard count > 0 else { throw CodexClientError.noBankedResetAvailable }
+            var params: [String: Any] = ["idempotencyKey": UUID().uuidString]
+            if let creditID = Self.parseResetCredits(limits)?.first?.id {
+                params["creditId"] = creditID
+            }
+            return try await session.request(
+                method: "account/rateLimitResetCredit/consume",
+                id: 2,
+                params: params,
+                timeout: requestTimeout
+            )
+        }
     }
 
     public func login(profileHome: URL) async throws -> AccountIdentity {
@@ -549,7 +575,7 @@ public struct CodexClient: AccountClient {
         return try await withTaskCancellationHandler {
             do {
                 try Task.checkCancellation()
-                try await session.initialize(timeout: requestTimeout, clientVersion: clientVersion)
+                try await session.initialize(timeout: requestTimeout)
                 let result = try await operation(session)
                 await session.stop()
                 try Task.checkCancellation()
@@ -587,10 +613,39 @@ public struct CodexClient: AccountClient {
     }
 
     private func parseWindows(_ value: JSONValue) -> [RateLimitWindow] {
-        guard let bucket = value["rateLimitsByLimitId"]?["codex"] ?? value["rateLimits"] else {
+        guard let bucket = value["rateLimitsByLimitId"]?["codex"] else {
             return []
         }
         return [bucket["primary"], bucket["secondary"]].compactMap(parseWindow)
+    }
+
+    private static func parseResetCreditCount(_ value: JSONValue) -> Int? {
+        guard let count = value["rateLimitResetCredits"]?["availableCount"]?.intValue,
+              count >= 0
+        else {
+            return nil
+        }
+        return count
+    }
+
+    private static func parseResetCredits(_ value: JSONValue) -> [BankedResetCredit]? {
+        guard case let .array(credits)? = value["rateLimitResetCredits"]?["credits"] else { return nil }
+        return credits.compactMap { credit in
+            guard credit["status"]?.stringValue == "available",
+                  let id = credit["id"]?.stringValue
+            else {
+                return nil
+            }
+            let expiresAt = credit["expiresAt"]?.doubleValue.map(Date.init(timeIntervalSince1970:))
+            return BankedResetCredit(id: id, expiresAt: expiresAt)
+        }
+        .sorted { lhs, rhs in
+            switch (lhs.expiresAt, rhs.expiresAt) {
+            case let (lhs?, rhs?): lhs < rhs
+            case (_?, nil): true
+            default: false
+            }
+        }
     }
 
     private func parseWindow(_ value: JSONValue?) -> RateLimitWindow? {

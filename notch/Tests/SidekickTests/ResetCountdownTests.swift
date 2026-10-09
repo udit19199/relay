@@ -1,7 +1,7 @@
 import Foundation
 import Testing
-@testable import CodexAccountSwitcher
-@testable import SwitcherCore
+@testable import Sidekick
+@testable import SidekickCore
 
 struct ResetCountdownTests {
     private let now = Date(timeIntervalSince1970: 1_800_000_000)
@@ -11,7 +11,7 @@ struct ResetCountdownTests {
     }
 
     @Test func justElapsedResetsShowNow() {
-        #expect(text(-30) == L10n.string("resets_now"))
+        #expect(text(-30) == "Resets now")
     }
 
     @Test func underAMinuteShowsAMoment() {

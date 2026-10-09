@@ -1,9 +1,9 @@
-import SwitcherCore
+import SidekickCore
 import AppKit
 import SwiftUI
 
 @main
-struct SwitcherApp: App {
+struct SidekickApp: App {
     @StateObject private var model = AppModel.live()
 
     var body: some Scene {
@@ -25,16 +25,16 @@ struct SwitcherApp: App {
         }
         .menuBarExtraStyle(.window)
         .commands {
-            QuitApplicationCommands(title: model.text("quit"))
+            QuitApplicationCommands(title: "Quit")
         }
     }
 
     private var menuBarAccessibilityLabel: String {
         guard let remainingPercent = model.activeRemainingPercent
         else {
-            return "Codex Account Switcher"
+            return "Sidekick"
         }
-        return "Codex Account Switcher, \(remainingPercent)%"
+        return "Sidekick, \(remainingPercent)%"
     }
 }
 
@@ -42,7 +42,7 @@ private struct MenuBarLogo: View {
     private static let logicalSize = NSSize(width: 17.5, height: 17.5)
 
     private static let image: NSImage = {
-        let resourceBundleName = "CodexAccountSwitcher_CodexAccountSwitcher.bundle"
+        let resourceBundleName = "Sidekick_Sidekick.bundle"
         let resourceBundle = [Bundle.main.resourceURL, Bundle.main.bundleURL]
             .compactMap { $0 }
             .map { $0.appending(path: resourceBundleName) }

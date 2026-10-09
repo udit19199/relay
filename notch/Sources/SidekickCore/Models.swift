@@ -14,14 +14,6 @@ public struct AccountProfile: Codable, Identifiable, Equatable, Hashable, Sendab
         self.id = id; self.displayName = displayName; self.email = email
         self.accountID = accountID; self.createdAt = createdAt; self.lastUsedAt = lastUsedAt
     }
-
-    public var initials: String {
-        let parts = displayName
-            .split(whereSeparator: { $0.isWhitespace })
-            .prefix(2)
-        let value = parts.compactMap(\.first).map(String.init).joined()
-        return value.isEmpty ? "?" : value.uppercased()
-    }
 }
 
 public struct AccountRegistry: Codable, Equatable, Sendable {
@@ -40,17 +32,33 @@ public struct WeeklyUsage: Codable, Equatable, Sendable {
     public let resetsAt: Date
     public let fiveHourRemainingPercent: Int?
     public let fiveHourResetsAt: Date?
+    public let availableResetCount: Int?
+    public let availableResetCredits: [BankedResetCredit]?
 
     public init(
         remainingPercent: Int,
         resetsAt: Date,
         fiveHourRemainingPercent: Int? = nil,
-        fiveHourResetsAt: Date? = nil
+        fiveHourResetsAt: Date? = nil,
+        availableResetCount: Int? = nil,
+        availableResetCredits: [BankedResetCredit]? = nil
     ) {
         self.remainingPercent = remainingPercent
         self.resetsAt = resetsAt
         self.fiveHourRemainingPercent = fiveHourRemainingPercent
         self.fiveHourResetsAt = fiveHourResetsAt
+        self.availableResetCount = availableResetCount
+        self.availableResetCredits = availableResetCredits
+    }
+}
+
+public struct BankedResetCredit: Codable, Equatable, Identifiable, Sendable {
+    public let id: String
+    public let expiresAt: Date?
+
+    public init(id: String, expiresAt: Date?) {
+        self.id = id
+        self.expiresAt = expiresAt
     }
 }
 
@@ -124,28 +132,24 @@ public struct AccountIdentity: Equatable, Sendable {
 }
 
 public enum SwitchStage: String, CaseIterable, Sendable {
-    case closeDesktop
     case saveCurrentCredential
     case activateTargetCredential
     case verifyTargetIdentity
     case commitActiveAccountID
-    case reopenDesktop
 }
 
 public struct OperationError: LocalizedError, Equatable, Sendable {
     public let stage: SwitchStage?
-    public let titleKey: String
-    public let messageKey: String?
+    public let title: String
     public let message: String
     public let underlyingDescription: String?
 
-    public init(stage: SwitchStage?, titleKey: String, messageKey: String?, message: String, underlyingDescription: String?) {
-        self.stage = stage; self.titleKey = titleKey; self.messageKey = messageKey
+    public init(stage: SwitchStage?, title: String, message: String, underlyingDescription: String?) {
+        self.stage = stage; self.title = title
         self.message = message; self.underlyingDescription = underlyingDescription
     }
 
     public var errorDescription: String? {
-        let title = L10n.string(titleKey)
         if let stage {
             return "\(title) (\(stage.rawValue)): \(message)"
         }
@@ -155,8 +159,7 @@ public struct OperationError: LocalizedError, Equatable, Sendable {
     public static func stage(_ stage: SwitchStage, _ error: any Error) -> OperationError {
         OperationError(
             stage: stage,
-            titleKey: "switch_failed",
-            messageKey: nil,
+            title: "Account switch failed",
             message: error.localizedDescription,
             underlyingDescription: String(describing: error)
         )
@@ -171,7 +174,7 @@ public enum AccountStoreError: LocalizedError, Equatable, Sendable {
     case targetCredentialMissing
     case duplicateAccount
     case cannotRemoveActiveAccount
-    case accountLimitReached
+    case storageMigrationConflict
 
     public var errorDescription: String? {
         switch self {
@@ -182,15 +185,15 @@ public enum AccountStoreError: LocalizedError, Equatable, Sendable {
         case .activeCredentialMissing:
             "The active Codex auth.json file is missing."
         case .activeCredentialMismatch:
-            "Codex is signed in to a different account than Switcher expects. No saved credential was overwritten. Sign in to the expected account, or add the current login again with Add Account."
+            "Codex is signed in to a different account than Sidekick expects. No saved credential was overwritten. Sign in to the expected account, or add the current login again with Add Account."
         case .targetCredentialMissing:
             "The selected account has no saved auth.json file."
         case .duplicateAccount:
             "This account is already saved. Select the existing account instead."
         case .cannotRemoveActiveAccount:
             "The active account cannot be removed."
-        case .accountLimitReached:
-            "Only two accounts are supported. Remove one before adding another."
+        case .storageMigrationConflict:
+            "Both the old account folder and Sidekick folder exist. Sidekick left both untouched; back up and resolve the folders before reopening."
         }
     }
 }
@@ -205,6 +208,8 @@ public enum CodexClientError: LocalizedError, Equatable, Sendable {
     case timeout
     case identityUnavailable
     case weeklyUsageUnavailable
+    case bankedResetAvailabilityUnavailable
+    case noBankedResetAvailable
     case loginFailed(String)
 
     public var errorDescription: String? {
@@ -227,6 +232,10 @@ public enum CodexClientError: LocalizedError, Equatable, Sendable {
             "Codex did not return an account identity."
         case .weeklyUsageUnavailable:
             "No weekly Codex Usage window is available."
+        case .bankedResetAvailabilityUnavailable:
+            "Codex did not report whether a banked reset is available. Update Codex and try again."
+        case .noBankedResetAvailable:
+            "No banked usage reset is available for this account."
         case let .loginFailed(message):
             "Codex login failed: \(message)"
         }
