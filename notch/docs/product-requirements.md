@@ -44,11 +44,11 @@ As a user, I can select a different account, read the normal consequences, confi
 
 ### US-3: Add an account
 
-As a user, I can open Manage Accounts, add another ChatGPT account through Codex login, and save it as a selectable profile.
+As a user, I can add another ChatGPT account through Codex login from the main screen, and save it as a selectable profile.
 
 ### US-4: Remove an account
 
-As a user, I can remove an inactive local profile from Manage Accounts.
+As a user, I can remove an inactive local profile from the account row’s context menu.
 
 ### US-5: Change language
 
@@ -144,13 +144,16 @@ Reset unknown
 
 ## 6. Main-menu footer
 
-The footer contains exactly three equal-width actions:
+The footer contains exactly one full-width action:
 
-1. `Manage Accounts`
-2. `Settings`
-3. `Quit`
+1. `Quit`
 
-Manage Accounts and Settings open inside the current popover and provide a Back action. Every new popover opening starts on the account list, regardless of which secondary page was last visible.
+Account lifecycle actions sit above the footer, below the account list:
+
+- `Add Account`, with its browser sign-in hint on the same line;
+- `Register Current Account`.
+
+Both are ordinary in-line buttons; they do not replace the popover content and provide no Back action.
 
 Quit directly terminates the application, remains enabled while another operation runs, and is also available through Command-Q.
 
@@ -212,17 +215,17 @@ If target activation completed and target verification or registry persistence f
 
 This bounded repair does not add a general rollback state machine, credential backup file, retry, journal, or startup recovery.
 
-## 8. Manage Accounts
+## 8. Account lifecycle
 
 ### 8.1 List
 
-Show:
+The main screen lists every saved account:
 
 - avatar or initials;
 - full email as a single-line title with tail ellipsis and a floating full-text tooltip;
 - local display name when email is missing or empty;
 - active-state highlight;
-- remove action for inactive profiles.
+- remove action for inactive profiles in the row’s context menu.
 
 ### 8.2 Add account
 
@@ -237,12 +240,12 @@ create profile directory
 → run Codex login with CODEX_HOME=<profile directory>
 → read account identity
 → create profile metadata
-→ return to Manage Accounts
+→ return to the account list
 ```
 
 Adding an account creates no current-account credential backup or rollback flow.
 
-The browser sign-in wait is tracked separately from profile mutations so the account list, Settings, and existing account actions remain interactive. While sign-in is pending, Manage Accounts shows a direct cancel action. Canceling stops the app-server login session without presenting an operation error.
+The browser sign-in wait is tracked separately from profile mutations so the account list and existing account actions remain interactive. While sign-in is pending, the main screen shows a direct cancel action. Canceling stops the app-server login session without presenting an operation error.
 
 If login fails, show the original Codex login error and remove only this attempt’s unregistered profile directory. Cancellation performs the same cleanup without a login error. If cleanup fails, expose that failure alongside the original error. Already registered profiles are never removed by this cleanup. Duplicate identities are rejected; distinct account IDs remain separate even when their emails match.
 
@@ -316,7 +319,7 @@ The MVP is accepted when:
 3. enabling Show 5-hour Usage displays separate 5h and 7d lines when both values exist, and omits the 5h line when it is absent;
 4. the progress bar exactly matches `NN% left`;
 5. the current row is highlighted without a checkmark;
-6. the footer contains equal-width Manage Accounts, Settings, and Quit actions;
+6. the footer contains a single Quit action, with Add Account and Register Current Account above it;
 7. the popover is 326 points wide and all secondary pages navigate inside it;
 8. Settings contains menu-bar percentage, 5-hour Usage, and language controls inside the popover;
 9. every popover opening starts on the account list;
@@ -340,4 +343,4 @@ Personal fork: no auto-update. Updates are `git pull` plus a local build.
 
 With no registered active account and no active auth.json, selecting a saved account activates it directly after Desktop exits normally. Verification or registry persistence failure removes the newly installed active credential and leaves the app signed out. Existing unregistered credentials are never overwritten by this path.
 
-Manage Accounts provides Register Current Account below Add Account. It reads the current shared login identity, updates that same identity’s saved credential or imports a new profile, and records it as active. A mismatch during switching links to Manage Accounts. Other profiles remain unchanged.
+The main screen provides Register Current Account below Add Account. It reads the current shared login identity, updates that same identity’s saved credential or imports a new profile, and records it as active. A mismatch during switching is fixed with the Register action on the main screen. Other profiles remain unchanged.

@@ -134,8 +134,8 @@ Verify:
 - enabled 5-hour display omits the 5h row when data is absent;
 - English and Simplified Chinese Usage labels remain fully visible;
 - progress-bar accessibility value equals `NN% left`;
-- footer contains equal-width Manage Accounts, Settings, and Quit actions;
-- Manage Accounts and Settings navigate inside the popover;
+- footer contains a single Quit action, with Add Account and Register Current Account above it;
+- switch and removal confirmations navigate inside the popover;
 - reopening after closing a secondary page starts on the account list;
 - Settings contains Show Percentage in Menu Bar, Show 5-hour Usage, and Language in that order;
 - no Login Item registration is created by the app;

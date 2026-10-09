@@ -628,7 +628,7 @@ sequenceDiagram
 5. Read identity from the same profile home.
 6. Derive the local display name from the returned identity.
 7. Append profile metadata.
-8. Return to Manage Accounts.
+8. Return to the account list.
 
 If any step fails, stop and show the error. Remove this login attempt’s directory only while it remains unregistered. Preserve the original error; surface cleanup failure too. Cancellation stops the login session and performs the same cleanup.
 
@@ -659,14 +659,14 @@ A registry-write failure leaves the credential directory intact. The bounded lis
 Only one mutation runs at a time. While `isMutating` is true:
 
 - account rows are disabled;
-- Manage Accounts actions that mutate profiles are disabled;
+- account lifecycle actions that mutate profiles are disabled;
 - Quit remains available.
 
 This is a simple in-process UI invariant, not a cross-process lock service.
 
-Browser sign-in uses `isAddingAccount` and a separately retained task. It does not hold the mutation lock while waiting for the browser callback. Manage Accounts replaces Add Account with a cancel action during this wait; canceling terminates the app-server session and restores the normal button without showing an error.
+Browser sign-in uses `isAddingAccount` and a separately retained task. It does not hold the mutation lock while waiting for the browser callback. The main screen replaces Add Account with a cancel action during this wait; canceling terminates the app-server session and restores the normal button without showing an error.
 
-`MenuBarPopover` owns an in-memory page enum for the account list, Manage Accounts, Settings, and switch confirmation. All secondary pages render inside the same 326-point popover. Cancel and Back change only page state. The root view resets the page to the account list on every popover appearance.
+`MenuBarPopover` owns an in-memory page enum for the account list, switch confirmation, and removal confirmation. All secondary pages render inside the same 326-point popover. Cancel and Back change only page state. The root view resets the page to the account list on every popover appearance.
 
 ## 17. Localization
 

@@ -22,10 +22,6 @@ struct MenuBarPopover: View {
                 switch page {
                 case .accounts:
                     accountPage
-                case .manageAccounts:
-                    ManageAccountsView(model: model) {
-                        page = .accounts
-                    }
                 case let .confirmSwitch(account):
                     SwitchConfirmationPage(
                         model: model,
@@ -36,6 +32,19 @@ struct MenuBarPopover: View {
                         onConfirm: {
                             page = .accounts
                             Task { await model.switchAccount(to: account.id) }
+                        }
+                    )
+                    .disabled(model.isMutating)
+                case let .remove(account):
+                    RemoveConfirmationPage(
+                        model: model,
+                        account: account,
+                        onCancel: {
+                            page = .accounts
+                        },
+                        onConfirm: {
+                            page = .accounts
+                            Task { await model.removeAccount(id: account.id) }
                         }
                     )
                     .disabled(model.isMutating)
@@ -57,8 +66,8 @@ struct MenuBarPopover: View {
             if !model.activeIdentityConfirmed {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(model.text("active_unconfirmed"))
-                    Button(model.text("manage")) {
-                        page = .manageAccounts
+                    Button(model.text("register")) {
+                        Task { await model.registerCurrentAccount() }
                     }
                     .disabled(model.isMutating || model.isAddingAccount)
                 }
@@ -92,21 +101,27 @@ struct MenuBarPopover: View {
                         }
                         .buttonStyle(.plain)
                         .disabled(model.isMutating)
+                        .contextMenu {
+                            if account.id != model.activeAccountID {
+                                Button(role: .destructive) {
+                                    page = .remove(account)
+                                } label: {
+                                    Text(model.format("remove_title", account.displayName))
+                                }
+                            }
+                        }
                     }
                 }
                 .padding(5)
             }
 
             Divider()
-            HStack(spacing: 2) {
-                FooterAction(
-                    title: model.text("manage"),
-                    systemImage: "person.2"
-                ) {
-                    page = .manageAccounts
-                }
-                .disabled(model.isMutating)
 
+            accountActions
+
+            Divider()
+
+            HStack(spacing: 2) {
                 FooterAction(
                     title: model.text("quit"),
                     systemImage: "power",
@@ -119,12 +134,71 @@ struct MenuBarPopover: View {
             .padding(.vertical, 5)
         }
     }
+
+    private var accountActions: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Button {
+                if model.isAddingAccount {
+                    model.cancelAddingAccount()
+                } else {
+                    model.addAccount()
+                }
+            } label: {
+                HStack(spacing: 7) {
+                    Image(systemName: model.isAddingAccount ? "xmark" : "plus")
+                        .frame(width: 14)
+                    Text(model.text(model.isAddingAccount ? "cancel_add_account" : "add_account"))
+                        .fixedSize()
+                    Spacer(minLength: 4)
+                    signInHint
+                    if model.isAddingAccount {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                }
+                .font(.system(size: 12, weight: .medium))
+                .padding(.horizontal, 8)
+                .frame(height: 30)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(model.isMutating && !model.isAddingAccount)
+
+            Button {
+                Task { await model.registerCurrentAccount() }
+            } label: {
+                HStack(spacing: 7) {
+                    Image(systemName: "person.crop.circle.badge.checkmark")
+                        .frame(width: 14)
+                    Text(model.text("register_current_account"))
+                    Spacer()
+                }
+                .font(.system(size: 12, weight: .medium))
+                .padding(.horizontal, 8)
+                .frame(height: 30)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(model.isMutating || model.isAddingAccount)
+        }
+        .padding(5)
+    }
+
+    private var signInHint: some View {
+        let hint = model.text(model.isAddingAccount ? "sign_in_pending_hint" : "sign_in_hint")
+        return Text(hint)
+            .font(.system(size: 10.5))
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .help(hint)
+    }
 }
 
 private enum PopoverPage {
     case accounts
-    case manageAccounts
     case confirmSwitch(AccountProfile)
+    case remove(AccountProfile)
 }
 
 private struct SwitchConfirmationPage: View {
@@ -157,6 +231,45 @@ private struct SwitchConfirmationPage: View {
                     Button(model.text("switch"), action: onConfirm)
                         .buttonStyle(.borderedProminent)
                         .frame(maxWidth: .infinity)
+                }
+            }
+            .padding(14)
+        }
+    }
+}
+
+private struct RemoveConfirmationPage: View {
+    @ObservedObject var model: AppModel
+    let account: AccountProfile
+    let onCancel: () -> Void
+    let onConfirm: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            PopoverHeader(
+                title: model.format("remove_title", account.displayName),
+                backTitle: model.text("cancel"),
+                onBack: onCancel
+            )
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 14) {
+                Text(model.text("remove_body"))
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 7) {
+                    Button(model.text("cancel"), action: onCancel)
+                        .buttonStyle(.bordered)
+                        .frame(maxWidth: .infinity)
+
+                    Button(model.text("remove"), role: .destructive, action: onConfirm)
+                        .buttonStyle(.borderedProminent)
+                        .tint(.red)
+                        .frame(maxWidth: .infinity)
+                        .disabled(model.isMutating)
                 }
             }
             .padding(14)
@@ -200,6 +313,33 @@ private struct InlineErrorBanner: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .background(Color.orange.opacity(0.08))
+    }
+}
+
+private struct PopoverHeader: View {
+    let title: String
+    let backTitle: String
+    let onBack: () -> Void
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Button(action: onBack) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 11, weight: .semibold))
+                    .frame(width: 27, height: 27)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(backTitle)
+            .help(backTitle)
+
+            Text(title)
+                .font(.system(size: 13, weight: .semibold))
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer()
+        }
+        .padding(.horizontal, 7)
+        .padding(.vertical, 5)
     }
 }
 

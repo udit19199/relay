@@ -32,13 +32,12 @@ The current account is represented by a highlighted row. It does not use:
 - a `Current` label;
 - a second status column.
 
-The footer divides its width equally between:
+The footer contains a single full-width `Quit` action. Account lifecycle actions sit above the footer on the main screen itself:
 
-- `Manage Accounts`;
-- `Settings`;
-- `Quit`.
+- `Add Account`, with its browser sign-in hint on the same line, which becomes a cancel action with a progress indicator while sign-in is pending;
+- `Register Current Account`.
 
-Manage Accounts and Settings replace the popover content in place and provide a Back action. Closing the popover from either page resets the next opening to the account list.
+Removal is available from the context menu of an inactive account row and opens an in-popover confirmation page. Cancel returns to the account list, keeps the popover open, and performs no deletion.
 
 Quit directly terminates the application, remains available during mutations, and has a Command-Q equivalent.
 
@@ -111,23 +110,23 @@ The MVP uses ordinary local files with user-only permissions.
 
 macOS Keychain is not used in the MVP. It adds implementation complexity without adding user-visible switching value.
 
-## 7. Manage Accounts
+## 7. Account lifecycle
 
-`Manage Accounts` owns account lifecycle operations:
+The main screen owns account lifecycle operations:
 
-- view saved accounts;
-- add account;
+- add account through browser sign-in;
+- register the current shared login as a profile;
 - remove an inactive account.
 
 The active account cannot be removed because the meaning of the active Codex authentication file would otherwise be ambiguous. The user first selects another account and then removes the old one.
 
 Removing an account deletes only the switcher's local profile directory and metadata. It does not claim to revoke every OpenAI server session.
 
-Removal uses an in-popover confirmation page. Cancel and Back return to the account list, keep the popover open, and perform no deletion.
-
 ## 8. Main screen
 
 The main screen has no settings page. The menu-bar percentage and the 5-hour usage line are always on.
+
+Add, register, and remove actions live directly on the main screen; there is no separate manage page.
 
 The app does not register a macOS Login Item and cannot start itself at login. Users who want it to launch automatically add it themselves in System Settings → General → Login Items.
 
