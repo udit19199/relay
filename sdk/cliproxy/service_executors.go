@@ -211,7 +211,6 @@ func baselineExecutorAuths() []*coreauth.Auth {
 		constant.GeminiInteractions,
 		"vertex",
 		"aistudio",
-		"antigravity",
 		"kimi",
 		"kimi-ai",
 		"kimi.ai",

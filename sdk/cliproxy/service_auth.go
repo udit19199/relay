@@ -21,7 +21,6 @@ func newDefaultAuthManager() *sdkAuth.Manager {
 		sdkAuth.GetTokenStore(),
 		sdkAuth.NewCodexAuthenticator(),
 		sdkAuth.NewClaudeAuthenticator(),
-		sdkAuth.NewAntigravityAuthenticator(),
 		sdkAuth.NewKimiAuthenticator(),
 		sdkAuth.NewKimiAIAuthenticator(),
 		sdkAuth.NewKimiAIDotAuthenticator(),

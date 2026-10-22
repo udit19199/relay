@@ -85,11 +85,12 @@ func TestRegisterAvailableExecutors(t *testing.T) {
 		"gemini-interactions",
 		"vertex",
 		"aistudio",
-		"antigravity",
 		"kimi",
 		"kimi-ai",
 		"kimi.ai",
 		"xai",
+		"devin",
+		"meta",
 		"openai-compatibility",
 		"plugin-provider",
 	}
@@ -98,6 +99,10 @@ func TestRegisterAvailableExecutors(t *testing.T) {
 		if !ok || resolved == nil {
 			t.Fatalf("expected executor for provider %s after registration", provider)
 		}
+	}
+
+	if _, ok := service.coreManager.Executor("antigravity"); ok {
+		t.Fatal("Antigravity must not be registered by default")
 	}
 
 	resolved, _ := service.coreManager.Executor("plugin-provider")
