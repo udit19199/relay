@@ -34,4 +34,6 @@ The app bundle is written to `.build/release/Sidekick.app`.
 
 ## License
 
-Original Sidekick code is MIT, see [LICENSE](LICENSE). The copied and adapted notch implementation is GPL-3.0-or-later, see [LICENSE-GPL-3.0-or-later](LICENSE-GPL-3.0-or-later) and source attribution in the affected files.
+Original Sidekick code and project artwork are MIT, see [LICENSE](LICENSE). The copied and adapted notch implementation is GPL-3.0-or-later, see [LICENSE-GPL-3.0-or-later](LICENSE-GPL-3.0-or-later) and the source attribution in the affected files.
+
+The combined Sidekick app is distributed under GPL-3.0-or-later. The MIT license remains in force for the original files. Swift source files identify their license with an SPDX header. GPL-covered files also name their upstream source. The local app bundle includes both license texts. You can use and share the app without charging. If you share a built app, provide the corresponding source for that exact build and any other materials the GPL requires.

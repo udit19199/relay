@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import Foundation
 
 // One quota interpretation on macOS and Windows.

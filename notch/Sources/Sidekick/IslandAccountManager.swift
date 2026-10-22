@@ -1,15 +1,24 @@
+// SPDX-License-Identifier: MIT
 import SidekickCore
 import AppKit
 import SwiftUI
 
 struct IslandAccountManager: View {
     @ObservedObject var model: AppModel
+    @Binding var showsCompactUsage: Bool
     let onDismiss: () -> Void
     var onConfirmationChanged: (Bool) -> Void = { _ in }
+    var onExpandedBodyLayoutChanged: (IslandExpandedBodyLayout) -> Void = { _ in }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var confirmation: AccountConfirmation?
+    @State private var addAccountFlow: AddAccountFlow?
+    @State private var pastedSessionText = ""
     @State private var hoveredAccountID: UUID?
     @State private var hoveredResetAccountID: UUID?
+
+    private var isManagingAddAccount: Bool {
+        model.isAddingAccount || model.awaitingBrowserSession != nil || addAccountFlow != nil
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -24,14 +33,40 @@ struct IslandAccountManager: View {
                     .padding(.horizontal, 16)
             }
 
-            ScrollView { accountList }
-                .scrollIndicators(.hidden)
+            Group {
+                if let addAccountFlow {
+                    addAccountPanel(flow: addAccountFlow)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .transition(.opacity)
+                } else {
+                    ScrollView {
+                        accountList
+                    }
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .scrollIndicators(.hidden)
+                    .transition(.opacity)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: addAccountFlow != nil)
 
             Divider()
                 .padding(.horizontal, 16)
 
             HStack(spacing: 2) {
                 accountActions
+                Button {
+                    showsCompactUsage.toggle()
+                } label: {
+                    Image(systemName: showsCompactUsage ? "eye" : "eye.slash")
+                        .font(.system(size: 12, weight: .medium))
+                        .frame(width: 30, height: 30)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Show compact usage")
+                .accessibilityValue(showsCompactUsage ? "On" : "Off")
+                .help(showsCompactUsage ? "Hide compact usage. Hover over the notch to reopen Sidekick." : "Show compact usage")
                 FooterAction(
                     title: "Quit",
                     systemImage: "power",
@@ -44,6 +79,11 @@ struct IslandAccountManager: View {
             .padding(.vertical, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .onAppear { reportExpandedBodyLayout(animated: false) }
+        .onChange(of: addAccountFlow) { _, _ in reportExpandedBodyLayout(animated: false) }
+        .onChange(of: model.accounts.count) { _, _ in
+            if addAccountFlow == nil { reportExpandedBodyLayout(animated: false) }
+        }
         .onChange(of: confirmation != nil) { _, isPresented in
             onConfirmationChanged(isPresented)
         }
@@ -61,6 +101,138 @@ struct IslandAccountManager: View {
         }
     }
 
+    @ViewBuilder
+    private func addAccountPanel(flow: AddAccountFlow) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            switch flow {
+            case .chooseProvider:
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Add which account?")
+                        .font(.headline)
+                        .islandNonSelectableText()
+                    Text("Codex uses the Codex sign-in flow. Cursor and Claude open your default browser to sign in.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .islandNonSelectableText()
+                }
+                Spacer(minLength: 20)
+                VStack(spacing: 10) {
+                    providerButton("Codex", systemImage: "terminal") {
+                        setAddAccountFlow(nil)
+                        model.addAccount(kind: .codex)
+                    }
+                    providerButton("Cursor", systemImage: "cursorarrow.rays") {
+                        startBrowserSignIn(kind: .cursor)
+                    }
+                    providerButton("Claude", systemImage: "bubble.left.and.bubble.right") {
+                        startBrowserSignIn(kind: .claude)
+                    }
+                }
+                Spacer(minLength: 20)
+                Button("Cancel", role: .cancel) { cancelAddAccountFlow() }
+                    .buttonStyle(.link)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            case let .pasteSession(kind):
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Finish \(kind.displayName) sign-in")
+                        .font(.headline)
+                        .islandNonSelectableText()
+                    Text(kind.sessionPasteInstructions)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .islandNonSelectableText()
+                }
+                Spacer(minLength: 12)
+                TextField("Session cookie", text: $pastedSessionText, axis: .vertical)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(.caption, design: .monospaced))
+                    .lineLimit(4 ... 8)
+                Spacer(minLength: 12)
+                HStack(spacing: 8) {
+                    Button("Save Account") {
+                        let text = pastedSessionText
+                        Task {
+                            await model.finishBrowserSession(pasted: text)
+                            if model.awaitingBrowserSession == nil {
+                                cancelAddAccountFlow()
+                            }
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(pastedSessionText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                    Button("Open Browser Again") {
+                        SystemBrowser.openSignIn(for: kind)
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func providerButton(
+        _ title: String,
+        systemImage: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.large)
+    }
+
+    private func startBrowserSignIn(kind: AccountKind) {
+        Task {
+            guard await model.beginBrowserSignIn(kind: kind) else { return }
+            SystemBrowser.openSignIn(for: kind)
+            pastedSessionText = ""
+            setAddAccountFlow(.pasteSession(kind))
+        }
+    }
+
+    private func cancelAddAccountFlow() {
+        setAddAccountFlow(nil)
+        pastedSessionText = ""
+        model.cancelAddingAccount()
+    }
+
+    private func setAddAccountFlow(_ flow: AddAccountFlow?) {
+        addAccountFlow = flow
+        reportExpandedBodyLayout(animated: false)
+    }
+
+    private func reportExpandedBodyLayout(animated: Bool) {
+        let layout: IslandExpandedBodyLayout =
+            if let addAccountFlow {
+                .addContent(layoutPhase(for: addAccountFlow))
+            } else {
+                .accounts(count: model.accounts.count)
+            }
+        if animated {
+            onExpandedBodyLayoutChanged(layout)
+        } else {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                onExpandedBodyLayoutChanged(layout)
+            }
+        }
+    }
+
+    private func layoutPhase(for flow: AddAccountFlow) -> IslandExpandedBodyLayout.AddAccountLayoutPhase {
+        switch flow {
+        case .chooseProvider: .chooseProvider
+        case .pasteSession: .pasteSession
+        }
+    }
+
     private var accountList: some View {
         VStack(spacing: 0) {
             if model.accounts.isEmpty {
@@ -73,7 +245,7 @@ struct IslandAccountManager: View {
                     ForEach(model.accounts) { account in
                         ZStack(alignment: .topTrailing) {
                             Button {
-                                if account.id == model.activeAccountID {
+                                if !account.supportsAccountSwitch || account.id == model.activeAccountID {
                                     onDismiss()
                                 } else {
                                     confirmation = .switchAccount(account)
@@ -85,7 +257,8 @@ struct IslandAccountManager: View {
                                         usageState: model.usageStates[account.id] ?? .idle,
                                         now: context.date,
                                         isActive: account.id == model.activeAccountID,
-                                        hasResetControl: model.usageStates[account.id]?.displayedUsage?.availableResetCount != nil
+                                        hasResetControl: account.supportsBankedReset
+                                            && model.usageStates[account.id]?.displayedUsage?.availableResetCount != nil
                                     )
                                 }
                             }
@@ -93,7 +266,8 @@ struct IslandAccountManager: View {
                             .frame(maxWidth: .infinity)
                             .disabled(model.isMutating)
 
-                            if let usage = model.usageStates[account.id]?.displayedUsage,
+                            if account.supportsBankedReset,
+                               let usage = model.usageStates[account.id]?.displayedUsage,
                                let count = usage.availableResetCount {
                                 Button {
                                     confirmation = .bankedReset(account)
@@ -160,17 +334,17 @@ struct IslandAccountManager: View {
 
     private var accountActions: some View {
         FooterAction(
-            title: model.isAddingAccount ? "Cancel Sign-In" : "Add Account",
-            systemImage: model.isAddingAccount ? "xmark" : "plus",
-            showsProgress: model.isAddingAccount
+            title: isManagingAddAccount ? "Cancel Sign-In" : "Add Account",
+            systemImage: isManagingAddAccount ? "xmark" : "plus",
+            showsProgress: isManagingAddAccount
         ) {
-            if model.isAddingAccount {
-                model.cancelAddingAccount()
+            if isManagingAddAccount {
+                cancelAddAccountFlow()
             } else {
-                model.addAccount()
+                setAddAccountFlow(.chooseProvider)
             }
         }
-        .disabled(model.isMutating && !model.isAddingAccount)
+        .disabled(model.isMutating && !isManagingAddAccount)
     }
 
     @ViewBuilder
@@ -197,6 +371,38 @@ struct IslandAccountManager: View {
                 .disabled(model.isMutating)
             }
             Button("Cancel", role: .cancel) { self.confirmation = nil }
+        }
+    }
+}
+
+private extension View {
+    func islandNonSelectableText() -> some View {
+        textSelection(.disabled)
+    }
+}
+
+private enum AddAccountFlow: Equatable {
+    case chooseProvider
+    case pasteSession(AccountKind)
+}
+
+private extension AccountKind {
+    var displayName: String {
+        switch self {
+        case .codex: "Codex"
+        case .cursor: "Cursor"
+        case .claude: "Claude"
+        }
+    }
+
+    var sessionPasteInstructions: String {
+        switch self {
+        case .codex:
+            ""
+        case .cursor:
+            "After signing in to Cursor in your browser, paste the Cookie header for cursor.com (from the network tab or a copy-cookies extension)."
+        case .claude:
+            "After signing in to Claude in your browser, paste the sessionKey value or full Cookie header for claude.ai."
         }
     }
 }

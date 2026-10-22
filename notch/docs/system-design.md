@@ -39,7 +39,6 @@ The MVP uses direct sequential code and lets failures surface. One bounded consi
 
 - zero-downtime switching;
 - a general rollback state machine for arbitrary partial completion;
-- automatic repair;
 - background daemon;
 - cloud synchronization;
 - secure enclave or Keychain integration;
@@ -314,7 +313,7 @@ There is no fallback to local display name or file hash.
 
 ### 9.3 Usage read
 
-Read the saved profile’s access token and account ID, then GET `https://chatgpt.com/backend-api/wham/usage`. Normalize `rate_limit.primary_window` and `secondary_window`, converting `limit_window_seconds` to minutes. There is no CLI fallback or automatic token renewal. Authentication failures require signing in again.
+Read the saved profile’s access token and account ID, then GET `https://chatgpt.com/backend-api/wham/usage`. Normalize `rate_limit.primary_window` and `secondary_window`, converting `limit_window_seconds` to minutes. There is no CLI fallback. If an inactive saved profile receives HTTP 401, refresh its token through `account/read` with `refreshToken: true`, then retry the HTTP reads once. The active account is not refreshed this way because Codex owns the matching `~/.codex/auth.json` credential.
 
 ```text
 fiveHour = first window where windowDurationMins == 300
@@ -368,7 +367,7 @@ Each account directory acts as a minimal Codex home for identity and Usage calls
 ~/Library/Application Support/Sidekick/accounts/<profile-id>/auth.json
 ```
 
-Sidekick reads that directory’s saved credentials for HTTP Usage requests. Sign-in and identity CLI calls use it as `CODEX_HOME`. Usage requests do not change the active `~/.codex/auth.json`.
+Sidekick reads that directory’s saved credentials for HTTP Usage requests. Sign-in and identity CLI calls use it as `CODEX_HOME`. Usage requests do not change the active `~/.codex/auth.json`. When an inactive profile gets HTTP 401, its app-server refresh uses that profile directory as `CODEX_HOME` and writes only that profile's updated credential.
 
 ### 10.2 Refresh behavior
 
@@ -386,7 +385,7 @@ The app owns one pending timer while it runs. Every launch, timer, or manual ref
 
 ### 10.3 Persisting refreshed credentials
 
-Routine Usage reads never renew or write tokens. Codex may refresh the profile's token during sign-in or other CLI operations. Because that app-server uses the profile directory directly, any updated `auth.json` remains in the correct profile directory. No extra copy-back stage is required.
+Routine Usage reads do not write tokens unless an inactive profile gets HTTP 401. Sidekick then asks Codex app-server to refresh that profile's token. Codex uses the profile directory directly, so the updated `auth.json` stays with the correct account. Sidekick does not refresh the active profile this way because Codex may use its matching token from `~/.codex` at the same time.
 
 ## 11. Desktop controller
 

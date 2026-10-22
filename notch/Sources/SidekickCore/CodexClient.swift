@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import Foundation
 #if canImport(AppKit)
 import AppKit
@@ -449,8 +450,15 @@ public struct CodexExecutableLocator: Sendable {
 
 public protocol AccountClient: CodexIdentityReading {
     func readWeeklyUsage(profileHome: URL) async throws -> WeeklyUsage
+    func readWeeklyUsage(profileHome: URL, refreshTokenOnUnauthorized: Bool) async throws -> WeeklyUsage
     func redeemBankedReset(profileHome: URL) async throws
     func login(profileHome: URL) async throws -> AccountIdentity
+}
+
+public extension AccountClient {
+    func readWeeklyUsage(profileHome: URL, refreshTokenOnUnauthorized: Bool) async throws -> WeeklyUsage {
+        try await readWeeklyUsage(profileHome: profileHome)
+    }
 }
 
 public struct CodexClient: AccountClient {
@@ -491,6 +499,31 @@ public struct CodexClient: AccountClient {
 
     public func readWeeklyUsage(profileHome: URL) async throws -> WeeklyUsage {
         try await DirectUsageReader(timeout: requestTimeout).read(profileHome: profileHome)
+    }
+
+    public func readWeeklyUsage(
+        profileHome: URL,
+        refreshTokenOnUnauthorized: Bool
+    ) async throws -> WeeklyUsage {
+        let reader = DirectUsageReader(timeout: requestTimeout)
+        do {
+            return try await reader.read(profileHome: profileHome)
+        } catch DirectUsageError.unauthorized {
+            guard refreshTokenOnUnauthorized else { throw DirectUsageError.signInRequired }
+            _ = try await withSession(profileHome: profileHome) { session in
+                try await session.request(
+                    method: "account/read",
+                    id: 1,
+                    params: ["refreshToken": true],
+                    timeout: requestTimeout
+                )
+            }
+            do {
+                return try await reader.read(profileHome: profileHome)
+            } catch DirectUsageError.unauthorized {
+                throw DirectUsageError.signInRequired
+            }
+        }
     }
 
     public func redeemBankedReset(profileHome: URL) async throws {

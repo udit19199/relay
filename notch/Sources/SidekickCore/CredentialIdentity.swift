@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import Foundation
 
 // Identity metadata labels a local login; Codex still authenticates with the service.

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import Foundation
 #if canImport(Darwin)
 import Darwin
@@ -147,11 +148,20 @@ public actor AccountStore: AccountStoring {
     }
 
     public func addProfile(_ profile: AccountProfile) throws {
-        let authURL = profileHome(id: profile.id).appending(path: "auth.json")
-        guard fileManager.fileExists(atPath: authURL.path) else {
-            throw AccountStoreError.targetCredentialMissing
+        switch profile.kind {
+        case .codex:
+            let authURL = profileHome(id: profile.id).appending(path: "auth.json")
+            guard fileManager.fileExists(atPath: authURL.path) else {
+                throw AccountStoreError.targetCredentialMissing
+            }
+            try restrictPermissions(authURL, directory: false)
+        case .cursor, .claude:
+            let sessionURL = profileHome(id: profile.id).appending(path: ProviderSessionCredential.fileName)
+            guard fileManager.fileExists(atPath: sessionURL.path) else {
+                throw AccountStoreError.targetCredentialMissing
+            }
+            try restrictPermissions(sessionURL, directory: false)
         }
-        try restrictPermissions(authURL, directory: false)
         var current = try loadRegistry()
         let identity = AccountIdentity(accountID: profile.accountID, email: profile.email)
         guard !current.accounts.contains(where: { identity.matches($0) }) else {

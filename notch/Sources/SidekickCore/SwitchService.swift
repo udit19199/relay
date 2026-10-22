@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import Foundation
 
 // The same ordered handoff and bounded restoration run on both platforms.

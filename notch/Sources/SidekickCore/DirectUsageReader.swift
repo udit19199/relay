@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import Foundation
 
 // Read-only HTTP requests. Login and reset redemption remain separate operations.
@@ -54,7 +55,8 @@ struct DirectUsageReader {
         request.setValue("Codex Desktop", forHTTPHeaderField: "originator")
         let (data, response) = try await session.data(for: request)
         guard let response = response as? HTTPURLResponse else { throw CodexClientError.malformedResponse }
-        if response.statusCode == 401 || response.statusCode == 403 { throw DirectUsageError.signInRequired }
+        if response.statusCode == 401 { throw DirectUsageError.unauthorized }
+        if response.statusCode == 403 { throw DirectUsageError.signInRequired }
         guard response.statusCode == 200 else { throw DirectUsageError.httpStatus(response.statusCode) }
         do { return try JSONDecoder().decode(JSONValue.self, from: data) }
         catch { throw CodexClientError.malformedResponse }
@@ -79,11 +81,13 @@ struct DirectUsageReader {
 
 enum DirectUsageError: LocalizedError {
     case signInRequired
+    case unauthorized
     case httpStatus(Int)
 
     var errorDescription: String? {
         switch self {
         case .signInRequired: "Usage could not authenticate. Sign in to this account again."
+        case .unauthorized: "Usage could not authenticate."
         case let .httpStatus(status): "Usage request failed (HTTP \(status))."
         }
     }

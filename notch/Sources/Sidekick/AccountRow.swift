@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import SidekickCore
 import SwiftUI
 

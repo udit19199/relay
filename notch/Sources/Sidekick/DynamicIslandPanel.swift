@@ -5,6 +5,7 @@
 
 import AppKit
 import Combine
+import QuartzCore
 import SidekickCore
 import SwiftUI
 
@@ -13,21 +14,36 @@ final class DynamicIslandPanelController: NSObject, ObservableObject {
     private let overlaySpace = NotchOverlaySpace()
     private let panel: NotchPanel
     private let model: AppModel
-    private var hoverTask: Task<Void, Never>?
+    private var hoverState = IslandHoverState()
+    private var pointerTimer: Timer?
     private var outsideClickMonitors: [Any] = []
-    private let menuSpaceQueue = DispatchQueue(label: "com.sidekick.notch.menu-space", qos: .utility)
+    private let menuSpaceQueue = DispatchQueue(
+        label: "com.sidekick.notch.menu-space", qos: .utility)
     private var menuSpaceTimer: Timer?
     private var menuSpaceGeneration = 0
+    private var frameAnimationGeneration = 0
+    private var isSurfaceAnimating = false
     @Published private(set) var isExpanded = false
+    @Published var showsCompactUsage =
+        UserDefaults.standard.object(forKey: "showsCompactUsage") as? Bool ?? true
+    {
+        didSet {
+            UserDefaults.standard.set(showsCompactUsage, forKey: "showsCompactUsage")
+        }
+    }
     @Published private(set) var hasActiveConfirmation = false
     @Published fileprivate private(set) var layout: NotchGeometry
+    @Published fileprivate var expandedBodyLayout = IslandExpandedBodyLayout.accounts(count: 0)
+    @Published private(set) var expandedPanelHeight: CGFloat = 0
 
     init(model: AppModel) {
-        let layout = NotchGeometry.current() ?? NotchGeometry(
-            screen: NSScreen.main?.frame ?? CGRect(x: 0, y: 0, width: 1440, height: 900),
-            safeAreaTop: 0,
-            cameraWidth: 0
-        )
+        let layout =
+            NotchGeometry.current()
+            ?? NotchGeometry(
+                screen: NSScreen.main?.frame ?? CGRect(x: 0, y: 0, width: 1440, height: 900),
+                safeAreaTop: 0,
+                cameraWidth: 0
+            )
         self.model = model
         self.layout = layout
         panel = NotchPanel(
@@ -38,6 +54,7 @@ final class DynamicIslandPanelController: NSObject, ObservableObject {
         )
         super.init()
 
+        panel.acceptsMouseMovedEvents = true
         panel.isFloatingPanel = true
         panel.level = NotchPanel.normalLevel
         panel.backgroundColor = .clear
@@ -48,7 +65,8 @@ final class DynamicIslandPanelController: NSObject, ObservableObject {
         panel.isReleasedWhenClosed = false
         panel.collectionBehavior = NotchPanel.overlayCollectionBehavior
         panel.animationBehavior = .none
-        let hostingView = IslandHostingView(rootView: DynamicIslandPanel(model: model, controller: self))
+        let hostingView = IslandHostingView(
+            rootView: DynamicIslandPanel(model: model, controller: self))
         hostingView.controller = self
         panel.contentView = hostingView
         updateFrame()
@@ -67,7 +85,8 @@ final class DynamicIslandPanelController: NSObject, ObservableObject {
             name: NSWorkspace.didActivateApplicationNotification,
             object: nil
         )
-        menuSpaceTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+        menuSpaceTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) {
+            [weak self] _ in
             Task { @MainActor in self?.measureMenuBarSpace() }
         }
     }
@@ -75,7 +94,7 @@ final class DynamicIslandPanelController: NSObject, ObservableObject {
     isolated deinit {
         panel.orderOut(nil)
         overlaySpace?.close()
-        hoverTask?.cancel()
+        pointerTimer?.invalidate()
         menuSpaceTimer?.invalidate()
         outsideClickMonitors.forEach(NSEvent.removeMonitor)
         NotificationCenter.default.removeObserver(self)
@@ -85,58 +104,144 @@ final class DynamicIslandPanelController: NSObject, ObservableObject {
     func show() {
         updateFrame()
         panel.orderFrontRegardless()
-        updateMousePassthrough(at: NSEvent.mouseLocation)
+        reconcilePointer()
+        if pointerTimer == nil {
+            // Read the position even if an entry event is missed or the pointer stops moving.
+            let timer = Timer(timeInterval: 0.05, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated { self?.reconcilePointer() }
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            pointerTimer = timer
+        }
         measureMenuBarSpace()
     }
 
     func toggleExpansion() {
-        hoverTask?.cancel()
-        setExpanded(!isExpanded, makeKey: !isExpanded)
+        if isExpanded { collapse() } else { setExpanded(true, makeKey: true) }
     }
 
     func collapse() {
-        hoverTask?.cancel()
+        hoverState.dismiss()
         setExpanded(false)
     }
 
-    fileprivate func pointerEnteredIsland() {
-        hoverTask?.cancel()
-        hoverTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(140))
-            guard !Task.isCancelled else { return }
-            self?.setExpanded(true)
-        }
+    /// Drops expanded UI immediately and snaps the panel back to the compact strip.
+    private func snapToCompact() {
+        frameAnimationGeneration += 1
+        isSurfaceAnimating = false
+        isExpanded = false
+        updateFrame(animated: false)
+        refreshPointerArtifacts()
     }
 
-    fileprivate func pointerLeftIsland() {
-        hoverTask?.cancel()
-        guard isExpanded, !hasActiveConfirmation else { return }
-        hoverTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(260))
-            guard !Task.isCancelled, let self, NSApp.modalWindow == nil else { return }
-            self.setExpanded(false)
+    private func reconcilePointer() {
+        let point = NSEvent.mouseLocation
+        let inside = IslandHoverState.contains(point, in: panel.frame)
+        panel.ignoresMouseEvents = !inside
+        if let expanded = hoverState.update(
+            inside: inside,
+            expanded: isExpanded,
+            keepOpen: hasActiveConfirmation || NSApp.modalWindow != nil,
+            now: ProcessInfo.processInfo.systemUptime
+        ) {
+            if expanded && isSurfaceAnimating { return }
+            setExpanded(expanded)
         }
     }
 
     private func setExpanded(_ expanded: Bool, makeKey: Bool = false) {
-        guard expanded != isExpanded else { return }
-        isExpanded = expanded
-        updateMousePassthrough(at: NSEvent.mouseLocation)
-        if let contentView = panel.contentView { panel.invalidateCursorRects(for: contentView) }
         if expanded {
+            guard !isExpanded else { return }
+            isExpanded = true
+            updateFrame(
+                animated: !IslandMotion.prefersReducedMotion,
+                duration: IslandMotion.expandDuration,
+                timing: IslandMotion.expandTiming()
+            )
             if makeKey { panel.makeKey() }
-        } else if panel.isKeyWindow {
-            panel.resignKey()
+            refreshPointerArtifacts()
+            return
+        }
+
+        guard isExpanded else { return }
+        if panel.isKeyWindow { panel.resignKey() }
+        isExpanded = false
+        updateFrame(
+            animated: !IslandMotion.prefersReducedMotion,
+            duration: IslandMotion.collapseDuration,
+            timing: IslandMotion.collapseTiming()
+        )
+        refreshPointerArtifacts()
+    }
+
+    private func refreshPointerArtifacts() {
+        panel.ignoresMouseEvents = !IslandHoverState.contains(NSEvent.mouseLocation, in: panel.frame)
+        if let contentView = panel.contentView {
+            contentView.updateTrackingAreas()
+            panel.invalidateCursorRects(for: contentView)
         }
     }
 
     fileprivate func setConfirmationActive(_ active: Bool) {
         hasActiveConfirmation = active
+        reconcilePointer()
     }
 
-    fileprivate func updateFrame() {
-        panel.setFrame(layout.frame(for: panelSize), display: true, animate: false)
-        updateMousePassthrough(at: NSEvent.mouseLocation)
+    fileprivate func setExpandedBodyLayout(_ layout: IslandExpandedBodyLayout) {
+        guard expandedBodyLayout != layout else { return }
+        expandedBodyLayout = layout
+        guard isExpanded else {
+            updateFrame(animated: false)
+            return
+        }
+        updateFrame(
+            animated: !IslandMotion.prefersReducedMotion,
+            duration: IslandMotion.morphDuration,
+            timing: IslandMotion.morphTiming()
+        )
+    }
+
+    fileprivate func updateFrame(
+        animated: Bool = false,
+        duration: TimeInterval = IslandMotion.morphDuration,
+        timing: CAMediaTimingFunction = IslandMotion.morphTiming()
+    ) {
+        let size = targetSurfaceSize
+        let newFrame = layout.frame(for: size)
+        expandedPanelHeight = size.height
+
+        guard animated else {
+            isSurfaceAnimating = false
+            panel.setFrame(newFrame, display: true, animate: false)
+            finalizeFrameLayout()
+            return
+        }
+
+        frameAnimationGeneration += 1
+        let generation = frameAnimationGeneration
+        isSurfaceAnimating = true
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = duration
+            context.timingFunction = timing
+            context.allowsImplicitAnimation = true
+            panel.animator().setFrame(newFrame, display: true)
+        } completionHandler: { [weak self] in
+            Task { @MainActor in
+                guard let self, self.frameAnimationGeneration == generation else { return }
+                self.isSurfaceAnimating = false
+                self.finalizeFrameLayout()
+            }
+        }
+    }
+
+    private func finalizeFrameLayout() {
+        panel.contentView?.needsLayout = true
+        panel.contentView?.layoutSubtreeIfNeeded()
+        panel.contentView?.updateTrackingAreas()
+        if let contentView = panel.contentView {
+            panel.invalidateCursorRects(for: contentView)
+        }
+        reconcilePointer()
     }
 
     @objc private func screenParametersDidChange(_ notification: Notification) {
@@ -149,69 +254,95 @@ final class DynamicIslandPanelController: NSObject, ObservableObject {
         measureMenuBarSpace()
     }
 
+    fileprivate var targetSurfaceSize: CGSize {
+        isExpanded ? panelSize : layout.collapsed
+    }
+
     fileprivate var panelSize: CGSize {
         let chromeHeight = layout.safeContentTop + NotchLayout.bottomInset
-        let accountRows = CGFloat(max(1, model.accounts.count))
+        let footerHeight: CGFloat = 63
         let errorAllowance: CGFloat = model.visibleError == nil ? 0 : 60
-        let desiredHeight = chromeHeight + 63 + accountRows * 104 + errorAllowance
-        return CGSize(width: layout.expandedWidth, height: min(min(desiredHeight, 440), layout.screen.height - 48))
+        let bodyHeight = expandedBodyLayout.bodyHeight
+        let desiredHeight = chromeHeight + footerHeight + bodyHeight + errorAllowance
+        let maxHeight = layout.screen.height - 48
+        let cappedHeight: CGFloat
+        switch expandedBodyLayout {
+        case .accounts:
+            cappedHeight = min(desiredHeight, 440)
+        case .addContent:
+            cappedHeight = desiredHeight
+        }
+        return CGSize(
+            width: expandedBodyLayout.panelWidth(expandedWidth: layout.expandedWidth),
+            height: min(cappedHeight, maxHeight))
     }
-    fileprivate var visibleHeight: CGFloat { isExpanded ? panelSize.height : layout.collapsed.height }
-    fileprivate var visibleSurfaceWidth: CGFloat { isExpanded ? panelSize.width : layout.collapsed.width }
+    fileprivate var visibleHeight: CGFloat { panel.frame.height }
+    fileprivate var visibleSurfaceWidth: CGFloat { panel.frame.width }
     private func currentGeometry() -> NotchGeometry {
-        NotchGeometry.current() ?? NotchGeometry(
-            screen: NSScreen.main?.frame ?? layout.screen,
-            safeAreaTop: 0,
-            cameraWidth: 0
-        )
+        NotchGeometry.current()
+            ?? NotchGeometry(
+                screen: NSScreen.main?.frame ?? layout.screen,
+                safeAreaTop: 0,
+                cameraWidth: 0
+            )
     }
 
     private func installOutsideClickMonitors() {
         let outsideClick: (NSEvent) -> Void = { [weak self] _ in
             Task { @MainActor in
-                guard let self, self.isExpanded, !self.hasActiveConfirmation, NSApp.modalWindow == nil else { return }
+                guard let self, self.isExpanded, !self.hasActiveConfirmation,
+                    NSApp.modalWindow == nil
+                else { return }
                 let point = NSEvent.mouseLocation
-                let visibleFrame = self.layout.frame(for: CGSize(width: self.panelSize.width, height: self.visibleHeight))
-                if !visibleFrame.contains(point) { self.collapse() }
+                if !IslandHoverState.contains(point, in: self.panel.frame) { self.collapse() }
             }
         }
-        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown, handler: outsideClick) {
+        if let monitor = NSEvent.addGlobalMonitorForEvents(
+            matching: .leftMouseDown, handler: outsideClick)
+        {
             outsideClickMonitors.append(monitor)
         }
-        if let monitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown, handler: { event in
-            outsideClick(event)
-            return event
-        }) {
+        if let monitor = NSEvent.addLocalMonitorForEvents(
+            matching: .leftMouseDown,
+            handler: { event in
+                outsideClick(event)
+                return event
+            })
+        {
             outsideClickMonitors.append(monitor)
         }
-        if let monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown, handler: { [weak self] event in
-            guard event.keyCode == 53 else { return event }
-            let keepForDialog = MainActor.assumeIsolated {
-                self?.hasActiveConfirmation == true || NSApp.modalWindow != nil
-            }
-            guard !keepForDialog else { return event }
-            Task { @MainActor in self?.collapse() }
-            return nil
-        }) {
+        if let monitor = NSEvent.addLocalMonitorForEvents(
+            matching: .keyDown,
+            handler: { [weak self] event in
+                guard event.keyCode == 53 else { return event }
+                let keepForDialog = MainActor.assumeIsolated {
+                    self?.hasActiveConfirmation == true || NSApp.modalWindow != nil
+                }
+                guard !keepForDialog else { return event }
+                Task { @MainActor in self?.collapse() }
+                return nil
+            })
+        {
             outsideClickMonitors.append(monitor)
         }
         let updatePassthrough: (NSEvent) -> Void = { [weak self] _ in
-            Task { @MainActor in self?.updateMousePassthrough(at: NSEvent.mouseLocation) }
+            Task { @MainActor in self?.reconcilePointer() }
         }
-        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved, handler: updatePassthrough) {
+        if let monitor = NSEvent.addGlobalMonitorForEvents(
+            matching: [.mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged],
+            handler: updatePassthrough)
+        {
             outsideClickMonitors.append(monitor)
         }
-        if let monitor = NSEvent.addLocalMonitorForEvents(matching: .mouseMoved, handler: { event in
-            updatePassthrough(event)
-            return event
-        }) {
+        if let monitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged],
+            handler: { event in
+                updatePassthrough(event)
+                return event
+            })
+        {
             outsideClickMonitors.append(monitor)
         }
-    }
-
-    private func updateMousePassthrough(at point: CGPoint) {
-        let frame = layout.frame(for: CGSize(width: visibleSurfaceWidth, height: visibleHeight))
-        panel.ignoresMouseEvents = !frame.contains(point)
     }
 
     private func measureMenuBarSpace() {
@@ -245,28 +376,19 @@ private final class NotchPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 
     static let overlayCollectionBehavior: NSWindow.CollectionBehavior = [
-        .canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle
+        .canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle,
     ]
     static let normalLevel = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
 }
 
 private final class IslandHostingView<Content: View>: NSHostingView<Content> {
     weak var controller: DynamicIslandPanelController?
-
     override func resetCursorRects() {
         super.resetCursorRects()
         addCursorRect(visibleSurfaceRect, cursor: .arrow)
     }
 
-    private var visibleSurfaceRect: CGRect {
-        guard let controller else { return .zero }
-        return CGRect(
-            x: bounds.midX - controller.visibleSurfaceWidth / 2,
-            y: isFlipped ? bounds.minY : bounds.maxY - controller.visibleHeight,
-            width: controller.visibleSurfaceWidth,
-            height: controller.visibleHeight
-        )
-    }
+    private var visibleSurfaceRect: CGRect { bounds }
 
     override func hitTest(_ point: NSPoint) -> NSView? {
         guard controller != nil else { return nil }
@@ -278,7 +400,6 @@ private final class IslandHostingView<Content: View>: NSHostingView<Content> {
 private struct DynamicIslandPanel: View {
     @ObservedObject var model: AppModel
     @ObservedObject var controller: DynamicIslandPanelController
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isHovered = false
 
     private var activeAccount: AccountProfile? {
@@ -292,52 +413,55 @@ private struct DynamicIslandPanel: View {
         return activeAccount.email.flatMap { $0.isEmpty ? nil : $0 } ?? activeAccount.displayName
     }
 
-    private var islandShape: NotchShape {
-        NotchShape.island(height: controller.visibleHeight, geometry: controller.layout)
-    }
-
     var body: some View {
-        VStack(spacing: 0) {
-            if controller.isExpanded {
-                IslandAccountManager(
-                    model: model,
-                    onDismiss: controller.collapse,
-                    onConfirmationChanged: { isActive in
-                        controller.setConfirmationActive(isActive)
-                        if !isActive && !isHovered { controller.pointerLeftIsland() }
-                    }
-                )
+        GeometryReader { geometry in
+            let islandShape = NotchShape.island(height: geometry.size.height, geometry: controller.layout)
+            ZStack(alignment: .top) {
+                if controller.isExpanded {
+                    IslandAccountManager(
+                        model: model,
+                        showsCompactUsage: $controller.showsCompactUsage,
+                        onDismiss: controller.collapse,
+                        onConfirmationChanged: { isActive in
+                            controller.setConfirmationActive(isActive)
+                        },
+                        onExpandedBodyLayoutChanged: { layout in
+                            controller.setExpandedBodyLayout(layout)
+                        }
+                    )
                     .padding(.horizontal, NotchLayout.horizontalInset)
                     .padding(.top, controller.layout.safeContentTop)
                     .padding(.bottom, NotchLayout.bottomInset)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    .transition(.identity)
-            } else {
-                compactHeader
+                } else if controller.showsCompactUsage {
+                    compactHeader
+                } else {
+                    Button(action: controller.toggleExpansion) {
+                        Color.clear.contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Open Sidekick")
+                }
             }
+            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
+            .background {
+                if controller.isExpanded || controller.showsCompactUsage {
+                    islandShape.fill(Color.black)
+                }
+            }
+            .clipShape(islandShape)
         }
-        .frame(width: controller.visibleSurfaceWidth, height: controller.visibleHeight, alignment: .top)
-        .background { islandShape.fill(Color.black) }
-        .clipShape(islandShape)
         .preferredColorScheme(.dark)
-        .animation(expansionAnimation, value: controller.isExpanded)
         .animation(.easeOut(duration: 0.15), value: isHovered)
         .onHover { hovering in
             isHovered = hovering
             if hovering {
                 NSCursor.arrow.set()
-                controller.pointerEnteredIsland()
             }
-            else { controller.pointerLeftIsland() }
         }
         .onExitCommand(perform: controller.collapse)
-        .frame(width: controller.panelSize.width, height: controller.panelSize.height, alignment: .top)
         .onChange(of: model.accounts.count) { _, _ in controller.updateFrame() }
         .onChange(of: model.visibleError != nil) { _, _ in controller.updateFrame() }
-    }
-
-    private var expansionAnimation: Animation {
-        reduceMotion ? .easeOut(duration: 0.12) : .spring(response: 0.42, dampingFraction: 0.9)
     }
 
     private var compactHeader: some View {
@@ -347,7 +471,7 @@ private struct DynamicIslandPanel: View {
                     HStack(spacing: 0) {
                         if controller.layout.restingWingWidth > 0 {
                             compactFiveHourValue
-                            .frame(width: controller.layout.restingWingWidth)
+                                .frame(width: controller.layout.restingWingWidth)
                         }
                         Color.clear.frame(width: controller.layout.cameraWidth)
                         if controller.layout.restingWingWidth > 0 {
@@ -371,14 +495,18 @@ private struct DynamicIslandPanel: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(controller.isExpanded ? "Collapse Sidekick" : "Open Sidekick")
-        .accessibilityValue("\(activeAccountName), weekly usage \(model.activeRemainingPercent.map { "\($0)" } ?? "unavailable") percent remaining")
+        .accessibilityValue(
+            "\(activeAccountName), weekly usage \(model.activeRemainingPercent.map { "\($0)" } ?? "unavailable") percent remaining"
+        )
         .help("\(activeAccountName) · Show account details")
     }
 
     private var compactFiveHourValue: some View {
-        compactUsageValue("5H", percent: model.activeAccountID.flatMap {
-            model.usageStates[$0]?.displayedUsage?.fiveHourRemainingPercent
-        })
+        compactUsageValue(
+            "5H",
+            percent: model.activeAccountID.flatMap {
+                model.usageStates[$0]?.displayedUsage?.fiveHourRemainingPercent
+            })
     }
 
     private var compactWeeklyValue: some View {
@@ -397,7 +525,9 @@ private struct DynamicIslandPanel: View {
                 .minimumScaleFactor(0.8)
         }
         .frame(width: 44, height: controller.layout.collapsed.height)
-        .help("\(label == "5H" ? "5-hour" : "Weekly") usage · \(percent.map { "\($0)% remaining" } ?? "Unavailable")")
+        .help(
+            "\(label == "5H" ? "5-hour" : "Weekly") usage · \(percent.map { "\($0)% remaining" } ?? "Unavailable")"
+        )
     }
 
 }

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import Foundation
 
 private enum UsageRefreshResult: Sendable {
@@ -13,25 +14,30 @@ open class AccountController {
     public private(set) var usageStates: [UUID: UsageViewState] = [:] { didSet { onChange?() } }
     public private(set) var isMutating = false { didSet { onChange?() } }
     public private(set) var isAddingAccount = false { didSet { onChange?() } }
+    public private(set) var awaitingBrowserSession: AccountKind? { didSet { onChange?() } }
     public var visibleError: OperationError? { didSet { onChange?() } }
 
     private let store: AccountStore
     private let codex: any AccountClient
+    private let usageService: ProfileUsageService
     private let switchService: any SwitchServicing
     private var hasStarted = false
     private var usageRefreshTask: Task<Void, Never>?
     private var nextUsageRefreshTask: Task<Void, Never>?
     private var addAccountTask: Task<Void, Never>?
+    private var pendingProviderProfileID: UUID?
     private var backgroundUsageRefreshInterval: Duration = .seconds(30)
     private var isBackgroundUsageRefreshEnabled = false
 
     public init(
         store: AccountStore,
         codex: any AccountClient,
+        usageService: ProfileUsageService? = nil,
         switchService: any SwitchServicing
     ) {
         self.store = store
         self.codex = codex
+        self.usageService = usageService ?? ProfileUsageService(codex: codex)
         self.switchService = switchService
     }
 
@@ -48,10 +54,12 @@ open class AccountController {
         do {
             var registry = try await store.loadRegistry()
             if registry.accounts.isEmpty, await store.activeCredentialExists() {
+                // Import the live Codex login only; Cursor and Claude profiles are added manually for now.
                 let activeHome = await store.activeCodexHome()
                 let identity = try await codex.readIdentity(profileHome: activeHome)
                 let profile = AccountProfile(
                     id: UUID(),
+                    kind: .codex,
                     displayName: identity.suggestedDisplayName,
                     email: identity.email,
                     accountID: identity.accountID,
@@ -118,7 +126,9 @@ open class AccountController {
 
     private func performWeeklyUsageRefresh() async {
         guard !Task.isCancelled else { return }
-        if let id = activeAccountID {
+        if let id = activeAccountID,
+           let active = accounts.first(where: { $0.id == id }),
+           active.kind == .codex {
             do {
                 _ = try await store.syncActiveCredentialIfMatching(id: id)
                 guard !Task.isCancelled else { return }
@@ -140,11 +150,19 @@ open class AccountController {
         }
 
         guard !Task.isCancelled else { return }
+        let activeID = activeAccountID
+        let accountByID = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, $0) })
         await withTaskGroup(of: UsageRefreshResult.self) { group in
             for (id, home) in targets {
-                group.addTask { [codex] in
+                guard let account = accountByID[id] else { continue }
+                group.addTask { [usageService] in
                     do {
-                        return .success(id, try await codex.readWeeklyUsage(profileHome: home))
+                        let usage = try await usageService.readUsage(
+                            for: account,
+                            profileHome: home,
+                            refreshTokenOnUnauthorized: id != activeID
+                        )
+                        return .success(id, usage)
                     } catch {
                         return .failure(id, error.localizedDescription)
                     }
@@ -174,6 +192,8 @@ open class AccountController {
     }
 
     public func switchAccount(to id: UUID) async {
+        guard let account = accounts.first(where: { $0.id == id }),
+              account.supportsAccountSwitch else { return }
         guard id != activeAccountID, !isMutating else { return }
         isMutating = true
         await cancelUsageRefresh()
@@ -188,24 +208,85 @@ open class AccountController {
         }
     }
 
-    public func addAccount() {
-        guard !isMutating, !isAddingAccount else { return }
+    public func addAccount(kind: AccountKind) {
+        guard !isMutating, !isAddingAccount, awaitingBrowserSession == nil else { return }
         visibleError = nil
-        isAddingAccount = true
-        addAccountTask = Task { [weak self] in
-            guard let self else { return }
-            await self.performAddAccount()
-            self.isAddingAccount = false
-            self.addAccountTask = nil
+        switch kind {
+        case .codex:
+            isAddingAccount = true
+            addAccountTask = Task { [weak self] in
+                guard let self else { return }
+                await self.performCodexAddAccount()
+                self.isAddingAccount = false
+                self.addAccountTask = nil
+            }
+        case .cursor, .claude:
+            break
         }
     }
 
     public func cancelAddingAccount() {
         addAccountTask?.cancel()
+        cancelBrowserSignIn()
+    }
+
+    public func beginBrowserSignIn(kind: AccountKind) async -> Bool {
+        guard kind != .codex else { return false }
+        do {
+            let id = UUID()
+            _ = try await store.createProfileDirectory(id: id)
+            pendingProviderProfileID = id
+            awaitingBrowserSession = kind
+            return true
+        } catch {
+            showError(error)
+            return false
+        }
+    }
+
+    public func cancelBrowserSignIn() {
+        let id = pendingProviderProfileID
+        pendingProviderProfileID = nil
+        awaitingBrowserSession = nil
+        if let id {
+            Task { [weak self] in
+                try? await self?.store.discardUnregisteredProfile(id: id)
+            }
+        }
+    }
+
+    public func finishBrowserSession(pasted: String) async {
+        guard let kind = awaitingBrowserSession, let id = pendingProviderProfileID else { return }
+        guard let credential = ProviderSessionCredential.parsePasted(pasted, kind: kind) else {
+            showError(ProviderUsageError.missingSession)
+            return
+        }
+        do {
+            let home = await store.profileHome(id: id)
+            try credential.save(to: home)
+            let resolved = try await ProviderIdentityResolver.resolve(kind: kind, credential: credential)
+            let profile = AccountProfile(
+                id: id,
+                kind: kind,
+                displayName: resolved.suggestedDisplayName,
+                email: resolved.email,
+                accountID: resolved.accountID,
+                createdAt: Date()
+            )
+            try await store.addProfile(profile)
+            pendingProviderProfileID = nil
+            awaitingBrowserSession = nil
+            apply(try await store.loadRegistry())
+            refreshWeeklyUsage()
+        } catch {
+            showError(error)
+        }
     }
 
     public func redeemBankedReset(for id: UUID) async {
-        guard !isMutating, accounts.contains(where: { $0.id == id }) else { return }
+        guard let account = accounts.first(where: { $0.id == id }),
+              account.supportsBankedReset else { return }
+        guard !isMutating else { return }
         isMutating = true
         await cancelUsageRefresh()
         defer { isMutating = false; refreshWeeklyUsage() }
@@ -217,7 +298,7 @@ open class AccountController {
         }
     }
 
-    private func performAddAccount() async {
+    private func performCodexAddAccount() async {
         let id = UUID()
         do {
             let home = try await store.createProfileDirectory(id: id)
@@ -226,6 +307,7 @@ open class AccountController {
             try Task.checkCancellation()
             let profile = AccountProfile(
                 id: id,
+                kind: .codex,
                 displayName: identity.suggestedDisplayName,
                 email: identity.email,
                 accountID: identity.accountID,

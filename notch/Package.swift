@@ -1,4 +1,5 @@
 // swift-tools-version: 6.4
+// SPDX-License-Identifier: MIT
 
 import Foundation
 import PackageDescription

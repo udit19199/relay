@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 @testable import SidekickCore
 import Darwin
 import Foundation
@@ -120,7 +121,7 @@ struct AccountStoreTests {
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: executable.path)
         let model = AppModel(store: fixture.store, codex: CodexClient(locator: .init(explicitURL: executable)),
             switchService: SwitchService(store: fixture.store, codex: StoreTestMatchingCodex()))
-        model.addAccount()
+        model.addAccount(kind: .codex)
         for _ in 0..<200 where model.isAddingAccount { try await Task.sleep(for: .milliseconds(10)) }
         #expect(!model.isAddingAccount)
         #expect(model.visibleError != nil)

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 @testable import SidekickCore
 import Foundation
 import Testing

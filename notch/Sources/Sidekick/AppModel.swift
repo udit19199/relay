@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 import SidekickCore
 import Combine
 import Foundation
@@ -6,8 +7,13 @@ import Foundation
 final class AppModel: AccountController, @MainActor ObservableObject {
     let objectWillChange = ObservableObjectPublisher()
 
-    override init(store: AccountStore, codex: any AccountClient, switchService: any SwitchServicing) {
-        super.init(store: store, codex: codex, switchService: switchService)
+    override init(
+        store: AccountStore,
+        codex: any AccountClient,
+        usageService: ProfileUsageService? = nil,
+        switchService: any SwitchServicing
+    ) {
+        super.init(store: store, codex: codex, usageService: usageService, switchService: switchService)
         onChange = { [weak self] in self?.objectWillChange.send() }
     }
 

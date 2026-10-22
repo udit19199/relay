@@ -1,19 +1,54 @@
+// SPDX-License-Identifier: MIT
 import Foundation
 
 // Shared account and usage types for both native platform clients.
 
+public enum AccountKind: String, Codable, Equatable, Sendable {
+    case codex
+    case cursor
+    case claude
+}
+
 public struct AccountProfile: Codable, Identifiable, Equatable, Hashable, Sendable {
     public let id: UUID
+    public var kind: AccountKind
     public var displayName: String
     public let email: String?
     public var accountID: String?
     public let createdAt: Date
     public var lastUsedAt: Date?
 
-    public init(id: UUID, displayName: String, email: String?, accountID: String?, createdAt: Date, lastUsedAt: Date? = nil) {
-        self.id = id; self.displayName = displayName; self.email = email
-        self.accountID = accountID; self.createdAt = createdAt; self.lastUsedAt = lastUsedAt
+    public init(
+        id: UUID,
+        kind: AccountKind = .codex,
+        displayName: String,
+        email: String?,
+        accountID: String?,
+        createdAt: Date,
+        lastUsedAt: Date? = nil
+    ) {
+        self.id = id
+        self.kind = kind
+        self.displayName = displayName
+        self.email = email
+        self.accountID = accountID
+        self.createdAt = createdAt
+        self.lastUsedAt = lastUsedAt
     }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        kind = try container.decodeIfPresent(AccountKind.self, forKey: .kind) ?? .codex
+        displayName = try container.decode(String.self, forKey: .displayName)
+        email = try container.decodeIfPresent(String.self, forKey: .email)
+        accountID = try container.decodeIfPresent(String.self, forKey: .accountID)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        lastUsedAt = try container.decodeIfPresent(Date.self, forKey: .lastUsedAt)
+    }
+
+    public var supportsAccountSwitch: Bool { kind == .codex }
+    public var supportsBankedReset: Bool { kind == .codex }
 }
 
 public struct AccountRegistry: Codable, Equatable, Sendable {
