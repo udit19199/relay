@@ -33,6 +33,7 @@ type pluginListEntry struct {
 	EffectiveEnabled bool                    `json:"effective_enabled"`
 	SupportsOAuth    bool                    `json:"supports_oauth"`
 	OAuthProvider    string                  `json:"oauth_provider"`
+	OAuthProviders   []string                `json:"oauth_providers,omitempty"`
 	SupportsQuota    bool                    `json:"supports_quota"`
 	QuotaProvider    string                  `json:"quota_provider,omitempty"`
 	Logo             string                  `json:"logo"`
@@ -51,6 +52,7 @@ type pluginMetadataInfo struct {
 }
 
 type pluginConfigFieldInfo struct {
+	Default     any      `json:"default"`
 	Name        string   `json:"name"`
 	Type        string   `json:"type"`
 	EnumValues  []string `json:"enum_values"`
@@ -124,6 +126,7 @@ func (h *Handler) ListPlugins(c *gin.Context) {
 			entry.Registered = true
 			entry.SupportsOAuth = info.SupportsOAuth
 			entry.OAuthProvider = htmlsanitize.String(info.OAuthProvider)
+			entry.OAuthProviders = pluginOAuthProviders(info.OAuthProviders)
 			entry.SupportsQuota = info.SupportsQuota
 			entry.QuotaProvider = htmlsanitize.String(info.QuotaProvider)
 			entry.Logo = htmlsanitize.String(info.Metadata.Logo)
@@ -469,11 +472,19 @@ func pluginConfigFields(fields []pluginapi.ConfigField) []pluginConfigFieldInfo 
 		out = append(out, pluginConfigFieldInfo{
 			Name:        htmlsanitize.String(field.Name),
 			Type:        htmlsanitize.String(string(field.Type)),
+			Default:     htmlsanitize.JSONValue(field.Default),
 			EnumValues:  htmlsanitize.Strings(field.EnumValues),
 			Description: htmlsanitize.String(field.Description),
 		})
 	}
 	return out
+}
+
+func pluginOAuthProviders(providers []string) []string {
+	if len(providers) == 0 {
+		return nil
+	}
+	return htmlsanitize.Strings(providers)
 }
 
 func pluginMenus(menus []pluginhost.RegisteredPluginMenu) []pluginMenuInfo {

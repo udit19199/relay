@@ -81,10 +81,6 @@ func TestRegisterAvailableExecutors(t *testing.T) {
 	providers := []string{
 		"codex",
 		"claude",
-		"gemini",
-		"gemini-interactions",
-		"vertex",
-		"aistudio",
 		"kimi",
 		"kimi-ai",
 		"kimi.ai",
@@ -101,10 +97,18 @@ func TestRegisterAvailableExecutors(t *testing.T) {
 		}
 	}
 
-	if _, ok := service.coreManager.Executor("antigravity"); ok {
-		t.Fatal("Antigravity must not be registered by default")
+	// Fork: Google families and Antigravity must not register executors.
+	for _, provider := range []string{
+		"gemini",
+		"gemini-interactions",
+		"vertex",
+		"aistudio",
+		"antigravity",
+	} {
+		if _, ok := service.coreManager.Executor(provider); ok {
+			t.Fatalf("fork: executor for stripped provider %s must not be registered", provider)
+		}
 	}
-
 	resolved, _ := service.coreManager.Executor("plugin-provider")
 	if _, isPlugin := resolved.(serviceTestPluginExecutor); !isPlugin {
 		t.Fatalf("executor type = %T, want serviceTestPluginExecutor", resolved)
