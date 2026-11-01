@@ -416,6 +416,13 @@ func (s *Service) prepareCoreAuthForModelRegistration(ctx context.Context, auth 
 	if s == nil || s.coreManager == nil || auth == nil || auth.ID == "" {
 		return nil
 	}
+	// Fork: never admit Google families (Gemini/Vertex/AI Studio) or Antigravity
+	// into the auth store. Cleans up stale entries so models do not linger.
+	if isForkDisabledAuth(auth) {
+		s.coreManager.UnregisterExecutor(strings.ToLower(strings.TrimSpace(auth.Provider)))
+		GlobalModelRegistry().UnregisterClient(auth.ID)
+		return nil
+	}
 	auth = auth.Clone()
 	s.ensureExecutorsForAuthWithContext(ctx, auth, false)
 
@@ -591,12 +598,22 @@ func (s *Service) completeModelRegistrationForAuthWithCache(ctx context.Context,
 	if s == nil || s.coreManager == nil || auth == nil || auth.ID == "" {
 		return 0
 	}
+	// Fork: never publish models for stripped providers, even if the auth
+	// somehow reached the store (e.g. batch paths that bypass prepare).
+	if isForkDisabledAuth(auth) {
+		GlobalModelRegistry().UnregisterClient(auth.ID)
+		return 0
+	}
 	if ctx != nil && ctx.Err() != nil {
 		return 0
 	}
 	targetAuth := auth
 	if latest, ok := s.latestAuthForModelRegistration(auth.ID); ok && latest != nil {
 		targetAuth = latest
+	}
+	if isForkDisabledAuth(targetAuth) {
+		GlobalModelRegistry().UnregisterClient(targetAuth.ID)
+		return 0
 	}
 	published := s.registerModelsForAuthWithCache(ctx, targetAuth, compatCache)
 	if ctx != nil && ctx.Err() != nil {
