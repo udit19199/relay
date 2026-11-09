@@ -39,3 +39,6 @@ bin
 .bmad
 _bmad
 _bmad-output
+
+# Native macOS notch app (built separately with SwiftPM)
+notch

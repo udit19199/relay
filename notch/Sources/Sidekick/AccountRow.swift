@@ -3,14 +3,12 @@ import SidekickCore
 import SwiftUI
 
 struct AccountRow: View {
-    let account: AccountProfile
+    let account: RelayAccount
     let usageState: UsageViewState
     let now: Date
-    var isActive = false
-    var hasResetControl = false
 
     private var accountTitle: String {
-        account.email.flatMap { $0.isEmpty ? nil : $0 } ?? account.displayName
+        account.email ?? account.displayName
     }
 
     var body: some View {
@@ -21,12 +19,10 @@ struct AccountRow: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .help(accountTitle)
-                if isActive {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .accessibilityLabel("Active account")
-                }
+                Text(verbatim: account.provider.uppercased())
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("\(account.provider) account")
                 Spacer(minLength: 4)
                 if let message = usageState.refreshError {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -36,7 +32,6 @@ struct AccountRow: View {
                         .accessibilityLabel(message)
                 }
             }
-            .padding(.trailing, hasResetControl ? 76 : 0)
             .frame(height: 28)
 
             usageContent

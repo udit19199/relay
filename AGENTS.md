@@ -1,9 +1,18 @@
 # AGENTS.md
 
-Go 1.26+ proxy server providing OpenAI/Gemini/Claude/Codex compatible APIs with OAuth and round-robin load balancing.
+Go 1.26+ proxy server providing OpenAI/Gemini/Claude/Codex compatible APIs with OAuth and round-robin load balancing, plus its native macOS notch app in `notch/`.
 
 ## Repository
-- GitHub: https://github.com/router-for-me/CLIProxyAPI
+- GitHub: https://github.com/udit19199/relay (personal fork of https://github.com/router-for-me/CLIProxyAPI)
+- One repo for both parts: the Go proxy (everything outside `notch/`) and the Swift notch app (`notch/`). The former `sidekick` repo's history is merged into `notch/`.
+
+## Notch app (`notch/`)
+- Native Swift/AppKit, macOS only. The notch island is the only interface: it lists Relay's accounts with 5-hour and weekly usage, adds accounts through Relay's browser OAuth, and removes credentials. Relay serves every account at once, so the app never switches accounts or writes credential files.
+- The only contract between the two parts is Relay's management API at `127.0.0.1:8317`: `GET`/`DELETE /v0/management/auth-files`, `*-auth-url`, `get-auth-status`, `oauth-session`. Go code never imports or launches Swift code, and the reverse. When syncing upstream, keep these routes working; the app depends on them.
+- The app reads the management key from `~/.relay/management.key` (0600). It must match `remote-management.secret-key` in `~/.relay/config.yaml`.
+- `notch/Sources/SidekickCore` holds the Relay API client and usage mapping only. Small concrete types; no protocol layers, no Keychain, no daemon, no menu-bar item.
+- Verify with `cd notch && swift build`, then package and install: `notch/scripts/package-local-app.sh`, replace `/Applications/Sidekick.app` with the built bundle, relaunch, and compare the island's numbers with `auth-files`.
+- `notch/` is GPL-3.0-or-later as a whole (MIT app sources plus GPL island code; see `notch/README.md`). The Go proxy stays MIT.
 
 ## Commands
 ```bash

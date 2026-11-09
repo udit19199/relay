@@ -8,7 +8,7 @@ SCRIPT_DIR=${0:A:h}
 PROJECT_DIR=${SCRIPT_DIR:h}
 RESOURCE_BUNDLE="Sidekick_Sidekick.bundle"
 APP_ICON="$PROJECT_DIR/assets/AppIcon.icns"
-APP_VERSION=0.1.17
+APP_VERSION=0.2.0
 
 cd "$PROJECT_DIR"
 BUILD_DIR=$(swift build -c release --show-bin-path)

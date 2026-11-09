@@ -1,80 +1,54 @@
 // SPDX-License-Identifier: MIT
 import Foundation
 
-private enum UsageRefreshResult: Sendable {
-    case success(UUID, WeeklyUsage)
-    case failure(UUID, String)
-}
-
+// Mirror of Relay's accounts plus their usage, refreshed from the local
+// proxy's management API. Relay serves every account concurrently, so there
+// is no active account, no switching, and no credential files here.
 @MainActor
 open class AccountController {
     public var onChange: (@MainActor () -> Void)?
-    public private(set) var accounts: [AccountProfile] = [] { didSet { onChange?() } }
-    public private(set) var activeAccountID: UUID? { didSet { onChange?() } }
-    public private(set) var usageStates: [UUID: UsageViewState] = [:] { didSet { onChange?() } }
+    public private(set) var accounts: [RelayAccount] = [] { didSet { onChange?() } }
+    public private(set) var usageStates: [String: UsageViewState] = [:] { didSet { onChange?() } }
     public private(set) var isMutating = false { didSet { onChange?() } }
     public private(set) var isAddingAccount = false { didSet { onChange?() } }
-    public private(set) var awaitingBrowserSession: AccountKind? { didSet { onChange?() } }
+    public private(set) var addingProvider: RelayProvider? { didSet { onChange?() } }
+    public private(set) var addingState: String? { didSet { onChange?() } }
     public var visibleError: OperationError? { didSet { onChange?() } }
 
-    private let store: AccountStore
-    private let codex: any AccountClient
-    private let usageService: ProfileUsageService
-    private let switchService: any SwitchServicing
+    private let client: RelayClient
     private var hasStarted = false
     private var usageRefreshTask: Task<Void, Never>?
     private var nextUsageRefreshTask: Task<Void, Never>?
     private var addAccountTask: Task<Void, Never>?
-    private var pendingProviderProfileID: UUID?
     private var backgroundUsageRefreshInterval: Duration = .seconds(30)
     private var isBackgroundUsageRefreshEnabled = false
 
-    public init(
-        store: AccountStore,
-        codex: any AccountClient,
-        usageService: ProfileUsageService? = nil,
-        switchService: any SwitchServicing
-    ) {
-        self.store = store
-        self.codex = codex
-        self.usageService = usageService ?? ProfileUsageService(codex: codex)
-        self.switchService = switchService
+    public init(client: RelayClient) {
+        self.client = client
     }
 
-    public var activeRemainingPercent: Int? {
-        guard let activeAccountID else { return nil }
-        return usageStates[activeAccountID]?.displayedUsage?.remainingPercent
+    // Lowest weekly remaining across accounts: the number that decides
+    // whether you can keep working. Nil when nothing usable is known.
+    public var headlineRemainingPercent: Int? {
+        usageStates.values.compactMap(\.displayedUsage?.remainingPercent).min()
+    }
+
+    public var headlineFiveHourPercent: Int? {
+        usageStates.values.compactMap(\.displayedUsage?.fiveHourRemainingPercent).min()
     }
 
     public func start() async {
         guard !hasStarted else { return }
         hasStarted = true
+        await refreshAccounts()
+    }
+
+    public func refreshAccounts() async {
         isMutating = true
         defer { isMutating = false }
         do {
-            var registry = try await store.loadRegistry()
-            if registry.accounts.isEmpty, await store.activeCredentialExists() {
-                // Import the live Codex login only; Cursor and Claude profiles are added manually for now.
-                let activeHome = await store.activeCodexHome()
-                let identity = try await codex.readIdentity(profileHome: activeHome)
-                let profile = AccountProfile(
-                    id: UUID(),
-                    kind: .codex,
-                    displayName: identity.suggestedDisplayName,
-                    email: identity.email,
-                    accountID: identity.accountID,
-                    createdAt: Date(),
-                    lastUsedAt: Date()
-                )
-                try await store.importCurrentProfile(profile)
-                registry = try await store.loadRegistry()
-            }
-            apply(registry)
-            do {
-                apply(try await store.loadUsageCache())
-            } catch {
-                showError(error)
-            }
+            accounts = try await client.listAccounts()
+            usageStates = usageStates.filter { id, _ in accounts.contains(where: { $0.id == id }) }
         } catch {
             showError(error)
         }
@@ -126,218 +100,102 @@ open class AccountController {
 
     private func performWeeklyUsageRefresh() async {
         guard !Task.isCancelled else { return }
-        if let id = activeAccountID,
-           let active = accounts.first(where: { $0.id == id }),
-           active.kind == .codex {
-            do {
-                _ = try await store.syncActiveCredentialIfMatching(id: id)
-                guard !Task.isCancelled else { return }
-            } catch {
-                guard !Task.isCancelled else { return }
-                showError(error)
-                return
-            }
-        }
-        let targets = await withTaskGroup(of: (UUID, URL).self, returning: [(UUID, URL)].self) { group in
-            for account in accounts {
-                group.addTask { [store] in
-                    (account.id, await store.profileHome(id: account.id))
-                }
-            }
-            var values: [(UUID, URL)] = []
-            for await value in group { values.append(value) }
-            return values
-        }
-
-        guard !Task.isCancelled else { return }
-        let activeID = activeAccountID
-        let accountByID = Dictionary(uniqueKeysWithValues: accounts.map { ($0.id, $0) })
-        await withTaskGroup(of: UsageRefreshResult.self) { group in
-            for (id, home) in targets {
-                guard let account = accountByID[id] else { continue }
-                group.addTask { [usageService] in
-                    do {
-                        let usage = try await usageService.readUsage(
-                            for: account,
-                            profileHome: home,
-                            refreshTokenOnUnauthorized: id != activeID
-                        )
-                        return .success(id, usage)
-                    } catch {
-                        return .failure(id, error.localizedDescription)
-                    }
-                }
-            }
-            for await result in group {
-                guard !Task.isCancelled else { continue }
-                switch result {
-                case let .success(id, usage):
-                    guard accounts.contains(where: { $0.id == id }) else { continue }
-                    usageStates[id] = .loaded(usage)
-                    do {
-                        try await store.cacheWeeklyUsage(usage, profileID: id)
-                    } catch {
-                        showError(error)
-                    }
-                case let .failure(id, message):
-                    guard accounts.contains(where: { $0.id == id }) else { continue }
-                    if let cached = usageStates[id]?.displayedUsage {
-                        usageStates[id] = .stale(cached, message)
-                    } else {
-                        usageStates[id] = .unavailable(message)
-                    }
-                }
-            }
-        }
-    }
-
-    public func switchAccount(to id: UUID) async {
-        guard let account = accounts.first(where: { $0.id == id }),
-              account.supportsAccountSwitch else { return }
-        guard id != activeAccountID, !isMutating else { return }
-        isMutating = true
-        await cancelUsageRefresh()
-        defer { isMutating = false; refreshWeeklyUsage() }
         do {
-            try await switchService.switchAccount(to: id)
-            apply(try await store.loadRegistry())
-        } catch let error as OperationError {
-            visibleError = error
+            let listed = try await client.listAccounts()
+            guard !Task.isCancelled else { return }
+            let knownIDs = Set(listed.map(\.id))
+            accounts = listed
+            for account in listed {
+                if let usage = account.relayUsage() {
+                    usageStates[account.id] = .loaded(usage)
+                } else if usageStates[account.id]?.displayedUsage != nil {
+                    usageStates[account.id] = .unavailable("Relay returned no weekly usage window for this account.")
+                } else {
+                    usageStates[account.id] = .unavailable("Relay returned no weekly usage window for this account.")
+                }
+            }
+            usageStates = usageStates.filter { knownIDs.contains($0.key) }
         } catch {
-            showError(error)
+            guard !Task.isCancelled else { return }
+            for account in accounts {
+                if let cached = usageStates[account.id]?.displayedUsage {
+                    usageStates[account.id] = .stale(cached, error.localizedDescription)
+                } else {
+                    usageStates[account.id] = .unavailable(error.localizedDescription)
+                }
+            }
+            if accounts.isEmpty {
+                showError(error)
+            }
         }
     }
 
-    public func addAccount(kind: AccountKind) {
-        guard !isMutating, !isAddingAccount, awaitingBrowserSession == nil else { return }
+    // Opens Relay's OAuth URL in the browser; call openURL with the result,
+    // then the poll below completes the flow and refreshes the list.
+    public func beginAddAccount(provider: RelayProvider) async -> URL? {
+        guard !isMutating, !isAddingAccount else { return nil }
         visibleError = nil
-        switch kind {
-        case .codex:
-            isAddingAccount = true
+        isAddingAccount = true
+        addingProvider = provider
+        do {
+            let (url, state) = try await client.startAddAccount(provider: provider)
+            addingState = state
             addAccountTask = Task { [weak self] in
                 guard let self else { return }
-                await self.performCodexAddAccount()
+                await self.pollAddAccount(state: state)
                 self.isAddingAccount = false
+                self.addingProvider = nil
+                self.addingState = nil
                 self.addAccountTask = nil
             }
-        case .cursor, .claude:
-            break
+            return url
+        } catch {
+            isAddingAccount = false
+            addingProvider = nil
+            showError(error)
+            return nil
         }
     }
 
     public func cancelAddingAccount() {
+        let state = addingState
         addAccountTask?.cancel()
-        cancelBrowserSignIn()
-    }
-
-    public func beginBrowserSignIn(kind: AccountKind) async -> Bool {
-        guard kind != .codex else { return false }
-        do {
-            let id = UUID()
-            _ = try await store.createProfileDirectory(id: id)
-            pendingProviderProfileID = id
-            awaitingBrowserSession = kind
-            return true
-        } catch {
-            showError(error)
-            return false
+        addAccountTask = nil
+        isAddingAccount = false
+        addingProvider = nil
+        addingState = nil
+        if let state {
+            Task { [client] in await client.cancelAddAccount(state: state) }
         }
     }
 
-    public func cancelBrowserSignIn() {
-        let id = pendingProviderProfileID
-        pendingProviderProfileID = nil
-        awaitingBrowserSession = nil
-        if let id {
-            Task { [weak self] in
-                try? await self?.store.discardUnregisteredProfile(id: id)
-            }
-        }
-    }
-
-    public func finishBrowserSession(pasted: String) async {
-        guard let kind = awaitingBrowserSession, let id = pendingProviderProfileID else { return }
-        guard let credential = ProviderSessionCredential.parsePasted(pasted, kind: kind) else {
-            showError(ProviderUsageError.missingSession)
-            return
-        }
-        do {
-            let home = await store.profileHome(id: id)
-            try credential.save(to: home)
-            let resolved = try await ProviderIdentityResolver.resolve(kind: kind, credential: credential)
-            let profile = AccountProfile(
-                id: id,
-                kind: kind,
-                displayName: resolved.suggestedDisplayName,
-                email: resolved.email,
-                accountID: resolved.accountID,
-                createdAt: Date()
-            )
-            try await store.addProfile(profile)
-            pendingProviderProfileID = nil
-            awaitingBrowserSession = nil
-            apply(try await store.loadRegistry())
-            refreshWeeklyUsage()
-        } catch {
-            showError(error)
-        }
-    }
-
-    public func redeemBankedReset(for id: UUID) async {
-        guard let account = accounts.first(where: { $0.id == id }),
-              account.supportsBankedReset else { return }
-        guard !isMutating else { return }
-        isMutating = true
-        await cancelUsageRefresh()
-        defer { isMutating = false; refreshWeeklyUsage() }
-        visibleError = nil
-        do {
-            try await codex.redeemBankedReset(profileHome: await store.profileHome(id: id))
-        } catch {
-            showError(error)
-        }
-    }
-
-    private func performCodexAddAccount() async {
-        let id = UUID()
-        do {
-            let home = try await store.createProfileDirectory(id: id)
-            try Task.checkCancellation()
-            let identity = try await codex.login(profileHome: home)
-            try Task.checkCancellation()
-            let profile = AccountProfile(
-                id: id,
-                kind: .codex,
-                displayName: identity.suggestedDisplayName,
-                email: identity.email,
-                accountID: identity.accountID,
-                createdAt: Date(),
-                lastUsedAt: nil
-            )
-            try await store.addProfile(profile)
-            apply(try await store.loadRegistry())
-        } catch {
-            let loginError = error
+    private func pollAddAccount(state: String) async {
+        let deadline = Date().addingTimeInterval(5 * 60)
+        while Date() < deadline {
+            if Task.isCancelled { return }
             do {
-                try await store.discardUnregisteredProfile(id: id)
+                if try await client.pollAddAccount(state: state) == .done {
+                    await refreshAccounts()
+                    refreshWeeklyUsage()
+                    return
+                }
             } catch {
-                showError(NSError(domain: "Sidekick.Login", code: 1, userInfo: [
-                    NSLocalizedDescriptionKey: "\(loginError.localizedDescription) Removing the incomplete profile also failed: \(error.localizedDescription)",
-                ]))
+                showError(error)
                 return
             }
-            if !(loginError is CancellationError) { showError(loginError) }
+            try? await Task.sleep(for: .seconds(2))
         }
+        showError(RelayError.serverMessage("Sign-in timed out after 5 minutes. Try again."))
     }
 
-    public func removeAccount(id: UUID) async {
-        guard !isMutating else { return }
+    public func removeAccount(id: String) async {
+        guard let account = accounts.first(where: { $0.id == id }), !isMutating else { return }
         isMutating = true
         await cancelUsageRefresh()
         defer { isMutating = false; refreshWeeklyUsage() }
         do {
-            try await store.removeAccount(id: id)
-            apply(try await store.loadRegistry())
+            try await client.removeAccount(name: account.name)
+            await refreshAccounts()
             usageStates[id] = nil
         } catch {
             showError(error)
@@ -353,22 +211,8 @@ open class AccountController {
         await usageRefreshTask?.value
     }
 
-    private func apply(_ registry: AccountRegistry) {
-        accounts = registry.accounts
-        activeAccountID = registry.activeAccountID
-        usageStates = usageStates.filter { id, _ in registry.accounts.contains(where: { $0.id == id }) }
-    }
-
-    private func apply(_ cache: UsageCache) {
-        let validAccountIDs = Set(accounts.map(\.id))
-        for entry in cache.entries where validAccountIDs.contains(entry.profileID) {
-            usageStates[entry.profileID] = .loaded(entry.usage)
-        }
-    }
-
     private func showError(_ error: any Error) {
         visibleError = OperationError(
-            stage: nil,
             title: "Operation failed",
             message: error.localizedDescription,
             underlyingDescription: String(describing: error)

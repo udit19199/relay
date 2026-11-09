@@ -8,7 +8,7 @@ enum IslandExpandedBodyLayout: Equatable {
 
     enum AddAccountLayoutPhase: Equatable {
         case chooseProvider
-        case pasteSession
+        case waitingForBrowser
     }
 
     var bodyHeight: CGFloat {
@@ -17,9 +17,9 @@ enum IslandExpandedBodyLayout: Equatable {
             if count == 0 { return 56 }
             return CGFloat(count) * 104 + 16
         case .addContent(.chooseProvider):
-            return 360
-        case .addContent(.pasteSession):
-            return 400
+            return 300
+        case .addContent(.waitingForBrowser):
+            return 220
         }
     }
 

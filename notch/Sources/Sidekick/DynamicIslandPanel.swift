@@ -402,15 +402,12 @@ private struct DynamicIslandPanel: View {
     @ObservedObject var controller: DynamicIslandPanelController
     @State private var isHovered = false
 
-    private var activeAccount: AccountProfile? {
-        model.accounts.first { $0.id == model.activeAccountID }
-    }
-
-    private var activeAccountName: String {
-        guard let activeAccount else {
-            return model.accounts.isEmpty ? "Add an account" : "No active account"
+    private var headlineAccountName: String {
+        switch model.accounts.count {
+        case 0: "Add an account"
+        case 1: model.accounts[0].email ?? model.accounts[0].displayName
+        default: "\(model.accounts.count) accounts"
         }
-        return activeAccount.email.flatMap { $0.isEmpty ? nil : $0 } ?? activeAccount.displayName
     }
 
     var body: some View {
@@ -496,21 +493,17 @@ private struct DynamicIslandPanel: View {
         .buttonStyle(.plain)
         .accessibilityLabel(controller.isExpanded ? "Collapse Sidekick" : "Open Sidekick")
         .accessibilityValue(
-            "\(activeAccountName), weekly usage \(model.activeRemainingPercent.map { "\($0)" } ?? "unavailable") percent remaining"
+            "\(headlineAccountName), weekly usage \(model.headlineRemainingPercent.map { "\($0)" } ?? "unavailable") percent remaining"
         )
-        .help("\(activeAccountName) · Show account details")
+        .help("\(headlineAccountName) · Show account details")
     }
 
     private var compactFiveHourValue: some View {
-        compactUsageValue(
-            "5H",
-            percent: model.activeAccountID.flatMap {
-                model.usageStates[$0]?.displayedUsage?.fiveHourRemainingPercent
-            })
+        compactUsageValue("5H", percent: model.headlineFiveHourPercent)
     }
 
     private var compactWeeklyValue: some View {
-        compactUsageValue("WK", percent: model.activeRemainingPercent)
+        compactUsageValue("WK", percent: model.headlineRemainingPercent)
     }
 
     private func compactUsageValue(_ label: String, percent: Int?) -> some View {
