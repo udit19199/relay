@@ -2,163 +2,154 @@
 import RelayCore
 import SwiftUI
 
+// Compact usage table: one line per account, a 5-hour and a weekly column,
+// each showing percent left and time until that window resets.
+enum UsageTable {
+    static let windowWidth: CGFloat = 112
+    static let spacing: CGFloat = 10
+}
+
+struct UsageTableHeader: View {
+    var body: some View {
+        HStack(spacing: UsageTable.spacing) {
+            Spacer(minLength: 0)
+            label("5-HOUR")
+            label("WEEKLY")
+        }
+        .padding(.horizontal, 10)
+    }
+
+    private func label(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 9, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .frame(width: UsageTable.windowWidth, alignment: .leading)
+    }
+}
+
+/// Total across every account, the first line of the table.
+struct PoolTableRow: View {
+    let pool: PooledUsage
+    let now: Date
+
+    var body: some View {
+        HStack(spacing: UsageTable.spacing) {
+            Text("All accounts")
+                .font(.system(size: 12.5, weight: .semibold))
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            cell(pool.fiveHour, includesDate: false)
+            cell(pool.weekly, includesDate: true)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private func cell(_ window: PooledWindow?, includesDate: Bool) -> some View {
+        guard let window else { return UsageCell(percent: nil, detail: nil, help: "Unavailable") }
+        if let next = window.nextResetAt, window.nextResetGainPercent > 0 {
+            return UsageCell(
+                percent: window.remainingPercent,
+                detail: "+\(window.nextResetGainPercent)% \(ResetCountdown.short(until: next, now: now))",
+                help: "+\(window.nextResetGainPercent)% comes back \(ResetCountdown.timestampText(until: next, includesDate: includesDate))"
+            )
+        }
+        return UsageCell(percent: window.remainingPercent, detail: nil, help: "No refill pending")
+    }
+}
+
 struct AccountRow: View {
     let account: RelayAccount
     let usageState: UsageViewState
     let now: Date
 
-    private var accountTitle: String {
-        account.email ?? account.displayName
+    private var title: String {
+        guard let email = account.email, let at = email.firstIndex(of: "@") else { return account.displayName }
+        return String(email[..<at])
+    }
+
+    // Disabled, rate limited, or a failed refresh: one icon, details on hover.
+    private var warning: String? {
+        if account.disabled || account.unavailable {
+            return account.statusSummary
+        }
+        return usageState.refreshError
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            HStack(alignment: .firstTextBaseline, spacing: 7) {
-                Text(verbatim: accountTitle)
-                    .font(.system(size: 13, weight: .semibold))
+        HStack(spacing: UsageTable.spacing) {
+            HStack(spacing: 5) {
+                Text(verbatim: title)
+                    .font(.system(size: 12.5, weight: .medium))
                     .lineLimit(1)
-                    .truncationMode(.tail)
-                    .help(accountTitle)
-                Text(verbatim: account.provider.uppercased())
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .accessibilityLabel("\(account.provider) account")
-                Spacer(minLength: 4)
-                if let message = usageState.refreshError {
+                    .truncationMode(.middle)
+                if let warning {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.system(size: 9))
                         .foregroundStyle(.orange)
-                        .help(message)
-                        .accessibilityLabel(message)
+                        .help(warning)
+                        .accessibilityLabel(warning)
                 }
             }
-            .frame(height: 28)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .help("\(account.email ?? account.displayName) · \(account.provider.capitalized)")
 
-            usageContent
+            usageCells
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
         .contentShape(Rectangle())
     }
 
     @ViewBuilder
-    private var usageContent: some View {
-        switch usageState {
-        case .idle:
-            Text("Usage is loading")
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
-        case let .unavailable(message):
-            Text("Usage unavailable")
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
-                .help(message)
-        case let .loaded(usage), let .stale(usage, _):
-            expandedUsageContent(usage)
+    private var usageCells: some View {
+        if let stored = usageState.displayedUsage {
+            let usage = stored.current(at: now)
+            if let percent = usage.fiveHourRemainingPercent, let resetsAt = usage.fiveHourResetsAt {
+                cell(percent, resetsAt, includesDate: false)
+            } else {
+                UsageCell(percent: nil, detail: nil, help: "No 5-hour window")
+            }
+            cell(usage.remainingPercent, usage.resetsAt, includesDate: true)
+        } else {
+            let help = if case let .unavailable(message) = usageState { message } else { "Usage is loading" }
+            UsageCell(percent: nil, detail: nil, help: help)
+            UsageCell(percent: nil, detail: nil, help: help)
         }
     }
 
-    private func expandedUsageContent(_ stored: WeeklyUsage) -> some View {
-        let usage = stored.current(at: now)
-        return VStack(alignment: .leading, spacing: 6) {
-            if let remaining = usage.fiveHourRemainingPercent,
-               let resetsAt = usage.fiveHourResetsAt {
-                LimitRow(
-                    title: "5-hour",
-                    remainingPercent: remaining,
-                    detail: ResetCountdown.text(until: resetsAt, now: now),
-                    help: ResetCountdown.absoluteText(until: resetsAt, includesDate: false)
-                )
-            }
-            LimitRow(
-                title: "Weekly",
-                remainingPercent: usage.remainingPercent,
-                detail: ResetCountdown.text(until: usage.resetsAt, now: now),
-                help: ResetCountdown.absoluteText(until: usage.resetsAt, includesDate: true)
-            )
-        }
-    }
-}
-
-/// Total capacity across every account, shown above the account rows.
-struct PoolSummaryRow: View {
-    let pool: PooledUsage
-    let accountCount: Int
-    let now: Date
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            HStack(alignment: .firstTextBaseline, spacing: 7) {
-                Text("All accounts")
-                    .font(.system(size: 13, weight: .semibold))
-                Text("\(accountCount) POOLED")
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 4)
-            }
-            .frame(height: 28)
-
-            VStack(alignment: .leading, spacing: 6) {
-                if let window = pool.fiveHour {
-                    row("5-hour", window, includesDate: false)
-                }
-                if let window = pool.weekly {
-                    row("Weekly", window, includesDate: true)
-                }
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 12)
-        .background(
-            Color.primary.opacity(0.05),
-            in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+    private func cell(_ percent: Int, _ resetsAt: Date, includesDate: Bool) -> UsageCell {
+        UsageCell(
+            percent: percent,
+            detail: ResetCountdown.short(until: resetsAt, now: now),
+            help: ResetCountdown.absoluteText(until: resetsAt, includesDate: includesDate)
         )
     }
-
-    private func row(_ title: String, _ window: PooledWindow, includesDate: Bool) -> some View {
-        let detail: String
-        let help: String
-        if let next = window.nextResetAt, window.nextResetGainPercent > 0 {
-            detail = "+\(window.nextResetGainPercent)% \(ResetCountdown.relative(until: next, now: now))"
-            help = "Next refill \(ResetCountdown.timestampText(until: next, includesDate: includesDate))"
-        } else {
-            detail = window.remainingPercent >= 100 ? "Full" : "No refill pending"
-            help = detail
-        }
-        return LimitRow(title: title, remainingPercent: window.remainingPercent, detail: detail, help: help)
-    }
 }
 
-/// One limit line: window name, percent left, and when it changes.
-struct LimitRow: View {
-    let title: String
-    let remainingPercent: Int
-    let detail: String
+/// Percent left in its usage colour, then a small detail such as the reset time.
+struct UsageCell: View {
+    let percent: Int?
+    let detail: String?
     let help: String
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(title)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.secondary)
-                .frame(width: 48, alignment: .leading)
-
-            Text("\(remainingPercent)% left")
-                .font(.system(size: 12, weight: .medium).monospacedDigit())
-                .foregroundStyle(UsageTint.color(for: remainingPercent))
-                .lineLimit(1)
-                .frame(width: 72, alignment: .leading)
-
-            Spacer(minLength: 4)
-
-            Text(detail)
-                .font(.system(size: 11, weight: .medium).monospacedDigit())
-                .lineLimit(1)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-                .minimumScaleFactor(0.8)
-                .help(help)
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(percent.map { "\($0)%" } ?? "—")
+                .font(.system(size: 12.5, weight: .semibold).monospacedDigit())
+                .foregroundStyle(UsageTint.color(for: percent))
+                .frame(width: 36, alignment: .leading)
+            if let detail {
+                Text(detail)
+                    .font(.system(size: 10.5, weight: .medium).monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+            }
         }
+        .frame(width: UsageTable.windowWidth, alignment: .leading)
+        .help(help)
     }
 }
 
@@ -167,6 +158,12 @@ enum ResetCountdown {
     static func text(until resetsAt: Date, now: Date) -> String {
         guard resetsAt > now else { return "Refilled" }
         return "Resets \(relative(until: resetsAt, now: now))"
+    }
+
+    /// "1h 20m", or "now" once the time has passed.
+    static func short(until date: Date, now: Date) -> String {
+        guard date > now else { return "now" }
+        return duration(date.timeIntervalSince(now))
     }
 
     /// "in 1h 20m", or "now" once the time has passed.

@@ -249,40 +249,26 @@ struct IslandAccountManager: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 28)
             } else {
-                VStack(spacing: 6) {
-                    if model.accounts.count > 1 {
-                        TimelineView(.periodic(from: .now, by: 30)) { context in
-                            PoolSummaryRow(
-                                pool: model.pooledUsage(at: context.date),
-                                accountCount: model.accounts.filter { !$0.disabled }.count,
+                TimelineView(.periodic(from: .now, by: 30)) { context in
+                    VStack(spacing: 2) {
+                        UsageTableHeader()
+                            .padding(.bottom, 2)
+                        if model.accounts.count > 1 {
+                            PoolTableRow(pool: model.pooledUsage(at: context.date), now: context.date)
+                                .padding(.bottom, 2)
+                        }
+                        ForEach(model.accounts) { account in
+                            AccountRow(
+                                account: account,
+                                usageState: model.usageStates[account.id] ?? .idle,
                                 now: context.date
                             )
-                        }
-                    }
-                    ForEach(model.accounts) { account in
-                        VStack(alignment: .leading, spacing: 0) {
-                            TimelineView(.periodic(from: .now, by: 30)) { context in
-                                AccountRow(
-                                    account: account,
-                                    usageState: model.usageStates[account.id] ?? .idle,
-                                    now: context.date
-                                )
-                            }
-                            if account.disabled || account.unavailable {
-                                Text(verbatim: account.statusSummary)
-                                    .font(.system(size: 10.5))
-                                    .foregroundStyle(.orange)
-                                    .lineLimit(2)
-                                    .help(account.statusMessage ?? account.statusSummary)
-                                    .padding(.horizontal, 12)
-                                    .padding(.bottom, 8)
-                            }
-                        }
-                        .contextMenu {
-                            Button(role: .destructive) {
-                                removingAccount = account
-                            } label: {
-                                Text("Remove \(account.displayName)?")
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    removingAccount = account
+                                } label: {
+                                    Text("Remove \(account.displayName)?")
+                                }
                             }
                         }
                     }
