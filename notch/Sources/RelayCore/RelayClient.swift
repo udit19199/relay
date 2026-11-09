@@ -40,8 +40,13 @@ public struct RelayClient: Sendable {
     public func listAccounts() async throws -> [RelayAccount] {
         struct Response: Decodable { var files: [RelayAccount]? }
         let response: Response = try await get(path: "/v0/management/auth-files")
+        // Claude accounts first (they share the total row), then other providers.
         return (response.files ?? []).sorted {
-            $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
+            let leftClaude = $0.provider == RelayProvider.claude.rawValue
+            let rightClaude = $1.provider == RelayProvider.claude.rawValue
+            if leftClaude != rightClaude { return leftClaude }
+            if $0.provider != $1.provider { return $0.provider < $1.provider }
+            return $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
         }
     }
 
@@ -91,6 +96,36 @@ public struct RelayClient: Sendable {
         if response.status != "ok" {
             throw RelayError.serverMessage(response.error ?? "remove failed")
         }
+    }
+
+    // Relay's quota endpoint: OpenCode Go accounts report their rolling,
+    // weekly, and monthly windows here instead of in response headers.
+    public func fetchQuota(authIndex: String) async throws -> WeeklyUsage {
+        struct Body: Encodable { var auth_index: String }
+        struct Bucket: Decodable { var window: String?; var remainingFraction: Double?; var resetTime: String? }
+        struct Group: Decodable { var buckets: [Bucket]? }
+        struct Response: Decodable { var groups: [Group]? }
+        var request = URLRequest(url: baseURL.appendingPathComponent("/v0/management/quota/fetch"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(Body(auth_index: authIndex))
+        authorize(&request)
+        let response: Response = try await send(request)
+        var windows: [String: (percent: Int, resetsAt: Date)] = [:]
+        for bucket in (response.groups ?? []).flatMap({ $0.buckets ?? [] }) {
+            guard let name = bucket.window, let fraction = bucket.remainingFraction,
+                  let resetsAt = bucket.resetTime.flatMap(RelayResetTime.parse) else { continue }
+            windows[name] = (min(100, max(0, Int((fraction * 100).rounded()))), resetsAt)
+        }
+        guard let weekly = windows["weekly"] else { throw RelayError.malformedResponse }
+        return WeeklyUsage(
+            remainingPercent: weekly.percent,
+            resetsAt: weekly.resetsAt,
+            fiveHourRemainingPercent: windows["rolling"]?.percent,
+            fiveHourResetsAt: windows["rolling"]?.resetsAt,
+            monthlyRemainingPercent: windows["monthly"]?.percent,
+            monthlyResetsAt: windows["monthly"]?.resetsAt
+        )
     }
 
     // MARK: - HTTP

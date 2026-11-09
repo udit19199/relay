@@ -75,6 +75,17 @@ func (h *Handler) FetchCredentialQuota(c *gin.Context) {
 		return
 	}
 
+	if isOpenCodeGoAuth(auth) {
+		quotaResp, errFetch := h.fetchOpenCodeGoQuota(c.Request.Context(), auth)
+		if errFetch != nil {
+			log.WithError(errFetch).Warnf("failed to fetch quota for credential %s", auth.Index)
+			c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("failed to fetch quota: %v", errFetch)})
+			return
+		}
+		c.JSON(http.StatusOK, quotaResp)
+		return
+	}
+
 	h.mu.Lock()
 	host := h.pluginHost
 	h.mu.Unlock()

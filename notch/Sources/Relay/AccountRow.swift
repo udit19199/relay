@@ -34,10 +34,13 @@ struct PoolTableRow: View {
 
     var body: some View {
         HStack(spacing: UsageTable.spacing) {
-            Text("All accounts")
-                .font(.system(size: 12.5, weight: .semibold))
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 6) {
+                ProviderDot(provider: RelayProvider.claude.rawValue)
+                Text("Claude total")
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
             cell(pool.fiveHour, includesDate: false)
             cell(pool.weekly, includesDate: true)
         }
@@ -65,25 +68,42 @@ struct AccountRow: View {
     let now: Date
 
     private var title: String {
-        guard let email = account.email, let at = email.firstIndex(of: "@") else { return account.displayName }
+        guard let email = account.email, let at = email.firstIndex(of: "@") else { return account.providerName }
         return String(email[..<at])
     }
 
     // Disabled, rate limited, or a failed refresh: one icon, details on hover.
+    // Relay keeps its rate-limit flag until the account's next request, so the
+    // icon also hides itself once the limit that blocked the account resets.
     private var warning: String? {
-        if account.disabled || account.unavailable {
-            return account.statusSummary
+        if account.disabled { return account.statusSummary }
+        if account.unavailable {
+            guard let usage = usageState.displayedUsage else { return account.statusSummary }
+            return usage.isBlocked(at: now) ? account.statusSummary : nil
         }
         return usageState.refreshError
+    }
+
+    private var monthly: (percent: Int, resetsAt: Date)? {
+        guard let usage = usageState.displayedUsage?.current(at: now),
+              let percent = usage.monthlyRemainingPercent, let resetsAt = usage.monthlyResetsAt else { return nil }
+        return (percent, resetsAt)
     }
 
     var body: some View {
         HStack(spacing: UsageTable.spacing) {
             HStack(spacing: 5) {
+                ProviderDot(provider: account.provider)
                 Text(verbatim: title)
                     .font(.system(size: 12.5, weight: .medium))
                     .lineLimit(1)
                     .truncationMode(.middle)
+                if let monthly {
+                    Text("\(monthly.percent)% mo")
+                        .font(.system(size: 10.5, weight: .medium).monospacedDigit())
+                        .foregroundStyle(UsageTint.color(for: monthly.percent))
+                        .help("Monthly: \(monthly.percent)% left · \(ResetCountdown.absoluteText(until: monthly.resetsAt, includesDate: true))")
+                }
                 if let warning {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.system(size: 9))
@@ -93,7 +113,7 @@ struct AccountRow: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .help("\(account.email ?? account.displayName) · \(account.provider.capitalized)")
+            .help("\(account.email ?? account.providerName) · \(account.providerName)")
 
             usageCells
         }
@@ -125,6 +145,27 @@ struct AccountRow: View {
             detail: ResetCountdown.short(until: resetsAt, now: now),
             help: ResetCountdown.absoluteText(until: resetsAt, includesDate: includesDate)
         )
+    }
+}
+
+/// Colour that marks which provider a row belongs to.
+struct ProviderDot: View {
+    let provider: String
+
+    var body: some View {
+        Circle()
+            .fill(Self.color(for: provider))
+            .frame(width: 7, height: 7)
+            .accessibilityHidden(true)
+    }
+
+    static func color(for provider: String) -> Color {
+        switch provider {
+        case "claude": Color(red: 0.85, green: 0.47, blue: 0.34)
+        case "opencode-go": Color(red: 0.38, green: 0.62, blue: 0.98)
+        case "codex": Color(red: 0.55, green: 0.80, blue: 0.62)
+        default: .secondary
+        }
     }
 }
 
@@ -160,9 +201,9 @@ enum ResetCountdown {
         return "Resets \(relative(until: resetsAt, now: now))"
     }
 
-    /// "1h 20m", or "now" once the time has passed.
+    /// "1h 20m", or "refilled" once the reset time has passed.
     static func short(until date: Date, now: Date) -> String {
-        guard date > now else { return "now" }
+        guard date > now else { return "refilled" }
         return duration(date.timeIntervalSince(now))
     }
 

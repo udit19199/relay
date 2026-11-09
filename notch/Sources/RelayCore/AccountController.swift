@@ -22,16 +22,19 @@ open class AccountController {
     private var addAccountTask: Task<Void, Never>?
     private var backgroundUsageRefreshInterval: Duration = .seconds(30)
     private var isBackgroundUsageRefreshEnabled = false
+    // Quota-endpoint accounts call the provider's API, so poll them less often.
+    private var lastQuotaFetch: [String: Date] = [:]
+    private let quotaFetchInterval: TimeInterval = 5 * 60
 
     public init(client: RelayClient) {
         self.client = client
     }
 
-    // Relay spreads requests over every enabled account, so the total
-    // capacity is the pool of all of them. Disabled accounts are left out.
+    // Relay spreads Claude requests over every enabled Claude account, so the
+    // total is the pool of those. OpenCode Go has its own row, not a share.
     public func pooledUsage(at now: Date) -> PooledUsage {
         PooledUsage(
-            usages: accounts.filter { !$0.disabled }
+            usages: accounts.filter { !$0.disabled && $0.provider == RelayProvider.claude.rawValue }
                 .compactMap { usageStates[$0.id]?.displayedUsage },
             now: now
         )
@@ -106,10 +109,10 @@ open class AccountController {
             let knownIDs = Set(listed.map(\.id))
             accounts = listed
             for account in listed {
-                if let usage = account.relayUsage() {
+                if account.usesQuotaEndpoint {
+                    await refreshQuota(for: account)
+                } else if let usage = account.relayUsage() {
                     usageStates[account.id] = .loaded(usage)
-                } else if usageStates[account.id]?.displayedUsage != nil {
-                    usageStates[account.id] = .unavailable("Relay returned no weekly usage window for this account.")
                 } else {
                     usageStates[account.id] = .unavailable("Relay returned no weekly usage window for this account.")
                 }
@@ -126,6 +129,28 @@ open class AccountController {
             }
             if accounts.isEmpty {
                 showError(error)
+            }
+        }
+    }
+
+    private func refreshQuota(for account: RelayAccount) async {
+        let now = Date()
+        let cached = usageStates[account.id]?.displayedUsage
+        // A reset time that has passed means the stored numbers are stale: refetch now.
+        let resetPassed = cached.map { $0.current(at: now) != $0 } ?? false
+        if let last = lastQuotaFetch[account.id], cached != nil, !resetPassed,
+           now.timeIntervalSince(last) < quotaFetchInterval
+        {
+            return
+        }
+        lastQuotaFetch[account.id] = now
+        do {
+            usageStates[account.id] = .loaded(try await client.fetchQuota(authIndex: account.authIndex))
+        } catch {
+            if let cached = usageStates[account.id]?.displayedUsage {
+                usageStates[account.id] = .stale(cached, error.localizedDescription)
+            } else {
+                usageStates[account.id] = .unavailable(error.localizedDescription)
             }
         }
     }

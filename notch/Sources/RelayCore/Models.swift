@@ -8,17 +8,24 @@ public struct WeeklyUsage: Codable, Equatable, Sendable {
     public let resetsAt: Date
     public let fiveHourRemainingPercent: Int?
     public let fiveHourResetsAt: Date?
+    /// OpenCode Go only.
+    public let monthlyRemainingPercent: Int?
+    public let monthlyResetsAt: Date?
 
     public init(
         remainingPercent: Int,
         resetsAt: Date,
         fiveHourRemainingPercent: Int? = nil,
-        fiveHourResetsAt: Date? = nil
+        fiveHourResetsAt: Date? = nil,
+        monthlyRemainingPercent: Int? = nil,
+        monthlyResetsAt: Date? = nil
     ) {
         self.remainingPercent = remainingPercent
         self.resetsAt = resetsAt
         self.fiveHourRemainingPercent = fiveHourRemainingPercent
         self.fiveHourResetsAt = fiveHourResetsAt
+        self.monthlyRemainingPercent = monthlyRemainingPercent
+        self.monthlyResetsAt = monthlyResetsAt
     }
 }
 
@@ -66,12 +73,22 @@ extension WeeklyUsage {
     /// even before Relay sees the account's next response headers.
     public func current(at now: Date) -> WeeklyUsage {
         let fiveHourReset = fiveHourResetsAt.map { $0 <= now } ?? false
+        let monthlyReset = monthlyResetsAt.map { $0 <= now } ?? false
         return WeeklyUsage(
             remainingPercent: resetsAt <= now ? 100 : remainingPercent,
             resetsAt: resetsAt,
             fiveHourRemainingPercent: fiveHourReset ? 100 : fiveHourRemainingPercent,
-            fiveHourResetsAt: fiveHourResetsAt
+            fiveHourResetsAt: fiveHourResetsAt,
+            monthlyRemainingPercent: monthlyReset ? 100 : monthlyRemainingPercent,
+            monthlyResetsAt: monthlyResetsAt
         )
+    }
+
+    /// True while some window is used up and its reset time is still ahead.
+    public func isBlocked(at now: Date) -> Bool {
+        let usage = current(at: now)
+        return usage.remainingPercent == 0 || usage.fiveHourRemainingPercent == 0
+            || usage.monthlyRemainingPercent == 0
     }
 }
 

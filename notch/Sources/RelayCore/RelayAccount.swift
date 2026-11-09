@@ -185,6 +185,22 @@ extension RelayAccount {
     }
 }
 
+extension RelayAccount {
+    /// Accounts whose usage comes from Relay's quota endpoint rather than
+    /// rate-limit headers on proxied responses.
+    public var usesQuotaEndpoint: Bool { provider == "opencode-go" }
+
+    /// Short provider name for display.
+    public var providerName: String {
+        switch provider {
+        case "claude": "Claude"
+        case "opencode-go": "OpenCode Go"
+        case "codex": "Codex"
+        default: provider
+        }
+    }
+}
+
 public enum RelayProvider: String, CaseIterable, Sendable {
     case claude
     case codex
