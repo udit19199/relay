@@ -27,26 +27,14 @@ open class AccountController {
         self.client = client
     }
 
-    // Relay fails over to whichever account still has room, so the compact
-    // strip shows the account with the most headroom. Both numbers come from
-    // that one account. Nil when no usage is known.
-    public var headlineAccount: RelayAccount? {
-        let known = accounts.filter { usageStates[$0.id]?.displayedUsage != nil }
-        let usable = known.filter { !$0.disabled && !$0.unavailable }
-        return (usable.isEmpty ? known : usable).max { headroom($0) < headroom($1) }
-    }
-
-    public var headlineRemainingPercent: Int? {
-        headlineAccount.flatMap { usageStates[$0.id]?.displayedUsage?.remainingPercent }
-    }
-
-    public var headlineFiveHourPercent: Int? {
-        headlineAccount.flatMap { usageStates[$0.id]?.displayedUsage?.fiveHourRemainingPercent }
-    }
-
-    private func headroom(_ account: RelayAccount) -> Int {
-        guard let usage = usageStates[account.id]?.displayedUsage else { return -1 }
-        return min(usage.remainingPercent, usage.fiveHourRemainingPercent ?? 100)
+    // Relay spreads requests over every enabled account, so the total
+    // capacity is the pool of all of them. Disabled accounts are left out.
+    public func pooledUsage(at now: Date) -> PooledUsage {
+        PooledUsage(
+            usages: accounts.filter { !$0.disabled }
+                .compactMap { usageStates[$0.id]?.displayedUsage },
+            now: now
+        )
     }
 
     public func start() async {

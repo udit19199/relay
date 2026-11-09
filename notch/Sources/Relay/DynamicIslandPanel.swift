@@ -397,9 +397,11 @@ private struct DynamicIslandPanel: View {
     @State private var isHovered = false
 
     private var headlineAccountName: String {
-        if model.accounts.isEmpty { return "Add an account" }
-        guard let account = model.headlineAccount else { return "\(model.accounts.count) accounts" }
-        return account.email ?? account.displayName
+        switch model.accounts.count {
+        case 0: "Add an account"
+        case 1: model.accounts[0].email ?? model.accounts[0].displayName
+        default: "All \(model.accounts.count) accounts"
+        }
     }
 
     var body: some View {
@@ -485,17 +487,18 @@ private struct DynamicIslandPanel: View {
         .buttonStyle(.plain)
         .accessibilityLabel(controller.isExpanded ? "Collapse Relay" : "Open Relay")
         .accessibilityValue(
-            "\(headlineAccountName), weekly usage \(model.headlineRemainingPercent.map { "\($0)" } ?? "unavailable") percent remaining"
+            "\(headlineAccountName), weekly usage \(model.pooledUsage(at: .now).weekly.map { "\($0.remainingPercent)" } ?? "unavailable") percent remaining"
         )
         .help("\(headlineAccountName) · Show account details")
     }
 
+    // Totals across all accounts; the island refreshes them every 30s.
     private var compactFiveHourValue: some View {
-        compactUsageValue("5H", percent: model.headlineFiveHourPercent)
+        compactUsageValue("5H", percent: model.pooledUsage(at: .now).fiveHour?.remainingPercent)
     }
 
     private var compactWeeklyValue: some View {
-        compactUsageValue("WK", percent: model.headlineRemainingPercent)
+        compactUsageValue("WK", percent: model.pooledUsage(at: .now).weekly?.remainingPercent)
     }
 
     private func compactUsageValue(_ label: String, percent: Int?) -> some View {
@@ -511,7 +514,7 @@ private struct DynamicIslandPanel: View {
         }
         .frame(width: 44, height: controller.layout.collapsed.height)
         .help(
-            "\(label == "5H" ? "5-hour" : "Weekly") usage · \(percent.map { "\($0)% remaining" } ?? "Unavailable")"
+            "\(label == "5H" ? "5-hour" : "Weekly") total across accounts · \(percent.map { "\($0)% remaining" } ?? "Unavailable")"
         )
     }
 

@@ -58,32 +58,85 @@ struct AccountRow: View {
         }
     }
 
-    private func expandedUsageContent(_ usage: WeeklyUsage) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+    private func expandedUsageContent(_ stored: WeeklyUsage) -> some View {
+        let usage = stored.current(at: now)
+        return VStack(alignment: .leading, spacing: 6) {
             if let remaining = usage.fiveHourRemainingPercent,
                let resetsAt = usage.fiveHourResetsAt {
-                limitRow(
+                LimitRow(
                     title: "5-hour",
                     remainingPercent: remaining,
-                    resetsAt: resetsAt,
-                    includesDate: false
+                    detail: ResetCountdown.text(until: resetsAt, now: now),
+                    help: ResetCountdown.absoluteText(until: resetsAt, includesDate: false)
                 )
             }
-            limitRow(
+            LimitRow(
                 title: "Weekly",
                 remainingPercent: usage.remainingPercent,
-                resetsAt: usage.resetsAt,
-                includesDate: true
+                detail: ResetCountdown.text(until: usage.resetsAt, now: now),
+                help: ResetCountdown.absoluteText(until: usage.resetsAt, includesDate: true)
             )
         }
     }
+}
 
-    private func limitRow(
-        title: String,
-        remainingPercent: Int,
-        resetsAt: Date,
-        includesDate: Bool
-    ) -> some View {
+/// Total capacity across every account, shown above the account rows.
+struct PoolSummaryRow: View {
+    let pool: PooledUsage
+    let accountCount: Int
+    let now: Date
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .firstTextBaseline, spacing: 7) {
+                Text("All accounts")
+                    .font(.system(size: 13, weight: .semibold))
+                Text("\(accountCount) POOLED")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 4)
+            }
+            .frame(height: 28)
+
+            VStack(alignment: .leading, spacing: 6) {
+                if let window = pool.fiveHour {
+                    row("5-hour", window, includesDate: false)
+                }
+                if let window = pool.weekly {
+                    row("Weekly", window, includesDate: true)
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .background(
+            Color.primary.opacity(0.05),
+            in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+        )
+    }
+
+    private func row(_ title: String, _ window: PooledWindow, includesDate: Bool) -> some View {
+        let detail: String
+        let help: String
+        if let next = window.nextResetAt, window.nextResetGainPercent > 0 {
+            detail = "+\(window.nextResetGainPercent)% \(ResetCountdown.relative(until: next, now: now))"
+            help = "Next refill \(ResetCountdown.timestampText(until: next, includesDate: includesDate))"
+        } else {
+            detail = window.remainingPercent >= 100 ? "Full" : "No refill pending"
+            help = detail
+        }
+        return LimitRow(title: title, remainingPercent: window.remainingPercent, detail: detail, help: help)
+    }
+}
+
+/// One limit line: window name, percent left, and when it changes.
+struct LimitRow: View {
+    let title: String
+    let remainingPercent: Int
+    let detail: String
+    let help: String
+
+    var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(title)
                 .font(.system(size: 11, weight: .medium))
@@ -98,13 +151,13 @@ struct AccountRow: View {
 
             Spacer(minLength: 4)
 
-            Text(ResetCountdown.text(until: resetsAt, now: now))
+            Text(detail)
                 .font(.system(size: 11, weight: .medium).monospacedDigit())
                 .lineLimit(1)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .trailing)
                 .minimumScaleFactor(0.8)
-                .help(ResetCountdown.absoluteText(until: resetsAt, includesDate: includesDate))
+                .help(help)
         }
     }
 }
@@ -112,8 +165,14 @@ struct AccountRow: View {
 /// Codex-bar style reset countdowns: how long until this window comes back.
 enum ResetCountdown {
     static func text(until resetsAt: Date, now: Date) -> String {
-        guard resetsAt > now else { return "Resets now" }
-        return "Resets in \(duration(resetsAt.timeIntervalSince(now)))"
+        guard resetsAt > now else { return "Refilled" }
+        return "Resets \(relative(until: resetsAt, now: now))"
+    }
+
+    /// "in 1h 20m", or "now" once the time has passed.
+    static func relative(until date: Date, now: Date) -> String {
+        guard date > now else { return "now" }
+        return "in \(duration(date.timeIntervalSince(now)))"
     }
 
     /// The exact local reset date and time.

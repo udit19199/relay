@@ -250,6 +250,15 @@ struct IslandAccountManager: View {
                     .padding(.vertical, 28)
             } else {
                 VStack(spacing: 6) {
+                    if model.accounts.count > 1 {
+                        TimelineView(.periodic(from: .now, by: 30)) { context in
+                            PoolSummaryRow(
+                                pool: model.pooledUsage(at: context.date),
+                                accountCount: model.accounts.filter { !$0.disabled }.count,
+                                now: context.date
+                            )
+                        }
+                    }
                     ForEach(model.accounts) { account in
                         VStack(alignment: .leading, spacing: 0) {
                             TimelineView(.periodic(from: .now, by: 30)) { context in
