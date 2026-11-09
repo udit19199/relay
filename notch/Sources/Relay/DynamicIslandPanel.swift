@@ -25,7 +25,7 @@ final class DynamicIslandPanelController: NSObject, ObservableObject {
     private var isSurfaceAnimating = false
     @Published private(set) var isExpanded = false
     @Published var showsCompactUsage =
-        UserDefaults.standard.object(forKey: "showsCompactUsage") as? Bool ?? true
+        UserDefaults.standard.object(forKey: "showsCompactUsage") as? Bool ?? false
     {
         didSet {
             UserDefaults.standard.set(showsCompactUsage, forKey: "showsCompactUsage")
