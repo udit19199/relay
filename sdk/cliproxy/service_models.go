@@ -200,6 +200,9 @@ func (s *Service) registerModelsForAuthWithConfigAndCache(ctx context.Context, c
 	case "devin":
 		models = registry.GetDevinModels()
 		models = applyExcludedModels(models, excluded)
+	case openCodeGoProvider:
+		models = s.openCodeGoModels(a)
+		models = applyExcludedModels(models, excluded)
 	case "meta":
 		models = registry.GetMetaModels()
 		if entry := resolveConfigMetaKeyForConfig(cfg, a); entry != nil {
@@ -331,7 +334,10 @@ func (s *Service) registerModelsForAuthWithConfigAndCache(ctx context.Context, c
 	models = s.appendPluginModels(key, models, excluded)
 	if len(models) > 0 {
 		models = applyOAuthSettingsForAuth(cfg, provider, authKind, models)
-		published = s.registerResolvedModelsForAuthFenced(a, fence, key, applyModelPrefixes(models, a.Prefix, cfg != nil && cfg.ForceModelPrefix))
+		// OpenCode Go models are exposed only under their prefix so catalog entries
+		// such as Claude models never shadow the native providers.
+		forcePrefix := (cfg != nil && cfg.ForceModelPrefix) || provider == openCodeGoProvider
+		published = s.registerResolvedModelsForAuthFenced(a, fence, key, applyModelPrefixes(models, a.Prefix, forcePrefix))
 		if strings.EqualFold(strings.TrimSpace(a.Provider), "antigravity") {
 			s.asyncProbeAntigravityCapabilities(ctx, a, key)
 		}

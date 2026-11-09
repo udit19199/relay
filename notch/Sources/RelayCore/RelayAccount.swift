@@ -192,30 +192,20 @@ extension RelayAccount {
 
     /// Short provider name for display.
     public var providerName: String {
-        switch provider {
-        case "claude": "Claude"
-        case "opencode-go": "OpenCode Go"
-        case "codex": "Codex"
-        default: provider
-        }
+        RelayProvider(rawValue: provider)?.displayName ?? provider
     }
 }
 
+/// Providers this app can add. Claude signs in through Relay's browser OAuth;
+/// OpenCode Go takes an API key.
 public enum RelayProvider: String, CaseIterable, Sendable {
     case claude
-    case codex
+    case openCodeGo = "opencode-go"
 
     public var displayName: String {
         switch self {
         case .claude: "Claude"
-        case .codex: "Codex"
-        }
-    }
-
-    public var systemImage: String {
-        switch self {
-        case .claude: "bubble.left.and.bubble.right"
-        case .codex: "terminal"
+        case .openCodeGo: "OpenCode Go"
         }
     }
 }

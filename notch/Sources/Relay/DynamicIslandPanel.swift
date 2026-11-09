@@ -29,12 +29,14 @@ final class DynamicIslandPanelController: NSObject, ObservableObject {
     {
         didSet {
             UserDefaults.standard.set(showsCompactUsage, forKey: "showsCompactUsage")
+            // The closed size depends on it: notch only, or notch plus usage wings.
+            if !isExpanded { updateFrame() }
         }
     }
     @Published private(set) var hasActiveConfirmation = false
     @Published fileprivate private(set) var layout: NotchGeometry
-    @Published fileprivate var expandedBodyLayout = IslandExpandedBodyLayout.accounts(contentHeight: 300)
-    @Published private(set) var expandedPanelHeight: CGFloat = 0
+    /// Measured height of the island's content (banner, body, footer).
+    @Published fileprivate var contentHeight: CGFloat = 300
 
     init(model: AppModel) {
         let layout =
@@ -182,14 +184,19 @@ final class DynamicIslandPanelController: NSObject, ObservableObject {
         }
     }
 
+    /// A text field in the island needs key status to receive typing.
+    fileprivate func focusForTyping() {
+        panel.makeKey()
+    }
+
     fileprivate func setConfirmationActive(_ active: Bool) {
         hasActiveConfirmation = active
         reconcilePointer()
     }
 
-    fileprivate func setExpandedBodyLayout(_ layout: IslandExpandedBodyLayout) {
-        guard expandedBodyLayout != layout else { return }
-        expandedBodyLayout = layout
+    fileprivate func setContentHeight(_ height: CGFloat) {
+        guard abs(contentHeight - height) > 0.5 else { return }
+        contentHeight = height
         guard isExpanded else {
             updateFrame(animated: false)
             return
@@ -208,7 +215,6 @@ final class DynamicIslandPanelController: NSObject, ObservableObject {
     ) {
         let size = targetSurfaceSize
         let newFrame = layout.frame(for: size)
-        expandedPanelHeight = size.height
 
         guard animated else {
             isSurfaceAnimating = false
@@ -255,23 +261,23 @@ final class DynamicIslandPanelController: NSObject, ObservableObject {
     }
 
     fileprivate var targetSurfaceSize: CGSize {
-        isExpanded ? panelSize : layout.collapsed
+        if isExpanded { return panelSize }
+        // Without the usage wings, the closed island is exactly the camera
+        // notch, so opening grows out of it and closing shrinks back into it.
+        if layout.isNotched && !showsCompactUsage {
+            return CGSize(width: layout.cameraWidth, height: layout.stripHeight)
+        }
+        return layout.collapsed
     }
 
     fileprivate var panelSize: CGSize {
         let chromeHeight = layout.safeContentTop + NotchLayout.bottomInset
-        // The accounts body is measured and already includes the error banner.
-        let errorAllowance: CGFloat =
-            if case .addContent = expandedBodyLayout, model.visibleError != nil { 60 } else { 0 }
-        let desiredHeight = chromeHeight + expandedBodyLayout.bodyHeight + errorAllowance
         // Past this the account list scrolls instead of growing.
         let maxHeight = min(layout.screen.height - 48, 640)
         return CGSize(
-            width: expandedBodyLayout.panelWidth(expandedWidth: layout.expandedWidth),
-            height: min(desiredHeight, maxHeight))
+            width: layout.expandedWidth,
+            height: min(chromeHeight + max(contentHeight, 56), maxHeight))
     }
-    fileprivate var visibleHeight: CGFloat { panel.frame.height }
-    fileprivate var visibleSurfaceWidth: CGFloat { panel.frame.width }
     private func currentGeometry() -> NotchGeometry {
         NotchGeometry.current()
             ?? NotchGeometry(
@@ -394,7 +400,6 @@ private final class IslandHostingView<Content: View>: NSHostingView<Content> {
 private struct DynamicIslandPanel: View {
     @ObservedObject var model: AppModel
     @ObservedObject var controller: DynamicIslandPanelController
-    @State private var isHovered = false
 
     private var headlineAccountName: String {
         switch model.accounts.count {
@@ -412,12 +417,12 @@ private struct DynamicIslandPanel: View {
                     IslandAccountManager(
                         model: model,
                         showsCompactUsage: $controller.showsCompactUsage,
-                        onDismiss: controller.collapse,
-                        onConfirmationChanged: { isActive in
-                            controller.setConfirmationActive(isActive)
+                        onHoldOpenChanged: { hold in
+                            controller.setConfirmationActive(hold)
                         },
-                        onExpandedBodyLayoutChanged: { layout in
-                            controller.setExpandedBodyLayout(layout)
+                        onNeedsKeyboard: controller.focusForTyping,
+                        onContentHeightChanged: { height in
+                            controller.setContentHeight(height)
                         }
                     )
                     .padding(.horizontal, NotchLayout.horizontalInset)
@@ -430,10 +435,15 @@ private struct DynamicIslandPanel: View {
                         height: controller.panelSize.height,
                         alignment: .top
                     )
-                    .transition(.opacity)
+                    // The black island grows or shrinks; only its content fades.
+                    // In after the shape has started growing, out before it shrinks.
+                    .transition(.asymmetric(
+                        insertion: .opacity.animation(.easeOut(duration: 0.2).delay(0.1)),
+                        removal: .opacity.animation(.easeIn(duration: 0.1))
+                    ))
                 } else if controller.showsCompactUsage {
                     compactHeader
-                        .transition(.opacity)
+                        .transition(.opacity.animation(.easeOut(duration: 0.15)))
                 } else {
                     Button(action: controller.toggleExpansion) {
                         Color.clear.contentShape(Rectangle())
@@ -443,24 +453,17 @@ private struct DynamicIslandPanel: View {
                 }
             }
             .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
-            .animation(
-                IslandMotion.prefersReducedMotion ? nil : .easeInOut(duration: 0.18),
-                value: controller.isExpanded
-            )
             .background {
-                if controller.isExpanded || controller.showsCompactUsage {
+                // Never faded: on a notched Mac the closed island is the notch itself.
+                if controller.isExpanded || controller.showsCompactUsage || controller.layout.isNotched {
                     islandShape.fill(Color.black)
                 }
             }
             .clipShape(islandShape)
         }
         .preferredColorScheme(.dark)
-        .animation(.easeOut(duration: 0.15), value: isHovered)
         .onHover { hovering in
-            isHovered = hovering
-            if hovering {
-                NSCursor.arrow.set()
-            }
+            if hovering { NSCursor.arrow.set() }
         }
         .onExitCommand(perform: controller.collapse)
         .onChange(of: model.accounts.count) { _, _ in controller.updateFrame() }

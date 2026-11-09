@@ -272,6 +272,9 @@ func synthesizeFileAuths(ctx *SynthesisContext, fullPath string, data []byte) ([
 			a.Attributes["base_url"] = kimiauth.ResolveKimiAPIBaseURL(resolvedDomain)
 		}
 	}
+	if provider == openCodeGoProvider {
+		applyOpenCodeGoAttributes(a, metadata)
+	}
 	// For codex auth files, extract plan_type from metadata or JWT id_token.
 	if provider == "codex" {
 		if ptRaw, ok := metadata["plan_type"].(string); ok && strings.TrimSpace(ptRaw) != "" {
@@ -286,6 +289,41 @@ func synthesizeFileAuths(ctx *SynthesisContext, fullPath string, data []byte) ([
 	}
 	a.BindFileSnapshot(fullPath, data)
 	return []*coreauth.Auth{a}, nil
+}
+
+const (
+	openCodeGoProvider = "opencode-go"
+	openCodeGoBaseURL  = "https://opencode.ai/inference/go/v1"
+)
+
+// applyOpenCodeGoAttributes lets an OpenCode Go auth file serve inference through
+// the OpenAI-compatible executor bound to provider "opencode-go". Its models are
+// exposed only as "opencode-go/<model>" so they never shadow other providers.
+func applyOpenCodeGoAttributes(a *coreauth.Auth, metadata map[string]any) {
+	if key, ok := metadata["api_key"].(string); ok && strings.TrimSpace(key) != "" {
+		a.Attributes["api_key"] = strings.TrimSpace(key)
+	}
+	a.Attributes["base_url"] = openCodeGoBaseURL
+	if bu, ok := metadata["base_url"].(string); ok && strings.TrimSpace(bu) != "" {
+		a.Attributes["base_url"] = strings.TrimSpace(bu)
+	}
+	// OpenCode Go asks clients to identify themselves and rejects requests without
+	// a session header; "$CPA-SESSION-ID" expands to Relay's per-conversation ID.
+	// A "headers" entry in the file wins over these defaults.
+	defaults := map[string]string{"User-Agent": "relay", "X-Opencode-Session": "$CPA-SESSION-ID"}
+	for name := range a.Attributes {
+		for header := range defaults {
+			if strings.EqualFold(name, "header:"+header) {
+				delete(defaults, header)
+			}
+		}
+	}
+	for header, value := range defaults {
+		a.Attributes["header:"+header] = value
+	}
+	if a.Prefix == "" {
+		a.Prefix = openCodeGoProvider
+	}
 }
 
 func parsePluginFileAuths(parser PluginAuthParser, req pluginapi.AuthParseRequest) ([]*coreauth.Auth, bool, error) {

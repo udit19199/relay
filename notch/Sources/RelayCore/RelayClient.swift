@@ -50,12 +50,9 @@ public struct RelayClient: Sendable {
         }
     }
 
-    public func startAddAccount(provider: RelayProvider) async throws -> (url: URL, state: String) {
+    public func startClaudeSignIn() async throws -> (url: URL, state: String) {
         struct Response: Decodable { var url: String?; var state: String?; var error: String? }
-        let path = provider == .codex
-            ? "/v0/management/codex-auth-url"
-            : "/v0/management/anthropic-auth-url"
-        let response: Response = try await get(path: path)
+        let response: Response = try await get(path: "/v0/management/anthropic-auth-url")
         if let error = response.error, !error.isEmpty { throw RelayError.serverMessage(error) }
         guard let urlString = response.url, let url = URL(string: urlString),
               let state = response.state, !state.isEmpty
@@ -96,6 +93,20 @@ public struct RelayClient: Sendable {
         if response.status != "ok" {
             throw RelayError.serverMessage(response.error ?? "remove failed")
         }
+    }
+
+    /// Saves a credential file in Relay's auth directory; Relay loads it on its own.
+    public func uploadAuthFile(name: String, json: Data) async throws {
+        struct Response: Decodable { var status: String?; var error: String? }
+        var components = URLComponents(url: baseURL.appendingPathComponent("/v0/management/auth-files"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "name", value: name)]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = json
+        authorize(&request)
+        let response: Response = try await send(request)
+        if response.status != "ok" { throw RelayError.serverMessage(response.error ?? "Relay did not save the account") }
     }
 
     // Relay's quota endpoint: OpenCode Go accounts report their rolling,

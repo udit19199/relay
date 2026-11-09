@@ -22,7 +22,8 @@ enum NotchLayout {
         return width + (button ? 28 + 6 : 0)
     }
 
-    static func surfaceRadius(height: CGFloat) -> CGFloat { min(28, height * 0.34) }
+    // Softer bottom corners on the short closed strip, matching the camera notch's curve.
+    static func surfaceRadius(height: CGFloat) -> CGFloat { min(28, height * 0.45) }
     static func shoulder(height: CGFloat) -> CGFloat { min(shoulder, height * 0.19) }
 
     static func capsuleGap(barHeight: CGFloat) -> CGFloat {
@@ -110,7 +111,7 @@ struct NotchGeometry: Equatable {
 
     var stripHeight: CGFloat { cameraHeight }
     // Usage must remain visible even when menu-bar clearance cannot be measured.
-    var restingWingWidth: CGFloat { 44 }
+    var restingWingWidth: CGFloat { 52 }
     var collapsed: CGSize {
         CGSize(width: min(screen.width - 24, cameraWidth + restingWingWidth * 2), height: stripHeight)
     }

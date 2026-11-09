@@ -11,7 +11,6 @@ open class AccountController {
     public private(set) var usageStates: [String: UsageViewState] = [:] { didSet { onChange?() } }
     public private(set) var isMutating = false { didSet { onChange?() } }
     public private(set) var isAddingAccount = false { didSet { onChange?() } }
-    public private(set) var addingProvider: RelayProvider? { didSet { onChange?() } }
     public private(set) var addingState: String? { didSet { onChange?() } }
     public var visibleError: OperationError? { didSet { onChange?() } }
 
@@ -23,8 +22,10 @@ open class AccountController {
     private var backgroundUsageRefreshInterval: Duration = .seconds(30)
     private var isBackgroundUsageRefreshEnabled = false
     // Quota-endpoint accounts call the provider's API, so poll them less often.
-    private var lastQuotaFetch: [String: Date] = [:]
+    private var lastQuotaSuccess: [String: Date] = [:]
     private let quotaFetchInterval: TimeInterval = 5 * 60
+    // A failed fetch younger than this keeps the last numbers without a warning.
+    private let quotaFailureGrace: TimeInterval = 15 * 60
 
     public init(client: RelayClient) {
         self.client = client
@@ -138,47 +139,85 @@ open class AccountController {
         let cached = usageStates[account.id]?.displayedUsage
         // A reset time that has passed means the stored numbers are stale: refetch now.
         let resetPassed = cached.map { $0.current(at: now) != $0 } ?? false
-        if let last = lastQuotaFetch[account.id], cached != nil, !resetPassed,
+        if let last = lastQuotaSuccess[account.id], cached != nil, !resetPassed,
            now.timeIntervalSince(last) < quotaFetchInterval
         {
             return
         }
-        lastQuotaFetch[account.id] = now
         do {
             usageStates[account.id] = .loaded(try await client.fetchQuota(authIndex: account.authIndex))
+            lastQuotaSuccess[account.id] = now
         } catch {
-            if let cached = usageStates[account.id]?.displayedUsage {
-                usageStates[account.id] = .stale(cached, error.localizedDescription)
-            } else {
+            // Failures retry on the next 30-second cycle. A brief upstream hiccup
+            // keeps the last numbers; only a lasting failure shows a warning.
+            guard let cached else {
                 usageStates[account.id] = .unavailable(error.localizedDescription)
+                return
+            }
+            let lastSuccess = lastQuotaSuccess[account.id] ?? .distantPast
+            if now.timeIntervalSince(lastSuccess) > quotaFailureGrace {
+                usageStates[account.id] = .stale(cached, error.localizedDescription)
             }
         }
     }
 
     // Opens Relay's OAuth URL in the browser; call openURL with the result,
     // then the poll below completes the flow and refreshes the list.
-    public func beginAddAccount(provider: RelayProvider) async -> URL? {
+    public func beginClaudeSignIn() async -> URL? {
         guard !isMutating, !isAddingAccount else { return nil }
         visibleError = nil
         isAddingAccount = true
-        addingProvider = provider
         do {
-            let (url, state) = try await client.startAddAccount(provider: provider)
+            let (url, state) = try await client.startClaudeSignIn()
             addingState = state
             addAccountTask = Task { [weak self] in
                 guard let self else { return }
                 await self.pollAddAccount(state: state)
                 self.isAddingAccount = false
-                self.addingProvider = nil
                 self.addingState = nil
                 self.addAccountTask = nil
             }
             return url
         } catch {
             isAddingAccount = false
-            addingProvider = nil
             showError(error)
             return nil
+        }
+    }
+
+    /// Saves an OpenCode Go key in Relay, then checks it by reading its usage.
+    /// A key OpenCode Go rejects is removed again. Returns an error message, or nil on success.
+    public func addOpenCodeGoAccount(apiKey: String) async -> String? {
+        let key = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty else { return "Paste an OpenCode Go API key." }
+        guard !isMutating else { return "Relay is busy. Try again." }
+        isMutating = true
+        defer { isMutating = false }
+        let name = "opencode-go-\(UUID().uuidString.prefix(8).lowercased()).json"
+        do {
+            let json = try JSONSerialization.data(withJSONObject: [
+                "type": RelayProvider.openCodeGo.rawValue, "label": "OpenCode Go", "api_key": key,
+            ])
+            try await client.uploadAuthFile(name: name, json: json)
+            // Relay loads new files on its own; wait briefly for the account to appear.
+            var added: RelayAccount?
+            for _ in 0 ..< 10 {
+                accounts = try await client.listAccounts()
+                if let match = accounts.first(where: { $0.name == name }) { added = match; break }
+                try await Task.sleep(for: .milliseconds(300))
+            }
+            guard let added else { return "Relay saved the key but did not load it. Check Relay's log." }
+            do {
+                usageStates[added.id] = .loaded(try await client.fetchQuota(authIndex: added.authIndex))
+                lastQuotaSuccess[added.id] = Date()
+                return nil
+            } catch {
+                try? await client.removeAccount(name: name)
+                accounts = (try? await client.listAccounts()) ?? accounts
+                return "OpenCode Go did not accept this key."
+            }
+        } catch {
+            return error.localizedDescription
         }
     }
 
@@ -187,7 +226,6 @@ open class AccountController {
         addAccountTask?.cancel()
         addAccountTask = nil
         isAddingAccount = false
-        addingProvider = nil
         addingState = nil
         if let state {
             Task { [client] in await client.cancelAddAccount(state: state) }

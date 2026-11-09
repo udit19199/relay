@@ -66,6 +66,8 @@ struct AccountRow: View {
     let account: RelayAccount
     let usageState: UsageViewState
     let now: Date
+    var onRemove: (() -> Void)?
+    @State private var isHovering = false
 
     private var title: String {
         guard let email = account.email, let at = email.firstIndex(of: "@") else { return account.providerName }
@@ -106,6 +108,27 @@ struct AccountRow: View {
                             .help(warning)
                             .accessibilityLabel(warning)
                     }
+                    Spacer(minLength: 2)
+                    if let onRemove {
+                        // Always laid out so the row never shifts; shown on hover.
+                        Menu {
+                            Button("Remove Account…", role: .destructive, action: onRemove)
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                                .frame(width: 20, height: 16)
+                                .contentShape(Rectangle())
+                        }
+                        .menuStyle(.button)
+                        .buttonStyle(.plain)
+                        .menuIndicator(.hidden)
+                        .fixedSize()
+                        .opacity(isHovering ? 1 : 0)
+                        .allowsHitTesting(isHovering)
+                        .help("Account actions")
+                        .accessibilityLabel("Account actions")
+                    }
                 }
                 // OpenCode Go also has a monthly limit; it sits under the name.
                 if let monthly {
@@ -129,7 +152,13 @@ struct AccountRow: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
+        .background(
+            Color.primary.opacity(isHovering ? 0.04 : 0),
+            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+        )
         .contentShape(Rectangle())
+        .onHover { isHovering = $0 }
+        .animation(.easeOut(duration: 0.12), value: isHovering)
     }
 
     @ViewBuilder
@@ -173,7 +202,6 @@ struct ProviderDot: View {
         switch provider {
         case "claude": Color(red: 0.85, green: 0.47, blue: 0.34)
         case "opencode-go": Color(red: 0.38, green: 0.62, blue: 0.98)
-        case "codex": Color(red: 0.55, green: 0.80, blue: 0.62)
         default: .secondary
         }
     }
