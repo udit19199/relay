@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-import SidekickCore
+import RelayCore
 import AppKit
 import SwiftUI
 
@@ -15,7 +15,10 @@ struct IslandAccountManager: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var removingAccount: RelayAccount?
     @State private var addAccountFlow: AddAccountFlow?
-    @State private var hoveredAccountID: String?
+    // Measured heights that size the expanded panel to its content.
+    @State private var bannerHeight: CGFloat = 0
+    @State private var listHeight: CGFloat = 0
+    @State private var footerHeight: CGFloat = 0
 
     private var isManagingAddAccount: Bool {
         model.isAddingAccount || addAccountFlow != nil
@@ -24,14 +27,17 @@ struct IslandAccountManager: View {
     var body: some View {
         VStack(spacing: 0) {
             if let error = model.visibleError {
-                InlineErrorBanner(
-                    title: error.title,
-                    message: error.message,
-                    dismissTitle: "OK",
-                    onDismiss: model.dismissError
-                )
-                Divider()
-                    .padding(.horizontal, 16)
+                VStack(spacing: 0) {
+                    InlineErrorBanner(
+                        title: error.title,
+                        message: error.message,
+                        dismissTitle: "OK",
+                        onDismiss: model.dismissError
+                    )
+                    Divider()
+                        .padding(.horizontal, 16)
+                }
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { bannerHeight = $0 }
             }
 
             Group {
@@ -42,6 +48,7 @@ struct IslandAccountManager: View {
                 } else {
                     ScrollView {
                         accountList
+                            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
                     }
                     .frame(maxHeight: .infinity, alignment: .top)
                     .scrollIndicators(.hidden)
@@ -51,6 +58,7 @@ struct IslandAccountManager: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: addAccountFlow != nil)
 
+            VStack(spacing: 0) {
             Divider()
                 .padding(.horizontal, 16)
 
@@ -67,7 +75,7 @@ struct IslandAccountManager: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Show compact usage")
                 .accessibilityValue(showsCompactUsage ? "On" : "Off")
-                .help(showsCompactUsage ? "Hide compact usage. Hover over the notch to reopen Sidekick." : "Show compact usage")
+                .help(showsCompactUsage ? "Hide compact usage. Hover over the notch to reopen Relay." : "Show compact usage")
                 FooterAction(
                     title: "Quit",
                     systemImage: "power",
@@ -78,12 +86,17 @@ struct IslandAccountManager: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
+            }
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { footerHeight = $0 }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onAppear { reportExpandedBodyLayout(animated: false) }
         .onChange(of: addAccountFlow) { _, _ in reportExpandedBodyLayout(animated: false) }
-        .onChange(of: model.accounts.count) { _, _ in
-            if addAccountFlow == nil { reportExpandedBodyLayout(animated: false) }
+        .onChange(of: model.visibleError == nil) { _, isHidden in
+            if isHidden { bannerHeight = 0 }
+        }
+        .onChange(of: [bannerHeight, listHeight, footerHeight]) { _, _ in
+            if addAccountFlow == nil { reportExpandedBodyLayout(animated: true) }
         }
         .onChange(of: model.isAddingAccount) { _, isAdding in
             if !isAdding, addAccountFlow != nil {
@@ -202,12 +215,14 @@ struct IslandAccountManager: View {
     }
 
     private func reportExpandedBodyLayout(animated: Bool) {
-        let layout: IslandExpandedBodyLayout =
-            if let addAccountFlow {
-                .addContent(layoutPhase(for: addAccountFlow))
-            } else {
-                .accounts(count: model.accounts.count)
-            }
+        let layout: IslandExpandedBodyLayout
+        if let addAccountFlow {
+            layout = .addContent(layoutPhase(for: addAccountFlow))
+        } else {
+            // Keep the last size until the list and footer have been measured.
+            guard listHeight > 0, footerHeight > 0 else { return }
+            layout = .accounts(contentHeight: bannerHeight + listHeight + footerHeight)
+        }
         if animated {
             onExpandedBodyLayoutChanged(layout)
         } else {
@@ -245,24 +260,15 @@ struct IslandAccountManager: View {
                                 )
                             }
                             if account.disabled || account.unavailable {
-                                Text(verbatim: account.statusMessage ?? "Unavailable")
+                                Text(verbatim: account.statusSummary)
                                     .font(.system(size: 10.5))
                                     .foregroundStyle(.orange)
+                                    .lineLimit(2)
+                                    .help(account.statusMessage ?? account.statusSummary)
                                     .padding(.horizontal, 12)
                                     .padding(.bottom, 8)
                             }
                         }
-                        .onHover { isHovering in
-                            if isHovering {
-                                hoveredAccountID = account.id
-                            } else if hoveredAccountID == account.id {
-                                hoveredAccountID = nil
-                            }
-                        }
-                        .background(
-                            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                .fill(account.id == hoveredAccountID ? Color.primary.opacity(0.055) : Color.clear)
-                        )
                         .contextMenu {
                             Button(role: .destructive) {
                                 removingAccount = account

@@ -27,14 +27,26 @@ open class AccountController {
         self.client = client
     }
 
-    // Lowest weekly remaining across accounts: the number that decides
-    // whether you can keep working. Nil when nothing usable is known.
+    // Relay fails over to whichever account still has room, so the compact
+    // strip shows the account with the most headroom. Both numbers come from
+    // that one account. Nil when no usage is known.
+    public var headlineAccount: RelayAccount? {
+        let known = accounts.filter { usageStates[$0.id]?.displayedUsage != nil }
+        let usable = known.filter { !$0.disabled && !$0.unavailable }
+        return (usable.isEmpty ? known : usable).max { headroom($0) < headroom($1) }
+    }
+
     public var headlineRemainingPercent: Int? {
-        usageStates.values.compactMap(\.displayedUsage?.remainingPercent).min()
+        headlineAccount.flatMap { usageStates[$0.id]?.displayedUsage?.remainingPercent }
     }
 
     public var headlineFiveHourPercent: Int? {
-        usageStates.values.compactMap(\.displayedUsage?.fiveHourRemainingPercent).min()
+        headlineAccount.flatMap { usageStates[$0.id]?.displayedUsage?.fiveHourRemainingPercent }
+    }
+
+    private func headroom(_ account: RelayAccount) -> Int {
+        guard let usage = usageStates[account.id]?.displayedUsage else { return -1 }
+        return min(usage.remainingPercent, usage.fiveHourRemainingPercent ?? 100)
     }
 
     public func start() async {

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-import SidekickCore
+import RelayCore
 import SwiftUI
 
 struct AccountRow: View {

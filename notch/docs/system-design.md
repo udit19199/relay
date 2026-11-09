@@ -1,10 +1,10 @@
 # System design
 
-Sidekick is a native macOS notch island that displays Relay's accounts
-and usage. Relay (Go, this repo root) holds every credential under
+The notch app is a native macOS island that displays Relay's accounts and
+usage. Relay (Go, this repo root) holds every credential under
 `~/.relay/auths/`, serves them concurrently with round-robin and
 429 failover, and exposes a management API on `127.0.0.1:8317` gated by
-a Bearer management key. Sidekick keeps no credentials and no usage
+a Bearer management key. Relay keeps no credentials and no usage
 cache; every number on screen comes from Relay.
 
 ## Operations

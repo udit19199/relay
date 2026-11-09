@@ -6,7 +6,7 @@
 import AppKit
 import Combine
 import QuartzCore
-import SidekickCore
+import RelayCore
 import SwiftUI
 
 @MainActor
@@ -18,7 +18,7 @@ final class DynamicIslandPanelController: NSObject, ObservableObject {
     private var pointerTimer: Timer?
     private var outsideClickMonitors: [Any] = []
     private let menuSpaceQueue = DispatchQueue(
-        label: "com.sidekick.notch.menu-space", qos: .utility)
+        label: "com.udit19199.relay.notch.menu-space", qos: .utility)
     private var menuSpaceTimer: Timer?
     private var menuSpaceGeneration = 0
     private var frameAnimationGeneration = 0
@@ -33,7 +33,7 @@ final class DynamicIslandPanelController: NSObject, ObservableObject {
     }
     @Published private(set) var hasActiveConfirmation = false
     @Published fileprivate private(set) var layout: NotchGeometry
-    @Published fileprivate var expandedBodyLayout = IslandExpandedBodyLayout.accounts(count: 0)
+    @Published fileprivate var expandedBodyLayout = IslandExpandedBodyLayout.accounts(contentHeight: 300)
     @Published private(set) var expandedPanelHeight: CGFloat = 0
 
     init(model: AppModel) {
@@ -260,21 +260,15 @@ final class DynamicIslandPanelController: NSObject, ObservableObject {
 
     fileprivate var panelSize: CGSize {
         let chromeHeight = layout.safeContentTop + NotchLayout.bottomInset
-        let footerHeight: CGFloat = 63
-        let errorAllowance: CGFloat = model.visibleError == nil ? 0 : 60
-        let bodyHeight = expandedBodyLayout.bodyHeight
-        let desiredHeight = chromeHeight + footerHeight + bodyHeight + errorAllowance
-        let maxHeight = layout.screen.height - 48
-        let cappedHeight: CGFloat
-        switch expandedBodyLayout {
-        case .accounts:
-            cappedHeight = min(desiredHeight, 440)
-        case .addContent:
-            cappedHeight = desiredHeight
-        }
+        // The accounts body is measured and already includes the error banner.
+        let errorAllowance: CGFloat =
+            if case .addContent = expandedBodyLayout, model.visibleError != nil { 60 } else { 0 }
+        let desiredHeight = chromeHeight + expandedBodyLayout.bodyHeight + errorAllowance
+        // Past this the account list scrolls instead of growing.
+        let maxHeight = min(layout.screen.height - 48, 640)
         return CGSize(
             width: expandedBodyLayout.panelWidth(expandedWidth: layout.expandedWidth),
-            height: min(cappedHeight, maxHeight))
+            height: min(desiredHeight, maxHeight))
     }
     fileprivate var visibleHeight: CGFloat { panel.frame.height }
     fileprivate var visibleSurfaceWidth: CGFloat { panel.frame.width }
@@ -403,11 +397,9 @@ private struct DynamicIslandPanel: View {
     @State private var isHovered = false
 
     private var headlineAccountName: String {
-        switch model.accounts.count {
-        case 0: "Add an account"
-        case 1: model.accounts[0].email ?? model.accounts[0].displayName
-        default: "\(model.accounts.count) accounts"
-        }
+        if model.accounts.isEmpty { return "Add an account" }
+        guard let account = model.headlineAccount else { return "\(model.accounts.count) accounts" }
+        return account.email ?? account.displayName
     }
 
     var body: some View {
@@ -437,7 +429,7 @@ private struct DynamicIslandPanel: View {
                         Color.clear.contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Open Sidekick")
+                    .accessibilityLabel("Open Relay")
                 }
             }
             .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
@@ -491,7 +483,7 @@ private struct DynamicIslandPanel: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(controller.isExpanded ? "Collapse Sidekick" : "Open Sidekick")
+        .accessibilityLabel(controller.isExpanded ? "Collapse Relay" : "Open Relay")
         .accessibilityValue(
             "\(headlineAccountName), weekly usage \(model.headlineRemainingPercent.map { "\($0)" } ?? "unavailable") percent remaining"
         )

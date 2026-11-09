@@ -1,6 +1,6 @@
 # Product decisions
 
-Sidekick is Relay's face. Every control must directly support one of
+The notch UI is Relay's face. Every control must directly support one of
 three jobs:
 
 1. see per-account 5-hour and weekly usage;
@@ -14,7 +14,7 @@ whether work continues — plus the lowest 5-hour value when Relay
 reports one.
 
 Adding an account opens Relay's OAuth URL in the default browser.
-Sidekick polls Relay until the credential lands, then refreshes the
+Relay polls Relay until the credential lands, then refreshes the
 list. There is no paste-a-cookie step and no local sign-in state.
 
 Removing deletes the credential from Relay (`auth-files?name=` is

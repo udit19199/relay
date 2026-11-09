@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
-import SidekickCore
+import RelayCore
 import AppKit
 
 @main
 @MainActor
-enum SidekickApp {
+enum RelayApp {
     static func main() {
         let application = NSApplication.shared
-        let delegate = SidekickAppDelegate()
+        let delegate = RelayAppDelegate()
         application.delegate = delegate
         application.setActivationPolicy(.accessory)
         application.run()
@@ -15,7 +15,7 @@ enum SidekickApp {
 }
 
 @MainActor
-final class SidekickAppDelegate: NSObject, NSApplicationDelegate {
+final class RelayAppDelegate: NSObject, NSApplicationDelegate {
     private var model: AppModel?
     private var islandPanelController: DynamicIslandPanelController?
 

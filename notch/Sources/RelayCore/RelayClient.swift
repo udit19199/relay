@@ -171,7 +171,7 @@ public enum RelayError: LocalizedError, Equatable, Sendable {
         case .unauthorized:
             "Relay rejected the management key. Check ~/.relay/management.key matches the secret in ~/.relay/config.yaml."
         case .malformedResponse:
-            "Relay returned a response Sidekick did not understand."
+            "Relay returned a response the app did not understand."
         case let .requestFailed(code):
             "Relay request failed (HTTP \(code))."
         case let .serverMessage(message):

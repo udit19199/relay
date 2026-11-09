@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-import SidekickCore
+import RelayCore
 import Combine
 import Foundation
 

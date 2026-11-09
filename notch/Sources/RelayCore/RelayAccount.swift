@@ -121,6 +121,28 @@ struct LosslessStringValue: Decodable {
     }
 }
 
+// MARK: - Status text
+
+extension RelayAccount {
+    // Relay passes the upstream error body through as the status message,
+    // often raw JSON. Turn it into one short line for the island.
+    public var statusSummary: String {
+        if disabled { return "Disabled in Relay" }
+        guard let message = statusMessage?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !message.isEmpty else { return "Unavailable" }
+        struct Body: Decodable {
+            struct Detail: Decodable { var type: String?; var message: String? }
+            var error: Detail?
+        }
+        if let data = message.data(using: .utf8),
+           let detail = (try? JSONDecoder().decode(Body.self, from: data))?.error {
+            if detail.type == "rate_limit_error" { return "Rate limited until the limit resets" }
+            if let text = detail.message, !text.isEmpty { return text }
+        }
+        return message
+    }
+}
+
 // MARK: - Usage from entry signals
 
 extension RelayAccount {

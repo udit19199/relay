@@ -4,19 +4,18 @@
 import PackageDescription
 
 let package = Package(
-    name: "Sidekick",
+    name: "Relay",
     platforms: [
         .macOS(.v14),
     ],
     products: [
-        .executable(name: "Sidekick", targets: ["Sidekick"]),
+        .executable(name: "Relay", targets: ["Relay"]),
     ],
     targets: [
-        .target(name: "SidekickCore"),
+        .target(name: "RelayCore"),
         .executableTarget(
-            name: "Sidekick",
-            dependencies: ["SidekickCore"],
-            resources: [.process("Resources")],
+            name: "Relay",
+            dependencies: ["RelayCore"],
             linkerSettings: [
                 .linkedFramework("AppKit"),
             ]
