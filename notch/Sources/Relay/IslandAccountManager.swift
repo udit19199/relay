@@ -253,27 +253,48 @@ struct IslandAccountManager: View {
                     VStack(spacing: 2) {
                         UsageTableHeader()
                             .padding(.bottom, 2)
-                        if model.accounts.count > 1 {
+                        if claudeAccounts.count > 1 {
                             PoolTableRow(pool: model.pooledUsage(at: context.date), now: context.date)
                                 .padding(.bottom, 2)
                         }
-                        ForEach(model.accounts) { account in
-                            AccountRow(
-                                account: account,
-                                usageState: model.usageStates[account.id] ?? .idle,
-                                now: context.date
-                            )
-                            .contextMenu {
-                                Button(role: .destructive) {
-                                    removingAccount = account
-                                } label: {
-                                    Text("Remove \(account.displayName)?")
-                                }
+                        ForEach(claudeAccounts) { account in
+                            accountRow(account, now: context.date)
+                        }
+                        // Other providers are tracked on their own, below the Claude group.
+                        if !otherAccounts.isEmpty {
+                            Divider()
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                            ForEach(otherAccounts) { account in
+                                accountRow(account, now: context.date)
                             }
                         }
                     }
                 }
                 .padding(.vertical, 8)
+            }
+        }
+    }
+
+    private var claudeAccounts: [RelayAccount] {
+        model.accounts.filter { $0.provider == RelayProvider.claude.rawValue }
+    }
+
+    private var otherAccounts: [RelayAccount] {
+        model.accounts.filter { $0.provider != RelayProvider.claude.rawValue }
+    }
+
+    private func accountRow(_ account: RelayAccount, now: Date) -> some View {
+        AccountRow(
+            account: account,
+            usageState: model.usageStates[account.id] ?? .idle,
+            now: now
+        )
+        .contextMenu {
+            Button(role: .destructive) {
+                removingAccount = account
+            } label: {
+                Text("Remove \(account.displayName)?")
             }
         }
     }

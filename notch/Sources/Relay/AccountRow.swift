@@ -54,8 +54,8 @@ struct PoolTableRow: View {
         if let next = window.nextResetAt, window.nextResetGainPercent > 0 {
             return UsageCell(
                 percent: window.remainingPercent,
-                detail: "+\(window.nextResetGainPercent)% \(ResetCountdown.short(until: next, now: now))",
-                help: "+\(window.nextResetGainPercent)% comes back \(ResetCountdown.timestampText(until: next, includesDate: includesDate))"
+                detail: ResetCountdown.short(until: next, now: now),
+                help: "Next account refills \(ResetCountdown.timestampText(until: next, includesDate: includesDate))"
             )
         }
         return UsageCell(percent: window.remainingPercent, detail: nil, help: "No refill pending")
@@ -92,24 +92,34 @@ struct AccountRow: View {
 
     var body: some View {
         HStack(spacing: UsageTable.spacing) {
-            HStack(spacing: 5) {
-                ProviderDot(provider: account.provider)
-                Text(verbatim: title)
-                    .font(.system(size: 12.5, weight: .medium))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                if let monthly {
-                    Text("\(monthly.percent)% mo")
-                        .font(.system(size: 10.5, weight: .medium).monospacedDigit())
-                        .foregroundStyle(UsageTint.color(for: monthly.percent))
-                        .help("Monthly: \(monthly.percent)% left · \(ResetCountdown.absoluteText(until: monthly.resetsAt, includesDate: true))")
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 5) {
+                    ProviderDot(provider: account.provider)
+                    Text(verbatim: title)
+                        .font(.system(size: 12.5, weight: .medium))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    if let warning {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.orange)
+                            .help(warning)
+                            .accessibilityLabel(warning)
+                    }
                 }
-                if let warning {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.orange)
-                        .help(warning)
-                        .accessibilityLabel(warning)
+                // OpenCode Go also has a monthly limit; it sits under the name.
+                if let monthly {
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        Text("Monthly")
+                            .foregroundStyle(.secondary)
+                        Text("\(monthly.percent)%")
+                            .foregroundStyle(UsageTint.color(for: monthly.percent))
+                        Text(ResetCountdown.short(until: monthly.resetsAt, now: now))
+                            .foregroundStyle(.secondary)
+                    }
+                    .font(.system(size: 10.5, weight: .medium).monospacedDigit())
+                    .padding(.leading, 12)
+                    .help("Monthly: \(monthly.percent)% left · \(ResetCountdown.absoluteText(until: monthly.resetsAt, includesDate: true))")
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

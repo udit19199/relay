@@ -423,9 +423,17 @@ private struct DynamicIslandPanel: View {
                     .padding(.horizontal, NotchLayout.horizontalInset)
                     .padding(.top, controller.layout.safeContentTop)
                     .padding(.bottom, NotchLayout.bottomInset)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    // Lay out at the final size while the window grows or shrinks,
+                    // so the island shape reveals the content instead of squeezing it.
+                    .frame(
+                        width: controller.panelSize.width,
+                        height: controller.panelSize.height,
+                        alignment: .top
+                    )
+                    .transition(.opacity)
                 } else if controller.showsCompactUsage {
                     compactHeader
+                        .transition(.opacity)
                 } else {
                     Button(action: controller.toggleExpansion) {
                         Color.clear.contentShape(Rectangle())
@@ -435,6 +443,10 @@ private struct DynamicIslandPanel: View {
                 }
             }
             .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
+            .animation(
+                IslandMotion.prefersReducedMotion ? nil : .easeInOut(duration: 0.18),
+                value: controller.isExpanded
+            )
             .background {
                 if controller.isExpanded || controller.showsCompactUsage {
                     islandShape.fill(Color.black)
