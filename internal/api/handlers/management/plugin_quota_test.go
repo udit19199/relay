@@ -105,7 +105,7 @@ func TestGetQuotaProviders_Endpoint(t *testing.T) {
 	host.RegisterPluginForTest("opencode-plugin", pluginapi.Plugin{
 		Metadata: pluginapi.Metadata{Name: "OpenCode Plugin"},
 		Capabilities: pluginapi.Capabilities{
-			QuotaProvider: &mockQuotaProvider{identifier: "opencode-go"},
+			QuotaProvider: &mockQuotaProvider{identifier: "sample-quota"},
 		},
 	})
 	h.SetPluginHost(host)
@@ -133,7 +133,7 @@ func TestFetchCredentialQuota_Endpoint(t *testing.T) {
 	auth := &coreauth.Auth{
 		ID:       "opencode-auth-1",
 		FileName: "opencode-key.json",
-		Provider: "opencode-go",
+		Provider: "sample-quota",
 		Metadata: map[string]any{"token": "test-token"},
 	}
 	authIndex := auth.EnsureIndex()
@@ -145,7 +145,7 @@ func TestFetchCredentialQuota_Endpoint(t *testing.T) {
 	host.RegisterPluginForTest("opencode-plugin", pluginapi.Plugin{
 		Metadata: pluginapi.Metadata{Name: "OpenCode Plugin"},
 		Capabilities: pluginapi.Capabilities{
-			QuotaProvider: &mockQuotaProvider{identifier: "opencode-go"},
+			QuotaProvider: &mockQuotaProvider{identifier: "sample-quota"},
 		},
 	})
 
@@ -206,7 +206,7 @@ func TestResetCredentialQuota_Endpoint(t *testing.T) {
 	auth := &coreauth.Auth{
 		ID:             "opencode-auth-2",
 		FileName:       "opencode-key-2.json",
-		Provider:       "opencode-go",
+		Provider:       "sample-quota",
 		Status:         coreauth.StatusError,
 		StatusMessage:  "exhausted",
 		Unavailable:    true,
@@ -222,7 +222,7 @@ func TestResetCredentialQuota_Endpoint(t *testing.T) {
 	host.RegisterPluginForTest("opencode-plugin", pluginapi.Plugin{
 		Metadata: pluginapi.Metadata{Name: "OpenCode Plugin"},
 		Capabilities: pluginapi.Capabilities{
-			QuotaProvider: &mockQuotaProvider{identifier: "opencode-go"},
+			QuotaProvider: &mockQuotaProvider{identifier: "sample-quota"},
 		},
 	})
 
@@ -313,7 +313,7 @@ func TestAuthFilesList_IncludesQuotaSupport(t *testing.T) {
 	authWithPlugin := &coreauth.Auth{
 		ID:         "opencode-auth-list",
 		FileName:   "opencode.json",
-		Provider:   "opencode-go",
+		Provider:   "sample-quota",
 		Attributes: map[string]string{"runtime_only": "true"},
 	}
 	authWithProbe := &coreauth.Auth{
@@ -341,7 +341,7 @@ func TestAuthFilesList_IncludesQuotaSupport(t *testing.T) {
 	host.RegisterPluginForTest("opencode-plugin", pluginapi.Plugin{
 		Metadata: pluginapi.Metadata{Name: "OpenCode Plugin"},
 		Capabilities: pluginapi.Capabilities{
-			QuotaProvider: &mockQuotaProvider{identifier: "opencode-go"},
+			QuotaProvider: &mockQuotaProvider{identifier: "sample-quota"},
 		},
 	})
 
@@ -373,8 +373,8 @@ func TestAuthFilesList_IncludesQuotaSupport(t *testing.T) {
 			if supports, ok := f["supports_quota"].(bool); !ok || !supports {
 				t.Fatalf("expected opencode auth to have supports_quota: true, got %#v", f["supports_quota"])
 			}
-			if qp, ok := f["quota_provider"].(string); !ok || qp != "opencode-go" {
-				t.Fatalf("expected quota_provider: opencode-go, got %#v", f["quota_provider"])
+			if qp, ok := f["quota_provider"].(string); !ok || qp != "sample-quota" {
+				t.Fatalf("expected quota_provider: sample-quota, got %#v", f["quota_provider"])
 			}
 			if _, ok := f["quota_plugin_id"]; ok {
 				t.Fatal("v0 auth files should not expose quota_plugin_id")

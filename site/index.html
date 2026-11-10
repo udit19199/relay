@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relay</title>
+<meta name="description" content="Use the AI subscriptions you already pay for from any tool. Relay runs on your Mac, holds every account, and moves to the next one when a limit hits.">
+<meta property="og:title" content="Relay">
+<meta property="og:description" content="Use the AI subscriptions you already pay for from any tool, with your limits in the Mac notch.">
+<meta name="twitter:card" content="summary">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0b0b0c;
+    --surface: #141416;
+    --surface-2: #1b1b1e;
+    --line: #26262a;
+    --text: #ededee;
+    --muted: #9a9aa0;
+    --faint: #6b6b72;
+    --claude: #e8875b;
+    --opencode: #6aa6ff;
+    --ok: #5fd08a;
+    --radius: 14px;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #fafaf9;
+      --surface: #ffffff;
+      --surface-2: #f2f2f0;
+      --line: #e4e4e0;
+      --text: #161617;
+      --muted: #5f5f66;
+      --faint: #8a8a90;
+      --claude: #c8602f;
+      --opencode: #2f6fd6;
+      --ok: #23935a;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.6 Inter, system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  code, pre { font-family: var(--mono); font-size: 14px; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 24px; }
+
+  nav { display: flex; align-items: center; justify-content: space-between; padding: 20px 0; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 17px; text-decoration: none; }
+  .brand-mark { width: 22px; height: 22px; border-radius: 6px; background: var(--text); position: relative; }
+  .brand-mark::after { content: ""; position: absolute; left: 5px; right: 5px; top: 0; height: 7px; border-radius: 0 0 5px 5px; background: var(--bg); }
+  .nav-links { display: flex; gap: 22px; font-size: 14px; color: var(--muted); }
+  .nav-links a { text-decoration: none; }
+  .nav-links a:hover { color: var(--text); }
+
+  .hero { padding: 72px 0 40px; text-align: center; }
+  h1 { font-size: clamp(36px, 6vw, 60px); line-height: 1.05; letter-spacing: -0.03em; margin: 0 auto 20px; max-width: 760px; font-weight: 700; text-wrap: balance; }
+  .lede { color: var(--muted); font-size: 19px; max-width: 600px; margin: 0 auto 32px; }
+  .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 11px 18px; border-radius: 10px; font-weight: 500; font-size: 15px; text-decoration: none; border: 1px solid var(--line); }
+  .btn-primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+  .btn:hover { opacity: .88; }
+
+  /* Notch island mock */
+  .stage { margin: 56px auto 0; max-width: 640px; position: relative; }
+  .screen { background: linear-gradient(180deg, var(--surface-2), var(--surface)); border: 1px solid var(--line); border-radius: 18px; padding: 0 0 28px; overflow: hidden; }
+  .menubar { height: 30px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; padding: 0 14px; font-size: 12px; color: var(--faint); }
+  .island { width: min(400px, calc(100% - 32px)); margin: -30px auto 0; background: #000; color: #f2f2f2; border-radius: 0 0 26px 26px; padding: 40px 20px 18px; position: relative; box-shadow: 0 20px 50px rgba(0,0,0,.35); }
+  .island h3 { margin: 0 0 4px; font-size: 12px; font-weight: 500; color: #8d8d93; letter-spacing: .04em; text-transform: uppercase; }
+  .pool { display: flex; gap: 20px; margin: 0 0 14px; }
+  .pool div { font-size: 13px; color: #9a9aa0; }
+  .pool b { display: block; font-size: 22px; color: #fff; font-weight: 600; }
+  .row { display: grid; grid-template-columns: 1fr 58px 58px; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid #1f1f22; font-size: 13px; }
+  .row .name { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .row .name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  .bar { height: 5px; border-radius: 3px; background: #26262a; overflow: hidden; }
+  .bar i { display: block; height: 100%; border-radius: 3px; }
+  .head { font-size: 11px; color: #6b6b72; border-top: 0; padding-bottom: 0; }
+  .limited { color: #8d8d93; font-size: 12px; }
+  .caption { text-align: center; color: var(--faint); font-size: 13px; margin-top: 14px; }
+
+  section { padding: 72px 0 0; }
+  h2 { font-size: 28px; letter-spacing: -0.02em; margin: 0 0 10px; }
+  .sub { color: var(--muted); margin: 0 0 32px; max-width: 620px; }
+
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; counter-reset: s; }
+  .step { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; }
+  .step::before { counter-increment: s; content: counter(s); display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--surface-2); border: 1px solid var(--line); font-size: 13px; font-weight: 600; margin-bottom: 14px; }
+  .step h4 { margin: 0 0 6px; font-size: 16px; }
+  .step p { margin: 0; color: var(--muted); font-size: 15px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  th { color: var(--faint); font-weight: 500; font-size: 13px; }
+  .table-box { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow-x: auto; }
+  .yes { color: var(--ok); }
+  .no { color: var(--faint); }
+
+  .formats { display: flex; flex-wrap: wrap; gap: 10px; }
+  .chip { padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-size: 14px; }
+
+  pre { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; overflow-x: auto; margin: 0 0 14px; line-height: 1.55; }
+  .c { color: var(--faint); }
+
+  .credits { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .credit { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
+  .credit a { font-weight: 600; text-decoration: none; }
+  .credit a:hover { text-decoration: underline; }
+  .credit p { margin: 6px 0 0; color: var(--muted); font-size: 14px; }
+
+  .note { margin-top: 18px; color: var(--muted); font-size: 15px; }
+  .warn { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--claude); border-radius: 10px; padding: 16px 18px; color: var(--muted); font-size: 15px; }
+
+  footer { padding: 72px 0 48px; color: var(--faint); font-size: 14px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+  @media (max-width: 760px) {
+    .wrap { padding: 0 16px; }
+    .steps, .credits { grid-template-columns: 1fr; }
+    .nav-links a.hide-sm { display: none; }
+    .hero { padding-top: 40px; }
+    .lede { font-size: 17px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <a class="brand" href="#"><span class="brand-mark" aria-hidden="true"></span>Relay</a>
+    <div class="nav-links">
+      <a class="hide-sm" href="#how">How it works</a>
+      <a class="hide-sm" href="#install">Install</a>
+      <a class="hide-sm" href="#credits">Credits</a>
+      <a href="https://github.com/udit19199/relay">GitHub</a>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <h1>Use the AI plans you already pay for, from any tool</h1>
+    <p class="lede">Relay runs on your Mac, holds every Claude, Codex, and OpenCode Go account you sign in with, and moves to the next account when one hits its limit. Your limits live in the notch.</p>
+    <div class="cta">
+      <a class="btn btn-primary" href="https://github.com/udit19199/relay">View on GitHub</a>
+      <a class="btn" href="#install">Install</a>
+    </div>
+
+    <div class="stage" aria-label="Illustration of the Relay notch app">
+      <div class="screen">
+        <div class="menubar"><span>Finder</span><span>9:41</span></div>
+        <div class="island">
+          <h3>Claude, all accounts</h3>
+          <div class="pool">
+            <div><b>64%</b>5-hour left</div>
+            <div><b>71%</b>weekly left</div>
+          </div>
+          <div class="row head"><span>Account</span><span>5h</span><span>Week</span></div>
+          <div class="row">
+            <div class="name"><i class="dot" style="background:var(--claude)"></i><span>work</span></div>
+            <div class="bar"><i style="width:82%;background:var(--claude)"></i></div>
+            <div class="bar"><i style="width:77%;background:var(--claude)"></i></div>
+          </div>
+          <div class="row">
+            <div class="name"><i class="dot" style="background:var(--claude)"></i><span>personal</span></div>
+            <div class="bar"><i style="width:48%;background:var(--claude)"></i></div>
+            <div class="bar"><i style="width:65%;background:var(--claude)"></i></div>
+          </div>
+          <div class="row">
+            <div class="name"><i class="dot" style="background:var(--claude)"></i><span>side</span></div>
+            <span class="limited" style="grid-column: span 2">Rate limited until the limit resets</span>
+          </div>
+          <div class="row">
+            <div class="name"><i class="dot" style="background:var(--opencode)"></i><span>OpenCode Go</span></div>
+            <div class="bar"><i style="width:89%;background:var(--opencode)"></i></div>
+            <div class="bar"><i style="width:91%;background:var(--opencode)"></i></div>
+          </div>
+        </div>
+      </div>
+      <p class="caption">Illustration. Numbers are made up.</p>
+    </div>
+  </header>
+
+  <section id="how">
+    <h2>How it works</h2>
+    <p class="sub">Relay is a small server on <code>127.0.0.1:8317</code>. Your tools talk to it instead of to Anthropic or OpenAI.</p>
+    <div class="steps">
+      <div class="step"><h4>Your tool sends a request</h4><p>Claude Code, OpenCode, or anything that speaks the OpenAI, Anthropic, or Gemini API.</p></div>
+      <div class="step"><h4>Relay picks an account</h4><p>It takes the next healthy account for that model and translates the request into that provider's format.</p></div>
+      <div class="step"><h4>A limit hits, it moves on</h4><p>On a rate limit, Relay rests that account and retries on another one. Your session keeps going.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Speaks every common format</h2>
+    <p class="sub">Streaming and tool calls work in all of them. A Gemini-format request can go to a Claude account, and an Anthropic-format request can go to OpenCode Go.</p>
+    <div class="formats">
+      <span class="chip">OpenAI chat completions</span>
+      <span class="chip">OpenAI Responses</span>
+      <span class="chip">Anthropic messages</span>
+      <span class="chip">Gemini generateContent</span>
+      <span class="chip">Thinking level in the model name</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>Accounts</h2>
+    <p class="sub">Claude and OpenCode Go are what I use every day. The rest come from CLIProxyAPI and have not been tested in Relay yet.</p>
+    <div class="table-box">
+      <table>
+        <thead><tr><th>Account</th><th>Sign in</th><th>Tested in Relay</th></tr></thead>
+        <tbody>
+          <tr><td>Claude Pro and Max</td><td>Browser, or Add Account in the notch</td><td class="yes">Yes</td></tr>
+          <tr><td>OpenCode Go</td><td>API key</td><td class="yes">Yes</td></tr>
+          <tr><td>Codex (ChatGPT plans)</td><td>Browser or device code</td><td class="no">Not yet</td></tr>
+          <tr><td>Kimi, xAI, Devin, Meta</td><td>Browser</td><td class="no">Not yet</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="install">
+    <h2>Install</h2>
+    <p class="sub">macOS, Go 1.26 or newer, and Xcode command line tools. No prebuilt downloads yet.</p>
+<pre><span class="c"># build the proxy</span>
+git clone https://github.com/udit19199/relay.git && cd relay
+go build -o ~/.local/bin/relay ./cmd/server
+
+<span class="c"># sign in, then start it</span>
+relay --config ~/.relay/config.yaml --claude-login
+relay --config ~/.relay/config.yaml
+
+<span class="c"># build the notch app</span>
+cd notch && ./scripts/package-local-app.sh</pre>
+<pre><span class="c"># point Claude Code at it</span>
+export ANTHROPIC_BASE_URL=http://127.0.0.1:8317
+export ANTHROPIC_AUTH_TOKEN=your-client-key</pre>
+    <p class="note">The <a href="https://github.com/udit19199/relay#install">README</a> has the full config and the management key step.</p>
+  </section>
+
+  <section>
+    <h2>Before you use it</h2>
+    <div class="warn">Relay signs in with your own accounts, the same way the official command line tools do. Providers may not allow this in their terms and can limit or close accounts that do it. Use accounts you are willing to risk.</div>
+  </section>
+
+  <section id="credits">
+    <h2>Credits</h2>
+    <p class="sub">Most of Relay is other people's work. I added OpenCode Go support, rebuilt the notch app around the proxy, and turned off the Google providers.</p>
+    <div class="credits">
+      <div class="credit"><a href="https://github.com/router-for-me/CLIProxyAPI">CLIProxyAPI</a><p>By Luis Pater, Router-For.ME, and contributors. The proxy, translation, sign-ins, rotation, and retries.</p></div>
+      <div class="credit"><a href="https://github.com/liuzhao1225/codex-account-switcher">Codex Account Switcher</a><p>By liuzhao1225. The Mac app the notch app started from.</p></div>
+      <div class="credit"><a href="https://github.com/vorssaint/vorssaint-utils">vorssaint-utils</a><p>By Vorssaint. The notch shape and island placement code.</p></div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Relay is a personal project. Proxy MIT, notch app GPL-3.0-or-later.</span>
+    <a href="https://github.com/udit19199/relay">github.com/udit19199/relay</a>
+  </footer>
+</div>
+</body>
+</html>

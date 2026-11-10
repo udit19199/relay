@@ -4,6 +4,7 @@ Go 1.26+ proxy server providing OpenAI/Gemini/Claude/Codex compatible APIs with 
 
 ## Repository
 - GitHub: https://github.com/udit19199/relay (personal fork of https://github.com/router-for-me/CLIProxyAPI)
+- Landing page: `site/index.html` (single static file), deployed to GitHub Pages by `.github/workflows/pages.yml` on pushes that touch `site/`.
 - One repo for both parts: the Go proxy (everything outside `notch/`) and the Swift notch app (`notch/`). The former `sidekick` repo's history is merged into `notch/`.
 
 ## Notch app (`notch/`)
