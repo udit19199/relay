@@ -264,7 +264,7 @@ func (s *Service) registerExecutorForAuth(a *coreauth.Auth, forceReplace bool) {
 	// Fork: drop Google families (Gemini/Vertex/AI Studio) and Antigravity.
 	// Upstream code stays untouched below; this single guard survives rebases.
 	if isForkDisabledAuth(a) {
-		s.coreManager.UnregisterExecutor(strings.ToLower(strings.TrimSpace(a.Provider)))
+		s.dropForkDisabledAuth(a)
 		return
 	}
 	s.cfgMu.RLock()

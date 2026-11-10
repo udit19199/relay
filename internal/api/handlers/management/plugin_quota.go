@@ -2,6 +2,7 @@ package management
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -78,6 +79,10 @@ func (h *Handler) FetchCredentialQuota(c *gin.Context) {
 
 	if isOpenCodeGoAuth(auth) {
 		quotaResp, errFetch := h.fetchOpenCodeGoQuota(c.Request.Context(), auth)
+		if errors.Is(errFetch, errOpenCodeGoKeyRejected) {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{"error": errFetch.Error()})
+			return
+		}
 		if errFetch != nil {
 			log.WithError(errFetch).Warnf("failed to fetch quota for credential %s", auth.Index)
 			c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("failed to fetch quota: %v", errFetch)})

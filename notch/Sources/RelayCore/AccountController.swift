@@ -211,10 +211,14 @@ open class AccountController {
                 usageStates[added.id] = .loaded(try await client.fetchQuota(authIndex: added.authIndex))
                 lastQuotaSuccess[added.id] = Date()
                 return nil
-            } catch {
+            } catch RelayError.keyRejected {
                 try? await client.removeAccount(name: name)
                 accounts = (try? await client.listAccounts()) ?? accounts
                 return "OpenCode Go did not accept this key."
+            } catch {
+                // Network or upstream trouble: keep the key; the next refresh retries.
+                usageStates[added.id] = .unavailable(error.localizedDescription)
+                return nil
             }
         } catch {
             return error.localizedDescription

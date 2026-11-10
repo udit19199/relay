@@ -21,3 +21,10 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+This MIT license covers everything in this repository except the `notch/`
+directory. The macOS app in `notch/` includes code from vorssaint-utils and is
+distributed as a whole under GPL-3.0-or-later; see `notch/LICENSE` and
+`notch/LICENSE-GPL-3.0-or-later`.

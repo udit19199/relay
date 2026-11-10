@@ -22,9 +22,9 @@ models:
 
 # Listener, TLS, network discovery, and server operation.
 server:
-  # Server host/interface to bind to. Default is empty ("") to bind all interfaces (IPv4 + IPv6).
-  # Use "127.0.0.1" or "localhost" to restrict access to local machine only.
-  host: ""
+  # Server host/interface to bind to. Relay listens on this Mac only.
+  # Set "" to bind all interfaces (IPv4 + IPv6) and expose the proxy to your network.
+  host: "127.0.0.1"
 
   # Server port
   port: 8317
@@ -1000,7 +1000,7 @@ upstream:
 # OAuth/file-backed credentials. Token material stays in the credential store.
 oauth:
   # Authentication directory (supports ~ for home directory)
-  auth-dir: "~/.cli-proxy-api"
+  auth-dir: "~/.relay/auths"
 
   # Core auth auto-refresh and manual refresh-all worker pool size (OAuth/file-based auth token refresh).
   # When > 0, overrides the default worker count (16).

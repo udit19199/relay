@@ -3,6 +3,7 @@ package management
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -22,6 +23,11 @@ const (
 	// Management quota calls are bounded like the management APICall.
 	openCodeGoQuotaTimeout = 20 * time.Second
 )
+
+// errOpenCodeGoKeyRejected means OpenCode answered 401/403 for the key. The
+// quota endpoint reports it as 422 so the notch app can tell a bad key apart
+// from a network or upstream failure.
+var errOpenCodeGoKeyRejected = errors.New("OpenCode Go rejected this key")
 
 func isOpenCodeGoAuth(auth *coreauth.Auth) bool {
 	return auth != nil && strings.EqualFold(strings.TrimSpace(auth.Provider), openCodeGoProvider)
@@ -60,6 +66,9 @@ func (h *Handler) fetchOpenCodeGoQuota(ctx context.Context, auth *coreauth.Auth)
 	body, errRead := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if errRead != nil {
 		return pluginapi.QuotaFetchResponse{}, fmt.Errorf("read usage response: %w", errRead)
+	}
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		return pluginapi.QuotaFetchResponse{}, errOpenCodeGoKeyRejected
 	}
 	if resp.StatusCode != http.StatusOK {
 		return pluginapi.QuotaFetchResponse{}, fmt.Errorf("usage request returned status %d", resp.StatusCode)

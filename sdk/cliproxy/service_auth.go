@@ -418,7 +418,7 @@ func (s *Service) prepareCoreAuthForModelRegistration(ctx context.Context, auth 
 	// Fork: never admit Google families (Gemini/Vertex/AI Studio) or Antigravity
 	// into the auth store. Cleans up stale entries so models do not linger.
 	if isForkDisabledAuth(auth) {
-		s.coreManager.UnregisterExecutor(strings.ToLower(strings.TrimSpace(auth.Provider)))
+		s.dropForkDisabledAuth(auth)
 		GlobalModelRegistry().UnregisterClient(auth.ID)
 		return nil
 	}

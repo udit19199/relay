@@ -183,6 +183,8 @@ public struct RelayClient: Sendable {
             }
         case 401, 403:
             throw RelayError.unauthorized
+        case 422:
+            throw RelayError.keyRejected
         default:
             if let message = String(data: data, encoding: .utf8),
                !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -207,6 +209,7 @@ public enum RelayError: LocalizedError, Equatable, Sendable {
     case malformedResponse
     case requestFailed(Int)
     case serverMessage(String)
+    case keyRejected
 
     public var errorDescription: String? {
         switch self {
@@ -222,6 +225,8 @@ public enum RelayError: LocalizedError, Equatable, Sendable {
             "Relay request failed (HTTP \(code))."
         case let .serverMessage(message):
             message
+        case .keyRejected:
+            "The provider rejected this key."
         }
     }
 }
