@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
@@ -203,4 +204,36 @@ func (s *Service) startOpenCodeGoModelRefresh(ctx context.Context) {
 			}
 		}
 	}()
+}
+
+// withOpenCodeGoAliases adds unprefixed copies of models that an alias in the
+// auth file (model_aliases) or config (oauth-model-alias) names. Catalog models
+// stay prefixed, but an alias is an explicit choice: it lets one model name be
+// served by OpenCode Go and other providers, with credential priority deciding
+// which is tried first.
+func withOpenCodeGoAliases(cfg *config.Config, provider, authKind string, attributes map[string]string, models, prefixed []*ModelInfo) []*ModelInfo {
+	channel := coreauth.OAuthModelAliasChannel(provider, authKind)
+	if channel == "" {
+		return prefixed
+	}
+	aliases := oauthModelAliasesForAuth(cfg, channel, attributes)
+	if len(aliases) == 0 {
+		return prefixed
+	}
+	names := make(map[string]struct{}, len(aliases))
+	for _, entry := range aliases {
+		if alias := strings.ToLower(strings.TrimSpace(entry.Alias)); alias != "" {
+			names[alias] = struct{}{}
+		}
+	}
+	out := prefixed
+	for _, model := range models {
+		if model == nil {
+			continue
+		}
+		if _, ok := names[strings.ToLower(strings.TrimSpace(model.ID))]; ok {
+			out = append(out, model)
+		}
+	}
+	return out
 }

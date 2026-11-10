@@ -1,13 +1,15 @@
 # Relay
 
-Relay lets you use the AI subscriptions you already pay for (Claude Pro or Max,
-ChatGPT through Codex, OpenCode Go and a few others) from any tool that speaks
-the OpenAI, Anthropic, or Gemini API. It runs on your Mac at `127.0.0.1:8317`,
-holds every account you sign in with, and spreads requests across them, so one
-account hitting its limit does not stop your work.
+Relay keeps your coding agent working when an AI plan hits its limit. It runs
+on your Mac at `127.0.0.1:8317`, holds the subscriptions you already pay for
+(Claude Pro or Max, ChatGPT through Codex, OpenCode Go and a few others), and
+serves them to any tool that speaks the OpenAI, Anthropic, or Gemini API. When
+one account runs out, the next request goes to another account, or to another
+plan in the fallback order you set.
 
-A small app in the Mac's notch shows how much of each account's 5-hour and
-weekly limit is left, and lets you add or remove accounts.
+You don't set it up by hand: you ask your coding agent to, and it uses Relay's
+command line (`relay setup`, `relay status`, `relay doctor`). An optional app
+in the Mac's notch shows what is left.
 
 Relay is a personal project built on top of
 [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI). Most of the proxy is
@@ -48,20 +50,22 @@ flowchart LR
 2. Relay picks the next healthy account for that model, translates the request
    into the provider's format, and sends it.
 3. If the provider answers with a rate limit (HTTP 429), Relay marks that
-   account as cooling down and retries on another one.
+   account as cooling down and retries on another one. When every account of
+   that provider is out, a fallback chain moves the request to the next plan,
+   for example from Claude to OpenCode Go.
 4. Relay reads the limit headers on every response. The notch app shows them.
 
 ## Accounts
 
 | Account | Sign in | Tested in Relay |
 | --- | --- | --- |
-| Claude (Pro, Max) | `--claude-login` or the notch app | Yes, daily use with three accounts |
-| OpenCode Go | API key in an auth file or the notch app | Yes, chat, streaming, tool calls, limits |
-| Codex (ChatGPT plans) | `--codex-login` or `--codex-device-login` | No, comes from CLIProxyAPI |
-| Kimi | `--kimi-login`, `--kimi-ai-login` | No, comes from CLIProxyAPI |
-| xAI | `--xai-login` | No, comes from CLIProxyAPI |
-| Devin | `--devin-login` | No, comes from CLIProxyAPI |
-| Meta | `--meta-login` | No, comes from CLIProxyAPI |
+| Claude (Pro, Max) | `relay accounts add claude` | Yes, daily use with three accounts |
+| OpenCode Go | `relay accounts add opencode-go` (API key) | Yes, chat, streaming, tool calls, limits |
+| Codex (ChatGPT plans) | `relay accounts add codex` | No, comes from CLIProxyAPI |
+| Kimi | `relay accounts add kimi` | No, comes from CLIProxyAPI |
+| xAI | `relay accounts add xai` | No, comes from CLIProxyAPI |
+| Devin | `relay accounts add devin` | No, comes from CLIProxyAPI |
+| Meta | `relay accounts add meta` | No, comes from CLIProxyAPI |
 
 Relay turns off the Google providers that CLIProxyAPI has (Gemini, Gemini CLI,
 Vertex, AI Studio, Antigravity). Clients can still call Relay with the Gemini
@@ -69,7 +73,8 @@ request format; Relay translates it for the accounts above.
 
 OpenCode Go models show up as `opencode-go/<model>`, for example
 `opencode-go/deepseek-v4.1-flash`. Relay asks OpenCode Go for its model list on
-start and every hour.
+start and every hour. A fallback chain can also serve another model name with
+an OpenCode Go model.
 
 ## What is tested
 
@@ -87,104 +92,116 @@ accounts:
 | Rotation across accounts, skipping a rate-limited one | Works |
 | Wrong or missing client key | Rejected with 401 |
 | Management API with a wrong key | Rejected with 401 |
+| `relay setup` on an empty folder, then again (changes nothing) | Works |
+| `relay doctor` and `relay status` on a real install | Works |
+| `relay accounts add opencode-go` with a good key, and a bad key | Saved; rejected and nothing saved |
+| `relay accounts add claude` link, then Ctrl-C | Link printed; sign-in cancelled |
+| `relay fallback set` with Claude failing: request answered by OpenCode Go | Works |
 | `go test ./...` and `swift build` | Pass |
 
-## Install
+## Set up
 
-You need macOS, Go 1.26 or newer, and Xcode command line tools (for the notch
-app). There are no prebuilt downloads yet.
+Paste this into Claude Code, Codex, or any coding agent:
 
-1. Build Relay:
+```text
+Set up Relay for me by following the "Agent setup" section of https://github.com/udit19199/relay
+```
 
-   ```bash
-   git clone https://github.com/udit19199/relay.git
-   cd relay
-   go build -o ~/.local/bin/relay ./cmd/server
-   ```
+The agent installs Relay, starts it, and points your tool at it. You only
+finish each account sign-in in your browser.
 
-2. Create `~/.relay/config.yaml`. Pick two long random strings: one for your
-   tools (client key), one for the notch app (management key).
+### Agent setup
 
-   ```yaml
-   config-version: 8
-   server:
-     host: "127.0.0.1"
-     port: 8317
-   access:
-     api-keys:
-       - "CLIENT_KEY"
-   management:
-     secret-key: "MANAGEMENT_KEY"
-   oauth:
-     auth-dir: "~/.relay/auths"
-   ```
+Steps for the agent. Every command accepts `--json`, prints one JSON object
+per line, and exits non-zero on failure. `relay help` lists every flag.
 
-   [`config.example.yaml`](config.example.yaml) lists every other option.
-
-3. Save the management key for the notch app before the first start. Relay
-   replaces the plain key in `config.yaml` with a hash when it starts, so this
-   is your only copy.
+1. Check that this is macOS and that `go version` reports 1.26 or newer.
+2. Build Relay:
 
    ```bash
-   printf '%s' 'MANAGEMENT_KEY' > ~/.relay/management.key
-   chmod 600 ~/.relay/management.key
+   git clone https://github.com/udit19199/relay.git ~/.relay-src 2>/dev/null || git -C ~/.relay-src pull
+   mkdir -p ~/.local/bin && cd ~/.relay-src && go build -o ~/.local/bin/relay ./cmd/server
    ```
 
-4. Start Relay:
-
-   ```bash
-   relay --config ~/.relay/config.yaml
-   ```
-
-   To keep it running after login, put the same command in a LaunchAgent
-   (`~/Library/LaunchAgents/com.relay.proxy.plist`).
-
-5. Sign in to an account. This opens your browser:
-
-   ```bash
-   relay --config ~/.relay/config.yaml --claude-login
-   ```
-
-   Run it again to add a second Claude account. For OpenCode Go, write
-   `~/.relay/auths/opencode-go.json`:
+3. Run `~/.local/bin/relay setup --json`. It creates `~/.relay` with a config
+   and keys, installs the login service, starts Relay, and returns `base_url`,
+   `client_key`, and the environment lines for Claude Code and OpenAI-style
+   tools. Running it again changes nothing. If port 8317 is taken, pass
+   `--port <n>`.
+4. Ask the user before changing their tool's settings. For Claude Code, add
+   the two values from `claude_code_env` to the `env` object in
+   `~/.claude/settings.json`, keeping every other key (create the file if it
+   does not exist):
 
    ```json
-   { "type": "opencode-go", "api_key": "YOUR_OPENCODE_GO_KEY" }
+   { "env": { "ANTHROPIC_BASE_URL": "http://127.0.0.1:8317", "ANTHROPIC_AUTH_TOKEN": "<client_key>" } }
    ```
-
-6. Build and open the notch app:
+5. Add accounts. `relay accounts add claude --json --no-browser` (or `codex`,
+   `kimi`, `xai`, `devin`, `meta`) prints a `{"event":"sign_in_link","url":...}`
+   line, waits up to 5 minutes, then prints the result line. Give the link to
+   the user; the user signs in. For OpenCode Go, ask the user to run
+   `OPENCODE_API_KEY=... relay accounts add opencode-go` themselves, so the key
+   never appears in the chat.
+6. Ask which order to fall back in, then set it. For example, to keep Claude
+   Code on Opus and continue on other plans when every Claude account is out:
 
    ```bash
-   cd notch
-   ./scripts/package-local-app.sh
-   cp -R .build/release/Relay.app /Applications/
-   open /Applications/Relay.app
+   relay fallback set claude-opus-5-5 claude codex:gpt-6-sol opencode-go:deepseek-v4.1-flash
    ```
 
-   The app is signed only for your own Mac, so build it yourself rather than
-   copying the bundle to another machine.
+7. Run `relay doctor --json` and apply the `fix` of every check with level
+   `fail`. Then report `relay status` to the user.
+
+Rules for the agent: never print `~/.relay/management.key` or credential
+files, never ask the user to paste a key or token into the chat, and never
+complete a sign-in for the user.
+
+### Commands
+
+| Command | What it does |
+| --- | --- |
+| `relay setup` | Creates `~/.relay`, keys, and the login service, then starts Relay. Safe to rerun. |
+| `relay status` | Accounts, how much of each limit is left, and fallback chains. |
+| `relay doctor` | Checks config, keys, the proxy, the login service, and every account, with a fix for each problem. |
+| `relay accounts add <provider>` | Browser sign-in for `claude`, `codex`, `kimi`, `xai`, `devin`, `meta`; API key for `opencode-go`. |
+| `relay accounts remove <name>` | Deletes a credential. |
+| `relay fallback set <model> <provider>[:<model>] ...` | Serves `<model>` from the first provider in the list that has capacity. |
+| `relay fallback clear <model>` | Removes a chain. |
+| `relay --config ~/.relay/config.yaml` | Runs the proxy in the foreground instead of the login service. |
+
+To stop the login service: `launchctl bootout gui/$(id -u)/com.relay.proxy`.
+`relay setup` starts it again. Setting `RELAY_HOME` moves `~/.relay` to another
+folder; such installs never use the login service.
+
+### How fallback works
+
+`relay fallback set` uses two features the proxy already has. Each account in
+the chain gets a priority (first in the list is highest), and the router always
+uses the highest-priority account that is not rate limited. Providers that name
+the model differently get an alias, so `codex:gpt-6-sol` means "answer requests
+for this model with `gpt-6-sol`". When the first provider's accounts recover,
+new requests go back to it.
+
+If two chains list the same providers in different orders, the last one set
+wins, because priority belongs to the account, not the model.
 
 ## Point your tools at Relay
 
-Claude Code:
+`relay setup` prints these values. By hand:
 
 ```bash
+# Claude Code
 export ANTHROPIC_BASE_URL=http://127.0.0.1:8317
-export ANTHROPIC_AUTH_TOKEN=CLIENT_KEY
-```
+export ANTHROPIC_AUTH_TOKEN=<client_key>
 
-OpenAI-style tools:
-
-```bash
+# OpenAI-style tools
 export OPENAI_BASE_URL=http://127.0.0.1:8317/v1
-export OPENAI_API_KEY=CLIENT_KEY
+export OPENAI_API_KEY=<client_key>
 ```
 
-Check that it works:
-
-```bash
-curl http://127.0.0.1:8317/v1/models -H "Authorization: Bearer CLIENT_KEY"
-```
+The notch app is optional. Build it with
+`cd notch && ./scripts/package-local-app.sh` and copy
+`.build/release/Relay.app` to `/Applications`.
 
 ## Notch app
 
@@ -227,6 +244,10 @@ Relay would not exist without these projects:
 
 What Relay adds on top:
 
+- A command line made for coding agents: `relay setup`, `status`, `doctor`,
+  `accounts`, and `fallback`, each with `--json` output.
+- Fallback chains across plans, built on CLIProxyAPI's credential priority and
+  model aliases.
 - OpenCode Go as a built-in account: limits, model list, and requests, with no
   plugin or config block.
 - The notch app rebuilt as a client of the proxy: pooled limits across

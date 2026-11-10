@@ -4,7 +4,6 @@ Go 1.26+ proxy server providing OpenAI/Gemini/Claude/Codex compatible APIs with 
 
 ## Repository
 - GitHub: https://github.com/udit19199/relay (personal fork of https://github.com/router-for-me/CLIProxyAPI)
-- Landing page: `site/index.html` (single static file), deployed to GitHub Pages by `.github/workflows/pages.yml` on pushes that touch `site/`.
 - One repo for both parts: the Go proxy (everything outside `notch/`) and the Swift notch app (`notch/`). The former `sidekick` repo's history is merged into `notch/`.
 
 ## Notch app (`notch/`)
@@ -50,6 +49,7 @@ go build -o test-output ./cmd/server && rm test-output # Verify compile (REQUIRE
 - `internal/home/` — CLIProxyAPIHome control plane integration (bootstrap, RESP communication, dispatch coordination)
 - `internal/tui/` — Bubbletea terminal UI (`--tui`, `--standalone`)
 - `sdk/cliproxy/` — Embeddable SDK entry (service/builder/watchers/pipeline)
+- `internal/relaycli/` — Relay's own commands (`setup`, `status`, `doctor`, `accounts`, `fallback`), dispatched from the top of `main()` in `cmd/server/main.go`. They talk to the running proxy only through `/v8/management` (plus `/v0/management/quota/fetch`, which has no v8 route), print one JSON object with `--json`, and are what coding agents use to install and run Relay (README "Agent setup"). `RELAY_HOME` overrides `~/.relay`. Fallback chains are credential `priority` plus per-credential `model_aliases`, with each credential's place recorded under `relay_fallback`; OpenCode Go aliases are published without the `opencode-go/` prefix (`withOpenCodeGoAliases`) so a chain can include it.
 - `test/` — Cross-module integration tests
 
 ## Code Conventions

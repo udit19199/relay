@@ -337,7 +337,11 @@ func (s *Service) registerModelsForAuthWithConfigAndCache(ctx context.Context, c
 		// OpenCode Go models are exposed only under their prefix so catalog entries
 		// such as Claude models never shadow the native providers.
 		forcePrefix := (cfg != nil && cfg.ForceModelPrefix) || provider == openCodeGoProvider
-		published = s.registerResolvedModelsForAuthFenced(a, fence, key, applyModelPrefixes(models, a.Prefix, forcePrefix))
+		resolved := applyModelPrefixes(models, a.Prefix, forcePrefix)
+		if provider == openCodeGoProvider {
+			resolved = withOpenCodeGoAliases(cfg, provider, authKind, a.Attributes, models, resolved)
+		}
+		published = s.registerResolvedModelsForAuthFenced(a, fence, key, resolved)
 		if strings.EqualFold(strings.TrimSpace(a.Provider), "antigravity") {
 			s.asyncProbeAntigravityCapabilities(ctx, a, key)
 		}

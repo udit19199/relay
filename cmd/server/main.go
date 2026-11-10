@@ -32,6 +32,7 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/pluginhost"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/redisqueue"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/relaycli"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/safemode"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/store"
 	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/translator"
@@ -72,6 +73,10 @@ func shouldEnableExampleAPIKeySafeMode(cfg *config.Config, commandMode, tuiMode,
 // It parses command-line flags, loads configuration, and starts the appropriate
 // service based on the provided flags (login, codex-login, or server mode).
 func main() {
+	// Relay's own commands (setup, status, doctor, accounts, fallback) run and exit.
+	if code, handled := relaycli.Run(os.Args[1:]); handled {
+		os.Exit(code)
+	}
 	if len(os.Args) > 1 && os.Args[1] == "discover" {
 		discoverFlags := flag.NewFlagSet("discover", flag.ExitOnError)
 		timeoutSec := discoverFlags.Int("timeout", 3, "Discovery timeout in seconds")
