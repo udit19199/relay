@@ -163,8 +163,12 @@ extension RelayAccount {
 
     private func windowUsage(containing markers: [String]) -> (remainingPercent: Int, resetsAt: Date)? {
         let lowered = Dictionary(uniqueKeysWithValues: quotaSignals.map { ($0.key.lowercased(), $0.value) })
+        // Match the whole window component, not a substring: Anthropic also
+        // reports scoped windows such as "7d_oi" with their own small allowance,
+        // and dictionary order must not decide which one the island shows.
         guard let utilKey = lowered.keys.first(where: { key in
-            markers.contains(where: { key.contains($0) }) && key.contains("util")
+            guard let window = Self.windowName(in: key) else { return false }
+            return markers.contains(window)
         }) else { return nil }
         let resetKey = utilKey.replacingOccurrences(of: "utilization", with: "reset")
             .replacingOccurrences(of: "utilisation", with: "reset")
@@ -174,6 +178,15 @@ extension RelayAccount {
         else { return nil }
         let remaining = min(100, max(0, Int(((1 - used) * 100).rounded())))
         return (remaining, resetsAt)
+    }
+
+    // The window component of "<scope>-<window>-utilization" signal keys.
+    private static func windowName(in key: String) -> String? {
+        for suffix in ["-utilization", "-utilisation"] {
+            guard key.hasSuffix(suffix) else { continue }
+            return key.dropLast(suffix.count).split(separator: "-").last.map(String.init)
+        }
+        return nil
     }
 
     private static func parseReset(_ value: String) -> Date? {
