@@ -819,6 +819,12 @@ func isAuthBlockedForModelForRequest(ctx context.Context, auth *Auth, model stri
 		return true, blockReasonOther, time.Time{}
 	}
 	if auth.Quota.Exceeded && auth.Quota.Reason == "credential_quota" && auth.Quota.NextRecoverAt.After(now) {
+		if credentialQuotaProbeDue(auth, now) {
+			// One real request is let through per probe interval so a reset made
+			// before the advertised deadline can be observed; a failed probe is
+			// recorded by the normal quota path and re-blocks the credential.
+			return false, blockReasonNone, time.Time{}
+		}
 		return true, blockReasonCooldown, auth.Quota.NextRecoverAt
 	}
 	unavailable := codexRefreshUnavailableForRequest(ctx, auth, now, clientHeaders...)
@@ -982,6 +988,9 @@ func isAuthBlockedByQuotaOrAuthForModelForRequest(ctx context.Context, auth *Aut
 		return true
 	}
 	if auth.Quota.Exceeded && auth.Quota.Reason == "credential_quota" && (auth.Quota.NextRecoverAt.IsZero() || auth.Quota.NextRecoverAt.After(now)) {
+		if credentialQuotaProbeDue(auth, now) {
+			return false
+		}
 		return true
 	}
 	if model != "" && len(auth.ModelStates) > 0 {

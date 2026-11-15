@@ -101,6 +101,12 @@ type Config struct {
 	// 0 keeps the legacy default cooldown. Negative values disable these cooldowns.
 	TransientErrorCooldownSeconds int `yaml:"transient-error-cooldown-seconds" json:"transient-error-cooldown-seconds"`
 
+	// QuotaProbeIntervalSeconds controls how often a Claude credential blocked by a
+	// credential-wide quota may carry one real probe request, so an early quota reset
+	// is noticed before the advertised deadline.
+	// 0 keeps the default of 12 minutes. Negative values disable probing.
+	QuotaProbeIntervalSeconds int `yaml:"quota-probe-interval-seconds" json:"quota-probe-interval-seconds"`
+
 	// AuthAutoRefreshWorkers overrides the size of the core auth auto-refresh and manual refresh-all worker pool.
 	// When <= 0, the default worker count is used.
 	AuthAutoRefreshWorkers int `yaml:"auth-auto-refresh-workers" json:"auth-auto-refresh-workers"`

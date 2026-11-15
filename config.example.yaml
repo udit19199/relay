@@ -256,6 +256,11 @@ routing:
     # Set to 0 to keep the legacy 60-second cooldown; set to -1 to disable transient error cooldowns.
     transient-error-cooldown-seconds: 0
 
+    # How often a Claude credential blocked by a credential-wide quota may carry one
+    # real probe request, so an early quota reset is noticed before the advertised deadline.
+    # Set to 0 to keep the default of 12 minutes (720 seconds); set to -1 to disable probing.
+    quota-probe-interval-seconds: 0
+
 # Shared request/response behavior.
 requests:
   # Proxy URL. Supports socks5/http/https protocols. Example: socks5://user:pass@192.168.1.1:1080/

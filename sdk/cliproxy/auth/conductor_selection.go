@@ -2227,7 +2227,25 @@ func requestAwareCredSelectionRequired(ctx context.Context, auth *Auth, clientHe
 	return !IsCodexUseSIWCForRequest(ctx, auth, clientHeaders...)
 }
 
+// pickNextLegacy selects one credential and admits it as a quota probe when the
+// credential is blocked but its probe interval has elapsed.
 func (m *Manager) pickNextLegacy(ctx context.Context, provider, model string, opts cliproxyexecutor.Options, tried map[string]struct{}) (*Auth, ProviderExecutor, error) {
+	for attempt := 0; ; attempt++ {
+		auth, executor, errPick := m.pickNextLegacyOnce(ctx, provider, model, opts, tried)
+		if errPick != nil || auth == nil {
+			return auth, executor, errPick
+		}
+		if !m.claimCredentialQuotaProbe(auth) || attempt >= quotaProbeClaimRetries {
+			return auth, executor, nil
+		}
+		if tried == nil {
+			tried = make(map[string]struct{})
+		}
+		tried[auth.ID] = struct{}{}
+	}
+}
+
+func (m *Manager) pickNextLegacyOnce(ctx context.Context, provider, model string, opts cliproxyexecutor.Options, tried map[string]struct{}) (*Auth, ProviderExecutor, error) {
 	if m.HomeEnabled() {
 		clearSchedulerSelectionID(opts.Metadata)
 		auth, exec, _, err := m.pickNextViaHome(ctx, model, opts, tried)
@@ -2852,7 +2870,25 @@ func (m *Manager) pickNextMixedLegacy(ctx context.Context, providers []string, m
 	return authCopy, executor, providerKey, nil
 }
 
+// pickNextMixed selects one credential and admits it as a quota probe when the
+// credential is blocked but its probe interval has elapsed.
 func (m *Manager) pickNextMixed(ctx context.Context, providers []string, model string, opts cliproxyexecutor.Options, tried map[string]struct{}) (*Auth, ProviderExecutor, string, error) {
+	for attempt := 0; ; attempt++ {
+		auth, executor, provider, errPick := m.pickNextMixedOnce(ctx, providers, model, opts, tried)
+		if errPick != nil || auth == nil {
+			return auth, executor, provider, errPick
+		}
+		if !m.claimCredentialQuotaProbe(auth) || attempt >= quotaProbeClaimRetries {
+			return auth, executor, provider, nil
+		}
+		if tried == nil {
+			tried = make(map[string]struct{})
+		}
+		tried[auth.ID] = struct{}{}
+	}
+}
+
+func (m *Manager) pickNextMixedOnce(ctx context.Context, providers []string, model string, opts cliproxyexecutor.Options, tried map[string]struct{}) (*Auth, ProviderExecutor, string, error) {
 	opts.EnsureMetadata()
 	clearSchedulerSelectionID(opts.Metadata)
 	if m.HomeEnabled() {

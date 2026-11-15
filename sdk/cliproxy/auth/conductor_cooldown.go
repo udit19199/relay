@@ -389,6 +389,7 @@ func (m *Manager) restoreCooldownRecordLocked(record CooldownStateRecord, now ti
 		auth.NextRetryAfter = record.NextRetryAfter
 		applyCooldownFields(&auth.Quota, quota)
 		auth.Quota = mergeQuotaObservation(auth.Quota, quota)
+		stampCredentialQuotaProbe(auth, now)
 		auth.Generation++
 		auth.UpdatedAt = updatedAt
 		if reason != "" {
@@ -474,6 +475,7 @@ func (m *Manager) restoreCooldownRecordLocked(record CooldownStateRecord, now ti
 	auth.Generation++
 	auth.UpdatedAt = updatedAt
 	updateAggregatedAvailability(auth, now)
+	stampCredentialQuotaProbe(auth, now)
 	return true
 }
 
@@ -957,6 +959,15 @@ func (m *Manager) MarkResult(ctx context.Context, result Result) {
 			auth.Failed++
 		}
 		wasTerminalUnauthorized := hasUnauthorizedAuthFailure(auth)
+		probeResult := !auth.Quota.ProbeLeaseUntil.IsZero()
+		if probeResult {
+			// The probe is no longer in flight. Its next chance comes one full
+			// interval later; a success clears the block below.
+			auth.Quota.ProbeLeaseUntil = time.Time{}
+			if interval := credentialQuotaProbeInterval(); interval > 0 {
+				auth.Quota.ProbeAfter = now.Add(interval)
+			}
+		}
 
 		// retainModelCooldown pins a still-live model cooldown against a success
 		// from an execution dispatched before that cooldown was recorded. Such a
@@ -975,6 +986,13 @@ func (m *Manager) MarkResult(ctx context.Context, result Result) {
 			isAuthActiveCooldown(auth, now) && auth.cooldownRecordedSeq > 0 && result.ExecutionSeq <= auth.cooldownRecordedSeq
 
 		if result.Success {
+			if probeResult && !retainModelCooldown && !retainAuthCooldown && !wasTerminalUnauthorized &&
+				auth.Quota.Reason == "credential_quota" && auth.Quota.NextRecoverAt.After(now) {
+				// The probe reached the upstream and completed: the quota was
+				// reset early, so release the credential-wide block now instead
+				// of waiting for the advertised deadline.
+				releaseCredentialQuotaBlock(auth, now)
+			}
 			if result.CompletedResponse && !result.SkipQuotaObservation && !wasTerminalUnauthorized && !(auth.Quota.Reason == "credential_quota" && auth.Quota.NextRecoverAt.After(now)) && !retainModelCooldown && !retainAuthCooldown {
 				auth.InferenceVerified = true
 				auth.LastInferenceVerifiedAt = now
@@ -1249,6 +1267,7 @@ func (m *Manager) MarkResult(ctx context.Context, result Result) {
 									auth.Quota.NextRecoverAt = authNext
 									auth.Quota.BackoffLevel = backoffLevel
 									auth.NextRetryAfter = authNext
+									stampCredentialQuotaProbe(auth, now)
 									// The reporting model is now part of the wrap too: mark it
 									// so a later credential report from another model cannot
 									// snapshot this credential-derived state as independent.

@@ -991,8 +991,20 @@ func applyDevinQuotaRestoration(auth, existing *Auth, now time.Time) bool {
 	if hasUnauthorizedAuthFailure(existing) {
 		return false
 	}
+	releaseCredentialQuotaBlock(auth, now)
+	return true
+}
 
+// releaseCredentialQuotaBlock drops an auth-level credential_quota cooldown
+// and the propagated layers it put on model states, reinstating each model's
+// own independent block when one is still live.
+func releaseCredentialQuotaBlock(auth *Auth, now time.Time) {
+	if auth == nil {
+		return
+	}
 	applyCooldownFields(&auth.Quota, QuotaState{})
+	auth.Quota.ProbeAfter = time.Time{}
+	auth.Quota.ProbeLeaseUntil = time.Time{}
 	for _, state := range auth.ModelStates {
 		if state == nil {
 			continue
@@ -1022,7 +1034,6 @@ func applyDevinQuotaRestoration(auth, existing *Auth, now time.Time) bool {
 	if len(auth.ModelStates) > 0 {
 		updateAggregatedAvailability(auth, now)
 	}
-	return true
 }
 
 // isDevinQuotaExhaustionMessage reports whether text is Devin's explicit

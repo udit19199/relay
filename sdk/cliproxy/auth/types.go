@@ -355,6 +355,15 @@ type QuotaState struct {
 	// Cooldown transitions must use applyCooldownFields so they cannot replace
 	// this snapshot.
 	Signals map[string]string `json:"signals,omitempty"`
+	// ProbeAfter is the earliest time one real request may be admitted through a
+	// credential_quota cooldown so Relay can notice an early quota reset. It is
+	// stamped when the block is recorded, and zero means probing is not enabled
+	// for this block.
+	ProbeAfter time.Time `json:"probe_after,omitempty"`
+	// ProbeLeaseUntil marks an admitted probe still in flight. A second probe is
+	// not admitted before the lease expires, even if the probe interval has
+	// passed.
+	ProbeLeaseUntil time.Time `json:"probe_lease_until,omitempty"`
 }
 
 // Clone returns an independent copy of the quota state.

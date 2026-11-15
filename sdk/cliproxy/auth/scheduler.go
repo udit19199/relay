@@ -941,7 +941,7 @@ func isCredentialBlocked(auth *Auth, supportedModelCount int, now time.Time) boo
 		return true
 	}
 	if auth.Quota.Exceeded && auth.Quota.Reason == "credential_quota" && auth.Quota.NextRecoverAt.After(now) {
-		return true
+		return !credentialQuotaProbeDue(auth, now)
 	}
 	if len(auth.ModelStates) == 0 {
 		return auth.Unavailable || auth.Quota.Exceeded || (!auth.NextRetryAfter.IsZero() && auth.NextRetryAfter.After(now))
@@ -1338,7 +1338,8 @@ func (m *modelScheduler) promoteExpiredLocked(now time.Time) {
 		if entry == nil || entry.auth == nil {
 			continue
 		}
-		if entry.nextRetryAt.IsZero() || entry.nextRetryAt.After(now) {
+		probeDue := credentialQuotaProbeDue(entry.auth, now)
+		if !probeDue && (entry.nextRetryAt.IsZero() || entry.nextRetryAt.After(now)) {
 			continue
 		}
 		blocked, reason, next := isAuthBlockedForModel(entry.auth, m.modelKey, now)

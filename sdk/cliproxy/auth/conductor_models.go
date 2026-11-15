@@ -238,13 +238,20 @@ func (m *Manager) clientModelProjectionForAuth(auth *Auth, routeModel string, no
 
 	state := existingModelState(auth, targetKey)
 	isSuspended := auth.Disabled || auth.Status == StatusDisabled
-	if auth.Quota.Exceeded && auth.Quota.Reason == "credential_quota" && auth.Quota.NextRecoverAt.After(now) {
+	probeDue := credentialQuotaProbeDue(auth, now)
+	if !probeDue && auth.Quota.Exceeded && auth.Quota.Reason == "credential_quota" && auth.Quota.NextRecoverAt.After(now) {
 		isSuspended = true
 	}
 	isQuotaExceeded := false
 	var suspendReason string
 	if state != nil {
-		if state.Status == StatusDisabled || state.Unavailable || (!state.NextRetryAfter.IsZero() && state.NextRetryAfter.After(now)) {
+		modelSuspended := state.Status == StatusDisabled || state.Unavailable || (!state.NextRetryAfter.IsZero() && state.NextRetryAfter.After(now))
+		if probeDue && (state.credentialQuotaPropagated || state.Quota.Reason == "credential_quota") {
+			// The scheduled probe makes the credential selectable again; the
+			// projection must not keep the propagated block visible.
+			modelSuspended = false
+		}
+		if modelSuspended {
 			isSuspended = true
 		}
 		if state.Quota.Exceeded && (state.Quota.NextRecoverAt.IsZero() || state.Quota.NextRecoverAt.After(now)) {
@@ -254,7 +261,7 @@ func (m *Manager) clientModelProjectionForAuth(auth *Auth, routeModel string, no
 			suspendReason = cooldownReason(state.StatusMessage, state.Quota, state.LastError)
 		}
 	}
-	if len(auth.ModelStates) == 0 && auth.Unavailable && auth.NextRetryAfter.After(now) {
+	if !probeDue && len(auth.ModelStates) == 0 && auth.Unavailable && auth.NextRetryAfter.After(now) {
 		// With no per-model states, scheduling falls back to the credential-wide
 		// cooldown (isAuthBlockedForModel); the projection must agree with it.
 		// When states exist, unmatched models stay schedulable by design, so the
