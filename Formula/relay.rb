@@ -2,9 +2,10 @@ class Relay < Formula
   desc "Keep your coding agent working when an AI plan hits its limit"
   homepage "https://github.com/udit19199/relay"
   # The v8.0.x tags are upstream CLIProxyAPI's; Relay's own commits live on main,
-  # so the formula pins a commit. Move to a release tag once Relay cuts one.
+  # so the formula pins a commit and carries a release-style version until Relay
+  # cuts its own tag.
   url "https://github.com/udit19199/relay/archive/5f79aaea5f10619b5fca90fe386c6adeadbe24e8.tar.gz"
-  version "5f79aaea"
+  version "0.9.0"
   sha256 "cae9266f8672c2604d8c497036b2fdb8b824681c8673b2f90d85ff29243103f6"
   license "MIT"
   head "https://github.com/udit19199/relay.git", branch: "main"
