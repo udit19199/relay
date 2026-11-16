@@ -1,0 +1,80 @@
+name: bottle
+
+# Builds one bottle for the macOS this runner has, and attaches it to the tag's
+# release. Homebrew pours a bottle only when the macOS tag matches, so installs
+# on any other macOS keep building from source.
+#
+# After the first run, copy the stanza the job prints into Formula/relay.rb,
+# above the dependencies. Then the same tag installs without a Go build:
+#
+#   bottle do
+#     root_url "https://github.com/udit19199/relay/releases/download/v0.9.0"
+#     sha256 cellar: :any_skip_relocation, arm64_golden_gate: "…"
+#   end
+#
+# The tag is the maintainer's to cut. This workflow only reacts to it.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to bottle
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  bottle:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+    steps:
+      - name: Tap this repository at the tag
+        run: |
+          set -euo pipefail
+          tapdir="$(brew --repository)/Library/Taps/udit19199/homebrew-relay"
+          rm -rf "$tapdir"
+          mkdir -p "$(dirname "$tapdir")"
+          git clone --depth 1 --branch "$TAG" "https://github.com/$GITHUB_REPOSITORY" "$tapdir"
+
+      - name: Build the bottle
+        run: |
+          set -euo pipefail
+          brew install --build-bottle udit19199/relay/relay
+          brew bottle --no-rebuild --json \
+            --root-url "https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG" \
+            udit19199/relay/relay | tee bottle.log
+          ls -l ./*.bottle.tar.gz
+
+      - name: Make the release when the tag has none yet
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --generate-notes --title "$TAG"
+
+      - name: Attach the bottle to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release upload "$TAG" ./*.bottle.tar.gz --clobber
+
+      - name: Put the stanza in the job summary
+        run: |
+          {
+            echo "### Bottle for $TAG"
+            echo ""
+            echo '```ruby'
+            sed -n '/bottle do/,/^  end/p' bottle.log || true
+            echo '```'
+            echo ""
+            echo "Copy that block into `Formula/relay.rb`, above \`depends_on\`, in the same commit as the tag."
+          } >> "$GITHUB_STEP_SUMMARY"
