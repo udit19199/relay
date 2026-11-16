@@ -200,8 +200,9 @@ extension RelayAccount {
 
 extension RelayAccount {
     /// Accounts whose usage comes from Relay's quota endpoint rather than
-    /// rate-limit headers on proxied responses.
-    public var usesQuotaEndpoint: Bool { provider == "opencode-go" }
+    /// rate-limit headers on proxied responses. Claude's endpoint reads the
+    /// account's live usage, so idle accounts do not show old figures.
+    public var usesQuotaEndpoint: Bool { provider == "opencode-go" || provider == "claude" }
 
     /// Short provider name for display.
     public var providerName: String {

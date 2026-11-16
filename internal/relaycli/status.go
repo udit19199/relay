@@ -104,10 +104,24 @@ func (c *client) accountStatus(cred credential) accountStatus {
 		a.State = "error"
 		a.Message = oneLine(cred.StatusMessage)
 	}
-	if a.Provider == "opencode-go" {
-		a.Limits = c.openCodeGoLimits(cred.AuthIndex)
-	} else {
+	if a.Provider == "opencode-go" || a.Provider == "claude" {
+		// Prefer the live quota endpoint so an account that serves no proxied
+		// traffic still shows its current usage instead of the last headers.
+		a.Limits = c.quotaEndpointLimits(cred.AuthIndex)
+	}
+	if len(a.Limits) == 0 {
 		a.Limits = signalLimits(cred.Quota.Signals)
+	}
+	// A live quota answer can be ahead of Relay's own cooldown: mark an account
+	// whose window is spent as limited even before its next 429 does.
+	if a.State == "ok" {
+		for _, w := range a.Limits {
+			if w.Left == 0 {
+				a.State = "limited"
+				a.Message = "rate limited until the limit resets"
+				break
+			}
+		}
 	}
 	return a
 }
@@ -148,7 +162,7 @@ func signalLimits(signals map[string]any) []window {
 	return out
 }
 
-func (c *client) openCodeGoLimits(authIndex string) []window {
+func (c *client) quotaEndpointLimits(authIndex string) []window {
 	var reply struct {
 		Groups []struct {
 			Buckets []struct {
@@ -167,7 +181,11 @@ func (c *client) openCodeGoLimits(authIndex string) []window {
 		for _, bucket := range group.Buckets {
 			w := window{Name: bucket.Window, Left: clampPercent(bucket.RemainingFraction)}
 			if reset, errParse := time.Parse(time.RFC3339, bucket.ResetTime); errParse == nil {
-				w.Resets = &reset
+				if reset.Before(time.Now()) {
+					w.Left = 100 // the window already reset since the answer was built
+				} else {
+					w.Resets = &reset
+				}
 			}
 			out = append(out, w)
 		}

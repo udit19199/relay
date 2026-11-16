@@ -109,8 +109,9 @@ public struct RelayClient: Sendable {
         if response.status != "ok" { throw RelayError.serverMessage(response.error ?? "Relay did not save the account") }
     }
 
-    // Relay's quota endpoint: OpenCode Go accounts report their rolling,
-    // weekly, and monthly windows here instead of in response headers.
+    // Relay's quota endpoint: OpenCode Go reports rolling, weekly and monthly
+    // windows here; Claude reports its 5-hour and weekly windows from the live
+    // account usage, not from the last proxied response.
     public func fetchQuota(authIndex: String) async throws -> WeeklyUsage {
         struct Body: Encodable { var auth_index: String }
         struct Bucket: Decodable { var window: String?; var remainingFraction: Double?; var resetTime: String? }
@@ -129,11 +130,12 @@ public struct RelayClient: Sendable {
             windows[name] = (min(100, max(0, Int((fraction * 100).rounded()))), resetsAt)
         }
         guard let weekly = windows["weekly"] else { throw RelayError.malformedResponse }
+        let fiveHour = windows["5h"] ?? windows["rolling"]
         return WeeklyUsage(
             remainingPercent: weekly.percent,
             resetsAt: weekly.resetsAt,
-            fiveHourRemainingPercent: windows["rolling"]?.percent,
-            fiveHourResetsAt: windows["rolling"]?.resetsAt,
+            fiveHourRemainingPercent: fiveHour?.percent,
+            fiveHourResetsAt: fiveHour?.resetsAt,
             monthlyRemainingPercent: windows["monthly"]?.percent,
             monthlyResetsAt: windows["monthly"]?.resetsAt
         )

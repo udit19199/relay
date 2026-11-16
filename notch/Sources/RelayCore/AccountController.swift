@@ -23,6 +23,7 @@ open class AccountController {
     private var isBackgroundUsageRefreshEnabled = false
     // Quota-endpoint accounts call the provider's API, so poll them less often.
     private var lastQuotaSuccess: [String: Date] = [:]
+    private var lastQuotaAttempt: [String: Date] = [:]
     private let quotaFetchInterval: TimeInterval = 5 * 60
     // A failed fetch younger than this keeps the last numbers without a warning.
     private let quotaFailureGrace: TimeInterval = 15 * 60
@@ -137,13 +138,16 @@ open class AccountController {
     private func refreshQuota(for account: RelayAccount) async {
         let now = Date()
         let cached = usageStates[account.id]?.displayedUsage
-        // A reset time that has passed means the stored numbers are stale: refetch now.
-        let resetPassed = cached.map { $0.current(at: now) != $0 } ?? false
-        if let last = lastQuotaSuccess[account.id], cached != nil, !resetPassed,
+        // Cap attempts, not just successes: a permanent failure must not turn
+        // the 30-second account poll into a provider call every 30 seconds.
+        // A passed reset already shows 100% via current(at:), so waiting for
+        // the next poll costs nothing visible.
+        if let last = lastQuotaAttempt[account.id],
            now.timeIntervalSince(last) < quotaFetchInterval
         {
             return
         }
+        lastQuotaAttempt[account.id] = now
         do {
             usageStates[account.id] = .loaded(try await client.fetchQuota(authIndex: account.authIndex))
             lastQuotaSuccess[account.id] = now
@@ -151,7 +155,13 @@ open class AccountController {
             // Failures retry on the next 30-second cycle. A brief upstream hiccup
             // keeps the last numbers; only a lasting failure shows a warning.
             guard let cached else {
-                usageStates[account.id] = .unavailable(error.localizedDescription)
+                // Before the first live answer, fall back to the usage Relay last
+                // saw in response headers rather than leaving the row empty.
+                if let usage = account.relayUsage() {
+                    usageStates[account.id] = .loaded(usage)
+                } else {
+                    usageStates[account.id] = .unavailable(error.localizedDescription)
+                }
                 return
             }
             let lastSuccess = lastQuotaSuccess[account.id] ?? .distantPast
