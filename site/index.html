@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relay, keeps your coding agent working when an AI plan hits its limit</title>
+<meta name="description" content="Relay runs one local endpoint over the Claude, Codex and OpenCode Go accounts you already pay for. When one plan runs out, the next request goes to another.">
+<meta property="og:title" content="Relay">
+<meta property="og:description" content="Keeps your coding agent working when an AI plan hits its limit.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#0c0d0e; --panel:#141517; --panel2:#1a1c1f; --line:#2a2c30; --fg:#ecebe6; --mute:#8b8a85; --amber:#ffb020; --amber-dim:#5a4210; --red:#ff4d3d; --blue:#5aa2ff; --green:#4fd98a; }
+  * { box-sizing:border-box; }
+  html { -webkit-text-size-adjust:100%; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.6 Inter, system-ui, sans-serif; -webkit-font-smoothing:antialiased;
+    background-image: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px); background-size:32px 32px; }
+  a { color:inherit; }
+  .mono { font-family:"IBM Plex Mono", monospace; }
+  .wrap { max-width:1120px; margin:0 auto; padding:0 20px; }
+  nav { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:18px 0; font-family:"IBM Plex Mono", monospace; font-size:13px; color:var(--mute); }
+  nav b { font-family:"Chakra Petch", sans-serif; font-size:20px; color:var(--fg); letter-spacing:.04em; display:flex; align-items:center; gap:10px; }
+  nav b i { width:10px; height:10px; border-radius:50%; background:var(--green); box-shadow:0 0 10px var(--green); }
+  nav div { display:flex; gap:18px; }
+  nav a { text-decoration:none; } nav a:hover { color:var(--fg); }
+  .hero { display:grid; grid-template-columns:1fr; gap:28px; padding:28px 0 56px; }
+  .tag { font-family:"IBM Plex Mono", monospace; font-size:12px; color:var(--amber); letter-spacing:.12em; text-transform:uppercase; }
+  h1 { font-family:"Chakra Petch", sans-serif; font-weight:700; font-size:clamp(38px,9vw,84px); line-height:.95; letter-spacing:-.01em; margin:10px 0 16px; text-transform:uppercase; }
+  h1 span { color:var(--amber); }
+  .lede { color:var(--mute); font-size:17px; max-width:560px; margin:0 0 24px; }
+  .btns { display:flex; gap:10px; flex-wrap:wrap; }
+  .btn { font-family:"IBM Plex Mono", monospace; font-size:14px; padding:12px 18px; border:1px solid var(--line); text-decoration:none; border-radius:4px; }
+  .btn.p { background:var(--amber); color:#111; border-color:var(--amber); font-weight:500; }
+  .btn:hover { border-color:var(--mute); }
+  .btn.p:hover { border-color:var(--amber); }
+
+  .dash { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:18px; box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 30px 80px rgba(0,0,0,.5); }
+  .dash-head { display:flex; justify-content:space-between; gap:12px; font-family:"IBM Plex Mono", monospace; font-size:11px; color:var(--mute); letter-spacing:.1em; text-transform:uppercase; margin-bottom:14px; }
+  .dash-head .live { color:var(--green); }
+  .gauges { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+  .g { background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:12px 12px 10px; position:relative; transition:border-color .3s; min-width:0; }
+  .g.active { border-color:var(--amber); box-shadow:0 0 0 1px var(--amber), 0 0 24px rgba(255,176,32,.15); }
+  .g.dead { opacity:.55; }
+  .g svg { width:100%; height:auto; display:block; }
+  .g .name { font-family:"IBM Plex Mono", monospace; font-size:12px; display:flex; justify-content:space-between; gap:8px; color:var(--mute); }
+  .g .name b { color:var(--fg); font-weight:500; }
+  .g .val { font-family:"Chakra Petch", sans-serif; font-weight:600; font-size:24px; text-align:center; line-height:1; margin-top:-6px; font-variant-numeric:tabular-nums; }
+  .g .state { font-family:"IBM Plex Mono", monospace; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; text-align:center; color:var(--mute); margin-top:2px; }
+  .g.active .state { color:var(--amber); } .g.dead .state { color:var(--red); }
+  .needle { transition:transform .9s cubic-bezier(.3,.7,.2,1); transform-origin:60px 60px; }
+  .log { margin-top:12px; font-family:"IBM Plex Mono", monospace; font-size:12px; background:#0a0b0c; border:1px solid var(--line); border-radius:8px; padding:10px 12px; height:88px; overflow:hidden; color:var(--mute); }
+  .log div { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .log .ok { color:var(--green); } .log .bad { color:var(--red); } .log .acc { color:var(--amber); }
+  .caption { font-family:"IBM Plex Mono", monospace; font-size:11.5px; color:#6f6e6a; margin:10px 2px 0; }
+
+  section { padding:72px 0 0; }
+  .label { font-family:"IBM Plex Mono", monospace; font-size:12px; color:var(--amber); letter-spacing:.12em; text-transform:uppercase; margin-bottom:10px; }
+  h2 { font-family:"Chakra Petch", sans-serif; font-weight:600; font-size:clamp(28px,5vw,44px); line-height:1.05; margin:0 0 28px; text-transform:uppercase; }
+  .steps { display:grid; grid-template-columns:1fr; gap:1px; background:var(--line); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  .step { background:var(--panel); padding:22px; display:grid; grid-template-columns:44px 1fr; gap:14px; }
+  .step .n { font-family:"Chakra Petch", sans-serif; font-size:28px; color:var(--amber); line-height:1; }
+  .step h3 { margin:0 0 4px; font-size:17px; } .step p { margin:0; color:var(--mute); font-size:15px; }
+  .switch { margin-top:12px; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:22px; display:flex; flex-direction:column; gap:8px; }
+  .switch .pair { font-family:"Chakra Petch", sans-serif; font-size:clamp(30px,6vw,44px); line-height:1; }
+  .switch .pair s { color:var(--red); text-decoration-thickness:4px; } .switch .pair b { color:var(--amber); }
+  .switch p { margin:0; color:var(--mute); font-size:15px; max-width:640px; }
+  .readout { display:grid; grid-template-columns:1fr; gap:1px; background:var(--line); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  .readout div { background:var(--panel); padding:14px 18px; display:flex; justify-content:space-between; gap:12px; align-items:center; }
+  .readout span:last-child { font-family:"IBM Plex Mono", monospace; font-size:12px; letter-spacing:.06em; text-transform:uppercase; }
+  .on { color:var(--green); } .off { color:var(--mute); }
+  .on::before { content:"● "; } .off::before { content:"○ "; }
+  pre { margin:0; background:#08090a; border:1px solid var(--line); border-radius:12px; padding:18px; overflow-x:auto; font:13.5px/1.75 "IBM Plex Mono", monospace; }
+  pre .c { color:var(--mute); } pre .a { color:var(--amber); }
+  .note { color:var(--mute); font-size:14.5px; margin:14px 0 0; }
+  .note b { color:var(--fg); font-weight:500; }
+  .credits { display:grid; grid-template-columns:1fr; gap:12px; }
+  .credits a { display:block; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px; text-decoration:none; }
+  .credits a:hover { border-color:var(--amber); }
+  .credits b { font-family:"Chakra Petch", sans-serif; font-size:19px; font-weight:600; } .credits p { margin:4px 0 0; color:var(--mute); font-size:14.5px; }
+  .warn { margin-top:16px; border:1px dashed var(--amber-dim); border-radius:12px; padding:16px 18px; color:var(--mute); font-size:14.5px; }
+  .warn b { color:var(--amber); font-weight:500; }
+  footer { padding:64px 0 40px; font-family:"IBM Plex Mono", monospace; font-size:12px; color:var(--mute); display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px; border-top:1px solid var(--line); margin-top:64px; }
+
+  @media (min-width:900px) {
+    .wrap { padding:0 32px; }
+    .hero { grid-template-columns:1fr 1fr; align-items:center; gap:56px; padding:72px 0 96px; }
+    .gauges { grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+    .steps { grid-template-columns:repeat(3,1fr); }
+    .step { grid-template-columns:1fr; align-content:start; }
+    .readout { grid-template-columns:1fr 1fr; }
+    .credits { grid-template-columns:repeat(3,1fr); }
+    .two { display:grid; grid-template-columns:1fr 1fr; gap:40px; align-items:start; }
+    section { padding-top:110px; }
+  }
+  @media (max-width:600px) { pre { white-space:pre-wrap; overflow-wrap:anywhere; } }
+  @media (prefers-reduced-motion: reduce) { .needle { transition:none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <b><i></i>RELAY</b>
+    <div><a href="#install">install</a><a href="https://github.com/udit19199/relay">github ↗</a></div>
+  </nav>
+
+  <header class="hero">
+    <div>
+      <div class="tag">open source / macOS</div>
+      <h1>Never hit <span>empty</span> mid task</h1>
+      <p class="lede">Relay keeps your coding agent working when an AI plan hits its limit. It holds the Claude, Codex and OpenCode Go accounts you already pay for behind one local endpoint, and when one runs dry the next request goes to another plan in the order you set.</p>
+      <div class="btns">
+        <a class="btn p" href="https://github.com/udit19199/relay">Get Relay</a>
+        <a class="btn" href="#install">How to install</a>
+      </div>
+    </div>
+
+    <div>
+      <div class="dash">
+        <div class="dash-head"><span>accounts / 5-hour limit</span><span class="live">● illustration</span></div>
+        <div class="gauges" id="gauges"></div>
+        <div class="log" id="log" aria-hidden="true"></div>
+      </div>
+      <p class="caption">Animated illustration, not live data. The real panel is in the notch.</p>
+    </div>
+  </header>
+
+  <section>
+    <div class="label">01 / how it works</div>
+    <h2>One URL in. Every account out.</h2>
+    <div class="steps">
+      <div class="step"><div class="n">1</div><div><h3>Point your tool at Relay</h3><p>Claude Code, OpenCode, or any client that speaks the OpenAI, Anthropic or Gemini API. <span class="mono">relay setup</span> prints the two lines.</p></div></div>
+      <div class="step"><div class="n">2</div><div><h3>Relay picks an account</h3><p>The next healthy one for that model. It translates the request into that provider's format.</p></div></div>
+      <div class="step"><div class="n">3</div><div><h3>Limit hit? Next one</h3><p>On a rate limit that account rests, the request retries on another, and a fallback chain moves it to the next plan. The notch shows what is left.</p></div></div>
+    </div>
+    <div class="switch">
+      <div class="pair"><s>429</s> → <b>200</b></div>
+      <p>Your tool sends one request and gets one answer. When a provider says an account is out, Relay rests it and retries the same request somewhere else, so the error never reaches the tool.</p>
+    </div>
+  </section>
+
+  <section class="two">
+    <div>
+      <div class="label">02 / accounts</div>
+      <h2>What it runs on</h2>
+      <p class="note">A filled dot means it is tested in Relay. The rest come from CLIProxyAPI and have not been tested here yet.</p>
+    </div>
+    <div class="readout">
+      <div><span>Claude Pro and Max</span><span class="on">tested</span></div>
+      <div><span>OpenCode Go</span><span class="on">tested</span></div>
+      <div><span>Codex</span><span class="off">untested</span></div>
+      <div><span>Kimi</span><span class="off">untested</span></div>
+      <div><span>xAI</span><span class="off">untested</span></div>
+      <div><span>Devin, Meta</span><span class="off">untested</span></div>
+    </div>
+  </section>
+
+  <section id="install" class="two">
+    <div>
+      <div class="label">03 / install</div>
+      <h2>Get it running</h2>
+      <p class="note">You need macOS and Homebrew. The proxy is built from source for now, and Homebrew installs Go as a build dependency.</p>
+      <p class="note"><b>If Relay already runs on this Mac</b>, stop the old service first: <span class="mono">launchctl bootout gui/$(id -u)/com.relay.proxy</span></p>
+    </div>
+    <div>
+<pre><span class="c"># the formula lives in the relay repo</span>
+brew tap udit19199/relay https://github.com/udit19199/relay
+brew install relay
+
+<span class="c"># first run: config, keys, login service, then it starts</span>
+relay setup
+
+<span class="c"># point a tool at it, lines printed by setup</span>
+export ANTHROPIC_BASE_URL=<span class="a">http://127.0.0.1:8317</span>
+export OPENAI_BASE_URL=<span class="a">http://127.0.0.1:8317/v1</span></pre>
+      <p class="note">Without Homebrew: <span class="mono">git clone https://github.com/udit19199/relay</span>, then <span class="mono">go build -o ~/.local/bin/relay ./cmd/server</span> and <span class="mono">relay setup</span>. The notch app is a separate Swift build.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="label">04 / credits</div>
+    <h2>Built on other people's work</h2>
+    <div class="credits">
+      <a href="https://github.com/router-for-me/CLIProxyAPI"><b>CLIProxyAPI</b><p>The proxy, translation, sign-ins, rotation and retries. Luis Pater, Router-For.ME and contributors.</p></a>
+      <a href="https://github.com/liuzhao1225/codex-account-switcher"><b>Codex Account Switcher</b><p>The Mac app the notch app started from. liuzhao1225.</p></a>
+      <a href="https://github.com/vorssaint/vorssaint-utils"><b>vorssaint-utils</b><p>The notch shape and placement code. Vorssaint.</p></a>
+    </div>
+    <div class="warn"><b>Before you use it.</b> Relay uses your own sign-ins, like the official command line tools do. Providers may not allow this and can limit accounts that do it. Use accounts you are okay risking.</div>
+  </section>
+
+  <footer><span>proxy MIT; notch app MIT and GPL-3.0-or-later</span><a href="https://github.com/udit19199/relay">github.com/udit19199/relay</a></footer>
+</div>
+
+<script>
+(function () {
+  var accts = [
+    { name: "claude", label: "work", level: 22, color: "var(--amber)" },
+    { name: "claude", label: "personal", level: 81, color: "var(--amber)" },
+    { name: "claude", label: "side", level: 64, color: "var(--amber)" },
+    { name: "opencode", label: "go", level: 90, color: "var(--blue)" }
+  ];
+  var active = 0;
+  var gaugesEl = document.getElementById("gauges");
+  var logEl = document.getElementById("log");
+
+  function arc(r) {
+    var a0 = Math.PI * 5 / 6, a1 = Math.PI / 6, cx = 60, cy = 60;
+    return "M" + (cx + r * Math.cos(a0)) + " " + (cy + r * Math.sin(a0)) + " A" + r + " " + r + " 0 1 1 " + (cx + r * Math.cos(a1)) + " " + (cy + r * Math.sin(a1));
+  }
+  var ticks = "";
+  for (var i = 0; i <= 10; i++) {
+    var a = Math.PI * 5 / 6 + (i / 10) * (Math.PI * 4 / 3);
+    var r1 = 50, r2 = i % 5 === 0 ? 42 : 46;
+    ticks += '<line x1="' + (60 + r1 * Math.cos(a)) + '" y1="' + (60 + r1 * Math.sin(a)) + '" x2="' + (60 + r2 * Math.cos(a)) + '" y2="' + (60 + r2 * Math.sin(a)) + '" stroke="#55565a" stroke-width="1.5"/>';
+  }
+  var LEN = 2 * Math.PI * 38 * (240 / 360);
+
+  accts.forEach(function (a) {
+    var g = document.createElement("div");
+    g.className = "g";
+    g.innerHTML = '<div class="name"><b>' + a.name + '</b><span>' + a.label + '</span></div>' +
+      '<svg viewBox="0 0 120 100" aria-hidden="true">' + ticks +
+      '<path d="' + arc(38) + '" stroke="#26282c" stroke-width="7" fill="none" stroke-linecap="round"/>' +
+      '<path class="fill" d="' + arc(38) + '" stroke="' + a.color + '" stroke-width="7" fill="none" stroke-linecap="round" stroke-dasharray="' + LEN + '" stroke-dashoffset="0" style="transition:stroke-dashoffset .9s cubic-bezier(.3,.7,.2,1)"/>' +
+      '<g class="needle"><line x1="60" y1="60" x2="60" y2="28" stroke="#ecebe6" stroke-width="2.5" stroke-linecap="round"/><circle cx="60" cy="60" r="5" fill="#ecebe6"/></g>' +
+      '</svg><div class="val"></div><div class="state"></div>';
+    gaugesEl.appendChild(g);
+    a.el = g;
+  });
+
+  function render() {
+    accts.forEach(function (a, i) {
+      var lv = Math.max(0, a.level);
+      a.el.querySelector(".fill").setAttribute("stroke-dashoffset", LEN * (1 - lv / 100));
+      a.el.querySelector(".needle").style.transform = "rotate(" + (-120 + 240 * lv / 100) + "deg)";
+      a.el.querySelector(".val").textContent = Math.round(lv) + "%";
+      a.el.className = "g" + (i === active ? " active" : "") + (lv <= 0 ? " dead" : "");
+      a.el.querySelector(".state").textContent = lv <= 0 ? "limit hit" : i === active ? "serving" : "standby";
+    });
+  }
+  function log(html) {
+    var d = document.createElement("div");
+    d.innerHTML = html;
+    logEl.appendChild(d);
+    while (logEl.children.length > 4) logEl.removeChild(logEl.firstChild);
+  }
+  var t = 0;
+  function pad(n) { return String(n).padStart(2, "0"); }
+  function stamp() { t += 7; return '<span>14:' + pad(2 + Math.floor(t / 60) % 58) + ':' + pad(t % 60) + '</span> '; }
+
+  log(stamp() + 'POST /v1/messages <span class="acc">claude/work</span> <span class="ok">200</span>');
+  log(stamp() + 'POST /v1/messages <span class="acc">claude/work</span> <span class="ok">200</span>');
+  render();
+
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  setInterval(function () {
+    var a = accts[active];
+    a.level -= 7;
+    if (a.level <= 0) {
+      a.level = 0;
+      log(stamp() + 'POST /v1/messages <span class="acc">claude/' + a.label + '</span> <span class="bad">429 limit</span>');
+      var next = accts.findIndex(function (x, i) { return i !== active && x.name === "claude" && x.level > 0; });
+      if (next < 0) {
+        accts.forEach(function (x) { if (x.name === "claude") x.level = 70 + Math.random() * 25; });
+        next = 0;
+        log('<span class="ok">limits reset, all accounts back</span>');
+      }
+      active = next;
+      log('&nbsp;&nbsp;retry on <span class="acc">claude/' + accts[active].label + '</span> <span class="ok">200</span>');
+    } else {
+      log(stamp() + 'POST /v1/messages <span class="acc">claude/' + a.label + '</span> <span class="ok">200</span>');
+    }
+    render();
+  }, 1400);
+})();
+</script>
+</body>
+</html>
