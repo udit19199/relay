@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 )
@@ -34,10 +35,8 @@ func isOpenCodeGoAuth(auth *coreauth.Auth) bool {
 }
 
 func openCodeGoAPIKey(auth *coreauth.Auth) string {
-	if auth.Metadata != nil {
-		if key, ok := auth.Metadata["api_key"].(string); ok && strings.TrimSpace(key) != "" {
-			return strings.TrimSpace(key)
-		}
+	if key := misc.MetadataString(auth.Metadata, "api_key"); key != "" {
+		return key
 	}
 	return tokenValueForAuth(auth)
 }

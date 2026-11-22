@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 )
 
@@ -108,8 +109,8 @@ func FindMatchingLegacyCredential(ctx context.Context, store coreauth.Store, tar
 		return nil, fmt.Errorf("list xAI credentials for legacy migration: %w", errList)
 	}
 
-	targetEmail := metadataString(target.Metadata, "email")
-	targetSubject := metadataString(target.Metadata, "sub")
+	targetEmail := misc.MetadataString(target.Metadata, "email")
+	targetSubject := misc.MetadataString(target.Metadata, "sub")
 	// A nonempty identity always yields a hashed filename even when the
 	// pre-hash sanitization would have produced an empty segment, so do not
 	// require a legacy name here; isHashedCredentialTarget already verified
@@ -143,8 +144,8 @@ func FindMatchingLegacyCredential(ctx context.Context, store coreauth.Store, tar
 		if strings.EqualFold(candidateBaseName, targetBaseName) {
 			continue
 		}
-		candidateEmail := metadataString(candidate.Metadata, "email")
-		candidateSubject := metadataString(candidate.Metadata, "sub")
+		candidateEmail := misc.MetadataString(candidate.Metadata, "email")
+		candidateSubject := misc.MetadataString(candidate.Metadata, "sub")
 		if isRecognizedPredecessor(candidateBaseName, candidateEmail, candidateSubject) {
 			return candidate, nil
 		}
@@ -186,8 +187,8 @@ func isHashedCredentialTarget(target *coreauth.Auth) bool {
 	if target == nil || !strings.EqualFold(strings.TrimSpace(target.Provider), "xai") {
 		return false
 	}
-	email := metadataString(target.Metadata, "email")
-	subject := metadataString(target.Metadata, "sub")
+	email := misc.MetadataString(target.Metadata, "email")
+	subject := misc.MetadataString(target.Metadata, "sub")
 	if email == "" && subject == "" {
 		return false
 	}
@@ -204,16 +205,11 @@ func isHashedCredentialTarget(target *coreauth.Auth) bool {
 // case-insensitively; subjects are case-sensitive identifiers and must match
 // exactly.
 func identityMatches(targetEmail, targetSubject string, candidate *coreauth.Auth) bool {
-	candidateEmail := metadataString(candidate.Metadata, "email")
-	candidateSubject := metadataString(candidate.Metadata, "sub")
+	candidateEmail := misc.MetadataString(candidate.Metadata, "email")
+	candidateSubject := misc.MetadataString(candidate.Metadata, "sub")
 	emailMatches := targetEmail != "" && candidateEmail != "" && strings.EqualFold(targetEmail, candidateEmail)
 	emailConflicts := targetEmail != "" && candidateEmail != "" && !strings.EqualFold(targetEmail, candidateEmail)
 	subjectMatches := targetSubject != "" && candidateSubject != "" && targetSubject == candidateSubject
 	subjectConflicts := targetSubject != "" && candidateSubject != "" && targetSubject != candidateSubject
 	return (emailMatches || subjectMatches) && !emailConflicts && !subjectConflicts
-}
-
-func metadataString(metadata map[string]any, key string) string {
-	value, _ := metadata[key].(string)
-	return strings.TrimSpace(value)
 }

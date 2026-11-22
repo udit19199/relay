@@ -15,6 +15,7 @@ import (
 	xaiauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/xai"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/clienterror"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/proxyutil"
@@ -363,7 +364,7 @@ func (h *Handler) resolveXAIToken(ctx context.Context, auth *coreauth.Auth, requ
 	if tokenEndpoint != "" {
 		metadata["token_endpoint"] = tokenEndpoint
 	}
-	if stringValue(metadata, "base_url") == "" {
+	if misc.MetadataString(metadata, "base_url") == "" {
 		metadata["base_url"] = xaiauth.DefaultAPIBaseURL
 	}
 	metadata["last_refresh"] = now.UTC().Format(time.RFC3339)
@@ -435,13 +436,13 @@ func xaiTokenValue(auth *coreauth.Auth) string {
 		}
 	}
 	if auth.Metadata != nil {
-		if v := stringValue(auth.Metadata, "api_key"); v != "" {
+		if v := misc.MetadataString(auth.Metadata, "api_key"); v != "" {
 			return v
 		}
-		if v := stringValue(auth.Metadata, "access_token"); v != "" {
+		if v := misc.MetadataString(auth.Metadata, "access_token"); v != "" {
 			return v
 		}
-		if v := stringValue(auth.Metadata, "accessToken"); v != "" {
+		if v := misc.MetadataString(auth.Metadata, "accessToken"); v != "" {
 			return v
 		}
 	}
@@ -457,7 +458,7 @@ func xaiRefreshToken(auth *coreauth.Auth) string {
 	if auth == nil {
 		return ""
 	}
-	if v := stringValue(auth.Metadata, "refresh_token"); v != "" {
+	if v := misc.MetadataString(auth.Metadata, "refresh_token"); v != "" {
 		return v
 	}
 	if ts := xaiTokenStorage(auth); ts != nil {
@@ -470,7 +471,7 @@ func xaiTokenEndpoint(auth *coreauth.Auth) string {
 	if auth == nil {
 		return ""
 	}
-	if v := stringValue(auth.Metadata, "token_endpoint"); v != "" {
+	if v := misc.MetadataString(auth.Metadata, "token_endpoint"); v != "" {
 		return v
 	}
 	if ts := xaiTokenStorage(auth); ts != nil {
@@ -509,17 +510,17 @@ func xaiOAuthTokenNeedsRefresh(auth *coreauth.Auth) bool {
 	if temp.Metadata == nil {
 		temp.Metadata = make(map[string]any)
 	}
-	if stringValue(temp.Metadata, "access_token") == "" {
+	if misc.MetadataString(temp.Metadata, "access_token") == "" {
 		temp.Metadata["access_token"] = tokenStr
 	}
 	if ts := xaiTokenStorage(auth); ts != nil {
-		if stringValue(temp.Metadata, "expired") == "" && strings.TrimSpace(ts.Expire) != "" {
+		if misc.MetadataString(temp.Metadata, "expired") == "" && strings.TrimSpace(ts.Expire) != "" {
 			temp.Metadata["expired"] = strings.TrimSpace(ts.Expire)
 		}
 		if _, ok := temp.Metadata["expires_in"]; !ok && ts.ExpiresIn > 0 {
 			temp.Metadata["expires_in"] = ts.ExpiresIn
 		}
-		if stringValue(temp.Metadata, "last_refresh") == "" && strings.TrimSpace(ts.LastRefresh) != "" {
+		if misc.MetadataString(temp.Metadata, "last_refresh") == "" && strings.TrimSpace(ts.LastRefresh) != "" {
 			temp.Metadata["last_refresh"] = strings.TrimSpace(ts.LastRefresh)
 		}
 	}
@@ -545,7 +546,7 @@ func (h *Handler) refreshAntigravityOAuthAccessToken(ctx context.Context, auth *
 		return current, nil
 	}
 
-	refreshToken := stringValue(metadata, "refresh_token")
+	refreshToken := misc.MetadataString(metadata, "refresh_token")
 	if refreshToken == "" {
 		return "", fmt.Errorf("antigravity refresh token missing")
 	}
@@ -754,16 +755,6 @@ func int64Value(raw any) int64 {
 		}
 	}
 	return 0
-}
-
-func stringValue(metadata map[string]any, key string) string {
-	if len(metadata) == 0 || key == "" {
-		return ""
-	}
-	if v, ok := metadata[key].(string); ok {
-		return strings.TrimSpace(v)
-	}
-	return ""
 }
 
 func tokenValueFromMetadata(metadata map[string]any) string {

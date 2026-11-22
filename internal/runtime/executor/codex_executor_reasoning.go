@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	internalcache "github.com/router-for-me/CLIProxyAPI/v8/internal/cache"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/signature"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/thinking"
@@ -112,10 +113,10 @@ func codexReasoningReplaySessionKey(ctx context.Context, from sdktranslator.Form
 			return sessionKey
 		}
 	}
-	if value := metadataString(opts.Metadata, cliproxyexecutor.ExecutionSessionMetadataKey); value != "" {
+	if value := misc.MetadataString(opts.Metadata, cliproxyexecutor.ExecutionSessionMetadataKey); value != "" {
 		return "execution:" + value
 	}
-	if value := metadataString(req.Metadata, cliproxyexecutor.ExecutionSessionMetadataKey); value != "" {
+	if value := misc.MetadataString(req.Metadata, cliproxyexecutor.ExecutionSessionMetadataKey); value != "" {
 		return "execution:" + value
 	}
 	if value := codexReasoningReplaySessionKeyFromPayload(body); value != "" {
@@ -149,10 +150,10 @@ func codexReasoningReplaySessionKeyDoc(ctx context.Context, from sdktranslator.F
 			return sessionKey
 		}
 	}
-	if value := metadataString(opts.Metadata, cliproxyexecutor.ExecutionSessionMetadataKey); value != "" {
+	if value := misc.MetadataString(opts.Metadata, cliproxyexecutor.ExecutionSessionMetadataKey); value != "" {
 		return "execution:" + value
 	}
-	if value := metadataString(req.Metadata, cliproxyexecutor.ExecutionSessionMetadataKey); value != "" {
+	if value := misc.MetadataString(req.Metadata, cliproxyexecutor.ExecutionSessionMetadataKey); value != "" {
 		return "execution:" + value
 	}
 	if value := codexReasoningReplaySessionKeyFromDoc(doc); value != "" {
@@ -191,24 +192,6 @@ func codexReasoningReplaySessionKeyFromDoc(doc *ojson.Doc) string {
 		return codexReasoningReplaySessionKeyFromTurnMetadata(turnMetadata)
 	}
 	return ""
-}
-
-func metadataString(metadata map[string]any, key string) string {
-	if len(metadata) == 0 {
-		return ""
-	}
-	raw, ok := metadata[key]
-	if !ok || raw == nil {
-		return ""
-	}
-	switch v := raw.(type) {
-	case string:
-		return strings.TrimSpace(v)
-	case []byte:
-		return strings.TrimSpace(string(v))
-	default:
-		return ""
-	}
 }
 
 func codexReasoningReplaySessionKeyFromPayload(payload []byte) string {

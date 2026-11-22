@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
 	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
 	cliproxysession "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/session"
 )
@@ -29,7 +30,7 @@ func DerivedSessionUUID(provider string, metadataSets ...map[string]any) string 
 // ProviderSessionUUID prefers a long-lived execution session and falls back to the derived identity.
 func ProviderSessionUUID(provider string, metadataSets ...map[string]any) string {
 	for _, metadata := range metadataSets {
-		if executionID := metadataString(metadata, cliproxyexecutor.ExecutionSessionMetadataKey); executionID != "" {
+		if executionID := misc.MetadataString(metadata, cliproxyexecutor.ExecutionSessionMetadataKey); executionID != "" {
 			return stableProviderSessionUUID(provider, "execution-session", executionID)
 		}
 	}
@@ -55,12 +56,4 @@ func DerivedAntigravitySessionID(metadataSets ...map[string]any) string {
 	sum := sha256.Sum256([]byte("cli-proxy-api:antigravity:derived-session\x00" + derivedID))
 	value := int64(binary.BigEndian.Uint64(sum[:8])) & 0x7FFFFFFFFFFFFFFF
 	return "-" + strconv.FormatInt(value, 10)
-}
-
-func metadataString(metadata map[string]any, key string) string {
-	if metadata == nil {
-		return ""
-	}
-	value, _ := metadata[key].(string)
-	return strings.TrimSpace(value)
 }

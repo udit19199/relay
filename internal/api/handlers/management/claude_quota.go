@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 )
@@ -36,26 +37,22 @@ func isClaudeAuth(auth *coreauth.Auth) bool {
 }
 
 func claudeAccessToken(auth *coreauth.Auth) string {
-	if auth == nil || auth.Metadata == nil {
+	if auth == nil {
 		return ""
 	}
-	if v, ok := auth.Metadata["accessToken"].(string); ok && strings.TrimSpace(v) != "" {
-		return strings.TrimSpace(v)
+	if v := misc.MetadataString(auth.Metadata, "accessToken"); v != "" {
+		return v
 	}
-	if v, ok := auth.Metadata["access_token"].(string); ok && strings.TrimSpace(v) != "" {
-		return strings.TrimSpace(v)
-	}
-	return ""
+	return misc.MetadataString(auth.Metadata, "access_token")
 }
 
 // claudeTokenExpired reads the OAuth expiry the auth file records. A missing
 // or unparseable value counts as expired: a 401 already proved the token bad.
 func claudeTokenExpired(auth *coreauth.Auth) bool {
-	if auth == nil || auth.Metadata == nil {
+	if auth == nil {
 		return true
 	}
-	raw, _ := auth.Metadata["expired"].(string)
-	raw = strings.TrimSpace(raw)
+	raw := misc.MetadataString(auth.Metadata, "expired")
 	if raw == "" {
 		return true
 	}
@@ -132,11 +129,7 @@ func (h *Handler) refreshClaudeAuth(ctx context.Context, auth *coreauth.Auth) *c
 }
 
 func claudeHasRefreshToken(auth *coreauth.Auth) bool {
-	if auth == nil || auth.Metadata == nil {
-		return false
-	}
-	token, _ := auth.Metadata["refresh_token"].(string)
-	return strings.TrimSpace(token) != ""
+	return auth != nil && misc.MetadataString(auth.Metadata, "refresh_token") != ""
 }
 
 // parseClaudeUsage maps {"five_hour":{"utilization","resets_at"},

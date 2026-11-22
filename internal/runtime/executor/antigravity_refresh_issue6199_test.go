@@ -12,6 +12,7 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
 	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 )
 
@@ -177,10 +178,10 @@ func TestIssue6199AntigravityRefreshPublishesTokenWithoutWaitingForCredits(t *te
 			}
 		default:
 			current, _ := manager.GetByID(auth.ID)
-			t.Fatalf("OAuth succeeded but refresh is blocked by optional credits lookup (calls=%d); published access_token=%q, want new-access before credits completes", creditsCalls, metaStringValue(current.Metadata, "access_token"))
+			t.Fatalf("OAuth succeeded but refresh is blocked by optional credits lookup (calls=%d); published access_token=%q, want new-access before credits completes", creditsCalls, misc.MetadataString(current.Metadata, "access_token"))
 		}
 		current, exists := manager.GetByID(auth.ID)
-		if !exists || metaStringValue(current.Metadata, "access_token") != "new-access" || !current.HasValidAccessToken(time.Now()) {
+		if !exists || misc.MetadataString(current.Metadata, "access_token") != "new-access" || !current.HasValidAccessToken(time.Now()) {
 			t.Fatalf("published auth = %#v, want refreshed usable access token while credits is blocked", current)
 		}
 	})

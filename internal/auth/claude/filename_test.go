@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 )
 
@@ -153,8 +154,8 @@ func TestFindMatchingLegacyCredential(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			target := &coreauth.Auth{
-				ID:       CredentialFileName(email, metadataString(tt.targetMetadata, "organization_uuid"), metadataString(tt.targetMetadata, "account_uuid")),
-				FileName: CredentialFileName(email, metadataString(tt.targetMetadata, "organization_uuid"), metadataString(tt.targetMetadata, "account_uuid")),
+				ID:       CredentialFileName(email, misc.MetadataString(tt.targetMetadata, "organization_uuid"), misc.MetadataString(tt.targetMetadata, "account_uuid")),
+				FileName: CredentialFileName(email, misc.MetadataString(tt.targetMetadata, "organization_uuid"), misc.MetadataString(tt.targetMetadata, "account_uuid")),
 				Provider: "claude",
 				Metadata: tt.targetMetadata,
 			}

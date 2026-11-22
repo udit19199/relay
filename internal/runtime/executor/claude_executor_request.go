@@ -1868,7 +1868,7 @@ func resolveClaudeMCPAliasOptions(ctx context.Context, metadataSets ...map[strin
 
 func callerScopeFromMetadataSets(metadataSets ...map[string]any) string {
 	for _, metadata := range metadataSets {
-		if scope := metadataString(metadata, cliproxyexecutor.CallerScopeMetadataKey); scope != "" {
+		if scope := misc.MetadataString(metadata, cliproxyexecutor.CallerScopeMetadataKey); scope != "" {
 			return scope
 		}
 	}

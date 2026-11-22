@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
 	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/httptransport"
@@ -423,10 +424,10 @@ func proxyPoolCredentialSecretScope(auth *cliproxyauth.Auth) string {
 	if auth == nil {
 		return ""
 	}
-	if refresh := authMetadataString(auth.Metadata, "refresh_token"); refresh != "" {
+	if refresh := misc.MetadataString(auth.Metadata, "refresh_token"); refresh != "" {
 		return proxyPoolSecretScope("refresh:", refresh)
 	}
-	if access := authMetadataString(auth.Metadata, "access_token"); access != "" {
+	if access := misc.MetadataString(auth.Metadata, "access_token"); access != "" {
 		return proxyPoolSecretScope("token:", access)
 	}
 	if auth.Attributes != nil {
@@ -442,18 +443,6 @@ func proxyPoolCredentialSecretScope(auth *cliproxyauth.Auth) string {
 func proxyPoolSecretScope(prefix, secret string) string {
 	digest := sha256.Sum256([]byte(secret))
 	return prefix + hex.EncodeToString(digest[:8])
-}
-
-func authMetadataString(metadata map[string]any, key string) string {
-	if metadata == nil {
-		return ""
-	}
-	value, ok := metadata[key]
-	if !ok {
-		return ""
-	}
-	text, _ := value.(string)
-	return strings.TrimSpace(text)
 }
 
 // unpooledTransport constructs a one-off transport for an opted-in credential that
