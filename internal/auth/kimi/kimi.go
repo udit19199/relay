@@ -113,95 +113,64 @@ func ResolveKimiAPIBaseURL(domain string) string {
 	return KimiAPIBaseURL
 }
 
+func classifyDomain(value string) (string, bool) {
+	if IsKimiAIDomain(value) {
+		return KimiAIDomain, true
+	}
+	if IsKimiComDomain(value) {
+		return KimiDefaultDomain, true
+	}
+	return "", false
+}
+
+func classifyHost(rawURL string) (string, bool) {
+	if isKimiAIHost(rawURL) {
+		return KimiAIDomain, true
+	}
+	if isKimiComHost(rawURL) {
+		return KimiDefaultDomain, true
+	}
+	return "", false
+}
+
 // ResolveKimiDomainFromAuth detects whether an Auth represents kimi.ai or kimi.com.
 // Explicit configurations (domain, base_url, type) take precedence over file names.
 func ResolveKimiDomainFromAuth(auth *cliproxyauth.Auth) string {
 	if auth == nil {
 		return KimiDefaultDomain
 	}
-	// 1. Attributes
-	if auth.Attributes != nil {
-		if dom := auth.Attributes["domain"]; dom != "" {
-			if IsKimiAIDomain(dom) {
-				return KimiAIDomain
-			}
-			if IsKimiComDomain(dom) {
-				return KimiDefaultDomain
-			}
-		}
-		if bu := auth.Attributes["base_url"]; bu != "" {
-			if isKimiAIHost(bu) {
-				return KimiAIDomain
-			}
-			if isKimiComHost(bu) {
-				return KimiDefaultDomain
-			}
-		}
+	type candidate struct {
+		value string
+		isURL bool
 	}
-	// 2. Metadata
-	if auth.Metadata != nil {
-		if dom, ok := auth.Metadata["domain"].(string); ok && strings.TrimSpace(dom) != "" {
-			if IsKimiAIDomain(dom) {
-				return KimiAIDomain
-			}
-			if IsKimiComDomain(dom) {
-				return KimiDefaultDomain
-			}
-		}
-		if bu, ok := auth.Metadata["base_url"].(string); ok && strings.TrimSpace(bu) != "" {
-			if isKimiAIHost(bu) {
-				return KimiAIDomain
-			}
-			if isKimiComHost(bu) {
-				return KimiDefaultDomain
-			}
-		}
-		if t, ok := auth.Metadata["type"].(string); ok && strings.TrimSpace(t) != "" {
-			if IsKimiAIDomain(t) {
-				return KimiAIDomain
-			}
-			if IsKimiComDomain(t) {
-				return KimiDefaultDomain
-			}
-		}
+	metaDomain, _ := auth.Metadata["domain"].(string)
+	metaBaseURL, _ := auth.Metadata["base_url"].(string)
+	metaType, _ := auth.Metadata["type"].(string)
+	candidates := []candidate{
+		{auth.Attributes["domain"], false},
+		{auth.Attributes["base_url"], true},
+		{metaDomain, false},
+		{metaBaseURL, true},
+		{metaType, false},
 	}
-	// 3. Storage
 	if storage, ok := auth.Storage.(*KimiTokenStorage); ok && storage != nil {
-		if storage.Domain != "" {
-			if IsKimiAIDomain(storage.Domain) {
-				return KimiAIDomain
-			}
-			if IsKimiComDomain(storage.Domain) {
-				return KimiDefaultDomain
-			}
+		candidates = append(candidates,
+			candidate{storage.Domain, false},
+			candidate{storage.BaseURL, true},
+			candidate{storage.Type, false},
+		)
+	}
+	candidates = append(candidates, candidate{auth.Provider, false})
+	for _, c := range candidates {
+		classify := classifyDomain
+		if c.isURL {
+			classify = classifyHost
 		}
-		if storage.BaseURL != "" {
-			if isKimiAIHost(storage.BaseURL) {
-				return KimiAIDomain
-			}
-			if isKimiComHost(storage.BaseURL) {
-				return KimiDefaultDomain
-			}
-		}
-		if storage.Type != "" {
-			if IsKimiAIDomain(storage.Type) {
-				return KimiAIDomain
-			}
-			if IsKimiComDomain(storage.Type) {
-				return KimiDefaultDomain
-			}
+		if domain, ok := classify(c.value); ok {
+			return domain
 		}
 	}
-	// 4. Provider
-	if auth.Provider != "" {
-		if IsKimiAIDomain(auth.Provider) {
-			return KimiAIDomain
-		}
-		if IsKimiComDomain(auth.Provider) {
-			return KimiDefaultDomain
-		}
-	}
-	// 5. File name fallback when no explicit domain information is present
+	// File name fallback when no explicit domain information is present
 	id := strings.ToLower(auth.ID)
 	fileName := strings.ToLower(auth.FileName)
 	if strings.Contains(id, "kimi-ai") || strings.Contains(id, "kimi.ai") ||
