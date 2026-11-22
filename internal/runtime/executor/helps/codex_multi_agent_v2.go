@@ -18,29 +18,10 @@ import (
 	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
 )
 
-// RewriteCodexSpawnAgentDescription optimizes spawn_agent definitions for
-// official Codex clients when multi-agent v2 optimization is enabled.
-func RewriteCodexSpawnAgentDescription(ctx context.Context, headers http.Header, payload []byte, cfg *config.Config) []byte {
-	return multiagentv2.RewriteCodexSpawnAgentDescription(ctx, headers, payload, cfg)
-}
-
-// RewriteCodexMultiAgentV2Input converts official Codex multi-agent input into
-// standard Responses API messages when multi-agent v2 optimization is enabled.
-func RewriteCodexMultiAgentV2Input(ctx context.Context, headers http.Header, payload []byte, cfg *config.Config) []byte {
-	return multiagentv2.RewriteCodexMultiAgentV2Input(ctx, headers, payload, cfg)
-}
-
 // RewriteCodexMultiAgentV2InputDoc converts official Codex multi-agent input into
 // standard Responses API messages in place on doc when multi-agent v2 optimization is enabled.
 func RewriteCodexMultiAgentV2InputDoc(doc *ojson.Doc, ctx context.Context, headers http.Header, cfg *config.Config) bool {
 	return multiagentv2.RewriteCodexMultiAgentV2InputDoc(doc, ctx, headers, cfg)
-}
-
-// RewriteCodexOrphanDelegationInput converts orphan Codex delegation outputs into
-// standard user messages when orphan delegation compatibility is enabled and the
-// request carries the X-Openai-Subagent: collab_spawn header.
-func RewriteCodexOrphanDelegationInput(ctx context.Context, headers http.Header, payload []byte, cfg *config.Config) []byte {
-	return multiagentv2.RewriteCodexOrphanDelegationInputForConfig(ctx, headers, payload, cfg)
 }
 
 // RewriteCodexOrphanDelegationInputDoc converts orphan Codex delegation outputs into
@@ -52,13 +33,7 @@ func RewriteCodexOrphanDelegationInputDoc(doc *ojson.Doc, ctx context.Context, h
 // TranslateRequestWithCodexMultiAgentV2 normalizes official Codex multi-agent
 // input before translating it to a non-Codex target protocol.
 func TranslateRequestWithCodexMultiAgentV2(ctx context.Context, headers http.Header, cfg *config.Config, from, to sdktranslator.Format, model string, payload []byte, stream bool) []byte {
-	return TranslateRequestWithCodexMultiAgentV2ForExecutor(ctx, headers, cfg, "", from, to, model, payload, stream)
-}
-
-// TranslateRequestWithCodexMultiAgentV2ForExecutor applies Codex client
-// compatibility while respecting the actual target executor identity.
-func TranslateRequestWithCodexMultiAgentV2ForExecutor(ctx context.Context, headers http.Header, cfg *config.Config, targetExecutor string, from, to sdktranslator.Format, model string, payload []byte, stream bool) []byte {
-	if IsCodexUserAgent(headers) && !isCodexTargetExecutor(targetExecutor) {
+	if IsCodexUserAgent(headers) {
 		payload = NormalizeCodexToolIntegerTypes(payload, headers)
 	}
 	return multiagentv2.TranslateRequestWithCodexMultiAgentV2(ctx, headers, cfg, from, to, model, payload, stream)
