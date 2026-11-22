@@ -1051,7 +1051,6 @@ func fixCLIToolResponseDocAt(doc *ojson.Doc, prefix string) (bool, error) {
 		return false, nil
 	}
 
-	// Initialize data structures for processing and grouping
 	contentItems := translatorcommon.NewRawArrayItems(contents.Get("#").Int())
 	var pendingGroups []*FunctionCallGroup // Groups awaiting completion with responses
 	var collectedResponses []ojson.Result  // Standalone responses to be matched
@@ -1070,8 +1069,6 @@ func fixCLIToolResponseDocAt(doc *ojson.Doc, prefix string) (bool, error) {
 		}
 	}
 
-	// Process each content object in the conversation
-	// This iterates through messages and groups function calls with their responses
 	contents.ForEach(func(key, value ojson.Result) bool {
 		role := value.Get("role").String()
 		parts := value.Get("parts")
@@ -1079,7 +1076,6 @@ func fixCLIToolResponseDocAt(doc *ojson.Doc, prefix string) (bool, error) {
 		// Collect function responses and attach sibling inlineData to the nearest one.
 		responsePartsInThisContent := collectFunctionResponsesWithSiblingInlineData(parts)
 
-		// If this content has function responses, collect them
 		if len(responsePartsInThisContent) > 0 {
 			collectedResponses = append(collectedResponses, responsePartsInThisContent...)
 
@@ -1088,7 +1084,6 @@ func fixCLIToolResponseDocAt(doc *ojson.Doc, prefix string) (bool, error) {
 				group := pendingGroups[0]
 				pendingGroups = pendingGroups[1:]
 
-				// Take the needed responses for this group
 				var groupResponses []ojson.Result
 				groupResponses, collectedResponses = selectGroupResponses(collectedResponses, group)
 
@@ -1103,7 +1098,6 @@ func fixCLIToolResponseDocAt(doc *ojson.Doc, prefix string) (bool, error) {
 			return true // Skip adding this content, responses are merged
 		}
 
-		// If this is a model with function calls, create a new group
 		if role == "model" {
 			var callIDs []string
 			var callNames []string
@@ -1116,14 +1110,12 @@ func fixCLIToolResponseDocAt(doc *ojson.Doc, prefix string) (bool, error) {
 			})
 
 			if len(callNames) > 0 {
-				// Add the model content
 				if !value.IsObject() {
 					log.Warnf("failed to parse model content")
 					return true
 				}
 				contentItems = append(contentItems, []byte(value.Raw))
 
-				// Create a new group for tracking responses
 				group := &FunctionCallGroup{
 					ResponsesNeeded: len(callNames),
 					CallIDs:         callIDs,
@@ -1131,7 +1123,6 @@ func fixCLIToolResponseDocAt(doc *ojson.Doc, prefix string) (bool, error) {
 				}
 				pendingGroups = append(pendingGroups, group)
 			} else {
-				// Regular model content without function calls
 				if !value.IsObject() {
 					log.Warnf("failed to parse content")
 					return true
