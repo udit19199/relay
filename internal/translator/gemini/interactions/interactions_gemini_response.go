@@ -50,9 +50,9 @@ func ConvertInteractionsResponseToGeminiNonStream(_ context.Context, modelName s
 		interaction = nested
 	}
 	st := &interactionsToGeminiStreamState{
-		ID:          firstNonEmptyInteractionString(interaction.Get("id").String(), root.Get("id").String(), fmt.Sprintf("response_%d", time.Now().UnixNano())),
-		Model:       firstNonEmptyInteractionString(interaction.Get("model").String(), root.Get("model").String(), modelName),
-		ServiceTier: firstNonEmptyInteractionString(interaction.Get("service_tier").String(), root.Get("service_tier").String()),
+		ID:          util.FirstNonEmpty(interaction.Get("id").String(), root.Get("id").String(), fmt.Sprintf("response_%d", time.Now().UnixNano())),
+		Model:       util.FirstNonEmpty(interaction.Get("model").String(), root.Get("model").String(), modelName),
+		ServiceTier: util.FirstNonEmpty(interaction.Get("service_tier").String(), root.Get("service_tier").String()),
 	}
 	var parts [][]byte
 	steps := interaction.Get("steps")
@@ -96,8 +96,8 @@ func convertInteractionsEventToGemini(modelName string, rawJSON []byte, st *inte
 	switch root.Get("event_type").String() {
 	case "interaction.created":
 		interaction := root.Get("interaction")
-		st.ID = strings.Clone(firstNonEmptyInteractionString(st.ID, interaction.Get("id").String()))
-		st.Model = strings.Clone(firstNonEmptyInteractionString(st.Model, interaction.Get("model").String(), modelName))
+		st.ID = strings.Clone(util.FirstNonEmpty(st.ID, interaction.Get("id").String()))
+		st.Model = strings.Clone(util.FirstNonEmpty(st.Model, interaction.Get("model").String(), modelName))
 	case "step.start":
 		rememberInteractionsGeminiStep(root, st)
 	case "step.delta":
@@ -106,9 +106,9 @@ func convertInteractionsEventToGemini(modelName string, rawJSON []byte, st *inte
 		}
 	case "interaction.completed", "finish":
 		interaction := root.Get("interaction")
-		st.ID = strings.Clone(firstNonEmptyInteractionString(st.ID, interaction.Get("id").String()))
-		st.Model = strings.Clone(firstNonEmptyInteractionString(st.Model, interaction.Get("model").String(), modelName))
-		st.ServiceTier = strings.Clone(firstNonEmptyInteractionString(st.ServiceTier, interaction.Get("service_tier").String()))
+		st.ID = strings.Clone(util.FirstNonEmpty(st.ID, interaction.Get("id").String()))
+		st.Model = strings.Clone(util.FirstNonEmpty(st.Model, interaction.Get("model").String(), modelName))
+		st.ServiceTier = strings.Clone(util.FirstNonEmpty(st.ServiceTier, interaction.Get("service_tier").String()))
 		chunk := buildInteractionsGeminiChunk(st, modelName, nil, "STOP", translatorcommon.InteractionsUsage(root), true)
 		return [][]byte{chunk}
 	case "response.failed", "interaction.failed":
@@ -120,7 +120,7 @@ func convertInteractionsEventToGemini(modelName string, rawJSON []byte, st *inte
 		if msg == "" {
 			msg = "upstream error occurred"
 		}
-		codeVal := firstNonEmptyInteractionString(errNode.Get("code").String(), root.Get("code").String(), errNode.Get("status").String())
+		codeVal := util.FirstNonEmpty(errNode.Get("code").String(), root.Get("code").String(), errNode.Get("status").String())
 		statusCode, statusText := mapInteractionsErrorToGemini(codeVal)
 		errorResponseDoc := ojson.NewDocString(`{"error":{"code":500,"message":"","status":"INTERNAL"}}`)
 		_ = errorResponseDoc.Set("error.code", statusCode)
@@ -167,8 +167,8 @@ func rememberInteractionsGeminiStep(root ojson.Result, st *interactionsToGeminiS
 	index := int(root.Get("index").Int())
 	step := root.Get("step")
 	st.StepNames[index] = strings.Clone(step.Get("name").String())
-	st.StepIDs[index] = strings.Clone(firstNonEmptyInteractionString(step.Get("call_id").String(), step.Get("id").String()))
-	st.StepSignatures[index] = strings.Clone(firstNonEmptyInteractionString(step.Get("signature").String(), step.Get("thoughtSignature").String(), step.Get("thought_signature").String()))
+	st.StepIDs[index] = strings.Clone(util.FirstNonEmpty(step.Get("call_id").String(), step.Get("id").String()))
+	st.StepSignatures[index] = strings.Clone(util.FirstNonEmpty(step.Get("signature").String(), step.Get("thoughtSignature").String(), step.Get("thought_signature").String()))
 }
 
 func interactionsStepDeltaToGeminiChunk(modelName string, root ojson.Result, st *interactionsToGeminiStreamState) []byte {
@@ -177,7 +177,7 @@ func interactionsStepDeltaToGeminiChunk(modelName string, root ojson.Result, st 
 	switch delta.Get("type").String() {
 	case "arguments_delta":
 		partDoc := ojson.NewDocString(`{"functionCall":{"name":"","args":{}}}`)
-		_ = partDoc.Set("functionCall.name", firstNonEmptyInteractionString(st.StepNames[index], root.Get("step.name").String()))
+		_ = partDoc.Set("functionCall.name", util.FirstNonEmpty(st.StepNames[index], root.Get("step.name").String()))
 		if id := st.StepIDs[index]; id != "" {
 			_ = partDoc.Set("functionCall.id", id)
 		}
@@ -190,19 +190,19 @@ func interactionsStepDeltaToGeminiChunk(modelName string, root ojson.Result, st 
 		}
 		return buildInteractionsGeminiChunk(st, modelName, [][]byte{partDoc.Bytes()}, "", ojson.Result{}, false)
 	case "text":
-		text := firstNonEmptyInteractionString(delta.Get("text").String(), delta.Get("content.text").String())
+		text := util.FirstNonEmpty(delta.Get("text").String(), delta.Get("content.text").String())
 		if text == "" {
 			return nil
 		}
 		return buildInteractionsGeminiChunk(st, modelName, [][]byte{geminiTextPartJSON(text, false)}, "", ojson.Result{}, false)
 	case "thought_summary":
-		text := firstNonEmptyInteractionString(delta.Get("content.text").String(), delta.Get("text").String())
+		text := util.FirstNonEmpty(delta.Get("content.text").String(), delta.Get("text").String())
 		if text == "" {
 			return nil
 		}
 		return buildInteractionsGeminiChunk(st, modelName, [][]byte{geminiTextPartJSON(text, true)}, "", ojson.Result{}, false)
 	case "thought_signature":
-		signature := strings.Clone(firstNonEmptyInteractionString(delta.Get("signature").String(), delta.Get("thought_signature").String(), delta.Get("thoughtSignature").String()))
+		signature := strings.Clone(util.FirstNonEmpty(delta.Get("signature").String(), delta.Get("thought_signature").String(), delta.Get("thoughtSignature").String()))
 		if signature == "" {
 			return nil
 		}
@@ -255,10 +255,10 @@ func interactionsContentToGeminiParts(content ojson.Result, thought bool) [][]by
 func interactionsFunctionCallStepToGeminiPart(step ojson.Result) []byte {
 	partDoc := ojson.NewDocString(`{"functionCall":{"name":"","args":{}}}`)
 	_ = partDoc.Set("functionCall.name", step.Get("name").String())
-	if id := firstNonEmptyInteractionString(step.Get("call_id").String(), step.Get("id").String()); id != "" {
+	if id := util.FirstNonEmpty(step.Get("call_id").String(), step.Get("id").String()); id != "" {
 		_ = partDoc.Set("functionCall.id", id)
 	}
-	if signature := firstNonEmptyInteractionString(step.Get("signature").String(), step.Get("thoughtSignature").String(), step.Get("thought_signature").String()); signature != "" {
+	if signature := util.FirstNonEmpty(step.Get("signature").String(), step.Get("thoughtSignature").String(), step.Get("thought_signature").String()); signature != "" {
 		_ = partDoc.Set("thoughtSignature", signature)
 	}
 	setInteractionsGeminiRawObjectDoc(partDoc, "functionCall.args", firstExistingInteractionResult(step, "arguments", "args"))
@@ -268,7 +268,7 @@ func interactionsFunctionCallStepToGeminiPart(step ojson.Result) []byte {
 func interactionsFunctionResponseStepToGeminiPart(step ojson.Result) []byte {
 	partDoc := ojson.NewDocString(`{"functionResponse":{"name":"","response":{}}}`)
 	_ = partDoc.Set("functionResponse.name", step.Get("name").String())
-	if id := firstNonEmptyInteractionString(step.Get("call_id").String(), step.Get("id").String()); id != "" {
+	if id := util.FirstNonEmpty(step.Get("call_id").String(), step.Get("id").String()); id != "" {
 		_ = partDoc.Set("functionResponse.id", id)
 	}
 	setInteractionsGeminiFunctionResponseDoc(partDoc, "functionResponse.response", firstExistingInteractionResult(step, "result", "response"))
@@ -292,7 +292,7 @@ func buildInteractionsGeminiChunk(st *interactionsToGeminiStreamState, modelName
 	if finishReason != "" {
 		_ = outDoc.Set("candidates.0.finishReason", finishReason)
 	}
-	if model := firstNonEmptyInteractionString(st.Model, modelName); model != "" {
+	if model := util.FirstNonEmpty(st.Model, modelName); model != "" {
 		_ = outDoc.Set("modelVersion", model)
 	}
 	if id := st.ID; id != "" {
@@ -408,15 +408,6 @@ func setInteractionsGeminiFunctionResponseDoc(doc *ojson.Doc, path string, value
 	if value.Raw != "" {
 		translatorcommon.SetGeminiFunctionResponseResultDoc(doc, path, value)
 	}
-}
-
-func firstNonEmptyInteractionString(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return value
-		}
-	}
-	return ""
 }
 
 func (st *interactionsToGeminiStreamState) ensureMaps() {

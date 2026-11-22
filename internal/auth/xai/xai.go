@@ -438,7 +438,7 @@ func (a *XAIAuth) CreateTokenStorage(bundle *AuthBundle) *TokenStorage {
 		LastRefresh:   bundle.LastRefresh,
 		Email:         strings.TrimSpace(bundle.TokenData.Email),
 		Subject:       bundle.TokenData.Subject,
-		BaseURL:       firstNonEmpty(bundle.BaseURL, DefaultAPIBaseURL),
+		BaseURL:       util.FirstNonEmptyTrimmed(bundle.BaseURL, DefaultAPIBaseURL),
 		RedirectURI:   bundle.RedirectURI,
 		TokenEndpoint: bundle.TokenEndpoint,
 		AuthKind:      "oauth",
@@ -482,13 +482,4 @@ func parseJWTIdentity(token string) (email string, subject string) {
 		subject = strings.TrimSpace(v)
 	}
 	return email, subject
-}
-
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if trimmed := strings.TrimSpace(value); trimmed != "" {
-			return trimmed
-		}
-	}
-	return ""
 }

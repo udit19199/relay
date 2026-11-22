@@ -130,7 +130,7 @@ func ConvertInteractionsResponseToOpenAIResponsesNonStream(ctx context.Context, 
 	_ = requestRawJSON
 	root := util.ParseGJSONBytesNoCopy(rawJSON)
 	outDoc := ojson.NewDocString(`{"id":"","object":"response","status":"completed","model":"","output":[]}`)
-	_ = outDoc.Set("id", firstNonEmpty(root.Get("id").String(), root.Get("interaction.id").String()))
+	_ = outDoc.Set("id", util.FirstNonEmpty(root.Get("id").String(), root.Get("interaction.id").String()))
 	_ = outDoc.Set("model", responseModel(modelName, root))
 	steps := root.Get("steps")
 	if !steps.Exists() {
@@ -153,7 +153,7 @@ func ConvertInteractionsResponseToOpenAIResponsesNonStream(ctx context.Context, 
 		}
 	}
 	var toolInputError error
-	status := firstNonEmpty(root.Get("status").String(), root.Get("interaction.status").String())
+	status := util.FirstNonEmpty(root.Get("status").String(), root.Get("interaction.status").String())
 	sourceError := firstExisting(root.Get("error"), root.Get("interaction.error"))
 	if patchEnabled && (status == "failed" || (sourceError.Exists() && sourceError.Type != ojson.Null)) {
 		toolInputError = fmt.Errorf("upstream apply_patch interaction failed")
@@ -194,8 +194,8 @@ func ConvertInteractionsResponseToOpenAIResponsesNonStream(ctx context.Context, 
 	if len(outputs) > 0 {
 		_ = outDoc.SetRawBytes("output", translatorcommon.JoinRawArray(outputs))
 	}
-	interactionStatus := firstNonEmpty(root.Get("status").String(), root.Get("interaction.status").String())
-	interactionFinishReason := firstNonEmpty(root.Get("finish_reason").String(), root.Get("interaction.finish_reason").String())
+	interactionStatus := util.FirstNonEmpty(root.Get("status").String(), root.Get("interaction.status").String())
+	interactionFinishReason := util.FirstNonEmpty(root.Get("finish_reason").String(), root.Get("interaction.finish_reason").String())
 	if interactionFinishReason == "content_filter" {
 		_ = outDoc.Set("status", "incomplete")
 		_ = outDoc.Set("incomplete_details.reason", "content_filter")
@@ -203,7 +203,7 @@ func ConvertInteractionsResponseToOpenAIResponsesNonStream(ctx context.Context, 
 		_ = outDoc.Set("status", "incomplete")
 		_ = outDoc.Set("incomplete_details.reason", "max_output_tokens")
 	}
-	if envID := firstNonEmpty(root.Get("environment_id").String(), root.Get("interaction.environment_id").String(), root.Get("environment.id").String(), root.Get("interaction.environment.id").String()); envID != "" {
+	if envID := util.FirstNonEmpty(root.Get("environment_id").String(), root.Get("interaction.environment_id").String(), root.Get("environment.id").String(), root.Get("interaction.environment.id").String()); envID != "" {
 		_ = outDoc.Set("environment_id", envID)
 	}
 	setResponsesUsageFromInteractionsDoc(outDoc, "usage", translatorcommon.InteractionsUsage(root))
@@ -323,7 +323,7 @@ func interactionsStepToResponsesOutput(step ojson.Result, forAntigravity bool, t
 	switch step.Get("type").String() {
 	case "model_output":
 		itemDoc := ojson.NewDocString(`{"type":"message","role":"assistant","content":[]}`)
-		if id := firstNonEmpty(step.Get("id").String(), step.Get("step_id").String()); id != "" {
+		if id := util.FirstNonEmpty(step.Get("id").String(), step.Get("step_id").String()); id != "" {
 			_ = itemDoc.Set("id", id)
 		}
 		content := step.Get("content")
@@ -371,13 +371,13 @@ func interactionsStepToResponsesOutput(step ojson.Result, forAntigravity bool, t
 func responsesCreatedEvent(modelName string, originalRequestRawJSON, requestRawJSON []byte, root ojson.Result, st *interactionsToResponsesStreamState) []byte {
 	payloadDoc := ojson.NewDocString(`{"type":"response.created","response":{"id":"","object":"response","status":"in_progress","model":"","output":[]}}`)
 	_ = payloadDoc.Set("sequence_number", nextResponsesSeq(st))
-	id := firstNonEmpty(root.Get("interaction.id").String(), root.Get("id").String())
+	id := util.FirstNonEmpty(root.Get("interaction.id").String(), root.Get("id").String())
 	if st != nil && id != "" {
 		st.ID = strings.Clone(id)
 	}
 	_ = payloadDoc.Set("response.id", id)
 	_ = payloadDoc.Set("response.model", modelName)
-	if envID := firstNonEmpty(root.Get("interaction.environment_id").String(), root.Get("environment_id").String(), root.Get("environment.id").String(), root.Get("interaction.environment.id").String()); envID != "" {
+	if envID := util.FirstNonEmpty(root.Get("interaction.environment_id").String(), root.Get("environment_id").String(), root.Get("environment.id").String(), root.Get("interaction.environment.id").String()); envID != "" {
 		if st != nil {
 			st.EnvironmentID = strings.Clone(envID)
 		}
@@ -404,7 +404,7 @@ func interactionsStepStartToResponses(modelName string, root ojson.Result, st *i
 	if call := st.FunctionCalls[index]; call != nil && (call.PatchCall != nil || st.ToolIdentityMap[call.RawName].ApplyPatch || (call.RawName == "" && interactionsHasPatchBridge(st))) {
 		return interactionsUpdateFunctionCall(index, step, st, true)
 	}
-	itemID := firstNonEmpty(step.Get("id").String(), step.Get("call_id").String(), interactionsFallbackItemID(st, index))
+	itemID := util.FirstNonEmpty(step.Get("id").String(), step.Get("call_id").String(), interactionsFallbackItemID(st, index))
 	if stepType == "function_call" {
 		return interactionsUpdateFunctionCall(index, step, st, true)
 	}
@@ -470,7 +470,7 @@ func interactionsStepDeltaToResponses(root ojson.Result, st *interactionsToRespo
 	delta := root.Get("delta")
 	switch delta.Get("type").String() {
 	case "thought_summary":
-		text := firstNonEmpty(delta.Get("content.text").String(), delta.Get("text").String())
+		text := util.FirstNonEmpty(delta.Get("content.text").String(), delta.Get("text").String())
 		recordResponsesReasoningSummary(st, index, text)
 		payloadDoc := ojson.NewDocString(`{"type":"response.reasoning_summary_text.delta","item_id":"","output_index":0,"summary_index":0,"delta":""}`)
 		_ = payloadDoc.Set("sequence_number", nextResponsesSeq(st))
@@ -724,8 +724,8 @@ func responsesCompletedEvent(modelName string, root ojson.Result, st *interactio
 	eventType := "response.completed"
 	status := "completed"
 	interaction := root.Get("interaction")
-	interactionStatus := firstNonEmpty(interaction.Get("status").String(), root.Get("status").String())
-	interactionFinishReason := firstNonEmpty(interaction.Get("finish_reason").String(), root.Get("finish_reason").String())
+	interactionStatus := util.FirstNonEmpty(interaction.Get("status").String(), root.Get("status").String())
+	interactionFinishReason := util.FirstNonEmpty(interaction.Get("finish_reason").String(), root.Get("finish_reason").String())
 	var incompleteReason string
 	if interactionFinishReason == "content_filter" {
 		eventType = "response.incomplete"
@@ -743,9 +743,9 @@ func responsesCompletedEvent(modelName string, root ojson.Result, st *interactio
 		_ = payloadDoc.Set("response.incomplete_details.reason", incompleteReason)
 	}
 	_ = payloadDoc.Set("sequence_number", nextResponsesSeq(st))
-	_ = payloadDoc.Set("response.id", firstNonEmpty(interaction.Get("id").String(), root.Get("id").String()))
-	_ = payloadDoc.Set("response.model", firstNonEmpty(interaction.Get("model").String(), modelName))
-	envID := firstNonEmpty(interaction.Get("environment_id").String(), root.Get("environment_id").String(), interaction.Get("environment.id").String(), root.Get("environment.id").String())
+	_ = payloadDoc.Set("response.id", util.FirstNonEmpty(interaction.Get("id").String(), root.Get("id").String()))
+	_ = payloadDoc.Set("response.model", util.FirstNonEmpty(interaction.Get("model").String(), modelName))
+	envID := util.FirstNonEmpty(interaction.Get("environment_id").String(), root.Get("environment_id").String(), interaction.Get("environment.id").String(), root.Get("environment.id").String())
 	if envID == "" && st != nil {
 		envID = st.EnvironmentID
 	}
@@ -762,12 +762,12 @@ func responsesFailedEvent(modelName string, root ojson.Result, st *interactionsT
 	payloadDoc := ojson.NewDocString(`{"type":"response.failed","response":{"id":"","object":"response","status":"failed","model":"","output":[],"error":{"message":"","code":"","type":"server_error"}}}`)
 	_ = payloadDoc.Set("sequence_number", nextResponsesSeq(st))
 	interaction := root.Get("interaction")
-	id := firstNonEmpty(interaction.Get("id").String(), root.Get("id").String())
+	id := util.FirstNonEmpty(interaction.Get("id").String(), root.Get("id").String())
 	if id == "" && st != nil {
 		id = st.ID
 	}
 	_ = payloadDoc.Set("response.id", id)
-	_ = payloadDoc.Set("response.model", firstNonEmpty(interaction.Get("model").String(), modelName))
+	_ = payloadDoc.Set("response.model", util.FirstNonEmpty(interaction.Get("model").String(), modelName))
 	errNode := root.Get("error")
 	if !errNode.Exists() && interaction.Exists() {
 		errNode = interaction.Get("error")
@@ -807,7 +807,7 @@ func interactionsThoughtSignature(step ojson.Result) string {
 	if content.IsArray() {
 		var signature string
 		content.ForEach(func(_, part ojson.Result) bool {
-			candidate := firstNonEmpty(
+			candidate := util.FirstNonEmpty(
 				part.Get("signature").String(),
 				part.Get("thought_signature").String(),
 				part.Get("thoughtSignature").String(),
@@ -1104,7 +1104,7 @@ func openAIResponsesOutputItemAddedToInteractions(modelName string, root ojson.R
 			name = translatorcommon.AntigravityToolNameToUpstream(name)
 		}
 		_ = stepDoc.Set("name", name)
-		if callID := firstNonEmpty(item.Get("call_id").String(), item.Get("id").String()); callID != "" {
+		if callID := util.FirstNonEmpty(item.Get("call_id").String(), item.Get("id").String()); callID != "" {
 			_ = stepDoc.Set("id", callID)
 			_ = stepDoc.Set("call_id", callID)
 			st.FunctionCallIndexes[strings.Clone(callID)] = st.StepIndex
@@ -1198,7 +1198,7 @@ func appendInteractionsCreatedDirect(out [][]byte, st *responsesToInteractionsSt
 	if st.Created {
 		return out
 	}
-	st.ID = strings.Clone(firstNonEmpty(response.Get("id").String(), st.ID, fmt.Sprintf("interaction_%d", time.Now().UnixNano())))
+	st.ID = strings.Clone(util.FirstNonEmpty(response.Get("id").String(), st.ID, fmt.Sprintf("interaction_%d", time.Now().UnixNano())))
 	createdDoc := ojson.NewDocString(`{"interaction":{"id":"","status":"in_progress","object":"interaction","model":""},"event_type":"interaction.created"}`)
 	_ = createdDoc.Set("interaction.id", st.ID)
 	_ = createdDoc.Set("interaction.model", responseModel(modelName, response))
@@ -1244,7 +1244,7 @@ func appendInteractionsStepStartDirect(out [][]byte, st *responsesToInteractions
 	_ = payloadDoc.Set("index", index)
 	_ = payloadDoc.Set("step.type", stepType)
 	if stepType == "function_call" {
-		if id := firstNonEmpty(step.Get("call_id").String(), step.Get("id").String()); id != "" {
+		if id := util.FirstNonEmpty(step.Get("call_id").String(), step.Get("id").String()); id != "" {
 			_ = payloadDoc.Set("step.id", id)
 			_ = payloadDoc.Set("step.call_id", id)
 		}
@@ -1328,7 +1328,7 @@ func ensureInteractionsFunctionCallStep(out [][]byte, st *responsesToInteraction
 		name = translatorcommon.AntigravityToolNameToUpstream(name)
 	}
 	_ = stepDoc.Set("name", name)
-	if callID := firstNonEmpty(item.Get("call_id").String(), item.Get("id").String(), root.Get("call_id").String(), root.Get("item_id").String()); callID != "" {
+	if callID := util.FirstNonEmpty(item.Get("call_id").String(), item.Get("id").String(), root.Get("call_id").String(), root.Get("item_id").String()); callID != "" {
 		_ = stepDoc.Set("id", callID)
 		_ = stepDoc.Set("call_id", callID)
 	}
@@ -1384,7 +1384,7 @@ func interactionsSSEPayload(rawJSON []byte) []byte {
 }
 
 func responseModel(modelName string, root ojson.Result) string {
-	return firstNonEmpty(modelName, root.Get("model").String(), root.Get("response.model").String(), root.Get("interaction.model").String())
+	return util.FirstNonEmpty(modelName, root.Get("model").String(), root.Get("response.model").String(), root.Get("interaction.model").String())
 }
 
 func firstUsageInt(root ojson.Result, paths ...string) (int64, bool) {
@@ -1793,7 +1793,7 @@ func interactionsUpdateFunctionCall(index int, step ojson.Result, st *interactio
 	} else {
 		call.ArgumentFragments = nil
 		if !call.ItemIDSeen && !call.Added {
-			call.ID = firstNonEmpty(call.CallID, interactionsFallbackItemID(st, index))
+			call.ID = util.FirstNonEmpty(call.CallID, interactionsFallbackItemID(st, index))
 		}
 		if !call.CallIDSeen && !call.Added {
 			call.CallID = call.ID
@@ -1868,7 +1868,7 @@ func interactionsFinishPatchCalls(st *interactionsToResponsesStreamState) [][]by
 			// to call_id or a per-response fallback item ID). Freeze that compatibility
 			// mapping only at the response terminal, after all supplied snapshot IDs were reconciled.
 			if !call.ItemIDSeen {
-				call.ID = firstNonEmpty(call.CallID, interactionsFallbackItemID(st, index))
+				call.ID = util.FirstNonEmpty(call.CallID, interactionsFallbackItemID(st, index))
 			}
 			if !call.CallIDSeen {
 				call.CallID = call.ID

@@ -14,6 +14,7 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 )
@@ -641,8 +642,8 @@ func (h *Host) callSingleProviderParseAuths(ctx context.Context, record capabili
 		if normalizeProviderID(data.Provider) == "" {
 			return nil, true, fmt.Errorf("auth provider %s returned auth without provider", record.id)
 		}
-		explicitHint := firstNonEmpty(authDataPortalHint(&data), extractRawJSONOAuthProviderHint(req.RawJSON))
-		effectivePortal := firstNonEmpty(explicitHint, portalIdentifier)
+		explicitHint := util.FirstNonEmptyTrimmed(authDataPortalHint(&data), extractRawJSONOAuthProviderHint(req.RawJSON))
+		effectivePortal := util.FirstNonEmptyTrimmed(explicitHint, portalIdentifier)
 		if explicitHint != "" || multiEntry || normalizeProviderID(data.Provider) != effectivePortal {
 			stampAuthDataOAuthProvider(&data, effectivePortal)
 		}
@@ -843,14 +844,14 @@ func (h *Host) callPollLogin(ctx context.Context, record capabilityRecord, provi
 		multiEntry := h.recordHasMultipleAuthProviders(record)
 		for index := range resp.Auths {
 			explicitHint := authDataPortalHint(&resp.Auths[index])
-			effectivePortal := firstNonEmpty(explicitHint, matchedPortal)
+			effectivePortal := util.FirstNonEmptyTrimmed(explicitHint, matchedPortal)
 			if multiEntry || explicitHint != "" || normalizeProviderID(resp.Auths[index].Provider) != effectivePortal {
 				stampAuthDataOAuthProvider(&resp.Auths[index], effectivePortal)
 			}
 			h.recordCredentialProvider(record.id, resp.Auths[index].Provider, effectivePortal)
 		}
 		explicitHint := authDataPortalHint(&resp.Auth)
-		effectivePortal := firstNonEmpty(explicitHint, matchedPortal)
+		effectivePortal := util.FirstNonEmptyTrimmed(explicitHint, matchedPortal)
 		if multiEntry || explicitHint != "" || normalizeProviderID(resp.Auth.Provider) != effectivePortal {
 			stampAuthDataOAuthProvider(&resp.Auth, effectivePortal)
 		}
@@ -884,7 +885,7 @@ func stampAuthDataOAuthProvider(data *pluginapi.AuthData, portalIdentifier strin
 	if data == nil {
 		return
 	}
-	portalIdentifier = firstNonEmpty(authDataPortalHint(data), normalizeProviderID(portalIdentifier))
+	portalIdentifier = util.FirstNonEmptyTrimmed(authDataPortalHint(data), normalizeProviderID(portalIdentifier))
 	if portalIdentifier == "" {
 		return
 	}
@@ -1304,13 +1305,13 @@ func pluginAuthDataToCoreAuth(data pluginapi.AuthData, path, fileName string, au
 			attributes[coreauth.AttributeSourceBackend] = coreauth.AuthSourceFile
 		}
 	}
-	fileName = strings.TrimSpace(firstNonEmpty(data.FileName, fileName))
+	fileName = strings.TrimSpace(util.FirstNonEmptyTrimmed(data.FileName, fileName))
 	if fileName != "" && attributes[coreauth.AttributeSource] == "" {
 		attributes[coreauth.AttributeSource] = fileName
 	}
 	id := strings.TrimSpace(data.ID)
 	if id == "" {
-		id = authIDForPath(firstNonEmpty(path, fileName), authDir)
+		id = authIDForPath(util.FirstNonEmptyTrimmed(path, fileName), authDir)
 	}
 	status := coreauth.StatusActive
 	if data.Disabled {
@@ -1334,13 +1335,4 @@ func pluginAuthDataToCoreAuth(data pluginapi.AuthData, path, fileName string, au
 		NextRefreshAfter: data.NextRefreshAfter,
 	}
 	return auth
-}
-
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if trimmed := strings.TrimSpace(value); trimmed != "" {
-			return trimmed
-		}
-	}
-	return ""
 }

@@ -18,15 +18,15 @@ func ConvertOpenAIRequestToInteractions(modelName string, inputRawJSON []byte, s
 func convertOpenAIRequestToInteractions(modelName string, inputRawJSON []byte, stream bool) ([]byte, error) {
 	root := util.ParseGJSONBytesNoCopy(inputRawJSON)
 	outDoc := ojson.NewDocString(`{"model":"","input":[]}`)
-	model := firstNonEmpty(modelName, root.Get("model").String())
+	model := util.FirstNonEmpty(modelName, root.Get("model").String())
 	_ = outDoc.Set("model", model)
 	if streamValue, ok := openAIRequestStreamValue(root, stream); ok {
 		_ = outDoc.Set("stream", streamValue)
 	}
-	if previousResponseID := firstNonEmpty(root.Get("previous_response_id").String(), root.Get("previous_interaction_id").String()); previousResponseID != "" {
+	if previousResponseID := util.FirstNonEmpty(root.Get("previous_response_id").String(), root.Get("previous_interaction_id").String()); previousResponseID != "" {
 		_ = outDoc.Set("previous_interaction_id", previousResponseID)
 	}
-	if environmentID := firstNonEmpty(root.Get("environment_id").String(), root.Get("environment.id").String()); environmentID != "" {
+	if environmentID := util.FirstNonEmpty(root.Get("environment_id").String(), root.Get("environment.id").String()); environmentID != "" {
 		_ = outDoc.Set("environment_id", environmentID)
 	}
 	if agentConfig := root.Get("agent_config"); agentConfig.Exists() {
@@ -193,21 +193,21 @@ func openAIChatContentPartToInteractions(part ojson.Result) ([]byte, bool) {
 	case "input_audio", "audio":
 		outDoc := ojson.NewDocString(`{"type":"audio","data":""}`)
 		audio := part.Get("input_audio")
-		data := firstNonEmpty(audio.Get("data").String(), part.Get("data").String())
+		data := util.FirstNonEmpty(audio.Get("data").String(), part.Get("data").String())
 		if data == "" {
 			return nil, false
 		}
 		_ = outDoc.Set("data", data)
-		if format := firstNonEmpty(audio.Get("format").String(), part.Get("format").String()); format != "" {
+		if format := util.FirstNonEmpty(audio.Get("format").String(), part.Get("format").String()); format != "" {
 			_ = outDoc.Set("mime_type", openAIInputAudioMIMEType(format))
 		}
 		return outDoc.Bytes(), true
 	case "file", "input_file", "document":
 		file := part.Get("file")
-		filename := firstNonEmpty(file.Get("filename").String(), part.Get("filename").String())
-		fallbackMIMEType := firstNonEmpty(file.Get("mime_type").String(), file.Get("mimeType").String(), part.Get("mime_type").String(), part.Get("mimeType").String())
-		fileData := firstNonEmpty(file.Get("file_data").String(), part.Get("file_data").String(), part.Get("data").String())
-		fileURL := firstNonEmpty(file.Get("file_url").String(), part.Get("file_url").String(), part.Get("url").String())
+		filename := util.FirstNonEmpty(file.Get("filename").String(), part.Get("filename").String())
+		fallbackMIMEType := util.FirstNonEmpty(file.Get("mime_type").String(), file.Get("mimeType").String(), part.Get("mime_type").String(), part.Get("mimeType").String())
+		fileData := util.FirstNonEmpty(file.Get("file_data").String(), part.Get("file_data").String(), part.Get("data").String())
+		fileURL := util.FirstNonEmpty(file.Get("file_url").String(), part.Get("file_url").String(), part.Get("url").String())
 		outDoc := ojson.NewDocString(`{"type":"document"}`)
 		if filename != "" {
 			_ = outDoc.Set("filename", filename)
@@ -229,7 +229,7 @@ func openAIChatContentPartToInteractions(part ojson.Result) ([]byte, bool) {
 
 func openAIChatImagePartToInteractions(part ojson.Result) []byte {
 	outDoc := ojson.NewDocString(`{"type":"image"}`)
-	imageURL := firstNonEmpty(part.Get("image_url.url").String(), part.Get("image_url").String(), part.Get("url").String())
+	imageURL := util.FirstNonEmpty(part.Get("image_url.url").String(), part.Get("image_url").String(), part.Get("url").String())
 	if mimeType, data, ok := openAIChatParseDataURL(imageURL); ok {
 		_ = outDoc.Set("mime_type", mimeType)
 		_ = outDoc.Set("data", data)
@@ -250,7 +250,7 @@ func openAIChatImagePartToInteractions(part ojson.Result) []byte {
 
 func openAIToolResultToInteractions(message ojson.Result, forAntigravity bool, toolNamesByID map[string]string) []byte {
 	outDoc := ojson.NewDocString(`{"type":"function_result","result":""}`)
-	callID := firstNonEmpty(message.Get("tool_call_id").String(), message.Get("id").String())
+	callID := util.FirstNonEmpty(message.Get("tool_call_id").String(), message.Get("id").String())
 	if callID != "" {
 		_ = outDoc.Set("call_id", callID)
 	}
@@ -341,7 +341,7 @@ func openAIChatToolToInteractions(tool ojson.Result, forAntigravity bool) ([]byt
 	if toolType != "" && toolType != "function" {
 		return nil, false
 	}
-	name := firstNonEmpty(tool.Get("function.name").String(), tool.Get("name").String())
+	name := util.FirstNonEmpty(tool.Get("function.name").String(), tool.Get("name").String())
 	if name == "" {
 		return nil, false
 	}

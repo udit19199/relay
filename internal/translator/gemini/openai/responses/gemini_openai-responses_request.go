@@ -2,10 +2,11 @@ package responses
 
 import (
 	"encoding/json"
-	"github.com/MoeForge/moego/base64"
 	"net/url"
 	"path/filepath"
 	"strings"
+
+	"github.com/MoeForge/moego/base64"
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
@@ -908,15 +909,6 @@ func geminiResponsesFileDataPart(mimeType, fileURI string) []byte {
 	return partDoc.Bytes()
 }
 
-func firstNonEmpty(values ...string) string {
-	for _, v := range values {
-		if strings.TrimSpace(v) != "" {
-			return strings.TrimSpace(v)
-		}
-	}
-	return ""
-}
-
 func isDataURL(raw string) bool {
 	trimmed := strings.ToLower(strings.TrimSpace(raw))
 	return strings.HasPrefix(trimmed, "data:")
@@ -1082,7 +1074,7 @@ func openAIResponsesAudioFromBlock(block ojson.Result) (mimeType string, data st
 		return "", "", false
 	}
 
-	filename := firstNonEmpty(block.Get("filename").String(), block.Get("file.filename").String())
+	filename := util.FirstNonEmptyTrimmed(block.Get("filename").String(), block.Get("file.filename").String())
 	audioObj := block.Get("input_audio")
 	if !audioObj.Exists() {
 		audioObj = block.Get("audio")
@@ -1104,7 +1096,7 @@ func openAIResponsesAudioFromBlock(block ojson.Result) (mimeType string, data st
 
 	// 3. audio_url / url
 	if audioData == "" {
-		audioURL := firstNonEmpty(
+		audioURL := util.FirstNonEmptyTrimmed(
 			block.Get("audio_url.url").String(),
 			block.Get("audio_url").String(),
 			block.Get("url").String(),
@@ -1177,7 +1169,7 @@ func openAIResponsesVideoFromBlock(block ojson.Result) (mimeType string, data st
 		return "", "", false
 	}
 
-	filename := firstNonEmpty(block.Get("filename").String(), block.Get("file.filename").String())
+	filename := util.FirstNonEmptyTrimmed(block.Get("filename").String(), block.Get("file.filename").String())
 	videoObj := block.Get("input_video")
 	if !videoObj.Exists() {
 		videoObj = block.Get("video")
@@ -1190,7 +1182,7 @@ func openAIResponsesVideoFromBlock(block ojson.Result) (mimeType string, data st
 	)
 
 	// 1. video_url (string or { "url": "..." }) or url
-	videoURL := firstNonEmpty(
+	videoURL := util.FirstNonEmptyTrimmed(
 		block.Get("video_url.url").String(),
 		block.Get("video_url").String(),
 		block.Get("url").String(),
@@ -1303,14 +1295,14 @@ func openAIResponsesFileFromBlock(block ojson.Result) (mimeType string, data str
 		return "", "", false
 	}
 
-	filename := firstNonEmpty(block.Get("filename").String(), block.Get("file.filename").String())
-	fileData := firstNonEmpty(
+	filename := util.FirstNonEmptyTrimmed(block.Get("filename").String(), block.Get("file.filename").String())
+	fileData := util.FirstNonEmptyTrimmed(
 		block.Get("file_data").String(),
 		block.Get("file.file_data").String(),
 		block.Get("data").String(),
 	)
 	if fileData == "" {
-		fileURL := firstNonEmpty(
+		fileURL := util.FirstNonEmptyTrimmed(
 			block.Get("file_url.url").String(),
 			block.Get("file_url").String(),
 			block.Get("file.file_url").String(),
@@ -1383,7 +1375,7 @@ func openAIResponsesPartFromBlock(block ojson.Result) ([]byte, bool) {
 	bType := strings.ToLower(strings.TrimSpace(block.Get("type").String()))
 
 	// 1. Check for remote URLs (http://, https://, gs://)
-	rawURL := firstNonEmpty(
+	rawURL := util.FirstNonEmptyTrimmed(
 		block.Get("video_url.url").String(),
 		block.Get("video_url").String(),
 		block.Get("audio_url.url").String(),
@@ -1396,7 +1388,7 @@ func openAIResponsesPartFromBlock(block ojson.Result) ([]byte, bool) {
 		block.Get("url").String(),
 	)
 	if isRemoteURL(rawURL) {
-		filename := firstNonEmpty(block.Get("filename").String(), block.Get("file.filename").String())
+		filename := util.FirstNonEmptyTrimmed(block.Get("filename").String(), block.Get("file.filename").String())
 		if filename == "" {
 			if parsed, errParse := url.Parse(rawURL); errParse == nil {
 				filename = filepath.Base(parsed.Path)
@@ -1514,13 +1506,13 @@ func openAIResponsesImageFromBlock(block ojson.Result) (mimeType string, data st
 			block.Get("image.format").String(),
 			block.Get("image.mime_type").String(),
 		)
-		filename := firstNonEmpty(
+		filename := util.FirstNonEmptyTrimmed(
 			block.Get("filename").String(),
 			block.Get("file.filename").String(),
 		)
 
 		// 1. image_url
-		imageURL := firstNonEmpty(
+		imageURL := util.FirstNonEmptyTrimmed(
 			block.Get("image_url.url").String(),
 			block.Get("image_url").String(),
 			block.Get("url").String(),

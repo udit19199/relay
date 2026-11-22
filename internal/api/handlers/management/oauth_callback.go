@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/clienterror"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -38,7 +39,7 @@ func (h *Handler) GetOAuthCallback(c *gin.Context) {
 		Provider: strings.TrimSpace(c.Query("provider")),
 		Code:     strings.TrimSpace(c.Query("code")),
 		State:    strings.TrimSpace(c.Query("state")),
-		Error:    firstNonEmpty(c.Query("error"), c.Query("error_description")),
+		Error:    util.FirstNonEmptyTrimmed(c.Query("error"), c.Query("error_description")),
 	}
 	h.handleOAuthCallback(c, req)
 }
@@ -136,14 +137,4 @@ func (h *Handler) handleOAuthCallback(c *gin.Context, req oauthCallbackRequest) 
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
-}
-
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		trimmed := strings.TrimSpace(value)
-		if trimmed != "" {
-			return trimmed
-		}
-	}
-	return ""
 }

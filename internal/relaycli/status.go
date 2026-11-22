@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -63,7 +64,7 @@ func runStatus(args []string) int {
 		} else {
 			fmt.Println("\nAccounts")
 			for _, a := range res.Accounts {
-				line := fmt.Sprintf("  %-12s %-34s %-8s", a.Provider, firstNonEmpty(a.Account, a.Name), a.State)
+				line := fmt.Sprintf("  %-12s %-34s %-8s", a.Provider, util.FirstNonEmpty(a.Account, a.Name), a.State)
 				var parts []string
 				for _, w := range a.Limits {
 					part := fmt.Sprintf("%s %d%% left", w.Name, w.Left)
@@ -90,7 +91,7 @@ func (c *client) accountStatus(cred credential) accountStatus {
 	a := accountStatus{
 		Name:     cred.Name,
 		Provider: cred.provider(),
-		Account:  firstNonEmpty(cred.Email, cred.Label),
+		Account:  util.FirstNonEmpty(cred.Email, cred.Label),
 		Priority: cred.Priority,
 		State:    "ok",
 	}
@@ -208,15 +209,6 @@ func oneLine(s string) string {
 	return s
 }
 
-func firstNonEmpty(values ...string) string {
-	for _, v := range values {
-		if strings.TrimSpace(v) != "" {
-			return v
-		}
-	}
-	return ""
-}
-
 // check is one doctor finding. Level is ok, warn, or fail.
 type check struct {
 	Name   string `json:"name"`
@@ -307,7 +299,7 @@ func runDoctor(args []string) int {
 		default:
 			for _, cred := range creds {
 				a := c.accountStatus(cred)
-				name := "account " + firstNonEmpty(a.Account, a.Name)
+				name := "account " + util.FirstNonEmpty(a.Account, a.Name)
 				switch a.State {
 				case "ok":
 					add(name, "ok", a.Provider, "")
