@@ -302,6 +302,18 @@ func (h *Host) openHostHTTPOperation(ctx context.Context, callbackID string) (st
 	callbackID = strings.TrimSpace(callbackID)
 	pluginID := hostCallbackPluginIDFromContext(ctx)
 	instance := hostCallbackInstanceFromContext(ctx)
+	parent, pluginID, instance, errOwner := h.resolveHostHTTPOperationOwner(ctx, callbackID, pluginID, instance)
+	if errOwner != nil {
+		return "", errOwner
+	}
+	operationID, _, errOpen := h.createHostHTTPOperation(pluginID, instance, callbackID, parent, false)
+	if errOpen != nil {
+		return "", errOpen
+	}
+	return operationID, nil
+}
+
+func (h *Host) resolveHostHTTPOperationOwner(ctx context.Context, callbackID, pluginID string, instance *hostCallbackInstance) (context.Context, string, *hostCallbackInstance, error) {
 	parent := ctx
 	if callbackID != "" {
 		var callbackPluginID string
@@ -309,26 +321,22 @@ func (h *Host) openHostHTTPOperation(ctx context.Context, callbackID string) (st
 		var exists bool
 		parent, callbackPluginID, callbackInstance, exists = h.lookupCallbackContext(callbackID)
 		if !exists {
-			return "", fmt.Errorf("host callback ID is not open")
+			return nil, "", nil, fmt.Errorf("host callback ID is not open")
 		}
 		if pluginID != "" && callbackPluginID != pluginID {
-			return "", fmt.Errorf("host callback ID does not belong to the calling plugin")
+			return nil, "", nil, fmt.Errorf("host callback ID does not belong to the calling plugin")
 		}
 		if pluginID == "" {
 			pluginID = callbackPluginID
 		}
 		if instance != callbackInstance && (instance != nil || callbackInstance != nil) {
-			return "", fmt.Errorf("host callback ID does not belong to the calling plugin instance")
+			return nil, "", nil, fmt.Errorf("host callback ID does not belong to the calling plugin instance")
 		}
 		if instance == nil {
 			instance = callbackInstance
 		}
 	}
-	operationID, _, errOpen := h.createHostHTTPOperation(pluginID, instance, callbackID, parent, false)
-	if errOpen != nil {
-		return "", errOpen
-	}
-	return operationID, nil
+	return parent, pluginID, instance, nil
 }
 
 func (h *Host) createHostHTTPOperation(pluginID string, instance *hostCallbackInstance, callbackID string, parent context.Context, claimed bool) (string, *hostHTTPOperation, error) {
@@ -367,27 +375,9 @@ func (h *Host) acquireHostHTTPOperation(ctx context.Context, callbackID, operati
 	pluginID := hostCallbackPluginIDFromContext(ctx)
 	instance := hostCallbackInstanceFromContext(ctx)
 	if operationID == "" {
-		parent := ctx
-		if callbackID != "" {
-			var callbackPluginID string
-			var callbackInstance *hostCallbackInstance
-			var exists bool
-			parent, callbackPluginID, callbackInstance, exists = h.lookupCallbackContext(callbackID)
-			if !exists {
-				return hostHTTPOperationHandle{}, fmt.Errorf("host callback ID is not open")
-			}
-			if pluginID != "" && callbackPluginID != pluginID {
-				return hostHTTPOperationHandle{}, fmt.Errorf("host callback ID does not belong to the calling plugin")
-			}
-			if pluginID == "" {
-				pluginID = callbackPluginID
-			}
-			if instance != callbackInstance && (instance != nil || callbackInstance != nil) {
-				return hostHTTPOperationHandle{}, fmt.Errorf("host callback ID does not belong to the calling plugin instance")
-			}
-			if instance == nil {
-				instance = callbackInstance
-			}
+		parent, pluginID, instance, errOwner := h.resolveHostHTTPOperationOwner(ctx, callbackID, pluginID, instance)
+		if errOwner != nil {
+			return hostHTTPOperationHandle{}, errOwner
 		}
 		operationID, entry, errOpen := h.createHostHTTPOperation(pluginID, instance, callbackID, parent, true)
 		if errOpen != nil {
