@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -47,31 +46,15 @@ func (h *Handler) fetchOpenCodeGoQuota(ctx context.Context, auth *coreauth.Auth)
 	if key == "" {
 		return pluginapi.QuotaFetchResponse{}, fmt.Errorf("opencode-go credential has no api_key")
 	}
-	ctx, cancel := context.WithTimeout(ctx, openCodeGoQuotaTimeout)
-	defer cancel()
-	req, errReq := http.NewRequestWithContext(ctx, http.MethodGet, openCodeGoUsageURL, nil)
-	if errReq != nil {
-		return pluginapi.QuotaFetchResponse{}, fmt.Errorf("build usage request: %w", errReq)
+	body, status, errFetch := h.usageBody(ctx, auth, openCodeGoUsageURL, key, openCodeGoQuotaTimeout, nil)
+	if errFetch != nil {
+		return pluginapi.QuotaFetchResponse{}, errFetch
 	}
-	req.Header.Set("Authorization", "Bearer "+key)
-	req.Header.Set("Accept", "application/json")
-	// OpenCode Go asks clients to identify themselves.
-	req.Header.Set("User-Agent", "relay")
-
-	resp, errDo := (&http.Client{Transport: h.apiCallTransport(auth, "")}).Do(req)
-	if errDo != nil {
-		return pluginapi.QuotaFetchResponse{}, fmt.Errorf("usage request failed: %w", errDo)
-	}
-	defer func() { _ = resp.Body.Close() }()
-	body, errRead := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-	if errRead != nil {
-		return pluginapi.QuotaFetchResponse{}, fmt.Errorf("read usage response: %w", errRead)
-	}
-	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+	if status == http.StatusUnauthorized || status == http.StatusForbidden {
 		return pluginapi.QuotaFetchResponse{}, errOpenCodeGoKeyRejected
 	}
-	if resp.StatusCode != http.StatusOK {
-		return pluginapi.QuotaFetchResponse{}, fmt.Errorf("usage request returned status %d", resp.StatusCode)
+	if status != http.StatusOK {
+		return pluginapi.QuotaFetchResponse{}, fmt.Errorf("usage request returned status %d", status)
 	}
 	return parseOpenCodeGoUsage(body)
 }
