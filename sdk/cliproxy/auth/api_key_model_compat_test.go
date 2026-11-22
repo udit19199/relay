@@ -27,3 +27,27 @@ func TestResolvedAPIKeyModelInfoPropagatesIsCompat(t *testing.T) {
 		t.Fatalf("ResolvedAPIKeyModelInfo() = (%+v, %t), want IsCompat=true", info, ok)
 	}
 }
+
+func TestOpenAICompatAttrsTrimsAndToleratesMissingAttributes(t *testing.T) {
+	cases := []struct {
+		name        string
+		auth        *Auth
+		providerKey string
+		compatName  string
+	}{
+		{name: "nil auth"},
+		{name: "nil attributes", auth: &Auth{}},
+		{
+			name:        "trimmed values",
+			auth:        &Auth{Attributes: map[string]string{"provider_key": " pool ", "compat_name": "\tcompat\n"}},
+			providerKey: "pool",
+			compatName:  "compat",
+		},
+	}
+	for _, tc := range cases {
+		providerKey, compatName := openAICompatAttrs(tc.auth)
+		if providerKey != tc.providerKey || compatName != tc.compatName {
+			t.Fatalf("%s: openAICompatAttrs() = (%q, %q), want (%q, %q)", tc.name, providerKey, compatName, tc.providerKey, tc.compatName)
+		}
+	}
+}
