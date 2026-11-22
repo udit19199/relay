@@ -2405,10 +2405,8 @@ func addEmptySchemaPlaceholder(jsonStr string) string {
 			continue
 		}
 
-		// Get the parent path (the object containing "type")
 		parentPath := trimSuffix(p, ".type")
 
-		// Check if properties exists and is empty or missing
 		propsPath := joinPath(parentPath, "properties")
 		propsVal := doc.Get(propsPath)
 		reqPath := joinPath(parentPath, "required")
@@ -2420,15 +2418,12 @@ func addEmptySchemaPlaceholder(jsonStr string) string {
 
 		needsPlaceholder := false
 		if !propsVal.Exists() {
-			// No properties field at all
 			needsPlaceholder = true
 		} else if propsVal.IsObject() && len(propsVal.Map()) == 0 {
-			// Empty properties object
 			needsPlaceholder = true
 		}
 
 		if needsPlaceholder {
-			// Add placeholder "reason" property
 			reasonPath := joinPath(propsPath, "reason")
 			_ = doc.Set(reasonPath+".type", "string")
 			_ = doc.Set(reasonPath+".description", placeholderReasonDescription)
