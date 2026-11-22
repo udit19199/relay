@@ -53,13 +53,6 @@ public struct RelayAccount: Codable, Identifiable, Equatable, Hashable, Sendable
 
     private struct QuotaPayload: Decodable {
         var signals: [String: LosslessStringValue]?
-
-        private enum CodingKeys: String, CodingKey { case signals }
-
-        init(from decoder: any Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            signals = try container.decodeIfPresent([String: LosslessStringValue].self, forKey: .signals)
-        }
     }
 
     public init(from decoder: any Decoder) throws {
