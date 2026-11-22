@@ -57,6 +57,18 @@ func TestRequestRetryOverride(t *testing.T) {
 	}
 }
 
+func TestAuthProviderIs(t *testing.T) {
+	if authProviderIs(nil, "codex") {
+		t.Fatal("nil auth matched")
+	}
+	if !authProviderIs(&Auth{Provider: "  CodeX "}, "codex") {
+		t.Fatal("trimmed case-insensitive provider did not match")
+	}
+	if authProviderIs(&Auth{Provider: "claude"}, "codex") {
+		t.Fatal("different provider matched")
+	}
+}
+
 func TestToolPrefixDisabled(t *testing.T) {
 	var a *Auth
 	if a.ToolPrefixDisabled() {

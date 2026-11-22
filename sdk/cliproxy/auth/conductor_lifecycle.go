@@ -551,7 +551,7 @@ func (m *Manager) updateInternalLocked(ctx context.Context, base, auth *Auth, mo
 	// Runtime-only changes made during I/O are merged below, never overwritten.
 	existingBeforeSave := existing.Clone()
 	refreshPatchBeforeSave := auth.CodexRefreshPatch
-	persistMetaMint := (mode == updateModePrepare || mode == updateModeRefresh) && strings.EqualFold(strings.TrimSpace(auth.Provider), "meta")
+	persistMetaMint := (mode == updateModePrepare || mode == updateModeRefresh) && authProviderIs(auth, "meta")
 	if errPersist := m.persistLocked(ctx, auth); errPersist != nil {
 		// A minted Meta key must reach the store before requests can use it.
 		if persistMetaMint {
