@@ -36,7 +36,7 @@ func isClaudeAuth(auth *coreauth.Auth) bool {
 }
 
 func claudeAccessToken(auth *coreauth.Auth) string {
-	if auth == nil || auth.Metadata == nil {
+	if auth == nil {
 		return ""
 	}
 	if v, ok := auth.Metadata["accessToken"].(string); ok && strings.TrimSpace(v) != "" {
@@ -51,9 +51,6 @@ func claudeAccessToken(auth *coreauth.Auth) string {
 // claudeTokenExpired reads the OAuth expiry the auth file records. A missing
 // or unparseable value counts as expired: a 401 already proved the token bad.
 func claudeTokenExpired(auth *coreauth.Auth) bool {
-	if auth == nil || auth.Metadata == nil {
-		return true
-	}
 	raw, _ := auth.Metadata["expired"].(string)
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -119,22 +116,19 @@ func (h *Handler) claudeUsageBody(ctx context.Context, auth *coreauth.Auth, toke
 }
 
 func (h *Handler) refreshClaudeAuth(ctx context.Context, auth *coreauth.Auth) *coreauth.Auth {
-	if h == nil || h.authManager == nil || auth == nil {
+	if h == nil || h.authManager == nil {
 		return nil
 	}
 	// The app gives up after 20 seconds; let a refresh already underway finish
 	// and land, so the next poll uses the new token.
 	refreshed, errRefresh := h.authManager.ForceRefreshAuth(context.WithoutCancel(ctx), auth.ID)
-	if errRefresh != nil || refreshed == nil {
+	if errRefresh != nil {
 		return nil
 	}
 	return refreshed
 }
 
 func claudeHasRefreshToken(auth *coreauth.Auth) bool {
-	if auth == nil || auth.Metadata == nil {
-		return false
-	}
 	token, _ := auth.Metadata["refresh_token"].(string)
 	return strings.TrimSpace(token) != ""
 }
