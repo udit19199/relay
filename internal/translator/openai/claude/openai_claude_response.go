@@ -149,8 +149,7 @@ func ConvertOpenAIResponseToClaude(_ context.Context, _ string, originalRequestR
 		state.ToolNameMapResolved = true
 	}
 
-	// Check if this is the [DONE] marker
-	if bytes.Equal(bytes.TrimSpace(rawJSON), []byte("[DONE]")) {
+	if bytes.Equal(rawJSON, []byte("[DONE]")) {
 		return convertOpenAIDoneToAnthropic(state)
 	}
 
