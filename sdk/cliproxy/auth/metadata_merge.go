@@ -41,7 +41,7 @@ func MergeExistingAuthMetadata(target *Auth, existingMap map[string]any) {
 		if IsAuthTokenPayloadKey(k) {
 			continue
 		}
-		if strings.EqualFold(strings.TrimSpace(target.Provider), "meta") {
+		if authProviderIs(target, "meta") {
 			switch CanonicalCredentialMetadataKey(k) {
 			case "api_key", "dca_token", "dca_expired", "dca_expires_at":
 				continue

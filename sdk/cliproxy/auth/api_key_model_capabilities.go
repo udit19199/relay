@@ -85,7 +85,7 @@ func ResolvedHomeModelOptions(req cliproxyexecutor.Request) (internalconfig.Open
 // is-compat enabled. When true, Codex MultiAgentV2 agent_message items are converted
 // into portable Responses message/user input for third-party Responses-compatible endpoints.
 func CodexAPIKeyModelIsCompat(cfg *internalconfig.Config, auth *Auth, model string) bool {
-	if cfg == nil || auth == nil || !strings.EqualFold(strings.TrimSpace(auth.Provider), "codex") {
+	if cfg == nil || !authProviderIs(auth, "codex") {
 		return false
 	}
 	entry := resolveCodexAPIKeyConfig(cfg, auth)
@@ -196,7 +196,7 @@ func (m *Manager) attachResolvedAPIKeyModelInfo(req cliproxyexecutor.Request, au
 
 func attachResolvedExecutionModelInfo(routing *apiKeyModelRoutingSnapshot, req cliproxyexecutor.Request, auth *Auth, routeModel, upstreamModel string, restoreExecutionModel bool) cliproxyexecutor.Request {
 	if restoreExecutionModel {
-		if auth == nil || !strings.EqualFold(strings.TrimSpace(auth.Provider), "codex") {
+		if !authProviderIs(auth, "codex") {
 			return req
 		}
 		routeModel, upstreamModel = req.Model, req.Model
@@ -233,7 +233,7 @@ func attachResolvedAPIKeyModelInfo(routing *apiKeyModelRoutingSnapshot, req clip
 }
 
 func lookupUnlistedCodexAPIKeyModelCapability(routing *apiKeyModelRoutingSnapshot, auth *Auth, upstreamModel string) (*registry.ModelInfo, bool) {
-	if routing == nil || auth == nil || auth.AuthKind() != AuthKindAPIKey || !strings.EqualFold(strings.TrimSpace(auth.Provider), "codex") || strings.TrimSpace(upstreamModel) == "" {
+	if routing == nil || !authProviderIs(auth, "codex") || auth.AuthKind() != AuthKindAPIKey || strings.TrimSpace(upstreamModel) == "" {
 		return nil, false
 	}
 	entry := resolveCodexAPIKeyConfig(routing.config, auth)
@@ -260,7 +260,7 @@ func lookupUnlistedCodexAPIKeyModelCapability(routing *apiKeyModelRoutingSnapsho
 }
 
 func lookupCodexOAuthModelCapability(auth *Auth, upstreamModel string) (*registry.ModelInfo, bool) {
-	if auth == nil || auth.AuthKind() != AuthKindOAuth || !strings.EqualFold(strings.TrimSpace(auth.Provider), "codex") {
+	if !authProviderIs(auth, "codex") || auth.AuthKind() != AuthKindOAuth {
 		return nil, false
 	}
 	var models []*registry.ModelInfo

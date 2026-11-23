@@ -1373,7 +1373,7 @@ func (m *Manager) findAllAntigravityCreditsCandidateAuths(ctx context.Context, r
 		if pinnedAuthID != "" && auth.ID != pinnedAuthID {
 			continue
 		}
-		if !strings.EqualFold(strings.TrimSpace(auth.Provider), "antigravity") {
+		if !authProviderIs(auth, "antigravity") {
 			continue
 		}
 		if !strings.Contains(strings.ToLower(strings.TrimSpace(routeModel)), "claude") {

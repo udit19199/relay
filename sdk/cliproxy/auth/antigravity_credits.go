@@ -107,10 +107,7 @@ func antigravityCreditsHintKey(authID string) string {
 }
 
 func antigravityCreditsAvailableForModel(auth *Auth, model string) bool {
-	if auth == nil {
-		return false
-	}
-	if !strings.EqualFold(strings.TrimSpace(auth.Provider), "antigravity") {
+	if !authProviderIs(auth, "antigravity") {
 		return false
 	}
 	if !strings.Contains(strings.ToLower(strings.TrimSpace(model)), "claude") {

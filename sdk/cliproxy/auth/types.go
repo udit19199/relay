@@ -307,6 +307,11 @@ func MarkPluginVirtualAuth(auth *Auth, sourcePath string, ordinal int) {
 	}, "|")
 }
 
+// authProviderIs reports whether a is non-nil and its trimmed provider matches provider case-insensitively.
+func authProviderIs(a *Auth, provider string) bool {
+	return a != nil && strings.EqualFold(strings.TrimSpace(a.Provider), provider)
+}
+
 // IsPluginVirtualAuth reports whether an auth was expanded from a plugin-owned source file.
 func IsPluginVirtualAuth(auth *Auth) bool {
 	if auth == nil || len(auth.Attributes) == 0 {

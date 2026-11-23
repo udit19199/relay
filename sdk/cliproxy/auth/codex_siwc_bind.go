@@ -33,7 +33,7 @@ func (m *Manager) BindCodexSIWC(ctx context.Context, id string, expectedEpoch ui
 	m.mu.RLock()
 	base := m.auths[id].Clone()
 	m.mu.RUnlock()
-	if base == nil || base.RegistrationEpoch != expectedEpoch || !strings.EqualFold(strings.TrimSpace(base.Provider), "codex") || !codexBindingHasOuter(base.Metadata) {
+	if base == nil || base.RegistrationEpoch != expectedEpoch || !authProviderIs(base, "codex") || !codexBindingHasOuter(base.Metadata) {
 		return nil, fmt.Errorf("bind SIWC: target is missing, changed, or not a Codex OAuth credential")
 	}
 	path, err := m.codexBindingPath(base)

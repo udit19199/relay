@@ -59,7 +59,7 @@ func isConfiguredOpenAICompatAuth(auth *Auth) bool {
 	if !isConfiguredModelRoutingAuth(auth) {
 		return false
 	}
-	if strings.EqualFold(strings.TrimSpace(auth.Provider), "openai-compatibility") {
+	if authProviderIs(auth, "openai-compatibility") {
 		return true
 	}
 	if auth.Attributes == nil {
@@ -500,7 +500,7 @@ func configuredModelAliasEntries(cfg *internalconfig.Config, auth *Auth) []model
 			providerKey = strings.TrimSpace(auth.Attributes["provider_key"])
 			compatName = strings.TrimSpace(auth.Attributes["compat_name"])
 		}
-		if compatName != "" || strings.EqualFold(strings.TrimSpace(auth.Provider), "openai-compatibility") {
+		if compatName != "" || authProviderIs(auth, "openai-compatibility") {
 			if entry := resolveOpenAICompatConfigForAuth(cfg, auth, providerKey, compatName); entry != nil {
 				models = asModelAliasEntries(entry.Models)
 			}
@@ -661,7 +661,7 @@ func (m *Manager) rebuildAPIKeyModelAliasLocked(cfg *internalconfig.Config) {
 				providerKey = strings.TrimSpace(auth.Attributes["provider_key"])
 				compatName = strings.TrimSpace(auth.Attributes["compat_name"])
 			}
-			if compatName != "" || strings.EqualFold(strings.TrimSpace(auth.Provider), "openai-compatibility") {
+			if compatName != "" || authProviderIs(auth, "openai-compatibility") {
 				if entry := resolveOpenAICompatConfigForAuth(cfg, auth, providerKey, compatName); entry != nil {
 					compileAPIKeyModelAliasForModels(byAlias, entry.Models)
 				}
@@ -952,7 +952,7 @@ func resolveUpstreamModelForOpenAICompatAPIKey(cfg *internalconfig.Config, auth 
 		providerKey = strings.TrimSpace(auth.Attributes["provider_key"])
 		compatName = strings.TrimSpace(auth.Attributes["compat_name"])
 	}
-	if compatName == "" && !strings.EqualFold(strings.TrimSpace(auth.Provider), "openai-compatibility") {
+	if compatName == "" && !authProviderIs(auth, "openai-compatibility") {
 		return ""
 	}
 	entry := resolveOpenAICompatConfigForAuth(cfg, auth, providerKey, compatName)
