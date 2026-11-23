@@ -80,14 +80,12 @@ func (a KimiAuthenticator) Login(ctx context.Context, cfg *config.Config, opts *
 
 	authSvc := kimi.NewKimiAuthWithDomain(cfg, domain)
 
-	// Start the device flow
 	fmt.Printf("Starting %s authentication...\n", displayName)
 	deviceCode, err := authSvc.StartDeviceFlow(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("kimi: failed to start device flow: %w", err)
 	}
 
-	// Display the verification URL
 	verificationURL := deviceCode.VerificationURIComplete
 	if verificationURL == "" {
 		verificationURL = deviceCode.VerificationURI
@@ -114,19 +112,16 @@ func (a KimiAuthenticator) Login(ctx context.Context, cfg *config.Config, opts *
 		fmt.Printf("(This will timeout in %d seconds if not authorized)\n", deviceCode.ExpiresIn)
 	}
 
-	// Wait for user authorization
 	authBundle, err := authSvc.WaitForAuthorization(ctx, deviceCode)
 	if err != nil {
 		return nil, fmt.Errorf("kimi: %w", err)
 	}
 
-	// Create the token storage
 	tokenStorage := authSvc.CreateTokenStorage(authBundle)
 	if isAI {
 		tokenStorage.Type = providerKey
 	}
 
-	// Build metadata with token information
 	metadata := map[string]any{
 		"type":          providerKey,
 		"access_token":  authBundle.TokenData.AccessToken,
@@ -146,7 +141,6 @@ func (a KimiAuthenticator) Login(ctx context.Context, cfg *config.Config, opts *
 		metadata["device_id"] = strings.TrimSpace(authBundle.DeviceID)
 	}
 
-	// Generate a unique filename
 	fileName := fmt.Sprintf("%s-%d.json", filePrefix, time.Now().UnixMilli())
 
 	fmt.Printf("\n%s authentication successful!\n", displayName)
