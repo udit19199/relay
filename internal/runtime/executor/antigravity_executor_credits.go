@@ -16,6 +16,7 @@ import (
 	"github.com/MoeForge/moego/ojson"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
 	homekv "github.com/router-for-me/CLIProxyAPI/v8/internal/home"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
 	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	log "github.com/sirupsen/logrus"
@@ -379,7 +380,7 @@ func (e *AntigravityExecutor) maybeRefreshAntigravityCreditsHint(ctx context.Con
 		return
 	}
 	if strings.TrimSpace(accessToken) == "" {
-		accessToken = metaStringValue(auth.Metadata, "access_token")
+		accessToken = misc.MetadataString(auth.Metadata, "access_token")
 	}
 	if strings.TrimSpace(accessToken) == "" {
 		return
@@ -522,7 +523,7 @@ func (e *AntigravityExecutor) updateAntigravityCreditsBalanceForTask(ctx context
 	}
 	token := strings.TrimSpace(accessToken)
 	if token == "" {
-		token = metaStringValue(auth.Metadata, "access_token")
+		token = misc.MetadataString(auth.Metadata, "access_token")
 	}
 	if token == "" {
 		return

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
 	sdkAuth "github.com/router-for-me/CLIProxyAPI/v8/sdk/auth"
 	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
@@ -73,7 +74,7 @@ func (e *AntigravityExecutor) ensureAccessToken(ctx context.Context, auth *clipr
 	if auth == nil {
 		return "", nil, statusErr{code: http.StatusUnauthorized, msg: "missing auth"}
 	}
-	accessToken := metaStringValue(auth.Metadata, "access_token")
+	accessToken := misc.MetadataString(auth.Metadata, "access_token")
 	expiry, _ := auth.ExpirationTime()
 	if accessToken != "" && expiry.After(time.Now().Add(antigravityRequestTokenSafetyWindow)) {
 		e.maybeRefreshAntigravityCreditsHint(ctx, auth, accessToken)
@@ -89,7 +90,7 @@ func (e *AntigravityExecutor) ensureAccessToken(ctx context.Context, auth *clipr
 		if err != nil {
 			return "", nil, err
 		}
-		token := metaStringValue(refreshed.Metadata, "access_token")
+		token := misc.MetadataString(refreshed.Metadata, "access_token")
 		if strings.TrimSpace(token) == "" {
 			return "", nil, statusErr{code: http.StatusUnauthorized, msg: "missing access token"}
 		}
@@ -101,14 +102,14 @@ func (e *AntigravityExecutor) ensureAccessToken(ctx context.Context, auth *clipr
 	if errRefresh != nil {
 		return "", nil, errRefresh
 	}
-	return metaStringValue(updated.Metadata, "access_token"), updated, nil
+	return misc.MetadataString(updated.Metadata, "access_token"), updated, nil
 }
 
 func (e *AntigravityExecutor) refreshToken(ctx context.Context, auth *cliproxyauth.Auth) (*cliproxyauth.Auth, error) {
 	if auth == nil {
 		return nil, statusErr{code: http.StatusUnauthorized, msg: "missing auth"}
 	}
-	refreshToken := metaStringValue(auth.Metadata, "refresh_token")
+	refreshToken := misc.MetadataString(auth.Metadata, "refresh_token")
 	if refreshToken == "" {
 		return auth, statusErr{code: http.StatusUnauthorized, msg: "missing refresh token"}
 	}
@@ -227,7 +228,7 @@ func (e *AntigravityExecutor) ensureAntigravityProjectID(ctx context.Context, au
 func (e *AntigravityExecutor) fetchAntigravityProjectID(ctx context.Context, auth *cliproxyauth.Auth, accessToken string) (string, error) {
 	token := strings.TrimSpace(accessToken)
 	if token == "" {
-		token = metaStringValue(auth.Metadata, "access_token")
+		token = misc.MetadataString(auth.Metadata, "access_token")
 	}
 	if token == "" {
 		return "", nil
@@ -289,19 +290,4 @@ func missingAntigravityProjectIDError(cause error) statusErr {
 		}
 	}
 	return statusErr{code: statusCode, msg: msg, retryAfter: retryAfter}
-}
-
-func metaStringValue(metadata map[string]any, key string) string {
-	if metadata == nil {
-		return ""
-	}
-	if v, ok := metadata[key]; ok {
-		switch typed := v.(type) {
-		case string:
-			return strings.TrimSpace(typed)
-		case []byte:
-			return strings.TrimSpace(string(typed))
-		}
-	}
-	return ""
 }

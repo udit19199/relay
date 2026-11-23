@@ -20,6 +20,7 @@ import (
 	xaiauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/xai"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/clienterror"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/credentialweight"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/watcher/synthesizer"
 	sdkAuth "github.com/router-for-me/CLIProxyAPI/v8/sdk/auth"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
@@ -699,8 +700,8 @@ func syncAuthFilePlanTypeAttribute(auth *coreauth.Auth) {
 	}
 	newPlanType := ""
 	if auth.Metadata != nil {
-		if ptRaw, ok := auth.Metadata["plan_type"].(string); ok && strings.TrimSpace(ptRaw) != "" {
-			newPlanType = strings.TrimSpace(ptRaw)
+		if planType := misc.MetadataString(auth.Metadata, "plan_type"); planType != "" {
+			newPlanType = planType
 		} else if idTokenRaw, ok := auth.Metadata["id_token"].(string); ok && strings.TrimSpace(idTokenRaw) != "" {
 			if claims, errParse := codex.ParseJWTToken(idTokenRaw); errParse == nil && claims != nil {
 				newPlanType = claims.GetPlanType()
@@ -1043,9 +1044,9 @@ func (h *Handler) saveTokenRecord(ctx context.Context, record *coreauth.Auth) (s
 	}
 	adoptXAICredential := legacyXAICredential != nil &&
 		strings.EqualFold(strings.TrimSpace(record.Provider), "xai") &&
-		metadataStringValue(record.Metadata, "email") == "" &&
-		metadataStringValue(record.Metadata, "sub") != "" &&
-		metadataStringValue(legacyXAICredential.Metadata, "email") != ""
+		misc.MetadataString(record.Metadata, "email") == "" &&
+		misc.MetadataString(record.Metadata, "sub") != "" &&
+		misc.MetadataString(legacyXAICredential.Metadata, "email") != ""
 	if adoptXAICredential {
 		// The upstream stopped returning the email; keep the account on its
 		// richer email-named credential (richest-known name wins) so the next
@@ -1141,11 +1142,6 @@ func (h *Handler) saveTokenRecord(ctx context.Context, record *coreauth.Auth) (s
 	return savedPath, nil
 }
 
-func metadataStringValue(metadata map[string]any, key string) string {
-	value, _ := metadata[key].(string)
-	return strings.TrimSpace(value)
-}
-
 // adoptLegacyXAIFileName points a subject-only xAI record at the existing
 // email-named credential so the save refreshes that file in place. The token
 // storage email is backfilled because SaveTokenToFile merges the record
@@ -1167,7 +1163,7 @@ func adoptLegacyXAIFileName(record, legacy *coreauth.Auth) {
 	record.ID = legacyFileName
 	record.FileName = legacyFileName
 	if storage, ok := record.Storage.(*xaiauth.TokenStorage); ok && storage != nil {
-		if email := metadataStringValue(legacy.Metadata, "email"); email != "" {
+		if email := misc.MetadataString(legacy.Metadata, "email"); email != "" {
 			storage.Email = email
 		}
 	}

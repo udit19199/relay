@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 )
 
@@ -49,9 +50,9 @@ func FindMatchingLegacyCredential(ctx context.Context, store coreauth.Store, tar
 		return nil, fmt.Errorf("list Claude credentials for legacy migration: %w", errList)
 	}
 
-	targetEmail := metadataString(target.Metadata, "email")
-	targetOrganization := metadataString(target.Metadata, "organization_uuid")
-	targetAccount := metadataString(target.Metadata, "account_uuid")
+	targetEmail := misc.MetadataString(target.Metadata, "email")
+	targetOrganization := misc.MetadataString(target.Metadata, "organization_uuid")
+	targetAccount := misc.MetadataString(target.Metadata, "account_uuid")
 	legacyFileName := CredentialFileName(targetEmail, "", "")
 	accountFileName := ""
 	if targetOrganization != "" && targetAccount != "" {
@@ -73,8 +74,8 @@ func FindMatchingLegacyCredential(ctx context.Context, store coreauth.Store, tar
 			continue
 		}
 
-		candidateOrganization := metadataString(candidate.Metadata, "organization_uuid")
-		candidateAccount := metadataString(candidate.Metadata, "account_uuid")
+		candidateOrganization := misc.MetadataString(candidate.Metadata, "organization_uuid")
+		candidateAccount := misc.MetadataString(candidate.Metadata, "account_uuid")
 		switch {
 		case targetOrganization != "":
 			if candidateOrganization != "" && strings.EqualFold(candidateOrganization, targetOrganization) {
@@ -97,9 +98,9 @@ func isHashedCredentialTarget(target *coreauth.Auth) bool {
 	if target == nil || !strings.EqualFold(strings.TrimSpace(target.Provider), "claude") {
 		return false
 	}
-	email := metadataString(target.Metadata, "email")
-	organizationUUID := metadataString(target.Metadata, "organization_uuid")
-	accountUUID := metadataString(target.Metadata, "account_uuid")
+	email := misc.MetadataString(target.Metadata, "email")
+	organizationUUID := misc.MetadataString(target.Metadata, "organization_uuid")
+	accountUUID := misc.MetadataString(target.Metadata, "account_uuid")
 	if email == "" || (organizationUUID == "" && accountUUID == "") {
 		return false
 	}
@@ -108,9 +109,4 @@ func isHashedCredentialTarget(target *coreauth.Auth) bool {
 		targetFileName = strings.TrimSpace(target.ID)
 	}
 	return strings.EqualFold(filepath.Base(targetFileName), CredentialFileName(email, organizationUUID, accountUUID))
-}
-
-func metadataString(metadata map[string]any, key string) string {
-	value, _ := metadata[key].(string)
-	return strings.TrimSpace(value)
 }

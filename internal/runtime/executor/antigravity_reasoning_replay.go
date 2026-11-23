@@ -17,6 +17,7 @@ import (
 	"github.com/MoeForge/moego/ojson"
 	internalcache "github.com/router-for-me/CLIProxyAPI/v8/internal/cache"
 	homekv "github.com/router-for-me/CLIProxyAPI/v8/internal/home"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
 	internalsignature "github.com/router-for-me/CLIProxyAPI/v8/internal/signature"
 	translatorcommon "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/common"
@@ -176,9 +177,9 @@ func antigravityReasoningReplayScopeFromRequest(ctx context.Context, modelName s
 	scope.openAIChat = opts.SourceFormat.String() == "openai"
 	// Only trusted execution metadata can namespace the ledger. Never read a
 	// caller identity from request JSON or downstream credential headers here.
-	callerScope := metadataString(opts.Metadata, cliproxyexecutor.CallerScopeMetadataKey)
+	callerScope := misc.MetadataString(opts.Metadata, cliproxyexecutor.CallerScopeMetadataKey)
 	if callerScope == "" {
-		callerScope = metadataString(req.Metadata, cliproxyexecutor.CallerScopeMetadataKey)
+		callerScope = misc.MetadataString(req.Metadata, cliproxyexecutor.CallerScopeMetadataKey)
 	}
 	if callerScope == "" {
 		callerScope = session.CallerScope(helps.APIKeyFromContext(ctx))
@@ -204,9 +205,9 @@ func antigravityReasoningReplayScopeFromRequestDoc(ctx context.Context, modelNam
 		}
 	}
 	scope.openAIChat = opts.SourceFormat.String() == "openai"
-	callerScope := metadataString(opts.Metadata, cliproxyexecutor.CallerScopeMetadataKey)
+	callerScope := misc.MetadataString(opts.Metadata, cliproxyexecutor.CallerScopeMetadataKey)
 	if callerScope == "" {
-		callerScope = metadataString(req.Metadata, cliproxyexecutor.CallerScopeMetadataKey)
+		callerScope = misc.MetadataString(req.Metadata, cliproxyexecutor.CallerScopeMetadataKey)
 	}
 	if callerScope == "" {
 		callerScope = session.CallerScope(helps.APIKeyFromContext(ctx))
@@ -261,10 +262,10 @@ func antigravityReasoningReplayClientSessionKey(ctx context.Context, req cliprox
 			}
 		}
 	}
-	if value := metadataString(opts.Metadata, cliproxyexecutor.ExecutionSessionMetadataKey); value != "" {
+	if value := misc.MetadataString(opts.Metadata, cliproxyexecutor.ExecutionSessionMetadataKey); value != "" {
 		return "execution:" + value
 	}
-	if value := metadataString(req.Metadata, cliproxyexecutor.ExecutionSessionMetadataKey); value != "" {
+	if value := misc.MetadataString(req.Metadata, cliproxyexecutor.ExecutionSessionMetadataKey); value != "" {
 		return "execution:" + value
 	}
 	for _, raw := range [][]byte{opts.OriginalRequest, req.Payload} {

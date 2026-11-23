@@ -128,7 +128,6 @@ func main() {
 
 	fmt.Printf("Scanning auth files in: %s\n", authsDir)
 
-	// Load all auth records from the directory.
 	fileStore := sdkauth.NewFileTokenStore()
 	fileStore.SetBaseDir(authsDir)
 
@@ -143,7 +142,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Find enabled antigravity auths.
 	var agAuths []*coreauth.Auth
 	for _, a := range auths {
 		if a == nil || a.Disabled {
@@ -167,7 +165,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Fetch models from the upstream Antigravity API using available auths.
 	var models []modelEntry
 	for _, chosen := range agAuths {
 		fmt.Printf("Using auth: id=%s label=%s\n", chosen.ID, chosen.Label)
@@ -187,12 +184,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, "warning: no models returned from any auth (API may be unavailable or tokens expired)")
 	}
 
-	// Build the output payload.
 	out := modelOutput{
 		Models: models,
 	}
 
-	// Marshal to JSON.
 	var raw []byte
 	if pretty {
 		raw, err = json.MarshalIndent(out, "", "  ")
@@ -223,7 +218,7 @@ func fetchModels(ctx context.Context, auth *coreauth.Auth) []modelEntry {
 func fetchModelsFromBaseURLs(ctx context.Context, auth *coreauth.Auth, baseURLs []string, client *http.Client) []modelEntry {
 	var accessToken string
 	if auth != nil {
-		accessToken = metaStringValue(auth.Metadata, "access_token")
+		accessToken = misc.MetadataString(auth.Metadata, "access_token")
 	}
 	if accessToken == "" {
 		fmt.Fprintln(os.Stderr, "error: no access token found in auth")
@@ -234,9 +229,9 @@ func fetchModelsFromBaseURLs(ctx context.Context, auth *coreauth.Auth, baseURLs 
 		modelsURL := baseURL + antigravityModelsPath
 
 		var payload []byte
-		if auth != nil && auth.Metadata != nil {
-			if pid, ok := auth.Metadata["project_id"].(string); ok && strings.TrimSpace(pid) != "" {
-				payload = []byte(fmt.Sprintf(`{"project": "%s"}`, strings.TrimSpace(pid)))
+		if auth != nil {
+			if pid := misc.MetadataString(auth.Metadata, "project_id"); pid != "" {
+				payload = []byte(fmt.Sprintf(`{"project": "%s"}`, pid))
 			}
 		}
 		if len(payload) == 0 {
@@ -327,20 +322,4 @@ func fetchModelsFromBaseURLs(ctx context.Context, auth *coreauth.Auth, baseURLs 
 	}
 
 	return nil
-}
-
-func metaStringValue(m map[string]interface{}, key string) string {
-	if m == nil {
-		return ""
-	}
-	v, ok := m[key]
-	if !ok {
-		return ""
-	}
-	switch val := v.(type) {
-	case string:
-		return val
-	default:
-		return ""
-	}
 }

@@ -18,6 +18,7 @@ import (
 	"github.com/MoeForge/moego/ojson"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/cache"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
 	internalsignature "github.com/router-for-me/CLIProxyAPI/v8/internal/signature"
 	antigravityclaude "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/antigravity/claude"
@@ -422,10 +423,10 @@ func antigravityTransportScope(auth *cliproxyauth.Auth) string {
 	// across token rotation. Keying on the access token would move a credential to a new
 	// pool on every refresh, and would also strand refresh requests themselves, which
 	// run before any access token exists.
-	if refresh := strings.TrimSpace(metaStringValue(auth.Metadata, "refresh_token")); refresh != "" {
+	if refresh := misc.MetadataString(auth.Metadata, "refresh_token"); refresh != "" {
 		return antigravityCredentialScope("refresh:", refresh)
 	}
-	if access := strings.TrimSpace(metaStringValue(auth.Metadata, "access_token")); access != "" {
+	if access := misc.MetadataString(auth.Metadata, "access_token"); access != "" {
 		return antigravityCredentialScope("token:", access)
 	}
 	return antigravityAnonymousTransportScope

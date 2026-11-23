@@ -21,6 +21,7 @@ import (
 	"github.com/google/uuid"
 	devinauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/devin"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
 	internalsignature "github.com/router-for-me/CLIProxyAPI/v8/internal/signature"
@@ -2824,19 +2825,17 @@ func devinAuthCredentials(auth *cliproxyauth.Auth) (apiKey string, baseURL strin
 			deviceSeed = v
 		}
 	}
-	if auth.Metadata != nil {
-		if v, ok := auth.Metadata["api_key"].(string); ok && strings.TrimSpace(v) != "" && apiKey == "" {
-			apiKey = strings.TrimSpace(v)
-		}
-		if v, ok := auth.Metadata["session_token"].(string); ok && strings.TrimSpace(v) != "" && apiKey == "" {
-			apiKey = strings.TrimSpace(v)
-		}
-		if v, ok := auth.Metadata["base_url"].(string); ok && strings.TrimSpace(v) != "" && baseURL == helps.DevinDefaultBaseURL {
-			baseURL = strings.TrimSpace(v)
-		}
-		if v, ok := auth.Metadata["device_seed"].(string); ok && strings.TrimSpace(v) != "" && deviceSeed == "" {
-			deviceSeed = strings.TrimSpace(v)
-		}
+	if v := misc.MetadataString(auth.Metadata, "api_key"); v != "" && apiKey == "" {
+		apiKey = v
+	}
+	if v := misc.MetadataString(auth.Metadata, "session_token"); v != "" && apiKey == "" {
+		apiKey = v
+	}
+	if v := misc.MetadataString(auth.Metadata, "base_url"); v != "" && baseURL == helps.DevinDefaultBaseURL {
+		baseURL = v
+	}
+	if v := misc.MetadataString(auth.Metadata, "device_seed"); v != "" && deviceSeed == "" {
+		deviceSeed = v
 	}
 	return
 }
