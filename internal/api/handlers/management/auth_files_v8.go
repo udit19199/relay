@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/kimi"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/clienterror"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/proxyutil"
 )
@@ -141,7 +142,7 @@ func (h *Handler) StartOAuthV8(c *gin.Context) {
 	}
 
 	provider := strings.TrimSpace(c.Query("provider"))
-	targetName := firstNonEmpty(strings.TrimSpace(c.Query("name")), strings.TrimSpace(c.Query("target_auth_id")), strings.TrimSpace(c.Query("auth_id")))
+	targetName := util.FirstNonEmptyTrimmed(c.Query("name"), c.Query("target_auth_id"), c.Query("auth_id"))
 	targetAuthIndex := strings.TrimSpace(c.Query("auth_index"))
 	verifyAfterLogin := strings.EqualFold(strings.TrimSpace(c.Query("verify")), "true") || strings.TrimSpace(c.Query("verify")) == "1"
 	verifyModel := strings.TrimSpace(c.Query("verify_model"))
@@ -319,7 +320,7 @@ func (h *Handler) StartOAuthV8(c *gin.Context) {
 		}
 	}
 
-	reqDomain := firstNonEmpty(strings.TrimSpace(c.Query("domain")), strings.TrimSpace(c.Query("channel")), oauthSessionDomainFromContext(c))
+	reqDomain := util.FirstNonEmptyTrimmed(c.Query("domain"), c.Query("channel"), oauthSessionDomainFromContext(c))
 	if provider != "" {
 		normalizedProvider, okProvider := normalizeOAuthProviderWithDomain(provider, reqDomain)
 		if !okProvider {
@@ -339,7 +340,7 @@ func (h *Handler) StartOAuthV8(c *gin.Context) {
 		if targetAuth.Attributes != nil {
 			targetPath = strings.TrimSpace(targetAuth.Attributes[coreauth.AttributePath])
 		}
-		targetFileName := firstNonEmpty(strings.TrimSpace(targetAuth.FileName), targetAuth.ID)
+		targetFileName := util.FirstNonEmptyTrimmed(targetAuth.FileName, targetAuth.ID)
 		effectiveTargetAuth := targetAuth
 		diskPath := targetPath
 		if diskPath == "" && targetFileName != "" {
@@ -546,7 +547,7 @@ func (h *Handler) VerifyAuthFileV8(c *gin.Context) {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "auth manager is not available"})
 		return
 	}
-	targetName := firstNonEmpty(strings.TrimSpace(c.Query("name")), strings.TrimSpace(c.Query("target_auth_id")), strings.TrimSpace(c.Query("auth_id")))
+	targetName := util.FirstNonEmptyTrimmed(c.Query("name"), c.Query("target_auth_id"), c.Query("auth_id"))
 	targetAuthIndex := strings.TrimSpace(c.Query("auth_index"))
 	model := strings.TrimSpace(c.Query("model"))
 

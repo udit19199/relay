@@ -478,7 +478,7 @@ func applyOAuthRecoveryTargetToRecord(target oauthRecoveryTarget, record *coreau
 	}
 	gotEmail, gotAccountID := authIdentityEmailAndAccountID(record)
 	gotOrgID := authIdentityOrganizationID(record)
-	candidateFileName := firstNonEmpty(strings.TrimSpace(record.FileName), strings.TrimSpace(record.ID))
+	candidateFileName := util.FirstNonEmptyTrimmed(record.FileName, record.ID)
 
 	if !matchesOAuthRecoveryTargetWithOrg(target, gotEmail, gotAccountID, gotOrgID, candidateFileName) {
 		return false
@@ -1787,7 +1787,7 @@ func (h *Handler) candidatePluginRecordPath(record *coreauth.Auth) string {
 			return p
 		}
 	}
-	name := firstNonEmpty(strings.TrimSpace(record.FileName), strings.TrimSpace(record.ID))
+	name := util.FirstNonEmptyTrimmed(record.FileName, record.ID)
 	if name == "" {
 		return ""
 	}
@@ -1843,7 +1843,7 @@ func (h *Handler) savePluginLoginRecords(ctx context.Context, records []*coreaut
 		}
 		savedPath, errSave := h.saveTokenRecord(ctx, record)
 		rb.savedPath = strings.TrimSpace(savedPath)
-		rb.diskPath = firstNonEmpty(rb.savedPath, candidatePath)
+		rb.diskPath = util.FirstNonEmptyTrimmed(rb.savedPath, candidatePath)
 		rb.record = record
 		if record != nil && record.Storage != nil {
 			if rawer, ok := record.Storage.(interface{ RawJSON() []byte }); ok {
@@ -1919,7 +1919,7 @@ func (h *Handler) restoreOverwrittenPluginRecord(ctx context.Context, rb savedPl
 			}
 		}
 		restoreRecord = &coreauth.Auth{
-			ID:       firstNonEmpty(id, fileName),
+			ID:       util.FirstNonEmptyTrimmed(id, fileName),
 			FileName: fileName,
 			Provider: provider,
 			Metadata: diskMeta,
@@ -2017,7 +2017,7 @@ func (h *Handler) rollbackSavedPluginLoginRecords(ctx context.Context, rollbacks
 		}
 
 		if !rb.hadRuntimeAuth && h != nil && h.authManager != nil && rb.record != nil {
-			primaryID := firstNonEmpty(h.authIDForPath(savedPath), strings.TrimSpace(rb.record.ID))
+			primaryID := util.FirstNonEmptyTrimmed(h.authIDForPath(savedPath), rb.record.ID)
 			if primaryID != "" {
 				superseded := false
 				diskHandled := false

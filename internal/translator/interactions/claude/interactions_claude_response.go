@@ -40,7 +40,7 @@ func ConvertInteractionsResponseToClaude(_ context.Context, modelName string, or
 		*param = &interactionsToClaudeStreamState{Model: modelName}
 	}
 	st := (*param).(*interactionsToClaudeStreamState)
-	st.Model = firstNonEmpty(st.Model, modelName)
+	st.Model = util.FirstNonEmpty(st.Model, modelName)
 	st.ensureMaps()
 	return convertInteractionsEventToClaude(modelName, rawJSON, st)
 }
@@ -54,8 +54,8 @@ func ConvertInteractionsResponseToClaudeNonStream(_ context.Context, modelName s
 		interaction = nested
 	}
 	outDoc := ojson.NewDocString(`{"id":"","type":"message","role":"assistant","model":"","content":[],"stop_reason":"end_turn","stop_sequence":null,"usage":{"input_tokens":0,"output_tokens":0}}`)
-	_ = outDoc.Set("id", firstNonEmpty(interaction.Get("id").String(), root.Get("id").String(), fmt.Sprintf("msg_%d", time.Now().UnixNano())))
-	_ = outDoc.Set("model", firstNonEmpty(interaction.Get("model").String(), modelName))
+	_ = outDoc.Set("id", util.FirstNonEmpty(interaction.Get("id").String(), root.Get("id").String(), fmt.Sprintf("msg_%d", time.Now().UnixNano())))
+	_ = outDoc.Set("model", util.FirstNonEmpty(interaction.Get("model").String(), modelName))
 	steps := interaction.Get("steps")
 	if !steps.Exists() {
 		steps = root.Get("steps")
@@ -101,8 +101,8 @@ func ConvertInteractionsResponseToClaudeNonStream(_ context.Context, modelName s
 	if sawToolCall {
 		_ = outDoc.Set("stop_reason", "tool_use")
 	}
-	status := firstNonEmpty(interaction.Get("status").String(), root.Get("status").String())
-	finishReason := firstNonEmpty(interaction.Get("finish_reason").String(), root.Get("finish_reason").String())
+	status := util.FirstNonEmpty(interaction.Get("status").String(), root.Get("status").String())
+	finishReason := util.FirstNonEmpty(interaction.Get("finish_reason").String(), root.Get("finish_reason").String())
 	if status == "incomplete" || finishReason == "length" || finishReason == "max_tokens" {
 		_ = outDoc.Set("stop_reason", "max_tokens")
 	}
@@ -125,8 +125,8 @@ func convertInteractionsEventToClaude(modelName string, rawJSON []byte, st *inte
 	switch root.Get("event_type").String() {
 	case "interaction.created":
 		interaction := root.Get("interaction")
-		st.ID = strings.Clone(firstNonEmpty(interaction.Get("id").String(), st.ID))
-		st.Model = strings.Clone(firstNonEmpty(interaction.Get("model").String(), st.Model, modelName))
+		st.ID = strings.Clone(util.FirstNonEmpty(interaction.Get("id").String(), st.ID))
+		st.Model = strings.Clone(util.FirstNonEmpty(interaction.Get("model").String(), st.Model, modelName))
 		return appendClaudeMessageStart(nil, st)
 	case "step.start":
 		return interactionsStepStartToClaude(modelName, root, st)
@@ -173,7 +173,7 @@ func interactionsStepDeltaToClaude(modelName string, root ojson.Result, st *inte
 	case "thought_summary":
 		out := appendClaudeMessageStart(nil, st)
 		out = ensureClaudeContentBlock(out, "thinking", st)
-		text := firstNonEmpty(delta.Get("content.text").String(), delta.Get("text").String())
+		text := util.FirstNonEmpty(delta.Get("content.text").String(), delta.Get("text").String())
 		return appendClaudeContentDelta(out, "thinking_delta", "thinking", text, st)
 	case "thought_signature":
 		if st.ActiveBlock && st.ActiveBlockType == "thinking" {
@@ -206,7 +206,7 @@ func appendClaudeMessageStart(out [][]byte, st *interactionsToClaudeStreamState)
 		return out
 	}
 	msgDoc := ojson.NewDocString(`{"type":"message_start","message":{"id":"","type":"message","role":"assistant","content":[],"model":"","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":0,"output_tokens":0}}}`)
-	_ = msgDoc.Set("message.id", firstNonEmpty(st.ID, fmt.Sprintf("msg_%d", time.Now().UnixNano())))
+	_ = msgDoc.Set("message.id", util.FirstNonEmpty(st.ID, fmt.Sprintf("msg_%d", time.Now().UnixNano())))
 	_ = msgDoc.Set("message.model", st.Model)
 	st.Started = true
 	return append(out, translatorcommon.AppendSSEEventBytes(nil, "message_start", msgDoc.Bytes(), 3))
@@ -233,7 +233,7 @@ func appendClaudeToolBlockStart(out [][]byte, stepIndex int, st *interactionsToC
 	out = appendClaudeContentBlockStop(out, st)
 	blockDoc := ojson.NewDocString(`{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"","name":"","input":{}}}`)
 	_ = blockDoc.Set("index", st.BlockIndex)
-	_ = blockDoc.Set("content_block.id", firstNonEmpty(st.ToolIDs[stepIndex], fmt.Sprintf("toolu_%d", stepIndex)))
+	_ = blockDoc.Set("content_block.id", util.FirstNonEmpty(st.ToolIDs[stepIndex], fmt.Sprintf("toolu_%d", stepIndex)))
 	_ = blockDoc.Set("content_block.name", st.ToolNames[stepIndex])
 	if signature := st.ToolSignatures[stepIndex]; signature != "" {
 		_ = blockDoc.Set("content_block.signature", signature)
@@ -285,8 +285,8 @@ func appendClaudeMessageDelta(out [][]byte, root ojson.Result, st *interactionsT
 		_ = payloadDoc.Set("delta.stop_reason", "tool_use")
 	}
 	interaction := root.Get("interaction")
-	status := firstNonEmpty(interaction.Get("status").String(), root.Get("status").String())
-	finishReason := firstNonEmpty(interaction.Get("finish_reason").String(), root.Get("finish_reason").String())
+	status := util.FirstNonEmpty(interaction.Get("status").String(), root.Get("status").String())
+	finishReason := util.FirstNonEmpty(interaction.Get("finish_reason").String(), root.Get("finish_reason").String())
 	if status == "incomplete" || finishReason == "length" || finishReason == "max_tokens" {
 		_ = payloadDoc.Set("delta.stop_reason", "max_tokens")
 	}
@@ -407,7 +407,7 @@ func interactionsContentTexts(content ojson.Result) []string {
 	}
 	var out []string
 	content.ForEach(func(_, part ojson.Result) bool {
-		if text := firstNonEmpty(part.Get("text").String(), part.Get("content.text").String()); text != "" {
+		if text := util.FirstNonEmpty(part.Get("text").String(), part.Get("content.text").String()); text != "" {
 			out = append(out, text)
 		}
 		return true
@@ -416,11 +416,11 @@ func interactionsContentTexts(content ojson.Result) []string {
 }
 
 func interactionsToolID(root ojson.Result) string {
-	return firstNonEmpty(root.Get("call_id").String(), root.Get("id").String(), root.Get("tool_use_id").String(), "toolu_interactions")
+	return util.FirstNonEmpty(root.Get("call_id").String(), root.Get("id").String(), root.Get("tool_use_id").String(), "toolu_interactions")
 }
 
 func interactionsSignature(root ojson.Result) string {
-	return firstNonEmpty(
+	return util.FirstNonEmpty(
 		root.Get("signature").String(),
 		root.Get("thought_signature").String(),
 		root.Get("thoughtSignature").String(),
@@ -444,15 +444,6 @@ func firstUsageInt(root ojson.Result, paths ...string) (int64, bool) {
 		}
 	}
 	return 0, false
-}
-
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return value
-		}
-	}
-	return ""
 }
 
 func (st *interactionsToClaudeStreamState) ensureMaps() {

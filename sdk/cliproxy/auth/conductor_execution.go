@@ -31,7 +31,7 @@ func newUpstreamAttemptContext(ctx context.Context) context.Context {
 }
 
 func claudeOAuthRequestCancellation(ctx context.Context, auth *Auth, err error) error {
-	if auth == nil || !strings.EqualFold(strings.TrimSpace(auth.Provider), "claude") || !strings.EqualFold(strings.TrimSpace(auth.Attributes["auth_kind"]), "oauth") {
+	if !authProviderIs(auth, "claude") || !strings.EqualFold(strings.TrimSpace(auth.Attributes["auth_kind"]), "oauth") {
 		return nil
 	}
 	if ctx != nil && errors.Is(ctx.Err(), context.Canceled) {
@@ -1655,8 +1655,9 @@ func (m *Manager) PrepareRequestAuth(ctx context.Context, preparer RequestAuthPr
 		return preparer.PrepareRequestAuth(ctx, auth.Clone())
 	}
 
+	isMeta := authProviderIs(auth, "meta")
 	var prepareMu *sync.Mutex
-	if strings.EqualFold(strings.TrimSpace(auth.Provider), "meta") {
+	if isMeta {
 		// Meta also mints on 401 recovery. Serialize both paths per credential.
 		lockValue, _ := m.refreshLocks.LoadOrStore(id, &authRefreshLock{})
 		prepareMu = &lockValue.(*authRefreshLock).mu
@@ -1674,7 +1675,7 @@ func (m *Manager) PrepareRequestAuth(ctx context.Context, preparer RequestAuthPr
 		target = current.Clone()
 	}
 	m.mu.RUnlock()
-	if current == nil && strings.EqualFold(strings.TrimSpace(auth.Provider), "meta") {
+	if current == nil && isMeta {
 		return nil, fmt.Errorf("prepare meta auth: credential no longer registered")
 	}
 
@@ -1698,7 +1699,7 @@ func (m *Manager) PrepareRequestAuth(ctx context.Context, preparer RequestAuthPr
 	if saved != nil {
 		return saved, nil
 	}
-	if strings.EqualFold(strings.TrimSpace(auth.Provider), "meta") {
+	if isMeta {
 		return nil, fmt.Errorf("prepare meta auth: credential removed during mint")
 	}
 	return target, nil
@@ -1856,7 +1857,7 @@ func isFreeCodexAuth(auth *Auth) bool {
 	if auth == nil || auth.Attributes == nil {
 		return false
 	}
-	if !strings.EqualFold(strings.TrimSpace(auth.Provider), "codex") {
+	if !authProviderIs(auth, "codex") {
 		return false
 	}
 	return strings.EqualFold(strings.TrimSpace(auth.Attributes["plan_type"]), "free")
@@ -1926,7 +1927,7 @@ func executorKeyFromAuth(auth *Auth) string {
 			return util.OpenAICompatibleProviderKey(providerKey)
 		}
 	}
-	if strings.EqualFold(strings.TrimSpace(auth.Provider), "openai-compatibility") {
+	if authProviderIs(auth, "openai-compatibility") {
 		providerKey := strings.TrimSpace(auth.Label)
 		if providerKey == "" {
 			providerKey = "openai-compatibility"

@@ -126,3 +126,23 @@ func WritablePath() string {
 	}
 	return ""
 }
+
+// FirstNonEmpty returns the first value that is not blank after trimming, unmodified.
+func FirstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+// FirstNonEmptyTrimmed returns the first value that is not blank, trimmed.
+func FirstNonEmptyTrimmed(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
+}

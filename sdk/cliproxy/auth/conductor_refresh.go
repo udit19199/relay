@@ -118,7 +118,7 @@ func (m *Manager) queueRefreshUnschedule(authID string) {
 // codexAutoRefreshUnavailable mirrors the executor's local renewal requirements.
 // Runtime evaluators and Home retain control over their own refresh mechanisms.
 func (m *Manager) codexAutoRefreshUnavailable(a *Auth, now time.Time) bool {
-	if a == nil || !strings.EqualFold(strings.TrimSpace(a.Provider), "codex") || m.HomeEnabled() {
+	if !authProviderIs(a, "codex") || m.HomeEnabled() {
 		return false
 	}
 	if evaluator, ok := a.Runtime.(RefreshEvaluator); ok && evaluator != nil {
@@ -469,7 +469,7 @@ func authHasRefreshCredential(auth *Auth) bool {
 		return true
 	}
 	// Meta exchanges its device token for a replacement API key after a 401.
-	return auth != nil && strings.EqualFold(strings.TrimSpace(auth.Provider), "meta") &&
+	return authProviderIs(auth, "meta") &&
 		(authMetadataString(auth, "dca_token") != "" || strings.TrimSpace(auth.Attributes["dca_token"]) != "")
 }
 
@@ -930,7 +930,7 @@ const devinQuotaRevalidateInterval = time.Hour
 // and early restoration could never be detected. It is scoped strictly to
 // the exhausted state; healthy credentials are unaffected.
 func devinQuotaRevalidateAt(a *Auth, now time.Time) (time.Time, bool) {
-	if a == nil || !strings.EqualFold(strings.TrimSpace(a.Provider), "devin") {
+	if !authProviderIs(a, "devin") {
 		return time.Time{}, false
 	}
 	if !a.Quota.Exceeded || a.Quota.Reason != "credential_quota" || !a.Quota.NextRecoverAt.After(now) {
@@ -960,7 +960,7 @@ func devinQuotaObservationRestored(auth, existing *Auth, now time.Time) bool {
 	if auth == nil || existing == nil {
 		return false
 	}
-	if !strings.EqualFold(strings.TrimSpace(existing.Provider), "devin") {
+	if !authProviderIs(existing, "devin") {
 		return false
 	}
 	if !existing.Quota.Exceeded || existing.Quota.Reason != "credential_quota" || !existing.Quota.NextRecoverAt.After(now) {
@@ -1281,7 +1281,7 @@ func (m *Manager) refreshAuthForRequestAtEpoch(ctx context.Context, id, failedAc
 	if auth == nil || exec == nil {
 		return nil, errors.New("auth or executor not found")
 	}
-	if strings.EqualFold(strings.TrimSpace(auth.Provider), "codex") {
+	if authProviderIs(auth, "codex") {
 		if resolver, okResolver := store.(interface {
 			RefreshJournalFor(*Auth) (codex.RefreshJournal, error)
 		}); okResolver {

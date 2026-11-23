@@ -41,7 +41,7 @@ func ConvertInteractionsResponseToOpenAI(ctx context.Context, modelName string, 
 		*param = &interactionsToOpenAIChatStreamState{Model: modelName}
 	}
 	st := (*param).(*interactionsToOpenAIChatStreamState)
-	st.Model = firstNonEmpty(st.Model, modelName)
+	st.Model = util.FirstNonEmpty(st.Model, modelName)
 	st.ensureMaps()
 	return convertInteractionsEventToOpenAIChat(modelName, rawJSON, st)
 }
@@ -56,9 +56,9 @@ func ConvertInteractionsResponseToOpenAINonStream(ctx context.Context, modelName
 		interaction = nested
 	}
 	outDoc := ojson.NewDocString(`{"id":"","object":"chat.completion","created":0,"model":"","choices":[{"index":0,"message":{"role":"assistant","content":""},"finish_reason":"stop"}]}`)
-	_ = outDoc.Set("id", firstNonEmpty(interaction.Get("id").String(), root.Get("id").String(), fmt.Sprintf("chatcmpl_%d", time.Now().UnixNano())))
+	_ = outDoc.Set("id", util.FirstNonEmpty(interaction.Get("id").String(), root.Get("id").String(), fmt.Sprintf("chatcmpl_%d", time.Now().UnixNano())))
 	_ = outDoc.Set("created", time.Now().Unix())
-	_ = outDoc.Set("model", firstNonEmpty(interaction.Get("model").String(), modelName))
+	_ = outDoc.Set("model", util.FirstNonEmpty(interaction.Get("model").String(), modelName))
 	steps := interaction.Get("steps")
 	if !steps.Exists() {
 		steps = root.Get("steps")
@@ -79,7 +79,7 @@ func ConvertInteractionsResponseToOpenAINonStream(ctx context.Context, modelName
 			}
 		case "function_call":
 			sawToolCall = true
-			forAntigravity := isAntigravityModel(firstNonEmpty(interaction.Get("model").String(), modelName))
+			forAntigravity := isAntigravityModel(util.FirstNonEmpty(interaction.Get("model").String(), modelName))
 			toolCalls = append(toolCalls, openAIChatToolCallFromInteractions(step, ojson.Result{}, forAntigravity))
 		}
 		return true
@@ -97,14 +97,14 @@ func ConvertInteractionsResponseToOpenAINonStream(ctx context.Context, modelName
 		_ = outDoc.Set("choices.0.message.content", nil)
 		_ = outDoc.Set("choices.0.finish_reason", "tool_calls")
 	}
-	status := firstNonEmpty(interaction.Get("status").String(), root.Get("status").String())
-	interactionFinishReason := firstNonEmpty(interaction.Get("finish_reason").String(), root.Get("finish_reason").String())
+	status := util.FirstNonEmpty(interaction.Get("status").String(), root.Get("status").String())
+	interactionFinishReason := util.FirstNonEmpty(interaction.Get("finish_reason").String(), root.Get("finish_reason").String())
 	if interactionFinishReason == "content_filter" {
 		_ = outDoc.Set("choices.0.finish_reason", "content_filter")
 	} else if status == "incomplete" || interactionFinishReason == "length" || interactionFinishReason == "max_tokens" {
 		_ = outDoc.Set("choices.0.finish_reason", "length")
 	}
-	if envID := firstNonEmpty(interaction.Get("environment_id").String(), root.Get("environment_id").String(), interaction.Get("environment.id").String(), root.Get("environment.id").String(), root.Get("interaction.environment_id").String()); envID != "" {
+	if envID := util.FirstNonEmpty(interaction.Get("environment_id").String(), root.Get("environment_id").String(), interaction.Get("environment.id").String(), root.Get("environment.id").String(), root.Get("interaction.environment_id").String()); envID != "" {
 		_ = outDoc.Set("environment_id", envID)
 	}
 	setOpenAIChatUsageFromInteractionsDoc(outDoc, "usage", translatorcommon.InteractionsUsage(root))
@@ -123,9 +123,9 @@ func convertInteractionsEventToOpenAIChat(modelName string, rawJSON []byte, st *
 	switch root.Get("event_type").String() {
 	case "interaction.created":
 		interaction := root.Get("interaction")
-		st.ID = strings.Clone(firstNonEmpty(interaction.Get("id").String(), st.ID))
-		st.Model = strings.Clone(firstNonEmpty(interaction.Get("model").String(), st.Model, modelName))
-		if envID := firstNonEmpty(interaction.Get("environment_id").String(), root.Get("environment_id").String(), interaction.Get("environment.id").String(), root.Get("environment.id").String()); envID != "" {
+		st.ID = strings.Clone(util.FirstNonEmpty(interaction.Get("id").String(), st.ID))
+		st.Model = strings.Clone(util.FirstNonEmpty(interaction.Get("model").String(), st.Model, modelName))
+		if envID := util.FirstNonEmpty(interaction.Get("environment_id").String(), root.Get("environment_id").String(), interaction.Get("environment.id").String(), root.Get("environment.id").String()); envID != "" {
 			st.EnvironmentID = strings.Clone(envID)
 		}
 		return ensureOpenAIChatStarted(nil, st)
@@ -135,7 +135,7 @@ func convertInteractionsEventToOpenAIChat(modelName string, rawJSON []byte, st *
 		return interactionsStepDeltaToOpenAIChat(modelName, root, st)
 	case "interaction.completed", "finish":
 		interaction := root.Get("interaction")
-		if envID := firstNonEmpty(interaction.Get("environment_id").String(), root.Get("environment_id").String(), interaction.Get("environment.id").String(), root.Get("environment.id").String()); envID != "" {
+		if envID := util.FirstNonEmpty(interaction.Get("environment_id").String(), root.Get("environment_id").String(), interaction.Get("environment.id").String(), root.Get("environment.id").String()); envID != "" {
 			st.EnvironmentID = strings.Clone(envID)
 		}
 		return appendOpenAIChatCompleted(nil, root, st)
@@ -164,7 +164,7 @@ func interactionsStepStartToOpenAIChat(modelName string, root ojson.Result, st *
 			st.ToolCallIndexByStep[index] = toolCallIndex
 			st.NextToolCallIndex++
 		}
-		st.ToolIDs[index] = strings.Clone(firstNonEmpty(step.Get("call_id").String(), step.Get("id").String(), fmt.Sprintf("call_%d", toolCallIndex)))
+		st.ToolIDs[index] = strings.Clone(util.FirstNonEmpty(step.Get("call_id").String(), step.Get("id").String(), fmt.Sprintf("call_%d", toolCallIndex)))
 		name := step.Get("name").String()
 		if isAntigravityModel(modelName) || (st != nil && isAntigravityModel(st.Model)) {
 			name = translatorcommon.AntigravityUpstreamToolNameToClient(name)
@@ -189,7 +189,7 @@ func interactionsStepDeltaToOpenAIChat(modelName string, root ojson.Result, st *
 	out := ensureOpenAIChatStarted(nil, st)
 	switch delta.Get("type").String() {
 	case "thought_summary":
-		text := firstNonEmpty(delta.Get("content.text").String(), delta.Get("text").String())
+		text := util.FirstNonEmpty(delta.Get("content.text").String(), delta.Get("text").String())
 		if text == "" {
 			return out
 		}
@@ -235,8 +235,8 @@ func appendOpenAIChatCompleted(out [][]byte, root ojson.Result, st *interactions
 		finishReason = "tool_calls"
 	}
 	interaction := root.Get("interaction")
-	status := firstNonEmpty(interaction.Get("status").String(), root.Get("status").String())
-	interactionFinishReason := firstNonEmpty(interaction.Get("finish_reason").String(), root.Get("finish_reason").String())
+	status := util.FirstNonEmpty(interaction.Get("status").String(), root.Get("status").String())
+	interactionFinishReason := util.FirstNonEmpty(interaction.Get("finish_reason").String(), root.Get("finish_reason").String())
 	if interactionFinishReason == "content_filter" {
 		finishReason = "content_filter"
 	} else if status == "incomplete" || interactionFinishReason == "length" || interactionFinishReason == "max_tokens" {
@@ -276,7 +276,7 @@ func interactionsFailedToOpenAIChat(root ojson.Result) [][]byte {
 
 func openAIChatBaseChunkDoc(st *interactionsToOpenAIChatStreamState) *ojson.Doc {
 	chunkDoc := ojson.NewDocString(`{"id":"","object":"chat.completion.chunk","created":0,"model":"","choices":[{"index":0,"delta":{},"finish_reason":null}]}`)
-	_ = chunkDoc.Set("id", firstNonEmpty(st.ID, fmt.Sprintf("chatcmpl_%d", time.Now().UnixNano())))
+	_ = chunkDoc.Set("id", util.FirstNonEmpty(st.ID, fmt.Sprintf("chatcmpl_%d", time.Now().UnixNano())))
 	_ = chunkDoc.Set("created", openAIChatCreated(st))
 	_ = chunkDoc.Set("model", st.Model)
 	if st != nil && st.EnvironmentID != "" {
@@ -301,7 +301,7 @@ func openAIChatToolCallStartChunk(st *interactionsToOpenAIChatStreamState, index
 	}
 	toolCallDoc := ojson.NewDocString(`{"index":0,"id":"","type":"function","function":{"name":"","arguments":""}}`)
 	_ = toolCallDoc.Set("index", toolCallIndex)
-	_ = toolCallDoc.Set("id", firstNonEmpty(st.ToolIDs[index], fmt.Sprintf("call_%d", toolCallIndex)))
+	_ = toolCallDoc.Set("id", util.FirstNonEmpty(st.ToolIDs[index], fmt.Sprintf("call_%d", toolCallIndex)))
 	_ = toolCallDoc.Set("function.name", st.ToolNames[index])
 	_ = chunkDoc.SetRawBytes("choices.0.delta.tool_calls.-1", toolCallDoc.Bytes())
 	return chunkDoc.Bytes()
@@ -324,7 +324,7 @@ func openAIChatToolCallArgumentsChunk(st *interactionsToOpenAIChatStreamState, i
 
 func openAIChatToolCallFromInteractions(step, fallbackArgs ojson.Result, forAntigravity bool) []byte {
 	toolCallDoc := ojson.NewDocString(`{"id":"","type":"function","function":{"name":"","arguments":"{}"}}`)
-	callID := firstNonEmpty(step.Get("call_id").String(), step.Get("id").String(), "call_0")
+	callID := util.FirstNonEmpty(step.Get("call_id").String(), step.Get("id").String(), "call_0")
 	_ = toolCallDoc.Set("id", callID)
 	name := step.Get("name").String()
 	if forAntigravity {
@@ -378,7 +378,7 @@ func interactionsContentTextsForOpenAIChat(content ojson.Result) []string {
 	}
 	var out []string
 	content.ForEach(func(_, part ojson.Result) bool {
-		if text := firstNonEmpty(part.Get("text").String(), part.Get("content.text").String()); text != "" {
+		if text := util.FirstNonEmpty(part.Get("text").String(), part.Get("content.text").String()); text != "" {
 			out = append(out, text)
 		}
 		return true

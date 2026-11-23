@@ -22,7 +22,7 @@ func credentialPolicyAllows(policy string, auth *Auth) bool {
 	}
 	switch policy {
 	case CredentialPolicyCodexAlphaSearchV1:
-		if !strings.EqualFold(strings.TrimSpace(auth.Provider), "codex") {
+		if !authProviderIs(auth, "codex") {
 			return false
 		}
 		switch auth.AuthKind() {

@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"strings"
 	"sync/atomic"
 	"time"
 )
@@ -52,7 +51,7 @@ func credentialQuotaProbeLease(interval time.Duration) time.Duration {
 // now. Only Claude credentials are probed: Codex and Devin already refresh
 // their own quota state.
 func credentialQuotaProbeDue(auth *Auth, now time.Time) bool {
-	if auth == nil || !strings.EqualFold(strings.TrimSpace(auth.Provider), "claude") {
+	if !authProviderIs(auth, "claude") {
 		return false
 	}
 	quota := auth.Quota
@@ -72,7 +71,7 @@ func credentialQuotaProbeDue(auth *Auth, now time.Time) bool {
 // still under a credential-wide quota block. It is called whenever that block
 // is recorded or restored, so the first probe waits one full interval.
 func stampCredentialQuotaProbe(auth *Auth, now time.Time) {
-	if auth == nil || !strings.EqualFold(strings.TrimSpace(auth.Provider), "claude") {
+	if !authProviderIs(auth, "claude") {
 		return
 	}
 	if !auth.Quota.Exceeded || auth.Quota.Reason != "credential_quota" {

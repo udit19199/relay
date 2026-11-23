@@ -12,7 +12,7 @@ import (
 func ConvertInteractionsRequestToOpenAI(modelName string, inputRawJSON []byte, stream bool) ([]byte, error) {
 	root := util.ParseGJSONBytesNoCopy(inputRawJSON)
 	outDoc := ojson.NewDocString(`{"model":"","messages":[]}`)
-	model := firstNonEmpty(modelName, root.Get("model").String())
+	model := util.FirstNonEmpty(modelName, root.Get("model").String())
 	_ = outDoc.Set("model", model)
 	if stream || root.Get("stream").Bool() {
 		_ = outDoc.Set("stream", true)
@@ -144,7 +144,7 @@ func appendInteractionsContentToOpenAIMessageDoc(msgDoc *ojson.Doc, content ojso
 func appendInteractionsFunctionCallToOpenAI(items *[][]byte, step ojson.Result, forAntigravity bool) {
 	msg := []byte(`{"role":"assistant","content":"","tool_calls":[]}`)
 	toolCallDoc := ojson.NewDocString(`{"id":"","type":"function","function":{"name":"","arguments":"{}"}}`)
-	callID := firstNonEmpty(step.Get("call_id").String(), step.Get("id").String(), "call_0")
+	callID := util.FirstNonEmpty(step.Get("call_id").String(), step.Get("id").String(), "call_0")
 	_ = toolCallDoc.Set("id", callID)
 	name := step.Get("name").String()
 	if forAntigravity {
@@ -158,7 +158,7 @@ func appendInteractionsFunctionCallToOpenAI(items *[][]byte, step ojson.Result, 
 
 func appendInteractionsFunctionResultToOpenAI(items *[][]byte, step ojson.Result) {
 	msgDoc := ojson.NewDocString(`{"role":"tool","tool_call_id":"","content":""}`)
-	_ = msgDoc.Set("tool_call_id", firstNonEmpty(step.Get("call_id").String(), step.Get("id").String()))
+	_ = msgDoc.Set("tool_call_id", util.FirstNonEmpty(step.Get("call_id").String(), step.Get("id").String()))
 	_ = msgDoc.Set("content", jsonStringValue(firstExisting(step.Get("result"), step.Get("output")), ""))
 	*items = append(*items, msgDoc.Bytes())
 }
@@ -219,10 +219,10 @@ func copyInteractionsOpenAITopLevelDoc(outDoc *ojson.Doc, root ojson.Result) {
 	if serviceTier := root.Get("service_tier"); serviceTier.Exists() && serviceTier.Type == ojson.String {
 		_ = outDoc.Set("service_tier", serviceTier.String())
 	}
-	if previousInteractionID := firstNonEmpty(root.Get("previous_interaction_id").String(), root.Get("previous_response_id").String()); previousInteractionID != "" {
+	if previousInteractionID := util.FirstNonEmpty(root.Get("previous_interaction_id").String(), root.Get("previous_response_id").String()); previousInteractionID != "" {
 		_ = outDoc.Set("previous_response_id", previousInteractionID)
 	}
-	if environmentID := firstNonEmpty(root.Get("environment_id").String(), root.Get("environment.id").String()); environmentID != "" {
+	if environmentID := util.FirstNonEmpty(root.Get("environment_id").String(), root.Get("environment.id").String()); environmentID != "" {
 		_ = outDoc.Set("environment_id", environmentID)
 	}
 	if agentConfig := root.Get("agent_config"); agentConfig.Exists() {
@@ -260,9 +260,9 @@ func interactionsContentPartToOpenAI(part ojson.Result, role string) ([]byte, bo
 		return out, true
 	case "document", "file":
 		outDoc := ojson.NewDocString(`{"type":"file","file":{"filename":"","file_data":""}}`)
-		_ = outDoc.Set("file.filename", firstNonEmpty(part.Get("filename").String(), openAIFileNameFromMIME(part.Get("mime_type").String())))
+		_ = outDoc.Set("file.filename", util.FirstNonEmpty(part.Get("filename").String(), openAIFileNameFromMIME(part.Get("mime_type").String())))
 		_ = outDoc.Set("file.file_data", part.Get("data").String())
-		if url := firstNonEmpty(part.Get("file_url").String(), part.Get("url").String()); url != "" {
+		if url := util.FirstNonEmpty(part.Get("file_url").String(), part.Get("url").String()); url != "" {
 			_ = outDoc.Delete("file.file_data")
 			_ = outDoc.Set("file.file_url", url)
 		}
@@ -274,7 +274,7 @@ func interactionsContentPartToOpenAI(part ojson.Result, role string) ([]byte, bo
 }
 
 func openAIToolFromInteractionsTool(tool ojson.Result, forAntigravity bool) ([]byte, bool) {
-	name := firstNonEmpty(tool.Get("name").String(), tool.Get("function.name").String())
+	name := util.FirstNonEmpty(tool.Get("name").String(), tool.Get("function.name").String())
 	if name == "" {
 		return nil, false
 	}
@@ -309,7 +309,7 @@ func interactionsText(value ojson.Result) string {
 		}
 		var builder strings.Builder
 		parts.ForEach(func(_, part ojson.Result) bool {
-			builder.WriteString(firstNonEmpty(part.Get("text").String(), part.Get("content.text").String()))
+			builder.WriteString(util.FirstNonEmpty(part.Get("text").String(), part.Get("content.text").String()))
 			return true
 		})
 		return builder.String()
@@ -334,14 +334,14 @@ func interactionsReasoningEffort(root, gen ojson.Result) string {
 }
 
 func interactionsMediaDataURL(part ojson.Result, fallbackMimeType string) string {
-	if url := firstNonEmpty(part.Get("image_url").String(), part.Get("file_data").String(), part.Get("url").String()); url != "" {
+	if url := util.FirstNonEmpty(part.Get("image_url").String(), part.Get("file_data").String(), part.Get("url").String()); url != "" {
 		return url
 	}
 	data := part.Get("data").String()
 	if data == "" {
 		return ""
 	}
-	mimeType := firstNonEmpty(part.Get("mime_type").String(), fallbackMimeType)
+	mimeType := util.FirstNonEmpty(part.Get("mime_type").String(), fallbackMimeType)
 	return "data:" + mimeType + ";base64," + data
 }
 
@@ -401,13 +401,4 @@ func firstExisting(values ...ojson.Result) ojson.Result {
 		}
 	}
 	return ojson.Result{}
-}
-
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return value
-		}
-	}
-	return ""
 }

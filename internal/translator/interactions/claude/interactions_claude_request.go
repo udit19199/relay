@@ -26,7 +26,7 @@ func convertClaudeRequestToInteractions(modelName string, inputRawJSON []byte, s
 	restoredRawJSON, _ := sigcompat.RestoreCodexCommentaryMarkers(inputRawJSON)
 	root := util.ParseGJSONBytesNoCopy(restoredRawJSON)
 	outDoc := ojson.NewDocString(`{"model":"","input":[]}`)
-	_ = outDoc.Set("model", firstNonEmpty(modelName, root.Get("model").String()))
+	_ = outDoc.Set("model", util.FirstNonEmpty(modelName, root.Get("model").String()))
 	if streamValue, ok := claudeRequestStreamValue(root, stream); ok {
 		_ = outDoc.Set("stream", streamValue)
 	}
