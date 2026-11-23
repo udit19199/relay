@@ -417,11 +417,7 @@ func compileAPIKeyModelCapabilitiesForAuth(cfg *internalconfig.Config, auth *Aut
 			compileConfiguredModelCapabilities(out, entry.Models, "meta")
 		}
 	default:
-		providerKey, compatName := "", ""
-		if auth.Attributes != nil {
-			providerKey = strings.TrimSpace(auth.Attributes["provider_key"])
-			compatName = strings.TrimSpace(auth.Attributes["compat_name"])
-		}
+		providerKey, compatName := openAICompatAttrs(auth)
 		if entry := resolveOpenAICompatConfigForAuth(cfg, auth, providerKey, compatName); entry != nil {
 			compileOpenAICompatibleModelCapabilities(out, entry.Models)
 		}

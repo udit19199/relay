@@ -68,6 +68,13 @@ func isConfiguredOpenAICompatAuth(auth *Auth) bool {
 	return strings.TrimSpace(auth.Attributes["compat_name"]) != ""
 }
 
+func openAICompatAttrs(auth *Auth) (providerKey, compatName string) {
+	if auth == nil {
+		return "", ""
+	}
+	return strings.TrimSpace(auth.Attributes["provider_key"]), strings.TrimSpace(auth.Attributes["compat_name"])
+}
+
 func openAICompatProviderKey(auth *Auth) string {
 	if auth == nil {
 		return ""
@@ -146,12 +153,7 @@ func resolveOpenAICompatUpstreamModelPool(cfg *internalconfig.Config, auth *Auth
 	if cfg == nil {
 		cfg = &internalconfig.Config{}
 	}
-	providerKey := ""
-	compatName := ""
-	if auth.Attributes != nil {
-		providerKey = strings.TrimSpace(auth.Attributes["provider_key"])
-		compatName = strings.TrimSpace(auth.Attributes["compat_name"])
-	}
+	providerKey, compatName := openAICompatAttrs(auth)
 	entry := resolveOpenAICompatConfigForAuth(cfg, auth, providerKey, compatName)
 	if entry == nil {
 		return nil
@@ -494,12 +496,7 @@ func configuredModelAliasEntries(cfg *internalconfig.Config, auth *Auth) []model
 			models = asModelAliasEntries(entry.Models)
 		}
 	default:
-		providerKey := ""
-		compatName := ""
-		if auth.Attributes != nil {
-			providerKey = strings.TrimSpace(auth.Attributes["provider_key"])
-			compatName = strings.TrimSpace(auth.Attributes["compat_name"])
-		}
+		providerKey, compatName := openAICompatAttrs(auth)
 		if compatName != "" || authProviderIs(auth, "openai-compatibility") {
 			if entry := resolveOpenAICompatConfigForAuth(cfg, auth, providerKey, compatName); entry != nil {
 				models = asModelAliasEntries(entry.Models)
@@ -654,13 +651,7 @@ func (m *Manager) rebuildAPIKeyModelAliasLocked(cfg *internalconfig.Config) {
 				compileAPIKeyModelAliasForModels(byAlias, entry.Models)
 			}
 		default:
-			// OpenAI-compat uses config selection from auth.Attributes.
-			providerKey := ""
-			compatName := ""
-			if auth.Attributes != nil {
-				providerKey = strings.TrimSpace(auth.Attributes["provider_key"])
-				compatName = strings.TrimSpace(auth.Attributes["compat_name"])
-			}
+			providerKey, compatName := openAICompatAttrs(auth)
 			if compatName != "" || authProviderIs(auth, "openai-compatibility") {
 				if entry := resolveOpenAICompatConfigForAuth(cfg, auth, providerKey, compatName); entry != nil {
 					compileAPIKeyModelAliasForModels(byAlias, entry.Models)
@@ -946,12 +937,7 @@ func resolveUpstreamModelForMetaAPIKey(cfg *internalconfig.Config, auth *Auth, r
 }
 
 func resolveUpstreamModelForOpenAICompatAPIKey(cfg *internalconfig.Config, auth *Auth, requestedModel string) string {
-	providerKey := ""
-	compatName := ""
-	if auth != nil && len(auth.Attributes) > 0 {
-		providerKey = strings.TrimSpace(auth.Attributes["provider_key"])
-		compatName = strings.TrimSpace(auth.Attributes["compat_name"])
-	}
+	providerKey, compatName := openAICompatAttrs(auth)
 	if compatName == "" && !authProviderIs(auth, "openai-compatibility") {
 		return ""
 	}
