@@ -11,6 +11,8 @@ import (
 	"os/signal"
 	"strings"
 	"time"
+
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
 )
 
 // oauthProviders are the browser sign-ins Relay offers.
@@ -118,12 +120,12 @@ func addOAuth(asJSON bool, provider string, noBrowser bool) int {
 					return
 				}
 				for _, a := range added {
-					fmt.Printf("Added %s account %s\n", a.Provider, firstNonEmpty(a.Account, a.Name))
+					fmt.Printf("Added %s account %s\n", a.Provider, util.FirstNonEmpty(a.Account, a.Name))
 				}
 			})
 			return 0
 		default:
-			return fail(asJSON, fmt.Errorf("sign-in failed: %s", firstNonEmpty(status.Error, status.Status)))
+			return fail(asJSON, fmt.Errorf("sign-in failed: %s", util.FirstNonEmpty(status.Error, status.Status)))
 		}
 	}
 	cancel()

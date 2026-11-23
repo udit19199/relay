@@ -28,10 +28,10 @@ func convertOpenAIResponsesRequestToInteractions(modelName string, inputRawJSON 
 	if instructions := root.Get("instructions"); instructions.Exists() {
 		_ = outDoc.Set("system_instruction", responsesInstructionsText(instructions))
 	}
-	if previousResponseID := firstNonEmpty(root.Get("previous_response_id").String(), root.Get("previous_interaction_id").String()); previousResponseID != "" {
+	if previousResponseID := util.FirstNonEmpty(root.Get("previous_response_id").String(), root.Get("previous_interaction_id").String()); previousResponseID != "" {
 		_ = outDoc.Set("previous_interaction_id", previousResponseID)
 	}
-	if environmentID := firstNonEmpty(root.Get("environment_id").String(), root.Get("environment.id").String()); environmentID != "" {
+	if environmentID := util.FirstNonEmpty(root.Get("environment_id").String(), root.Get("environment.id").String()); environmentID != "" {
 		_ = outDoc.Set("environment_id", environmentID)
 	}
 	if agentConfig := root.Get("agent_config"); agentConfig.Exists() {
@@ -46,8 +46,8 @@ func convertOpenAIResponsesRequestToInteractions(modelName string, inputRawJSON 
 	if toolChoice := root.Get("tool_choice"); toolChoice.Exists() {
 		if toolChoice.IsObject() {
 			tcRaw := []byte(toolChoice.Raw)
-			fnName := firstNonEmpty(toolChoice.Get("function.name").String(), toolChoice.Get("name").String(), toolChoice.Get("custom.name").String())
-			ns := firstNonEmpty(toolChoice.Get("namespace").String(), toolChoice.Get("function.namespace").String(), toolChoice.Get("custom.namespace").String())
+			fnName := util.FirstNonEmpty(toolChoice.Get("function.name").String(), toolChoice.Get("name").String(), toolChoice.Get("custom.name").String())
+			ns := util.FirstNonEmpty(toolChoice.Get("namespace").String(), toolChoice.Get("function.namespace").String(), toolChoice.Get("custom.namespace").String())
 			if ns != "" && fnName != "" {
 				fnName = util.QualifyResponsesNamespaceToolName(ns, fnName)
 			}
@@ -125,10 +125,10 @@ func ConvertInteractionsRequestToOpenAIResponses(modelName string, inputRawJSON 
 	if instructions := interactionsSystemInstructionText(root); instructions != "" {
 		_ = outDoc.Set("instructions", instructions)
 	}
-	if previousInteractionID := firstNonEmpty(root.Get("previous_interaction_id").String(), root.Get("previous_response_id").String()); previousInteractionID != "" {
+	if previousInteractionID := util.FirstNonEmpty(root.Get("previous_interaction_id").String(), root.Get("previous_response_id").String()); previousInteractionID != "" {
 		_ = outDoc.Set("previous_response_id", previousInteractionID)
 	}
-	if environmentID := firstNonEmpty(root.Get("environment_id").String(), root.Get("environment.id").String()); environmentID != "" {
+	if environmentID := util.FirstNonEmpty(root.Get("environment_id").String(), root.Get("environment.id").String()); environmentID != "" {
 		_ = outDoc.Set("environment_id", environmentID)
 	}
 	if agentConfig := root.Get("agent_config"); agentConfig.Exists() {
@@ -284,7 +284,7 @@ func responsesInputItemToInteractions(item ojson.Result, functionNamesByCallID m
 		appendResponsesContentToInteractionsDoc(stepDoc, item.Get("content"), turnDrops)
 		return stepDoc.Bytes()
 	case "function_call":
-		callID := firstNonEmpty(item.Get("call_id").String(), item.Get("id").String())
+		callID := util.FirstNonEmpty(item.Get("call_id").String(), item.Get("id").String())
 		name := item.Get("name").String()
 		if ns := item.Get("namespace").String(); ns != "" && name != "" {
 			name = util.QualifyResponsesNamespaceToolName(ns, name)
@@ -294,7 +294,7 @@ func responsesInputItemToInteractions(item ojson.Result, functionNamesByCallID m
 		}
 		return responsesFunctionCallToInteractions(item, forAntigravity)
 	case "custom_tool_call":
-		callID := firstNonEmpty(item.Get("call_id").String(), item.Get("id").String())
+		callID := util.FirstNonEmpty(item.Get("call_id").String(), item.Get("id").String())
 		name := item.Get("name").String()
 		if ns := item.Get("namespace").String(); ns != "" && name != "" {
 			name = util.QualifyResponsesNamespaceToolName(ns, name)
@@ -415,7 +415,7 @@ func responsesContentPartToInteractions(part ojson.Result) ([]byte, bool) {
 // only the OpenAI side can resolve, so it reports false.
 func responsesFilePartToInteractions(part ojson.Result) ([]byte, bool) {
 	filename := part.Get("filename").String()
-	fallbackMIMEType := firstNonEmpty(part.Get("mime_type").String(), part.Get("mimeType").String())
+	fallbackMIMEType := util.FirstNonEmpty(part.Get("mime_type").String(), part.Get("mimeType").String())
 	outDoc := ojson.NewDocString(`{"type":"document"}`)
 	if filename != "" {
 		_ = outDoc.Set("filename", filename)
@@ -437,13 +437,13 @@ func responsesFilePartToInteractions(part ojson.Result) ([]byte, bool) {
 // Interactions audio part.
 func responsesAudioPartToInteractions(part ojson.Result) ([]byte, bool) {
 	audio := part.Get("input_audio")
-	data := firstNonEmpty(audio.Get("data").String(), part.Get("data").String())
+	data := util.FirstNonEmpty(audio.Get("data").String(), part.Get("data").String())
 	if data == "" {
 		return nil, false
 	}
 	outDoc := ojson.NewDocString(`{"type":"audio","data":""}`)
 	_ = outDoc.Set("data", data)
-	if format := firstNonEmpty(audio.Get("format").String(), part.Get("format").String()); format != "" {
+	if format := util.FirstNonEmpty(audio.Get("format").String(), part.Get("format").String()); format != "" {
 		_ = outDoc.Set("mime_type", responsesInputAudioMIMEType(format))
 	}
 	return outDoc.Bytes(), true
@@ -466,7 +466,7 @@ func responsesInputAudioMIMEType(format string) string {
 
 func responsesImagePartToInteractions(part ojson.Result) []byte {
 	outDoc := ojson.NewDocString(`{"type":"image"}`)
-	imageURL := firstNonEmpty(part.Get("image_url").String(), part.Get("url").String())
+	imageURL := util.FirstNonEmpty(part.Get("image_url").String(), part.Get("url").String())
 	if mimeType, data, ok := parseDataURL(imageURL); ok {
 		_ = outDoc.Set("mime_type", mimeType)
 		_ = outDoc.Set("data", data)
@@ -495,7 +495,7 @@ func responsesFunctionCallToInteractions(item ojson.Result, forAntigravity bool)
 		name = translatorcommon.AntigravityToolNameToUpstream(name)
 	}
 	_ = outDoc.Set("name", name)
-	if callID := firstNonEmpty(item.Get("call_id").String(), item.Get("id").String()); callID != "" {
+	if callID := util.FirstNonEmpty(item.Get("call_id").String(), item.Get("id").String()); callID != "" {
 		_ = outDoc.Set("call_id", callID)
 	}
 	setJSONValueDoc(outDoc, "arguments", item.Get("arguments"), `{}`)
@@ -512,7 +512,7 @@ func responsesCustomToolCallToInteractions(item ojson.Result, forAntigravity boo
 		name = translatorcommon.AntigravityToolNameToUpstream(name)
 	}
 	_ = outDoc.Set("name", name)
-	if callID := firstNonEmpty(item.Get("call_id").String(), item.Get("id").String()); callID != "" {
+	if callID := util.FirstNonEmpty(item.Get("call_id").String(), item.Get("id").String()); callID != "" {
 		_ = outDoc.Set("call_id", callID)
 	}
 	if input := item.Get("input"); input.Exists() {
@@ -525,7 +525,7 @@ func responsesCustomToolCallToInteractions(item ojson.Result, forAntigravity boo
 
 func responsesFunctionOutputToInteractions(item ojson.Result, functionNamesByCallID map[string]string, forAntigravity bool) []byte {
 	outDoc := ojson.NewDocString(`{"type":"function_result","name":"","result":{}}`)
-	callID := firstNonEmpty(item.Get("call_id").String(), item.Get("id").String())
+	callID := util.FirstNonEmpty(item.Get("call_id").String(), item.Get("id").String())
 	name := item.Get("name").String()
 	if ns := item.Get("namespace").String(); ns != "" && name != "" {
 		name = util.QualifyResponsesNamespaceToolName(ns, name)
@@ -804,7 +804,7 @@ func interactionsFunctionCallToResponsesWithIdentity(item ojson.Result, forAntig
 		}
 	}
 
-	callID := firstNonEmpty(item.Get("call_id").String(), item.Get("id").String())
+	callID := util.FirstNonEmpty(item.Get("call_id").String(), item.Get("id").String())
 	if isCustom {
 		outDoc := ojson.NewDocString(`{"type":"custom_tool_call","call_id":"","name":"","input":""}`)
 		if callID != "" {
@@ -837,7 +837,7 @@ func interactionsFunctionCallToResponses(item ojson.Result, forAntigravity bool)
 
 func interactionsFunctionResultToResponses(item ojson.Result, forAntigravity bool) []byte {
 	outDoc := ojson.NewDocString(`{"type":"function_call_output","call_id":"","output":""}`)
-	if callID := firstNonEmpty(item.Get("call_id").String(), item.Get("id").String()); callID != "" {
+	if callID := util.FirstNonEmpty(item.Get("call_id").String(), item.Get("id").String()); callID != "" {
 		_ = outDoc.Set("call_id", callID)
 	}
 	if name := item.Get("name").String(); name != "" {
@@ -879,7 +879,7 @@ func appendInteractionsToolsToResponsesDoc(outDoc *ojson.Doc, tools ojson.Result
 }
 
 func responsesToolFromInteractionsTool(tool ojson.Result, forAntigravity bool) ([]byte, bool) {
-	name := firstNonEmpty(tool.Get("name").String(), tool.Get("function.name").String())
+	name := util.FirstNonEmpty(tool.Get("name").String(), tool.Get("function.name").String())
 	if name == "" {
 		return nil, false
 	}
@@ -900,7 +900,7 @@ func interactionsContentTexts(content ojson.Result) []string {
 	}
 	if content.IsArray() {
 		content.ForEach(func(_, part ojson.Result) bool {
-			if text := firstNonEmpty(part.Get("text").String(), part.Get("content.text").String()); text != "" {
+			if text := util.FirstNonEmpty(part.Get("text").String(), part.Get("content.text").String()); text != "" {
 				texts = append(texts, text)
 			}
 			return true
@@ -910,7 +910,7 @@ func interactionsContentTexts(content ojson.Result) []string {
 }
 
 func interactionsMediaDataURL(part ojson.Result) string {
-	if url := firstNonEmpty(part.Get("image_url").String(), part.Get("file_data").String(), part.Get("url").String()); url != "" {
+	if url := util.FirstNonEmpty(part.Get("image_url").String(), part.Get("file_data").String(), part.Get("url").String()); url != "" {
 		return url
 	}
 	data := part.Get("data").String()
@@ -1003,13 +1003,4 @@ func firstExisting(values ...ojson.Result) ojson.Result {
 		}
 	}
 	return ojson.Result{}
-}
-
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return value
-		}
-	}
-	return ""
 }
