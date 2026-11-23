@@ -128,7 +128,6 @@ func (h *OpenAIAPIHandler) ChatCompletions(c *gin.Context) {
 		return
 	}
 
-	// Check if the client requested a streaming response.
 	streamResult := ojson.GetBytesNoCopy(rawJSON, "stream")
 	stream := streamResult.Type == ojson.True
 
@@ -179,7 +178,6 @@ func (h *OpenAIAPIHandler) Completions(c *gin.Context) {
 		return
 	}
 
-	// Check if the client requested a streaming response.
 	streamResult := ojson.GetBytesNoCopy(rawJSON, "stream")
 	if streamResult.Type == ojson.True {
 		h.handleCompletionsStreamingResponse(c, rawJSON)
@@ -346,12 +344,10 @@ func convertChatCompletionsResponseToCompletions(rawJSON []byte) []byte {
 func convertChatCompletionsStreamChunkToCompletions(chunkData []byte) []byte {
 	root := util.ParseGJSONBytesNoCopy(chunkData)
 
-	// Check if this chunk has any meaningful content
 	hasContent := false
 	hasUsage := root.Get("usage").Exists()
 	if chatChoices := root.Get("choices"); chatChoices.Exists() && chatChoices.IsArray() {
 		chatChoices.ForEach(func(_, choice ojson.Result) bool {
-			// Check if delta has content or finish_reason
 			if delta := choice.Get("delta"); delta.Exists() {
 				if content := delta.Get("content"); content.Exists() && content.String() != "" {
 					hasContent = true
