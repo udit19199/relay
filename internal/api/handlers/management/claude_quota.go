@@ -49,9 +49,6 @@ func claudeAccessToken(auth *coreauth.Auth) string {
 // claudeTokenExpired reads the OAuth expiry the auth file records. A missing
 // or unparseable value counts as expired: a 401 already proved the token bad.
 func claudeTokenExpired(auth *coreauth.Auth) bool {
-	if auth == nil {
-		return true
-	}
 	raw := misc.MetadataString(auth.Metadata, "expired")
 	if raw == "" {
 		return true
@@ -92,16 +89,25 @@ func (h *Handler) claudeUsageBody(ctx context.Context, auth *coreauth.Auth, toke
 	if token == "" {
 		return nil, 0, fmt.Errorf("claude credential has no access token")
 	}
-	ctx, cancel := context.WithTimeout(ctx, claudeQuotaTimeout)
+	return h.usageBody(ctx, auth, claudeUsageURL, token, claudeQuotaTimeout, map[string]string{"anthropic-beta": "oauth-2025-04-20"})
+}
+
+// usageBody sends an authenticated GET to a provider usage endpoint and
+// returns at most 1 MiB of the body with the status code, leaving status
+// handling to the caller.
+func (h *Handler) usageBody(ctx context.Context, auth *coreauth.Auth, url, token string, timeout time.Duration, headers map[string]string) ([]byte, int, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	req, errReq := http.NewRequestWithContext(ctx, http.MethodGet, claudeUsageURL, nil)
+	req, errReq := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if errReq != nil {
 		return nil, 0, fmt.Errorf("build usage request: %w", errReq)
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("anthropic-beta", "oauth-2025-04-20")
 	req.Header.Set("User-Agent", "relay")
+	for name, value := range headers {
+		req.Header.Set(name, value)
+	}
 
 	resp, errDo := (&http.Client{Transport: h.apiCallTransport(auth, "")}).Do(req)
 	if errDo != nil {
@@ -116,20 +122,20 @@ func (h *Handler) claudeUsageBody(ctx context.Context, auth *coreauth.Auth, toke
 }
 
 func (h *Handler) refreshClaudeAuth(ctx context.Context, auth *coreauth.Auth) *coreauth.Auth {
-	if h == nil || h.authManager == nil || auth == nil {
+	if h == nil || h.authManager == nil {
 		return nil
 	}
 	// The app gives up after 20 seconds; let a refresh already underway finish
 	// and land, so the next poll uses the new token.
 	refreshed, errRefresh := h.authManager.ForceRefreshAuth(context.WithoutCancel(ctx), auth.ID)
-	if errRefresh != nil || refreshed == nil {
+	if errRefresh != nil {
 		return nil
 	}
 	return refreshed
 }
 
 func claudeHasRefreshToken(auth *coreauth.Auth) bool {
-	return auth != nil && misc.MetadataString(auth.Metadata, "refresh_token") != ""
+	return misc.MetadataString(auth.Metadata, "refresh_token") != ""
 }
 
 // parseClaudeUsage maps {"five_hour":{"utilization","resets_at"},

@@ -2471,7 +2471,7 @@ func isTerminalRefreshError(auth *Auth, err error) bool {
 	if isUnauthorizedError(err) || isTerminalRefreshGrantMessage(err.Error()) {
 		return true
 	}
-	if auth != nil && strings.EqualFold(strings.TrimSpace(auth.Provider), "codex") && isInvalidGrantError(err) {
+	if authProviderIs(auth, "codex") && isInvalidGrantError(err) {
 		return true
 	}
 	return false

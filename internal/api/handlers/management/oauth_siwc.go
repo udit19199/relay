@@ -324,7 +324,7 @@ func (h *Handler) PostOAuthCallbackV8(c *gin.Context) {
 func (h *Handler) GetOAuthCallbackV8(c *gin.Context) {
 	h.handleOAuthCallbackV8(c, siwcCallbackRequest{oauthCallbackRequest: oauthCallbackRequest{
 		Provider: c.Query("provider"), State: c.Query("state"), Code: c.Query("code"),
-		Error: firstNonEmpty(c.Query("error"), c.Query("error_description")),
+		Error: util.FirstNonEmptyTrimmed(c.Query("error"), c.Query("error_description")),
 	}, ClientID: c.Query("client_id")})
 }
 

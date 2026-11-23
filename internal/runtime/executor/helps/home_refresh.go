@@ -114,7 +114,7 @@ func RefreshAuthViaHome(ctx context.Context, cfg *config.Config, auth *cliproxya
 		return nil, true, homeStatusErr{code: http.StatusBadGateway, msg: "home refresh: auth_index is empty"}
 	}
 
-	raw, err := client.GetRefreshAuth(ctx, authIndex, authAccessTokenSHA256(auth))
+	raw, err := client.GetRefreshAuth(ctx, authIndex, cliproxyauth.AccessTokenSHA256(auth))
 	if err != nil {
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 			return nil, true, err
@@ -169,10 +169,6 @@ func RefreshAuthViaHome(ctx context.Context, cfg *config.Config, auth *cliproxya
 	updated.Index = authIndex
 	updated.EnsureIndex()
 	return updated, true, nil
-}
-
-func authAccessTokenSHA256(auth *cliproxyauth.Auth) string {
-	return cliproxyauth.AccessTokenSHA256(auth)
 }
 
 func parseHomeRefreshAuth(raw []byte) (*cliproxyauth.Auth, string, error) {

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/MoeForge/moego/base64"
 	"io"
 	"net"
 	"net/http"
@@ -15,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/MoeForge/moego/base64"
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/google/uuid"
@@ -1743,7 +1744,7 @@ func parseInteractionsPayload(payload, originalRequest []byte) (
 	// Prioritize stable session identifiers across turns (session_id, sessionId, conversation_id)
 	// to ensure upstream session ID and cascade ID remain stable, preserving prompt caching.
 	// Fall back to previous_interaction_id only when no stable session identifier exists.
-	sessionID = strings.TrimSpace(firstNonEmpty(
+	sessionID = strings.TrimSpace(util.FirstNonEmpty(
 		root.Get("session_id").String(),
 		root.Get("sessionId").String(),
 		root.Get("conversation_id").String(),
@@ -1751,7 +1752,7 @@ func parseInteractionsPayload(payload, originalRequest []byte) (
 	))
 	if sessionID == "" && len(originalRequest) > 0 {
 		origRoot := util.ParseGJSONBytesNoCopy(originalRequest)
-		sessionID = strings.TrimSpace(firstNonEmpty(
+		sessionID = strings.TrimSpace(util.FirstNonEmpty(
 			origRoot.Get("session_id").String(),
 			origRoot.Get("sessionId").String(),
 			origRoot.Get("conversation_id").String(),
@@ -1803,7 +1804,7 @@ func parseInteractionsPayload(payload, originalRequest []byte) (
 
 			case "model_output":
 				text := extractInteractionsStepText(step)
-				sigStr := firstNonEmpty(step.Get("signature").String(), step.Get("thought_signature").String())
+				sigStr := util.FirstNonEmpty(step.Get("signature").String(), step.Get("thought_signature").String())
 				sigBytes, sigType := parseSignatureBytes(sigStr)
 				if len(prompts) > 0 && prompts[len(prompts)-1].Source == 2 {
 					if prompts[len(prompts)-1].Content != "" {
@@ -1828,7 +1829,7 @@ func parseInteractionsPayload(payload, originalRequest []byte) (
 			case "thought":
 				// If previous prompt was assistant, attach thinking; otherwise append assistant prompt
 				text := extractInteractionsStepText(step)
-				sigStr := firstNonEmpty(step.Get("signature").String(), step.Get("thought_signature").String())
+				sigStr := util.FirstNonEmpty(step.Get("signature").String(), step.Get("thought_signature").String())
 				sigBytes, sigType := parseSignatureBytes(sigStr)
 				if len(prompts) > 0 && prompts[len(prompts)-1].Source == 2 {
 					if prompts[len(prompts)-1].Thinking != "" {
@@ -1852,7 +1853,7 @@ func parseInteractionsPayload(payload, originalRequest []byte) (
 
 			case "function_call":
 				name := step.Get("name").String()
-				id := firstNonEmpty(step.Get("id").String(), step.Get("call_id").String())
+				id := util.FirstNonEmpty(step.Get("id").String(), step.Get("call_id").String())
 				argsRes := step.Get("arguments")
 				var args string
 				if argsRes.Type == ojson.String {
@@ -1873,7 +1874,7 @@ func parseInteractionsPayload(payload, originalRequest []byte) (
 				pendingToolCalls = append(pendingToolCalls, id)
 
 			case "function_result":
-				id := firstNonEmpty(step.Get("call_id").String(), step.Get("id").String())
+				id := util.FirstNonEmpty(step.Get("call_id").String(), step.Get("id").String())
 				resText, resImages := extractFunctionResultContent(step)
 				if matched, matchedID := matchPendingToolCall(id); matched {
 					prompts = append(prompts, helps.DevinPrompt{
@@ -1918,7 +1919,7 @@ func parseInteractionsPayload(payload, originalRequest []byte) (
 				var toolCalls []helps.DevinToolCall
 				if tcRes := m.Get("tool_calls"); tcRes.IsArray() {
 					for _, tcItem := range tcRes.Array() {
-						tcID := firstNonEmpty(tcItem.Get("id").String(), tcItem.Get("call_id").String())
+						tcID := util.FirstNonEmpty(tcItem.Get("id").String(), tcItem.Get("call_id").String())
 						tcName := tcItem.Get("function.name").String()
 						if tcName == "" {
 							tcName = tcItem.Get("name").String()
@@ -1948,7 +1949,7 @@ func parseInteractionsPayload(payload, originalRequest []byte) (
 					ToolCalls: toolCalls,
 				})
 			case "tool":
-				id := firstNonEmpty(m.Get("tool_call_id").String(), m.Get("id").String(), m.Get("call_id").String())
+				id := util.FirstNonEmpty(m.Get("tool_call_id").String(), m.Get("id").String(), m.Get("call_id").String())
 				resText, resImages := extractFunctionResultContent(m)
 				if matched, matchedID := matchPendingToolCall(id); matched {
 					prompts = append(prompts, helps.DevinPrompt{
@@ -2083,7 +2084,7 @@ func extractDevinImage(part ojson.Result) (helps.DevinImage, bool) {
 
 	if base64Data == "" {
 		// uri and file_uri are Interactions spellings of url; only a data URL is usable.
-		url := firstNonEmpty(part.Get("image_url.url").String(), part.Get("image_url").String(), part.Get("url").String(), part.Get("uri").String(), part.Get("file_uri").String(), part.Get("fileUri").String())
+		url := util.FirstNonEmpty(part.Get("image_url.url").String(), part.Get("image_url").String(), part.Get("url").String(), part.Get("uri").String(), part.Get("file_uri").String(), part.Get("fileUri").String())
 		if m, d, ok := parseDataURL(url); ok {
 			base64Data = d
 			if mimeType == "" {
@@ -2413,7 +2414,7 @@ func supplementImagesFromOriginal(original []byte, prompts []helps.DevinPrompt) 
 				for _, part := range content.Array() {
 					partType := strings.ToLower(strings.TrimSpace(part.Get("type").String()))
 					if partType == "tool_result" {
-						toolCallID := firstNonEmpty(part.Get("tool_use_id").String(), part.Get("id").String())
+						toolCallID := util.FirstNonEmpty(part.Get("tool_use_id").String(), part.Get("id").String())
 						var toolImgs []helps.DevinImage
 						toolContent := part.Get("content")
 						if toolContent.IsArray() {
@@ -2436,7 +2437,7 @@ func supplementImagesFromOriginal(original []byte, prompts []helps.DevinPrompt) 
 			userImages = append(userImages, imgs)
 
 		case "tool":
-			toolCallID := firstNonEmpty(m.Get("tool_call_id").String(), m.Get("id").String())
+			toolCallID := util.FirstNonEmpty(m.Get("tool_call_id").String(), m.Get("id").String())
 			var toolImgs []helps.DevinImage
 			content := m.Get("content")
 			if content.IsArray() {
@@ -2895,15 +2896,6 @@ func normalizeDevinUUID(raw string) string {
 	}
 	// Deterministically map any non-UUID session string (e.g. lcp:hash, conv:id) to an RFC 4122 UUID v5
 	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(raw)).String()
-}
-
-func firstNonEmpty(values ...string) string {
-	for _, v := range values {
-		if strings.TrimSpace(v) != "" {
-			return v
-		}
-	}
-	return ""
 }
 
 func setDevinStringWithoutHTMLEscapeDoc(doc *ojson.Doc, path, value string) error {

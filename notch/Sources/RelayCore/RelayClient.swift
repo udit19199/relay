@@ -39,7 +39,7 @@ public struct RelayClient: Sendable {
     // quota signals, so one call returns accounts and usage together.
     public func listAccounts() async throws -> [RelayAccount] {
         struct Response: Decodable { var files: [RelayAccount]? }
-        let response: Response = try await get(path: "/v0/management/auth-files")
+        let response: Response = try await request(method: "GET", path: "/v0/management/auth-files")
         // Claude accounts first (they share the total row), then other providers.
         return (response.files ?? []).sorted {
             let leftClaude = $0.provider == RelayProvider.claude.rawValue
@@ -52,7 +52,7 @@ public struct RelayClient: Sendable {
 
     public func startClaudeSignIn() async throws -> (url: URL, state: String) {
         struct Response: Decodable { var url: String?; var state: String?; var error: String? }
-        let response: Response = try await get(path: "/v0/management/anthropic-auth-url")
+        let response: Response = try await request(method: "GET", path: "/v0/management/anthropic-auth-url")
         if let error = response.error, !error.isEmpty { throw RelayError.serverMessage(error) }
         guard let urlString = response.url, let url = URL(string: urlString),
               let state = response.state, !state.isEmpty
@@ -61,13 +61,10 @@ public struct RelayClient: Sendable {
     }
 
     public func pollAddAccount(state: String) async throws -> AddAccountStatus {
-        struct Response: Decodable {
-            var status: String?
-            var error: String?
-        }
-        var components = URLComponents(url: baseURL.appendingPathComponent("/v0/management/get-auth-status"), resolvingAgainstBaseURL: false)!
-        components.queryItems = [URLQueryItem(name: "state", value: state)]
-        let response: Response = try await get(url: components.url!)
+        let response: StatusResponse = try await request(
+            method: "GET", path: "/v0/management/get-auth-status",
+            query: [URLQueryItem(name: "state", value: state)]
+        )
         switch response.status {
         case "ok": return .done
         case "wait": return .waiting
@@ -78,18 +75,18 @@ public struct RelayClient: Sendable {
     }
 
     public func cancelAddAccount(state: String) async {
-        var components = URLComponents(url: baseURL.appendingPathComponent("/v0/management/oauth-session"), resolvingAgainstBaseURL: false)!
-        components.queryItems = [URLQueryItem(name: "state", value: state)]
-        var request = URLRequest(url: components.url!)
-        request.httpMethod = "DELETE"
-        authorize(&request)
-        _ = try? await session.data(for: request)
+        let _: StatusResponse? = try? await request(
+            method: "DELETE", path: "/v0/management/oauth-session",
+            query: [URLQueryItem(name: "state", value: state)]
+        )
     }
 
     public func removeAccount(name: String) async throws {
         struct Body: Encodable { var name: String }
-        struct Response: Decodable { var status: String?; var error: String? }
-        let response: Response = try await delete(path: "/v0/management/auth-files", body: Body(name: name))
+        let response: StatusResponse = try await request(
+            method: "DELETE", path: "/v0/management/auth-files",
+            body: JSONEncoder().encode(Body(name: name))
+        )
         if response.status != "ok" {
             throw RelayError.serverMessage(response.error ?? "remove failed")
         }
@@ -97,15 +94,10 @@ public struct RelayClient: Sendable {
 
     /// Saves a credential file in Relay's auth directory; Relay loads it on its own.
     public func uploadAuthFile(name: String, json: Data) async throws {
-        struct Response: Decodable { var status: String?; var error: String? }
-        var components = URLComponents(url: baseURL.appendingPathComponent("/v0/management/auth-files"), resolvingAgainstBaseURL: false)!
-        components.queryItems = [URLQueryItem(name: "name", value: name)]
-        var request = URLRequest(url: components.url!)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = json
-        authorize(&request)
-        let response: Response = try await send(request)
+        let response: StatusResponse = try await request(
+            method: "POST", path: "/v0/management/auth-files",
+            query: [URLQueryItem(name: "name", value: name)], body: json
+        )
         if response.status != "ok" { throw RelayError.serverMessage(response.error ?? "Relay did not save the account") }
     }
 
@@ -117,12 +109,10 @@ public struct RelayClient: Sendable {
         struct Bucket: Decodable { var window: String?; var remainingFraction: Double?; var resetTime: String? }
         struct Group: Decodable { var buckets: [Bucket]? }
         struct Response: Decodable { var groups: [Group]? }
-        var request = URLRequest(url: baseURL.appendingPathComponent("/v0/management/quota/fetch"))
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(Body(auth_index: authIndex))
-        authorize(&request)
-        let response: Response = try await send(request)
+        let response: Response = try await request(
+            method: "POST", path: "/v0/management/quota/fetch",
+            body: JSONEncoder().encode(Body(auth_index: authIndex))
+        )
         var windows: [String: (percent: Int, resetsAt: Date)] = [:]
         for bucket in (response.groups ?? []).flatMap({ $0.buckets ?? [] }) {
             guard let name = bucket.window, let fraction = bucket.remainingFraction,
@@ -143,31 +133,20 @@ public struct RelayClient: Sendable {
 
     // MARK: - HTTP
 
-    private func get<T: Decodable>(path: String) async throws -> T {
-        try await get(url: baseURL.appendingPathComponent(path))
-    }
+    private struct StatusResponse: Decodable { var status: String?; var error: String? }
 
-    private func get<T: Decodable>(url: URL) async throws -> T {
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        authorize(&request)
-        return try await send(request)
-    }
-
-    private func delete<B: Encodable, T: Decodable>(path: String, body: B) async throws -> T {
-        var request = URLRequest(url: baseURL.appendingPathComponent(path))
-        request.httpMethod = "DELETE"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(body)
-        authorize(&request)
-        return try await send(request)
-    }
-
-    private func authorize(_ request: inout URLRequest) {
+    private func request<T: Decodable>(
+        method: String, path: String, query: [URLQueryItem] = [], body: Data? = nil
+    ) async throws -> T {
+        var components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
+        if !query.isEmpty { components.queryItems = query }
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = method
         request.setValue("Bearer \(managementKey)", forHTTPHeaderField: "Authorization")
-    }
-
-    private func send<T: Decodable>(_ request: URLRequest) async throws -> T {
+        if let body {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = body
+        }
         let data: Data
         let response: URLResponse
         do {

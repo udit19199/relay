@@ -1300,3 +1300,35 @@ func TestFetchCredentialQuota_MissingTokenDoesNotHitUpstream(t *testing.T) {
 		t.Fatal("upstream server must NOT be contacted when template requires token but token is missing")
 	}
 }
+
+func TestUsageBodySendsHeadersAndReturnsStatus(t *testing.T) {
+	var got http.Header
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = r.Header.Clone()
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(strings.Repeat("x", 1<<20+10)))
+	}))
+	defer server.Close()
+
+	h := &Handler{cfg: &config.Config{}}
+	body, status, errFetch := h.usageBody(context.Background(), &coreauth.Auth{}, server.URL, "tok", time.Second, map[string]string{"anthropic-beta": "oauth-2025-04-20"})
+	if errFetch != nil {
+		t.Fatalf("usageBody error: %v", errFetch)
+	}
+	if status != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", status, http.StatusForbidden)
+	}
+	if len(body) != 1<<20 {
+		t.Fatalf("body length = %d, want %d", len(body), 1<<20)
+	}
+	for name, want := range map[string]string{
+		"Authorization":  "Bearer tok",
+		"Accept":         "application/json",
+		"User-Agent":     "relay",
+		"Anthropic-Beta": "oauth-2025-04-20",
+	} {
+		if got.Get(name) != want {
+			t.Errorf("header %s = %q, want %q", name, got.Get(name), want)
+		}
+	}
+}

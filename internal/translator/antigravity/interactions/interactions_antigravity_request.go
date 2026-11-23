@@ -458,7 +458,7 @@ func appendInteractionsStepToAntigravity(ctx *antigravityInteractionsInputContex
 		ctx.lastStepType = "model_output"
 	case "thought":
 		ctx.run.End()
-		if sig := firstNonEmptyString(step.Get("signature").String(), step.Get("thought_signature").String(), step.Get("thoughtSignature").String()); sig != "" {
+		if sig := util.FirstNonEmptyTrimmed(step.Get("signature").String(), step.Get("thought_signature").String(), step.Get("thoughtSignature").String()); sig != "" {
 			if ctx.pendingSignature != "" && ctx.pendingSignature != sig {
 				carrier := antigravityTextPartJSON("", false)
 				carrier, _ = ojson.SetBytes(carrier, "thoughtSignature", ctx.pendingSignature)
@@ -483,7 +483,7 @@ func appendInteractionsStepToAntigravity(ctx *antigravityInteractionsInputContex
 	case "function_call":
 		ctx.run.End()
 		part := buildAntigravityFunctionCallPart(step)
-		sig := firstNonEmptyString(step.Get("signature").String(), step.Get("thought_signature").String(), step.Get("thoughtSignature").String())
+		sig := util.FirstNonEmptyTrimmed(step.Get("signature").String(), step.Get("thought_signature").String(), step.Get("thoughtSignature").String())
 		if sig == "" && ctx.pendingSignature != "" {
 			sig = ctx.pendingSignature
 			ctx.pendingSignature = ""
@@ -667,15 +667,6 @@ func appendGeminiUserContentPart(content []byte, part []byte) []byte {
 	return updated
 }
 
-func firstNonEmptyString(values ...string) string {
-	for _, v := range values {
-		if s := strings.TrimSpace(v); s != "" {
-			return s
-		}
-	}
-	return ""
-}
-
 func buildAntigravityFunctionCallPart(step ojson.Result) []byte {
 	partDoc := ojson.NewDoc([]byte(`{"functionCall":{"name":"","args":{}}}`))
 	_ = partDoc.Set("functionCall.name", step.Get("name").String())
@@ -817,7 +808,7 @@ func appendInteractionsContentToAntigravityPart(_ []byte, content ojson.Result, 
 			}
 		}
 		// uri is the Interactions spelling of file_uri.
-		if fileURI := firstNonEmptyString(content.Get("file_uri").String(), content.Get("fileUri").String(), content.Get("uri").String()); fileURI != "" {
+		if fileURI := util.FirstNonEmptyTrimmed(content.Get("file_uri").String(), content.Get("fileUri").String(), content.Get("uri").String()); fileURI != "" {
 			mimeType := content.Get("mime_type").String()
 			if mimeType == "" {
 				mimeType = content.Get("mimeType").String()

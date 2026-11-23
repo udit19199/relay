@@ -16,13 +16,11 @@ import (
 // SHA256 code challenge, as specified in RFC 7636. This is a critical security
 // feature for the OAuth 2.0 authorization code flow.
 func GeneratePKCECodes() (*PKCECodes, error) {
-	// Generate code verifier: 43-128 characters, URL-safe
 	codeVerifier, err := generateCodeVerifier()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate code verifier: %w", err)
 	}
 
-	// Generate code challenge using S256 method
 	codeChallenge := generateCodeChallenge(codeVerifier)
 
 	return &PKCECodes{
@@ -43,7 +41,6 @@ func generateCodeVerifier() (string, error) {
 		return "", fmt.Errorf("failed to generate random bytes: %w", err)
 	}
 
-	// Encode to URL-safe base64 without padding
 	return base64.RawURLEncoding.EncodeToString(bytes), nil
 }
 

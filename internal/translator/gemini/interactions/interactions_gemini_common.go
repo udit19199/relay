@@ -1001,7 +1001,7 @@ func appendInteractionsStepToGemini(ctx *geminiInteractionsInputContext, item oj
 		ctx.lastStepType = "model_output"
 	case "thought":
 		ctx.run.End()
-		if sig := firstNonEmptyString(item.Get("signature").String(), item.Get("thought_signature").String(), item.Get("thoughtSignature").String()); sig != "" {
+		if sig := util.FirstNonEmptyTrimmed(item.Get("signature").String(), item.Get("thought_signature").String(), item.Get("thoughtSignature").String()); sig != "" {
 			if ctx.pendingSignature != "" && ctx.pendingSignature != sig {
 				carrier := geminiTextPartJSON("", false)
 				carrier, _ = ojson.SetBytes(carrier, "thoughtSignature", ctx.pendingSignature)
@@ -1025,7 +1025,7 @@ func appendInteractionsStepToGemini(ctx *geminiInteractionsInputContext, item oj
 		ctx.lastStepType = "thought"
 	case "function_call":
 		ctx.run.End()
-		sig := firstNonEmptyString(item.Get("signature").String(), item.Get("thought_signature").String(), item.Get("thoughtSignature").String())
+		sig := util.FirstNonEmptyTrimmed(item.Get("signature").String(), item.Get("thought_signature").String(), item.Get("thoughtSignature").String())
 		if sig == "" && ctx.pendingSignature != "" {
 			sig = ctx.pendingSignature
 			ctx.pendingSignature = ""
@@ -1150,15 +1150,6 @@ func appendGeminiUserContentPart(content []byte, part []byte) []byte {
 		return content
 	}
 	return updated
-}
-
-func firstNonEmptyString(values ...string) string {
-	for _, v := range values {
-		if s := strings.TrimSpace(v); s != "" {
-			return s
-		}
-	}
-	return ""
 }
 
 func extractInteractionsThoughtPartsToGemini(step ojson.Result) [][]byte {
@@ -1352,7 +1343,7 @@ func interactionsContentPartToGeminiPart(part ojson.Result, thought bool) []byte
 			}
 		}
 		// uri is the Interactions spelling of file_uri.
-		if fileURI := firstNonEmptyString(part.Get("file_uri").String(), part.Get("fileUri").String(), part.Get("uri").String()); fileURI != "" {
+		if fileURI := util.FirstNonEmptyTrimmed(part.Get("file_uri").String(), part.Get("fileUri").String(), part.Get("uri").String()); fileURI != "" {
 			mimeType := part.Get("mime_type").String()
 			if mimeType == "" {
 				mimeType = part.Get("mimeType").String()

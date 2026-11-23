@@ -964,7 +964,6 @@ func (h *OpenAIResponsesAPIHandler) Responses(c *gin.Context) {
 
 	rawJSON = h.prepareCodexRequestPayload(c, rawJSON)
 
-	// Check if the client requested a streaming response.
 	streamResult := ojson.GetBytesNoCopy(rawJSON, "stream")
 	if streamResult.Type == ojson.True {
 		h.handleStreamingResponse(c, rawJSON)

@@ -15,7 +15,7 @@ func IsCodexAuthRecord(auth *Auth) bool {
 	if auth == nil {
 		return false
 	}
-	if strings.EqualFold(strings.TrimSpace(auth.Provider), "codex") {
+	if authProviderIs(auth, "codex") {
 		return true
 	}
 	if auth.Metadata != nil {

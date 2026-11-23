@@ -55,8 +55,8 @@ func ConvertOpenAIResponseToInteractionsNonStream(ctx context.Context, modelName
 	_ = requestRawJSON
 	root := util.ParseGJSONBytesNoCopy(rawJSON)
 	outDoc := ojson.NewDocString(`{"id":"","status":"completed","object":"interaction","model":"","steps":[]}`)
-	_ = outDoc.Set("id", firstNonEmpty(root.Get("id").String(), fmt.Sprintf("interaction_%d", time.Now().UnixNano())))
-	_ = outDoc.Set("model", firstNonEmpty(modelName, root.Get("model").String()))
+	_ = outDoc.Set("id", util.FirstNonEmpty(root.Get("id").String(), fmt.Sprintf("interaction_%d", time.Now().UnixNano())))
+	_ = outDoc.Set("model", util.FirstNonEmpty(modelName, root.Get("model").String()))
 	choices := root.Get("choices")
 	var steps [][]byte
 	choices.ForEach(func(_, choice ojson.Result) bool {
@@ -158,7 +158,7 @@ func appendOpenAIToolCallDelta(out [][]byte, st *openAIToInteractionsStreamState
 		}
 		st.ToolCallNames[index] = strings.Clone(name)
 	}
-	stepID := firstNonEmpty(st.ToolCallIDs[index], fmt.Sprintf("call_%d", index))
+	stepID := util.FirstNonEmpty(st.ToolCallIDs[index], fmt.Sprintf("call_%d", index))
 	stepName := st.ToolCallNames[index]
 	if st.CurrentStepType != "function_call" || st.CurrentStepID != stepID {
 		out = appendInteractionsStepStop(out, st)
@@ -178,10 +178,10 @@ func appendInteractionsCreated(out [][]byte, st *openAIToInteractionsStreamState
 	if st.Created {
 		return out
 	}
-	st.ID = strings.Clone(firstNonEmpty(root.Get("id").String(), st.ID, fmt.Sprintf("interaction_%d", time.Now().UnixNano())))
+	st.ID = strings.Clone(util.FirstNonEmpty(root.Get("id").String(), st.ID, fmt.Sprintf("interaction_%d", time.Now().UnixNano())))
 	createdDoc := ojson.NewDocString(`{"interaction":{"id":"","status":"in_progress","object":"interaction","model":""},"event_type":"interaction.created"}`)
 	_ = createdDoc.Set("interaction.id", st.ID)
-	_ = createdDoc.Set("interaction.model", firstNonEmpty(modelName, root.Get("model").String()))
+	_ = createdDoc.Set("interaction.model", util.FirstNonEmpty(modelName, root.Get("model").String()))
 	out = append(out, translatorcommon.SSEEventData("interaction.created", createdDoc.Bytes()))
 	st.Created = true
 	return appendInteractionsStatusUpdate(out, st)
@@ -217,7 +217,7 @@ func appendInteractionsStepStart(out [][]byte, st *openAIToInteractionsStreamSta
 	_ = payloadDoc.Set("index", index)
 	_ = payloadDoc.Set("step.type", stepType)
 	if stepType == "function_call" {
-		id := firstNonEmpty(step.Get("id").String(), step.Get("call_id").String(), st.CurrentStepID)
+		id := util.FirstNonEmpty(step.Get("id").String(), step.Get("call_id").String(), st.CurrentStepID)
 		st.CurrentStepID = strings.Clone(id)
 		if id != "" {
 			_ = payloadDoc.Set("step.id", id)
@@ -275,7 +275,7 @@ func appendInteractionsCompleted(out [][]byte, st *openAIToInteractionsStreamSta
 	_ = payloadDoc.Set("interaction.id", st.ID)
 	_ = payloadDoc.Set("interaction.created", now)
 	_ = payloadDoc.Set("interaction.updated", now)
-	_ = payloadDoc.Set("interaction.model", firstNonEmpty(modelName, root.Get("model").String()))
+	_ = payloadDoc.Set("interaction.model", util.FirstNonEmpty(modelName, root.Get("model").String()))
 	usage := root.Get("usage")
 	if !usage.Exists() {
 		usage = st.Usage
@@ -383,7 +383,7 @@ func openAIReasoningTexts(reasoning ojson.Result) []string {
 	texts := make([]string, 0)
 	if reasoning.IsArray() {
 		reasoning.ForEach(func(_, item ojson.Result) bool {
-			if text := firstNonEmpty(item.Get("text").String(), item.Get("content").String()); text != "" {
+			if text := util.FirstNonEmpty(item.Get("text").String(), item.Get("content").String()); text != "" {
 				texts = append(texts, text)
 			}
 			return true

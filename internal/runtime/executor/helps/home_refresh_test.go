@@ -285,7 +285,7 @@ func TestRefreshAuthViaHomeRejectsUnmarkedRefreshMessage(t *testing.T) {
 }
 
 func TestAuthAccessTokenSHA256SupportsKnownMetadataShapes(t *testing.T) {
-	want := authAccessTokenSHA256(&cliproxyauth.Auth{Metadata: map[string]any{"access_token": "same-token"}})
+	want := cliproxyauth.AccessTokenSHA256(&cliproxyauth.Auth{Metadata: map[string]any{"access_token": "same-token"}})
 	cases := map[string]*cliproxyauth.Auth{
 		"camel case":        {Metadata: map[string]any{"accessToken": "same-token"}},
 		"nested any map":    {Metadata: map[string]any{"token": map[string]any{"access_token": "same-token"}}},
@@ -293,7 +293,7 @@ func TestAuthAccessTokenSHA256SupportsKnownMetadataShapes(t *testing.T) {
 	}
 	for name, auth := range cases {
 		t.Run(name, func(t *testing.T) {
-			if got := authAccessTokenSHA256(auth); got == "" || got != want {
+			if got := cliproxyauth.AccessTokenSHA256(auth); got == "" || got != want {
 				t.Fatalf("token hash = %q, want %q", got, want)
 			}
 		})
@@ -351,8 +351,8 @@ func TestRefreshAuthViaHomeAcceptsAuthEnvelope(t *testing.T) {
 	if client.authIndex != "home-index-1" {
 		t.Fatalf("home refresh auth_index = %q, want home-index-1", client.authIndex)
 	}
-	if client.accessTokenHash != authAccessTokenSHA256(auth) {
-		t.Fatalf("home refresh access token hash = %q, want %q", client.accessTokenHash, authAccessTokenSHA256(auth))
+	if client.accessTokenHash != cliproxyauth.AccessTokenSHA256(auth) {
+		t.Fatalf("home refresh access token hash = %q, want %q", client.accessTokenHash, cliproxyauth.AccessTokenSHA256(auth))
 	}
 	if updated == nil {
 		t.Fatal("updated auth = nil")

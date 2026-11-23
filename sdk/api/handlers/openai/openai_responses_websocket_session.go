@@ -95,10 +95,6 @@ func (h *OpenAIResponsesAPIHandler) responsesWebsocketHasAlternativeReplayTarget
 	return h.HasAlternativeExecutionTarget(ctx, h.HandlerType(), modelName, rawJSON, failedAuthID)
 }
 
-func (h *OpenAIResponsesAPIHandler) responsesWebsocketUsesCodexWebsocketPassthrough(modelName string) bool {
-	return h.responsesWebsocketUsesUpstreamWebsocketPassthrough(modelName)
-}
-
 func (h *OpenAIResponsesAPIHandler) responsesWebsocketUsesUpstreamWebsocketPassthrough(modelName string) bool {
 	modelName = strings.TrimSpace(modelName)
 	if h == nil || h.AuthManager == nil || modelName == "" {
@@ -150,7 +146,7 @@ func responsesWebsocketPinnedAuthMatchesModel(auth *coreauth.Auth, modelName str
 			return false
 		}
 	}
-	if !responsesWebsocketAuthAvailableForModel(auth, modelKey, time.Now()) {
+	if !coreauth.IsAuthAvailableForModel(auth, modelKey, time.Now()) {
 		return false
 	}
 
@@ -205,7 +201,7 @@ func responsesWebsocketAuthMatchesModel(auth *coreauth.Auth, providerSet map[str
 	if modelKey != "" && registryRef != nil && !registryRef.ClientSupportsModel(auth.ID, modelKey) {
 		return false
 	}
-	return responsesWebsocketAuthAvailableForModel(auth, modelKey, now)
+	return coreauth.IsAuthAvailableForModel(auth, modelKey, now)
 }
 
 func responsesWebsocketAuthSupportsCompactionReplay(auth *coreauth.Auth) bool {
@@ -213,8 +209,4 @@ func responsesWebsocketAuthSupportsCompactionReplay(auth *coreauth.Auth) bool {
 		return false
 	}
 	return strings.EqualFold(strings.TrimSpace(auth.Provider), "codex")
-}
-
-func responsesWebsocketAuthAvailableForModel(auth *coreauth.Auth, modelName string, now time.Time) bool {
-	return coreauth.IsAuthAvailableForModel(auth, modelName, now)
 }

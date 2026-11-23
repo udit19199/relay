@@ -78,11 +78,6 @@ func setImagesSSEHeaders(c *gin.Context) {
 	c.Header("Access-Control-Allow-Origin", "*")
 }
 
-func (h *OpenAIAPIHandler) newImagesStreamKeepAliveTicker() (func(), <-chan time.Time) {
-	stop, keepAliveC, _ := h.newImagesStreamKeepAliveTickerWithReset()
-	return stop, keepAliveC
-}
-
 func (h *OpenAIAPIHandler) newImagesStreamKeepAliveTickerWithReset() (func(), <-chan time.Time, func()) {
 	if h == nil || h.BaseAPIHandler == nil {
 		return func() {}, nil, func() {}

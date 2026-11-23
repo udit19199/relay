@@ -64,28 +64,19 @@ func (ts *ClaudeTokenStorage) SetMetadata(meta map[string]any) {
 // This method creates the necessary directory structure and writes the token
 // data in JSON format to the specified file path for persistent storage.
 // It merges any injected metadata into the top-level JSON object.
-//
-// Parameters:
-//   - authFilePath: The full path where the token file should be saved
-//
-// Returns:
-//   - error: An error if the operation fails, nil otherwise
 func (ts *ClaudeTokenStorage) SaveTokenToFile(authFilePath string) error {
 	misc.LogSavingCredentials(authFilePath)
 	ts.Type = "claude"
 
-	// Create directory structure if it doesn't exist
 	if err := os.MkdirAll(filepath.Dir(authFilePath), 0700); err != nil {
 		return fmt.Errorf("failed to create directory: %v", err)
 	}
 
-	// Merge metadata using helper
 	data, errMerge := misc.MergeMetadata(ts, ts.Metadata)
 	if errMerge != nil {
 		return fmt.Errorf("failed to merge metadata: %w", errMerge)
 	}
 
-	// Create the token file
 	f, err := os.Create(authFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to create token file: %w", err)
@@ -96,7 +87,6 @@ func (ts *ClaudeTokenStorage) SaveTokenToFile(authFilePath string) error {
 		}
 	}()
 
-	// Encode and write the token data as JSON
 	if err = json.NewEncoder(f).Encode(data); err != nil {
 		return fmt.Errorf("failed to write token to file: %w", err)
 	}

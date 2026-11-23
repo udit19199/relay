@@ -104,18 +104,6 @@ func TestParseOAuthCallbackClientID(t *testing.T) {
 	if parsed.Code != "auth-code-123" || parsed.State != "state-abc" || parsed.ClientID != "oaiapp_issued_99" {
 		t.Fatalf("parsed = %+v, want code=auth-code-123 state=state-abc client_id=oaiapp_issued_99", parsed)
 	}
-
-	srv := NewOAuthServer(0)
-	req := httptest.NewRequest(http.MethodGet, "/auth/callback?code=c1&state=s1&client_id=oaiapp_srv_1", nil)
-	rec := httptest.NewRecorder()
-	srv.handleCallback(rec, req)
-	res, errWait := srv.WaitForCallback(time.Second)
-	if errWait != nil {
-		t.Fatalf("WaitForCallback error: %v", errWait)
-	}
-	if res.Code != "c1" || res.State != "s1" || res.ClientID != "oaiapp_srv_1" {
-		t.Fatalf("OAuthServer result = %+v", res)
-	}
 }
 
 func TestExchangeAndRefreshSIWCTokens(t *testing.T) {
