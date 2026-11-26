@@ -17,15 +17,10 @@ The journal must accompany credentials across backups, migrations, and restores:
 | Credential storage | Authoritative journal |
 | --- | --- |
 | Files | `.codex-refresh/` under the auth directory |
-| PostgreSQL | `<auth-table>_refresh_journal` in the configured schema |
-| Git | Immutable `refs/tags/cliproxy-refresh/` references in the same remote |
-| S3-compatible storage | `codex-refresh/` under the configured object prefix |
 
-Receipts contain credentials. Protect them with the same access controls as auth files. Do not publish the Git repository, bucket, database, or journal directory. Claims and receipts are retained rather than expiring automatically. Revoke the associated grants before administratively removing their journal history. Restoring older credentials without their complete journal history is unsafe.
+Receipts contain credentials. Protect them with the same access controls as auth files. Do not publish the journal directory. Claims and receipts are retained rather than expiring automatically. Revoke the associated grants before administratively removing their journal history. Restoring older credentials without their complete journal history is unsafe.
 
 On Unix, file claims synchronize their canonical directory ancestry before an exchange; those directories must permit synchronization. Windows preserves claims across process restarts but does not support directory fsync, so this is not a power-loss durability guarantee.
-
-PostgreSQL initializes the journal before refresh workers start, using a transaction-scoped advisory lock to coordinate concurrent initialization. It requires permission to create the journal table and acquire that lock. Git requires permission to create the journal tags; all journal pushes are non-force. S3 backends must implement atomic `If-None-Match: *` writes. A capability check rejects backends that ignore that condition. Storage failure never falls back to refreshing against a local mirror.
 
 All processes sharing credentials must use the same authoritative journal and this safety protocol. Older deployments or external clients refreshing the same grant cannot be coordinated by a journal they do not participate in.
 

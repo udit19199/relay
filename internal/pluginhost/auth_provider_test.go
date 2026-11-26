@@ -779,7 +779,7 @@ func TestRefreshAuth_MergesAttributesAndPreservesPath_Issue6119(t *testing.T) {
 		sourceBackend string
 	}{
 		{name: "file_backend", sourceBackend: coreauth.AuthSourceFile},
-		{name: "postgres_backend", sourceBackend: "postgres"},
+		{name: "custom_backend", sourceBackend: "custom"},
 	}
 
 	for _, tc := range testCases {

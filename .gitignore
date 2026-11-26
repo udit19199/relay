@@ -16,9 +16,6 @@ plugins/*
 examples/plugin/bin/*
 
 # Storage backends
-pgstore/*
-gitstore/*
-objectstore/*
 
 # Static assets
 static/*

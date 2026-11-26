@@ -1052,9 +1052,8 @@ func (h *Handler) saveTokenRecord(ctx context.Context, record *coreauth.Auth) (s
 		// richer email-named credential (richest-known name wins) so the next
 		// login that returns the email finds the same file again. Renaming is
 		// limited to stores that resolve the save path from the record name;
-		// every built-in backend (file, git, Postgres, object) exposes the
-		// SetBaseDir capability, so unknown stores keep the ordinary
-		// migration instead of risking a rename they cannot honor.
+		// unknown stores keep the ordinary migration instead of risking a
+		// rename they cannot honor.
 		if _, isFileNameStore := store.(interface{ SetBaseDir(string) }); !isFileNameStore {
 			adoptXAICredential = false
 		} else if disabled, hasDisabled := record.Metadata["disabled"].(bool); hasDisabled && disabled {

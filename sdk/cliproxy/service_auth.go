@@ -213,8 +213,7 @@ func (s *Service) handleAuthUpdates(ctx context.Context, updates []watcher.AuthU
 					continue
 				}
 				// Whole-file deletes can outlive a persisted re-create whose inline
-				// sync did not carry a revision. Recheck local files, including remote
-				// store mirrors, but do not suppress per-ID content/config deletes.
+				// sync did not carry a revision. Recheck local files, but do not suppress per-ID content/config deletes.
 				if update.Auth == nil && update.IsFileRemoval() {
 					path := existing.Attributes[coreauth.AttributePath]
 					switch existing.AuthSourceKind() {
@@ -222,8 +221,6 @@ func (s *Service) handleAuthUpdates(ctx context.Context, updates []watcher.AuthU
 						if path == "" {
 							path = existing.Attributes[coreauth.AttributeSource]
 						}
-					case coreauth.AuthSourceGit, coreauth.AuthSourcePostgres, coreauth.AuthSourceObjectStore:
-						// Remote stores are file-backed only when they provide a local path.
 					default:
 						path = ""
 					}

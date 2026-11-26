@@ -255,8 +255,7 @@ func TestBindCodexSIWCConcurrentFileRefresh(t *testing.T) {
 func TestBindCodexSIWCRejectsNonFileSources(t *testing.T) {
 	for _, attrs := range []map[string]string{
 		{"source": "config:codex[test]"}, {"source": "config"}, {"runtime_only": "true"},
-		{"source_backend": "memory"}, {"source_backend": "postgres"}, {"source_backend": "git"},
-		{"source_backend": "objectstore"}, {"auth_kind": "apikey"},
+		{"source_backend": "memory"}, {"auth_kind": "apikey"},
 	} {
 		t.Run(fmt.Sprint(attrs), func(t *testing.T) {
 			m, base, path, hook := setupSIWCBinding(t, "auth.json")
