@@ -10,7 +10,6 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
 	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/translator"
 	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
 )
@@ -195,47 +194,6 @@ func TestSameByteSlice(t *testing.T) {
 				t.Fatalf("sameByteSlice() = %v, want %v", got, tc.want)
 			}
 		})
-	}
-}
-
-func TestTranslateRequestEnvelopePairWithCodexMultiAgentV2UsesModelInfo(t *testing.T) {
-	trueVal := true
-	falseVal := false
-	const model = "gemini-3.8-flash-high"
-
-	input := []byte(`{
-		"model": "` + model + `",
-		"input": "Search weather",
-		"tools": [{"type": "web_search"}]
-	}`)
-
-	enabled := &registry.ModelInfo{
-		ID:                 model,
-		NativeCapabilities: &registry.NativeCapabilities{WebSearch: &trueVal},
-	}
-	envelope := sdktranslator.RequestEnvelope{Format: sdktranslator.FormatOpenAIResponse, Model: model, ModelInfo: enabled}
-	base, work, errPair := TranslateRequestEnvelopePairWithCodexMultiAgentV2(context.Background(), http.Header{}, &config.Config{}, sdktranslator.FormatOpenAIResponse, sdktranslator.FormatClaude, envelope, input, input)
-	if errPair != nil {
-		t.Fatalf("translate request pair: %v", errPair)
-	}
-	if ojson.GetBytes(base, "requestType").String() != "web_search" {
-		t.Fatalf("expected baseline requestType web_search, got: %s", base)
-	}
-	if ojson.GetBytes(work, "requestType").String() != "web_search" {
-		t.Fatalf("expected working requestType web_search, got: %s", work)
-	}
-
-	disabled := &registry.ModelInfo{
-		ID:                 model,
-		NativeCapabilities: &registry.NativeCapabilities{WebSearch: &falseVal},
-	}
-	envelope.ModelInfo = disabled
-	_, workDisabled, errPair := TranslateRequestEnvelopePairWithCodexMultiAgentV2(context.Background(), http.Header{}, &config.Config{}, sdktranslator.FormatOpenAIResponse, sdktranslator.FormatClaude, envelope, input, input)
-	if errPair != nil {
-		t.Fatalf("translate request pair: %v", errPair)
-	}
-	if ojson.GetBytes(workDisabled, "requestType").String() == "web_search" {
-		t.Fatalf("expected non-web_search when capability disabled, got: %s", workDisabled)
 	}
 }
 
@@ -424,26 +382,4 @@ func TestTranslateRequestWithCodexMultiAgentV2_NormalizesCodexToolTypes(t *testi
 		t.Errorf("translated Claude tool timeout_ms type = %q, want integer; out=%s", got, out)
 	}
 
-	outGemini := TranslateRequestWithCodexMultiAgentV2(
-		context.Background(),
-		headers,
-		&config.Config{},
-		sdktranslator.FormatOpenAIResponse,
-		sdktranslator.FormatClaude,
-		"gemini-2.5-flash",
-		payload,
-		false,
-	)
-
-	// In Gemini format, tool is under functionDeclarations with parameters or parametersJsonSchema
-	geminiParam := ojson.GetBytes(outGemini, "tools.0.functionDeclarations.0.parametersJsonSchema.properties")
-	if !geminiParam.Exists() {
-		geminiParam = ojson.GetBytes(outGemini, "tools.0.function_declarations.0.parameters.properties")
-	}
-	if got := geminiParam.Get("yield_time_ms.type").String(); got != "integer" {
-		t.Errorf("translated Gemini tool yield_time_ms type = %q, want integer; out=%s", got, outGemini)
-	}
-	if got := geminiParam.Get("timeout_ms.type").String(); got != "integer" {
-		t.Errorf("translated Gemini tool timeout_ms type = %q, want integer; out=%s", got, outGemini)
-	}
 }

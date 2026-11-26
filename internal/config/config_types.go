@@ -212,8 +212,7 @@ type DevinConfig struct {
 // credential (group level or per key).
 //
 // Pools are per credential: two API keys never share a connection, and OAuth
-// credentials are not poolable at all (Antigravity keeps its own switch). The
-// transport cache is bounded, so a deployment with very many keys degrades to the
+// credentials are not poolable at all. The transport cache is bounded, so a deployment with very many keys degrades to the
 // historical one-transport-per-request behavior instead of growing without limit.
 type ProxyConnectionPoolConfig struct {
 	// Enabled controls whether connection reuse is active for this credential.
@@ -232,30 +231,6 @@ type ProxyConnectionPoolConfig struct {
 	// MaxIdleConnsPerHost caps idle connections kept per upstream host.
 	// Defaults to 2, matching net/http's DefaultMaxIdleConnsPerHost. Zero or a
 	// negative value disables keep-alives as well.
-	MaxIdleConnsPerHost *int `yaml:"max-idle-conns-per-host,omitempty" json:"max-idle-conns-per-host,omitempty"`
-}
-
-// AntigravityConfig configures provider-wide Antigravity request behavior.
-type AntigravityConfig struct {
-	// SensitiveWords is a list of words to obfuscate with zero-width characters in system instructions.
-	SensitiveWords []string `yaml:"sensitive-words,omitempty" json:"sensitive-words,omitempty"`
-
-	// ConnectionPool configures upstream HTTP connection pooling behavior for Antigravity.
-	ConnectionPool AntigravityConnectionPoolConfig `yaml:"connection-pool,omitempty" json:"connection-pool,omitempty"`
-}
-
-// AntigravityConnectionPoolConfig controls upstream HTTP/1.1 connection pooling behavior for Antigravity.
-type AntigravityConnectionPoolConfig struct {
-	// Enabled controls whether upstream connection pooling is enabled.
-	// Defaults to false (short-lived connection mode). Set to true to enable connection pooling.
-	Enabled *bool `yaml:"enabled,omitempty" json:"enabled,omitempty"`
-
-	// IdleConnTimeout specifies how long an idle connection stays in the pool before expiring.
-	// Defaults to "30s". Capped at 210s to prevent exceeding Google Frontend (GFE) 240s cutoff.
-	IdleConnTimeout string `yaml:"idle-conn-timeout,omitempty" json:"idle-conn-timeout,omitempty"`
-
-	// MaxIdleConnsPerHost specifies the maximum number of idle connections to retain per host per credential.
-	// Defaults to 2.
 	MaxIdleConnsPerHost *int `yaml:"max-idle-conns-per-host,omitempty" json:"max-idle-conns-per-host,omitempty"`
 }
 
@@ -488,11 +463,6 @@ type QuotaExceeded struct {
 
 	// SwitchPreviewModel indicates whether to automatically switch to a preview model when a quota is exceeded.
 	SwitchPreviewModel bool `yaml:"switch-preview-model" json:"switch-preview-model"`
-
-	// AntigravityCredits enables credits-based last-resort fallback for Claude models.
-	// When all free-tier auths are exhausted (429/503), the conductor retries with
-	// an auth that has available Google One AI credits.
-	AntigravityCredits bool `yaml:"antigravity-credits" json:"antigravity-credits"`
 }
 
 // RoutingConfig configures how credentials are selected for requests.
@@ -513,8 +483,8 @@ type RoutingConfig struct {
 	SessionAffinityTTL string `yaml:"session-affinity-ttl,omitempty" json:"session-affinity-ttl,omitempty"`
 
 	// SessionAffinitySubagents controls whether subagents (child sessions with parent references)
-	// inherit and bind to the parent's upstream credential across all providers (Claude, Codex,
-	// Antigravity, Gemini), maximizing prompt and KV cache reuse.
+	// inherit and bind to the parent's upstream credential across all providers, maximizing
+	// prompt and KV cache reuse.
 	// When false, subagents are distributed across the credential pool via the fallback selector.
 	// Default: true. Ignored when SessionAffinity is false.
 	SessionAffinitySubagents *bool `yaml:"session-affinity-subagents,omitempty" json:"session-affinity-subagents,omitempty"`
@@ -537,9 +507,6 @@ type RoutingConfig struct {
 // When Fork is true, the alias is added as an additional model in listings while
 // keeping the original model ID available.
 type OAuthModelAlias struct {
-	// OpenAPI overrides Vertex endpoint selection for this model.
-	OpenAPI *bool `yaml:"openapi,omitempty" json:"openapi,omitempty"`
-
 	Name  string `yaml:"name" json:"name"`
 	Alias string `yaml:"alias" json:"alias"`
 	Fork  bool   `yaml:"fork,omitempty" json:"fork,omitempty"`
@@ -552,9 +519,6 @@ type OAuthModelAlias struct {
 
 // OAuthModelSetting defines provider/channel model settings (such as context window overrides) for OAuth credentials.
 type OAuthModelSetting struct {
-	// OpenAPI overrides Vertex endpoint selection for this model.
-	OpenAPI *bool `yaml:"openapi,omitempty" json:"openapi,omitempty"`
-
 	Name  string `yaml:"name" json:"name"`
 	Alias string `yaml:"alias,omitempty" json:"alias,omitempty"`
 
@@ -633,13 +597,13 @@ type PayloadRule struct {
 
 // PayloadModelRule ties a model name pattern to a specific translator protocol.
 type PayloadModelRule struct {
-	// Name is the model name or wildcard pattern (e.g., "gpt-*", "*-5", "gemini-*-pro").
+	// Name is the model name or wildcard pattern (e.g., "gpt-*", "*-5", "claude-*").
 	Name string `yaml:"name" json:"name"`
-	// Protocol restricts the rule to a specific translator format (e.g., "gemini", "responses").
+	// Protocol restricts the rule to a specific translator format (e.g., "claude", "responses").
 	Protocol string `yaml:"protocol" json:"protocol"`
 	// Headers restricts the rule to requests whose headers match all configured wildcard patterns.
 	Headers map[string]string `yaml:"headers" json:"headers"`
-	// FromProtocol restricts the rule to a specific source protocol (e.g., "gemini", "responses").
+	// FromProtocol restricts the rule to a specific source protocol (e.g., "claude", "responses").
 	FromProtocol string `yaml:"from-protocol" json:"from-protocol"`
 	// Match requires payload JSON paths to equal the configured values.
 	Match []map[string]any `yaml:"match" json:"match"`
@@ -743,7 +707,7 @@ type ClaudeKey struct {
 	// shape (OAuth betas, CCH signing, stable CLI identity) without treating the
 	// credential as a real OAuth token for refresh/profile/runtime semantics.
 	// CCH is a per-request hash and follows the native gate: it is emitted only on
-	// api.anthropic.com and Vertex, so an opt-in on any other gateway sends the
+	// api.anthropic.com, so an opt-in on any other gateway sends the
 	// billing block unsigned and cannot bust that gateway's prompt cache. The gateway
 	// strips the attribution entirely by default and keeps it, unsigned, after an
 	// explicit opt-in. count_tokens keeps the native model/messages/tools shape.
@@ -922,99 +886,6 @@ type MetaKey = CodexKey
 
 // MetaModel uses the Codex model mapping structure for Meta Muse models.
 type MetaModel = CodexModel
-
-// GeminiKey represents the configuration for a Gemini API key,
-// including optional overrides for upstream base URL, proxy routing, and headers.
-type GeminiKey struct {
-	// APIKey is the authentication key for accessing Gemini API services.
-	APIKey string `yaml:"api-key" json:"api-key"`
-
-	// Priority controls selection preference when multiple credentials match.
-	// Higher values are preferred; defaults to 0.
-	Priority int `yaml:"priority,omitempty" json:"priority,omitempty"`
-
-	// Weight controls proportional selection under weighted-round-robin.
-	// An omitted value defaults to 1; non-positive values exclude this credential; maximum 1,000,000.
-	Weight *int `yaml:"weight,omitempty" json:"weight,omitempty"`
-
-	// Prefix optionally namespaces models for this credential (e.g., "teamA/gemini-3-pro-preview").
-	Prefix string `yaml:"prefix,omitempty" json:"prefix,omitempty"`
-
-	// BaseURL optionally overrides the Gemini API endpoint.
-	BaseURL string `yaml:"base-url,omitempty" json:"base-url,omitempty"`
-
-	// ProxyURL optionally overrides the global proxy for this API key.
-	ProxyURL string `yaml:"proxy-url,omitempty" json:"proxy-url,omitempty"`
-
-	// ConnectionPool configures upstream connection reuse for this credential.
-	// Omitted disables pooling (preserving the fresh-transport-per-request default);
-	// pools stay per credential, so opting in never shares connections with another key.
-	ConnectionPool *ProxyConnectionPoolConfig `yaml:"connection-pool,omitempty" json:"connection-pool,omitempty"`
-
-	// Models defines upstream model names and aliases for request routing.
-	Models []GeminiModel `yaml:"models,omitempty" json:"models,omitempty"`
-
-	// Headers optionally adds extra HTTP headers for requests sent with this key.
-	Headers map[string]string `yaml:"headers,omitempty" json:"headers,omitempty"`
-
-	// ExcludedModels lists model IDs that should be excluded for this provider.
-	ExcludedModels []string `yaml:"excluded-models,omitempty" json:"excluded-models,omitempty"`
-
-	// DisableCooling overrides the global cooling policy for this credential when set.
-	// True disables auth/model cooldowns; false explicitly enables them.
-	DisableCooling *bool `yaml:"disable-cooling,omitempty" json:"disable-cooling,omitempty"`
-
-	// RequestRetry optionally overrides the global request-retry for this credential.
-	// Nil or a negative value means "use the global request-retry". 0 disables additional retry rounds.
-	RequestRetry *int `yaml:"request-retry,omitempty" json:"request-retry,omitempty"`
-
-	// RequestScopedErrors configures custom classification rules for upstream errors.
-	RequestScopedErrors []RequestScopedErrorRule `yaml:"request-scoped-errors,omitempty" json:"request-scoped-errors,omitempty"`
-}
-
-func (k GeminiKey) GetAPIKey() string { return k.APIKey }
-
-func (k GeminiKey) GetBaseURL() string { return k.BaseURL }
-
-func (k GeminiKey) GetPrefix() string { return k.Prefix }
-
-func (k GeminiKey) GetProxyURL() string { return k.ProxyURL }
-
-// GeminiModel describes a mapping between an alias and the actual upstream model name.
-type GeminiModel struct {
-	// Name is the upstream model identifier used when issuing requests.
-	Name string `yaml:"name" json:"name"`
-
-	// Alias is the client-facing model name that maps to Name.
-	Alias string `yaml:"alias" json:"alias"`
-
-	// DisplayName is the optional human-readable name shown in model catalogs.
-	DisplayName string `yaml:"display-name,omitempty" json:"display-name,omitempty"`
-
-	// MaxContextLength overrides the context window advertised to Codex clients.
-	MaxContextLength int `yaml:"max-context-length,omitempty" json:"max-context-length,omitempty"`
-
-	// ForceMapping rewrites upstream response model fields back to Alias.
-	ForceMapping bool `yaml:"force-mapping,omitempty" json:"force-mapping,omitempty"`
-
-	// IsCompat preserves thinking blocks with empty signatures for compatible upstreams.
-	// Default false keeps the normal signature validation behavior.
-	IsCompat bool `yaml:"is-compat,omitempty" json:"is-compat,omitempty"`
-
-	// Thinking configures the thinking/reasoning capability for this model.
-	Thinking *registry.ThinkingSupport `yaml:"thinking,omitempty" json:"thinking,omitempty"`
-}
-
-func (m GeminiModel) GetName() string { return m.Name }
-
-func (m GeminiModel) GetAlias() string { return m.Alias }
-
-func (m GeminiModel) GetDisplayName() string   { return m.DisplayName }
-func (m GeminiModel) GetMaxContextLength() int { return m.MaxContextLength }
-func (m GeminiModel) GetForceMapping() bool    { return m.ForceMapping }
-func (m GeminiModel) GetIsCompat() bool        { return m.IsCompat }
-
-func (m GeminiModel) GetThinking() *registry.ThinkingSupport { return m.Thinking }
 
 // OpenAICompatibility represents the configuration for OpenAI API compatibility
 // with external providers, allowing model aliases to be routed through OpenAI API format.

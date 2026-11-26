@@ -97,8 +97,8 @@ func TestEnsureTokenBreakdownForProviderUsesKnownSemantics(t *testing.T) {
 			wantOutput:   30,
 		},
 		{
-			name:       "Gemini keeps reasoning separate",
-			provider:   "gemini",
+			name:       "Interactions keeps reasoning separate",
+			provider:   "interactions",
 			detail:     Detail{InputTokens: 100, OutputTokens: 30, ReasoningTokens: 12, CacheReadTokens: 40, CacheCreationTokens: 10},
 			wantTotal:  142,
 			wantInput:  100,
@@ -141,8 +141,8 @@ func TestEnsureTokenBreakdownForUnknownProviderPreservesAuxiliaryOnlyUsage(t *te
 	}
 }
 
-func TestEnsureTokenBreakdownForGeminiClassifiesReasoningOnlyUsage(t *testing.T) {
-	detail := EnsureTokenBreakdownForProvider(Detail{ReasoningTokens: 12}, "gemini", "")
+func TestEnsureTokenBreakdownForInteractionsClassifiesReasoningOnlyUsage(t *testing.T) {
+	detail := EnsureTokenBreakdownForProvider(Detail{ReasoningTokens: 12}, "interactions", "")
 	if detail.TotalTokens != 12 || detail.TokenBreakdown.Quality != TokenAccountingQualityComplete ||
 		detail.TokenBreakdown.Output.ReasoningTokens != 12 {
 		t.Fatalf("detail = %+v", detail)

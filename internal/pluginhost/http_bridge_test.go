@@ -1475,7 +1475,7 @@ func TestHostHTTPClientStripsCredentialHeadersOnCrossOriginRedirect(t *testing.T
 				URL: originURL,
 				Headers: http.Header{
 					"X-Api-Key":           []string{"secret-a"},
-					"X-Goog-Api-Key":      []string{"secret-b"},
+					"X-Test-Secret-Key":   []string{"secret-b"},
 					"Authorization":       []string{"Bearer secret-c"},
 					"Proxy-Authorization": []string{"Basic secret-d"},
 					"Cookie":              []string{"session=secret-e"},
@@ -1489,7 +1489,7 @@ func TestHostHTTPClientStripsCredentialHeadersOnCrossOriginRedirect(t *testing.T
 			if response.StatusCode != http.StatusOK {
 				t.Fatalf("response status = %d, want %d", response.StatusCode, http.StatusOK)
 			}
-			for _, header := range []string{"X-Api-Key", "X-Goog-Api-Key", "Authorization", "Proxy-Authorization", "Cookie"} {
+			for _, header := range []string{"X-Api-Key", "X-Test-Secret-Key", "Authorization", "Proxy-Authorization", "Cookie"} {
 				if value := got.Get(header); value != "" {
 					t.Errorf("destination received %s = %q, want credential stripped", header, value)
 				}

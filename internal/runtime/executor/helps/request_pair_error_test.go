@@ -38,11 +38,7 @@ func TestPairTranslationReportsOnlyTheWorkingError(t *testing.T) {
 
 	type pairFunc func(original, working []byte) (originalBody, workingBody []byte, err error)
 	routes := map[string]pairFunc{}
-	routes["antigravity envelope pair"] = func(original, working []byte) ([]byte, []byte, error) {
-		req := sdktranslator.RequestEnvelope{Format: sdktranslator.FormatClaude, Model: "m"}
-		return TranslateRequestEnvelopePairWithCodexMultiAgentV2(ctx, nil, &config.Config{}, sdktranslator.FormatClaude, sdktranslator.FormatClaude, req, original, working)
-	}
-	for _, to := range []sdktranslator.Format{sdktranslator.FormatOpenAI, sdktranslator.FormatClaude, sdktranslator.FormatCodex, sdktranslator.FormatInteractions} {
+	for _, to := range []sdktranslator.Format{sdktranslator.FormatOpenAI, sdktranslator.FormatCodex, sdktranslator.FormatInteractions} {
 		for _, compat := range []bool{false, true} {
 			name := "api-key pair to " + to.String()
 			if compat {
@@ -81,19 +77,6 @@ func TestPairTranslationReportsOnlyTheWorkingError(t *testing.T) {
 }
 
 // A refused baseline never rejects or replaces the working payload that translated.
-func TestEnvelopePairKeepsTheWorkingPayloadWhenTheBaselineIsRefused(t *testing.T) {
-	file := []byte(pairFileOnlyClaude)
-	text := []byte(pairTextOnlyClaude)
-	req := sdktranslator.RequestEnvelope{Format: sdktranslator.FormatClaude, Model: "m"}
-	_, working, err := TranslateRequestEnvelopePairWithCodexMultiAgentV2(context.Background(), nil, &config.Config{}, sdktranslator.FormatClaude, sdktranslator.FormatClaude, req, append([]byte(nil), file...), text)
-	if err != nil {
-		t.Fatalf("err = %v", err)
-	}
-	if got := ojson.GetBytes(working, "request.contents.0.parts.0.text").String(); got != "keep me" {
-		t.Fatalf("working = %s", working)
-	}
-}
-
 // A Responses request whose only user content is an input_file file id must be
 // refused with a named 400 on the default envelope path and on the compat path.
 func TestResponsesFileIDOnlyReturns400OnEveryPath(t *testing.T) {

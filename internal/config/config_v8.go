@@ -65,8 +65,7 @@ var v8SharedStructPaths = []configPath{
 }
 
 var v8KeyFamilies = []configPath{
-	{"gemini-api-key", "gemini"}, {"interactions-api-key", "interactions"},
-	{"vertex-api-key", "vertex"}, {"codex-api-key", "codex"},
+	{"codex-api-key", "codex"},
 	{"claude-api-key", "claude"}, {"xai-api-key", "xai"}, {"meta-api-key", "meta"},
 	{"openai-compatibility", "openai-compatibility"},
 }
@@ -88,7 +87,7 @@ func buildV8Paths() []configPath {
 		{"response-compression", "server.response-compression"},
 		{"auth-dir", "oauth.auth-dir"}, {"auth-auto-refresh-workers", "oauth.auth-auto-refresh-workers"},
 		{"oauth-model-alias", "oauth.model-alias"}, {"oauth-excluded-models", "oauth.excluded-models"},
-		{"oauth-request-scoped-errors", "oauth.request-scoped-errors"}, {"oauth-settings", "oauth.settings"}, {"ws-auth", "oauth.providers.aistudio.ws-auth"},
+		{"oauth-request-scoped-errors", "oauth.request-scoped-errors"}, {"oauth-settings", "oauth.settings"}, {"ws-auth", "oauth.providers.codex.ws-auth"},
 		{"codex.disable-codex-cloaking", "upstream.codex.disable-codex-cloaking"},
 		{"codex.stream-bootstrap-buffering", "upstream.codex.stream-bootstrap-buffering"},
 		{"codex.stream-bootstrap-timeout", "upstream.codex.stream-bootstrap-timeout"},
@@ -102,10 +101,6 @@ func buildV8Paths() []configPath {
 		{"claude", "upstream.claude"}, {"claude-code", "upstream.claude"},
 		{"disable-claude-cloak-mode", "upstream.claude.disable-claude-cloak-mode"},
 		{"claude-header-defaults", "upstream.claude.header-defaults"},
-		{"antigravity", "oauth.providers.antigravity"},
-		{"antigravity-signature-cache-enabled", "oauth.providers.antigravity.signature-cache-enabled"},
-		{"antigravity-signature-bypass-strict", "oauth.providers.antigravity.signature-bypass-strict"},
-		{"quota-exceeded.antigravity-credits", "oauth.providers.antigravity.antigravity-credits"},
 		{"xai", "upstream.xai"}, {"devin", "oauth.providers.devin"},
 		{"disable-image-generation", "multimedia.disable-image-generation"}, {"gpt-image-2-base-model", "multimedia.gpt-image-2-base-model"},
 		{"video-result-auth-cache-ttl", "multimedia.video-result-auth-cache-ttl"},

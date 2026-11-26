@@ -13,7 +13,7 @@ import (
 // 400, through both the single and the pair translation, with and without compat.
 func TestClaudeContainerUploadReturns400(t *testing.T) {
 	payload := []byte(`{"messages":[{"role":"user","content":[{"type":"container_upload","file_id":"file-example"}]}]}`)
-	for _, to := range []sdktranslator.Format{sdktranslator.FormatClaude, sdktranslator.FormatOpenAI, sdktranslator.FormatCodex, sdktranslator.FormatInteractions} {
+	for _, to := range []sdktranslator.Format{sdktranslator.FormatOpenAI, sdktranslator.FormatCodex, sdktranslator.FormatInteractions} {
 		for _, compat := range []bool{false, true} {
 			_, single := TranslateRequestReturningError(context.Background(), nil, nil, sdktranslator.FormatClaude, to, "m", payload, false, compat)
 			_, _, pair := TranslateRequestPairReturningError(context.Background(), nil, nil, sdktranslator.FormatClaude, to, "m", payload, payload, false, compat)
@@ -30,7 +30,7 @@ func TestClaudeContainerUploadReturns400(t *testing.T) {
 // ignore the error: they must get a request body, never an empty one.
 func TestByteWrappersKeepAJSONBodyForAnUnsendableFile(t *testing.T) {
 	payload := []byte(`{"model":"m","messages":[{"role":"user","content":[{"type":"container_upload","file_id":"file-absent"}]}]}`)
-	for _, to := range []sdktranslator.Format{sdktranslator.FormatOpenAI, sdktranslator.FormatCodex, sdktranslator.FormatInteractions, sdktranslator.FormatClaude} {
+	for _, to := range []sdktranslator.Format{sdktranslator.FormatOpenAI, sdktranslator.FormatCodex, sdktranslator.FormatInteractions} {
 		for _, compat := range []bool{false, true} {
 			original, working := TranslateRequestPairWithAPIKeyModelCompatibility(context.Background(), nil, nil, sdktranslator.FormatClaude, to, "m", payload, payload, false, compat)
 			for _, body := range [][]byte{original, working} {

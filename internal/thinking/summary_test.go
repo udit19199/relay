@@ -20,8 +20,6 @@ func TestExtractSummaryConfig(t *testing.T) {
 		{name: "chat missing unspecified", format: "openai", body: `{}`, wantMode: SummaryUnspecified},
 		{name: "chat null effort unspecified", format: "openai", body: `{"reasoning_effort":null}`, wantMode: SummaryUnspecified},
 		{name: "chat non-string effort unspecified", format: "openai", body: `{"reasoning_effort":17}`, wantMode: SummaryUnspecified},
-		{name: "chat google extension false overrides effort", format: "openai", body: `{"reasoning_effort":"high","extra_body":{"google":{"thinking_config":{"include_thoughts":false}}}}`, wantMode: SummaryDisabled},
-		{name: "chat google extension true", format: "openai", body: `{"extra_body":{"google":{"thinking_config":{"include_thoughts":true}}}}`, wantMode: SummaryEnabled, wantDetail: "auto"},
 		{name: "chat exclude disables", format: "openai", body: `{"reasoning_effort":"high","reasoning":{"exclude":true}}`, wantMode: SummaryDisabled},
 		{name: "chat exclude false enables", format: "openai", body: `{"reasoning":{"effort":"high","exclude":false}}`, wantMode: SummaryEnabled, wantDetail: "auto"},
 		{name: "chat legacy include_reasoning false disables", format: "openai", body: `{"reasoning_effort":"high","include_reasoning":false}`, wantMode: SummaryDisabled},
@@ -46,9 +44,6 @@ func TestExtractSummaryConfig(t *testing.T) {
 		{name: "claude enabled display with zero budget is invalid", format: "claude", body: `{"thinking":{"type":"enabled","budget_tokens":0,"display":"summarized"}}`, wantMode: SummaryUnspecified},
 		{name: "claude auto compatibility budget summarized", format: "claude", body: `{"thinking":{"type":"enabled","budget_tokens":-1,"display":"summarized"}}`, wantMode: SummaryEnabled, wantDetail: "auto"},
 		{name: "claude auto compatibility budget omitted", format: "claude", body: `{"thinking":{"type":"enabled","budget_tokens":-1,"display":"omitted"}}`, wantMode: SummaryDisabled},
-		{name: "gemini include true", format: "gemini", body: `{"generationConfig":{"thinkingConfig":{"includeThoughts":true}}}`, wantMode: SummaryEnabled, wantDetail: "auto"},
-		{name: "gemini include false", format: "gemini", body: `{"generationConfig":{"thinkingConfig":{"includeThoughts":false}}}`, wantMode: SummaryDisabled},
-		{name: "antigravity include true", format: "antigravity", body: `{"request":{"generationConfig":{"thinkingConfig":{"includeThoughts":true}}}}`, wantMode: SummaryEnabled, wantDetail: "auto"},
 		{name: "interactions auto", format: "interactions", body: `{"generation_config":{"thinking_summaries":"auto"}}`, wantMode: SummaryEnabled, wantDetail: "auto"},
 		{name: "interactions none", format: "interactions", body: `{"generation_config":{"thinking_summaries":"none"}}`, wantMode: SummaryDisabled},
 		{name: "interactions nested snake include false", format: "interactions", body: `{"generation_config":{"thinking_config":{"include_thoughts":false}}}`, wantMode: SummaryDisabled},
@@ -62,7 +57,6 @@ func TestExtractSummaryConfig(t *testing.T) {
 		{name: "interactions string include alias is invalid", format: "interactions", body: `{"generation_config":{"thinking_config":{"include_thoughts":"false"}}}`, wantMode: SummaryUnspecified},
 		{name: "interactions detailed is invalid", format: "interactions", body: `{"generation_config":{"thinking_summaries":"detailed"}}`, wantMode: SummaryUnspecified},
 		{name: "interactions boolean is invalid", format: "interactions", body: `{"generation_config":{"thinking_summaries":true}}`, wantMode: SummaryUnspecified},
-		{name: "gemini string bool is invalid", format: "gemini", body: `{"generationConfig":{"thinkingConfig":{"includeThoughts":"true"}}}`, wantMode: SummaryUnspecified},
 	}
 
 	for _, test := range tests {
@@ -108,9 +102,6 @@ func TestApplySummaryConfig(t *testing.T) {
 		{name: "chat disabled invents no openrouter field", format: "openai", body: `{"reasoning_effort":"high"}`, config: SummaryConfig{Mode: SummaryDisabled}, path: "reasoning", want: ""},
 		{name: "claude enabled", format: "claude", body: `{"thinking":{"type":"adaptive"}}`, config: SummaryConfig{Mode: SummaryEnabled}, path: "thinking.display", want: "summarized"},
 		{name: "claude disabled", format: "claude", body: `{"thinking":{"type":"enabled","budget_tokens":2048}}`, config: SummaryConfig{Mode: SummaryDisabled}, path: "thinking.display", want: "omitted"},
-		{name: "gemini enabled", format: "gemini", config: SummaryConfig{Mode: SummaryEnabled}, path: "generationConfig.thinkingConfig.includeThoughts", want: "true"},
-		{name: "gemini disabled", format: "gemini", config: SummaryConfig{Mode: SummaryDisabled}, path: "generationConfig.thinkingConfig.includeThoughts", want: "false"},
-		{name: "antigravity enabled", format: "antigravity", config: SummaryConfig{Mode: SummaryEnabled}, path: "request.generationConfig.thinkingConfig.includeThoughts", want: "true"},
 		{name: "interactions detail collapses to auto", format: "interactions", config: SummaryConfig{Mode: SummaryEnabled, Detail: "detailed"}, path: "generation_config.thinking_summaries", want: "auto"},
 		{name: "interactions disabled", format: "interactions", config: SummaryConfig{Mode: SummaryDisabled}, path: "generation_config.thinking_summaries", want: "none"},
 		{name: "responses concise", format: "openai-response", config: SummaryConfig{Mode: SummaryEnabled, Detail: "concise"}, path: "reasoning.summary", want: "concise"},
@@ -177,8 +168,6 @@ func TestApplySummaryConfigNormalizesTargetAliases(t *testing.T) {
 		canonical string
 		alias     string
 	}{
-		{format: "gemini", body: `{"generationConfig":{"thinkingConfig":{"include_thoughts":true}}}`, canonical: "generationConfig.thinkingConfig.includeThoughts", alias: "generationConfig.thinkingConfig.include_thoughts"},
-		{format: "antigravity", body: `{"request":{"generationConfig":{"thinkingConfig":{"include_thoughts":true}}}}`, canonical: "request.generationConfig.thinkingConfig.includeThoughts", alias: "request.generationConfig.thinkingConfig.include_thoughts"},
 		{format: "interactions", body: `{"generation_config":{"thinkingSummaries":"auto"}}`, canonical: "generation_config.thinking_summaries", alias: "generation_config.thinkingSummaries"},
 	}
 	for _, test := range tests {

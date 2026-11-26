@@ -16,6 +16,28 @@ import (
 	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
 )
 
+type summaryRemovingPluginHooks struct{}
+
+func (*summaryRemovingPluginHooks) NormalizeRequest(_ context.Context, _, _ sdktranslator.Format, _ string, body []byte, _ bool) []byte {
+	return body
+}
+
+func (*summaryRemovingPluginHooks) TranslateRequest(context.Context, sdktranslator.Format, sdktranslator.Format, string, []byte, bool) ([]byte, bool) {
+	return nil, false
+}
+
+func (*summaryRemovingPluginHooks) NormalizeResponseBefore(context.Context, sdktranslator.Format, sdktranslator.Format, string, []byte, []byte, []byte, bool) []byte {
+	return nil
+}
+
+func (*summaryRemovingPluginHooks) TranslateResponse(context.Context, sdktranslator.Format, sdktranslator.Format, string, []byte, []byte, []byte, bool) ([]byte, bool) {
+	return nil, false
+}
+
+func (*summaryRemovingPluginHooks) NormalizeResponseAfter(context.Context, sdktranslator.Format, sdktranslator.Format, string, []byte, []byte, []byte, bool) []byte {
+	return nil
+}
+
 type editUpdatePluginHooks struct {
 	summaryRemovingPluginHooks
 	effort string

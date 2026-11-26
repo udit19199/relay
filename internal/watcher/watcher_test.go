@@ -127,10 +127,10 @@ func TestSnapshotCoreAuths_ConfigAndAuthFiles(t *testing.T) {
 
 	cfg := &config.Config{
 		AuthDir: authDir,
-		GeminiKey: []config.GeminiKey{
+		ClaudeKey: []config.ClaudeKey{
 			{
-				APIKey:         "g-key",
-				BaseURL:        "https://gemini",
+				APIKey:         "claude-key",
+				BaseURL:        "https://claude.example.com",
 				ExcludedModels: []string{"Model-A", "model-b"},
 				Headers:        map[string]string{"X-Req": "1"},
 			},
@@ -145,21 +145,21 @@ func TestSnapshotCoreAuths_ConfigAndAuthFiles(t *testing.T) {
 		t.Fatalf("expected 1 config auth entry, got %d", len(auths))
 	}
 
-	var geminiAPIKeyAuth *coreauth.Auth
+	var claudeAPIKeyAuth *coreauth.Auth
 	for _, a := range auths {
-		if a.Provider == "gemini" && a.Attributes["api_key"] == "g-key" {
-			geminiAPIKeyAuth = a
+		if a.Provider == "claude" && a.Attributes["api_key"] == "claude-key" {
+			claudeAPIKeyAuth = a
 		}
 	}
-	if geminiAPIKeyAuth == nil {
-		t.Fatal("expected synthesized Gemini API key auth")
+	if claudeAPIKeyAuth == nil {
+		t.Fatal("expected synthesized Claude API key auth")
 	}
 	expectedAPIKeyHash := diff.ComputeExcludedModelsHash([]string{"Model-A", "model-b"})
-	if geminiAPIKeyAuth.Attributes["excluded_models_hash"] != expectedAPIKeyHash {
-		t.Fatalf("expected API key excluded hash %s, got %s", expectedAPIKeyHash, geminiAPIKeyAuth.Attributes["excluded_models_hash"])
+	if claudeAPIKeyAuth.Attributes["excluded_models_hash"] != expectedAPIKeyHash {
+		t.Fatalf("expected API key excluded hash %s, got %s", expectedAPIKeyHash, claudeAPIKeyAuth.Attributes["excluded_models_hash"])
 	}
-	if geminiAPIKeyAuth.Attributes["auth_kind"] != "apikey" {
-		t.Fatalf("expected auth_kind=apikey, got %s", geminiAPIKeyAuth.Attributes["auth_kind"])
+	if claudeAPIKeyAuth.Attributes["auth_kind"] != "apikey" {
+		t.Fatalf("expected auth_kind=apikey, got %s", claudeAPIKeyAuth.Attributes["auth_kind"])
 	}
 }
 

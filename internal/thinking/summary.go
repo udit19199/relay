@@ -86,24 +86,6 @@ func extractSummaryConfigFromGetter(get func(string) ojson.Result, normalized st
 		if config, ok := claudeSummaryConfigFromGetter(get, "thinking.display"); ok {
 			return config
 		}
-	case "gemini":
-		if config, ok := firstSummaryBoolConfigFromGetter(get, []string{
-			"generationConfig.thinkingConfig.includeThoughts",
-			"generationConfig.thinkingConfig.include_thoughts",
-			"generation_config.thinking_config.include_thoughts",
-			"generation_config.thinking_config.includeThoughts",
-		}); ok {
-			return config
-		}
-	case "antigravity":
-		if config, ok := firstSummaryBoolConfigFromGetter(get, []string{
-			"request.generationConfig.thinkingConfig.includeThoughts",
-			"request.generationConfig.thinkingConfig.include_thoughts",
-			"request.generationConfig.thinking_config.includeThoughts",
-			"request.generationConfig.thinking_config.include_thoughts",
-		}); ok {
-			return config
-		}
 	case "interactions":
 		for _, path := range []string{
 			"generation_config.thinking_summaries",
@@ -212,7 +194,7 @@ func CanRepresentSummaryConfigForModelDoc(doc *ojson.Doc, format, model string, 
 	}
 	enabled := config.Mode == SummaryEnabled
 	switch normalized {
-	case "gemini", "antigravity", "interactions":
+	case "interactions":
 		return true
 	case "openai-response", "codex":
 		return enabled
@@ -252,20 +234,10 @@ func CanRepresentSummaryConfigForModelDoc(doc *ojson.Doc, format, model string, 
 
 func extractExplicitSummaryNonBoolOpenAIFromGetter(get func(string) ojson.Result) bool {
 	for _, path := range []string{
-		"extra_body.google.thinking_config.include_thoughts",
-		"extra_body.google.thinking_config.includeThoughts",
-		"extra_body.google.thinkingConfig.include_thoughts",
-		"extra_body.google.thinkingConfig.includeThoughts",
-		"extra_body.extra_body.google.thinking_config.include_thoughts",
-		"extra_body.extra_body.google.thinking_config.includeThoughts",
-		"google.thinking_config.include_thoughts",
-		"google.thinking_config.includeThoughts",
 		"thinking.includeThoughts",
 		"thinking.include_thoughts",
 		"reasoning.includeThoughts",
 		"reasoning.include_thoughts",
-		"generationConfig.thinkingConfig.includeThoughts",
-		"generationConfig.thinkingConfig.include_thoughts",
 		"generation_config.thinking_config.include_thoughts",
 		"generation_config.thinking_config.includeThoughts",
 	} {
@@ -328,34 +300,8 @@ func applySummaryConfigForProviderDoc(doc *ojson.Doc, docValid bool, format, mod
 		if doc.Set("thinking.display", value) == nil {
 			modified = true
 		}
-	case "gemini":
-		if doc.Set("generationConfig.thinkingConfig.includeThoughts", enabled) == nil {
-			modified = true
-		}
-		for _, path := range []string{
-			"generationConfig.thinkingConfig.include_thoughts",
-			"generation_config.thinking_config.include_thoughts",
-			"generation_config.thinking_config.includeThoughts",
-		} {
-			if doc.Get(path).Exists() && doc.Delete(path) == nil {
-				modified = true
-			}
-		}
-	case "antigravity":
-		if doc.Set("request.generationConfig.thinkingConfig.includeThoughts", enabled) == nil {
-			modified = true
-		}
-		for _, path := range []string{
-			"request.generationConfig.thinkingConfig.include_thoughts",
-			"request.generationConfig.thinking_config.includeThoughts",
-			"request.generationConfig.thinking_config.include_thoughts",
-		} {
-			if doc.Get(path).Exists() && doc.Delete(path) == nil {
-				modified = true
-			}
-		}
 	case "interactions":
-		// Google Interactions only accepts auto or none. OpenAI's concise and
+		// Interactions only accepts auto or none. OpenAI's concise and
 		// detailed selectors therefore collapse to the supported enabled value.
 		value := "none"
 		if enabled {
@@ -398,7 +344,7 @@ func applySummaryConfigForProviderDoc(doc *ojson.Doc, docValid bool, format, mod
 // intent that this package can read or write.
 func summaryFormatSupported(format string) bool {
 	switch format {
-	case "openai", "openai-response", "codex", "claude", "gemini", "antigravity", "interactions":
+	case "openai", "openai-response", "codex", "claude", "interactions":
 		return true
 	default:
 		return false
@@ -453,20 +399,10 @@ func isOpenRouterProvider(provider string) bool {
 
 func extractOpenAIExplicitSummaryConfigFromGetter(get func(string) ojson.Result) (SummaryConfig, bool) {
 	for _, path := range []string{
-		"extra_body.google.thinking_config.include_thoughts",
-		"extra_body.google.thinking_config.includeThoughts",
-		"extra_body.google.thinkingConfig.include_thoughts",
-		"extra_body.google.thinkingConfig.includeThoughts",
-		"extra_body.extra_body.google.thinking_config.include_thoughts",
-		"extra_body.extra_body.google.thinking_config.includeThoughts",
-		"google.thinking_config.include_thoughts",
-		"google.thinking_config.includeThoughts",
 		"thinking.includeThoughts",
 		"thinking.include_thoughts",
 		"reasoning.includeThoughts",
 		"reasoning.include_thoughts",
-		"generationConfig.thinkingConfig.includeThoughts",
-		"generationConfig.thinkingConfig.include_thoughts",
 		"generation_config.thinking_config.include_thoughts",
 		"generation_config.thinking_config.includeThoughts",
 	} {

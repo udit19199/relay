@@ -823,8 +823,8 @@ func TestFullScanPreservesAuthsInUnreadableDir(t *testing.T) {
 		}
 		cfg := &config.Config{
 			AuthDir: ".",
-			GeminiKey: []config.GeminiKey{
-				{APIKey: "AIzaSyTestKey1234567890"},
+			ClaudeKey: []config.ClaudeKey{
+				{APIKey: "claude-test-key"},
 			},
 		}
 		w := &Watcher{
@@ -840,7 +840,7 @@ func TestFullScanPreservesAuthsInUnreadableDir(t *testing.T) {
 		if errChmod := os.Chmod(dir, 0); errChmod != nil {
 			t.Fatal(errChmod)
 		}
-		cfg.GeminiKey = nil
+		cfg.ClaudeKey = nil
 		w.refreshAuthState(false)
 		if w.currentAuths["account.json"] == nil {
 			t.Fatalf("expected file credential in unreadable '.' dir to be preserved, got %#v", w.currentAuths)

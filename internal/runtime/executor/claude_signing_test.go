@@ -142,7 +142,7 @@ func TestClaudeCCHSigningEnabled(t *testing.T) {
 	}{
 		{name: "official API key default", apiKey: "key-123", kind: claudeCCHUpstreamAnthropic, origin: anthropicOrigin, want: false},
 		{name: "official API key opt-in", apiKey: "key-123", kind: claudeCCHUpstreamAnthropic, cliFingerprint: true, origin: anthropicOrigin, want: true},
-		// Native emits cch only for firstParty on api.anthropic.com or for vertex, so an
+		// Native emits cch only for firstParty on api.anthropic.com, so an
 		// opted-in key on any other gateway keeps a cache-stable billing header.
 		{name: "gateway API key opt-in", apiKey: "key-123", kind: claudeCCHUpstreamAnthropic, cliFingerprint: true, origin: gatewayOrigin, want: false},
 		{name: "anthropic host over http opt-in", apiKey: "key-123", kind: claudeCCHUpstreamAnthropic, cliFingerprint: true, origin: "http://api.anthropic.com/v1/messages", want: false},
@@ -153,7 +153,6 @@ func TestClaudeCCHSigningEnabled(t *testing.T) {
 		{name: "Claude OAuth", apiKey: "sk-ant-oat-custom", kind: claudeCCHUpstreamAnthropic, origin: anthropicOrigin, want: true},
 		{name: "Claude OAuth custom gateway", apiKey: "sk-ant-oat-custom", kind: claudeCCHUpstreamAnthropic, origin: gatewayOrigin, want: true},
 		{name: "other provider Claude OAuth", apiKey: "sk-ant-oat-other", kind: claudeCCHUpstreamOther, origin: gatewayOrigin, want: true},
-		{name: "Vertex provider API key", apiKey: "key-123", kind: claudeCCHUpstreamVertex, origin: "https://us-east5-aiplatform.googleapis.com/v1/projects/p/locations/l/publishers/anthropic/models/m:streamRawPredict", want: true},
 		{name: "other provider API key", apiKey: "key-123", kind: claudeCCHUpstreamOther, origin: gatewayOrigin, want: false},
 		{name: "other provider API key opt-in", apiKey: "key-123", kind: claudeCCHUpstreamOther, cliFingerprint: true, origin: gatewayOrigin, want: false},
 	}

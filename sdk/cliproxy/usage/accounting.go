@@ -350,7 +350,7 @@ func tokenAccountingSemanticsFor(provider, executorType string) tokenAccountingS
 	if strings.Contains(value, "claude") || strings.Contains(value, "anthropic") {
 		return tokenAccountingSemanticsIndependent
 	}
-	for _, marker := range []string{"gemini", "aistudio", "antigravity", "vertex", "interaction"} {
+	for _, marker := range []string{"interaction"} {
 		if strings.Contains(value, marker) {
 			return tokenAccountingSemanticsSeparateReasoning
 		}

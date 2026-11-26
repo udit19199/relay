@@ -7,16 +7,16 @@ func TestReplaceClientModelsProjectionGeneration(t *testing.T) {
 		t.Run(mode, func(t *testing.T) {
 			r := newTestModelRegistry()
 			models := []*ModelInfo{{ID: "keep"}}
-			r.RegisterClient("account", "antigravity", models)
+			r.RegisterClient("account", "devin", models)
 			epoch := r.ClientRegistrationEpoch("account")
 			if !r.ApplyClientModelProjections("account", epoch, 11, []ClientModelProjection{{ModelID: "keep", QuotaExceeded: true, Suspended: true, SuspendReason: "rate_limit"}}) {
 				t.Fatal("initial projection rejected")
 			}
 			switch mode {
 			case "register":
-				r.RegisterClient("account", "antigravity", models)
+				r.RegisterClient("account", "devin", models)
 			default:
-				provider := "antigravity"
+				provider := "devin"
 				if mode == "new-provider" {
 					provider = "gemini"
 				}
@@ -43,13 +43,13 @@ func TestReplaceClientModelsProjectionGeneration(t *testing.T) {
 func TestReplaceClientModelsEpochAndAvailability(t *testing.T) {
 	r := newTestModelRegistry()
 	models := []*ModelInfo{{ID: "keep"}, {ID: "remove"}, {ID: "keep"}}
-	if _, ok := r.ReplaceClientModels("account", "antigravity", 0, models); !ok {
+	if _, ok := r.ReplaceClientModels("account", "devin", 0, models); !ok {
 		t.Fatal("initial epoch rejected")
 	}
 	epoch := r.ClientRegistrationEpoch("account")
 	r.SuspendClientModel("account", "keep", "rate_limit")
 	r.SetModelQuotaExceeded("account", "keep")
-	if _, ok := r.ReplaceClientModels("account", "antigravity", epoch, []*ModelInfo{{ID: "keep"}, {ID: "add"}}); !ok {
+	if _, ok := r.ReplaceClientModels("account", "devin", epoch, []*ModelInfo{{ID: "keep"}, {ID: "add"}}); !ok {
 		t.Fatal("replacement failed")
 	}
 	if r.models["keep"].SuspendedClients["account"] != "rate_limit" || !r.IsModelQuotaExceededForClient("account", "keep") {
@@ -58,27 +58,27 @@ func TestReplaceClientModelsEpochAndAvailability(t *testing.T) {
 	if r.ClientSupportsModel("account", "remove") || !r.ClientSupportsModel("account", "add") {
 		t.Fatal("wrong model set")
 	}
-	if _, ok := r.ReplaceClientModels("account", "antigravity", epoch, models); ok {
+	if _, ok := r.ReplaceClientModels("account", "devin", epoch, models); ok {
 		t.Fatal("stale epoch accepted")
 	}
-	r.RegisterClient("account", "antigravity", []*ModelInfo{{ID: "keep"}})
+	r.RegisterClient("account", "devin", []*ModelInfo{{ID: "keep"}})
 	if r.models["keep"].SuspendedClients["account"] != "" || r.IsModelQuotaExceededForClient("account", "keep") {
 		t.Fatal("ordinary registration no longer clears state")
 	}
 	epoch = r.ClientRegistrationEpoch("account")
-	if _, ok := r.ReplaceClientModels("account", "antigravity", epoch, nil); !ok {
+	if _, ok := r.ReplaceClientModels("account", "devin", epoch, nil); !ok {
 		t.Fatal("empty catalog rejected")
 	}
 	if len(r.GetModelsForClient("account")) != 0 {
 		t.Fatal("empty catalog did not revoke models")
 	}
 	emptyEpoch := r.ClientRegistrationEpoch("account")
-	if applied, ok := r.ReplaceClientModels("account", "antigravity", emptyEpoch, models); !ok || emptyEpoch == epoch || applied != emptyEpoch+1 {
+	if applied, ok := r.ReplaceClientModels("account", "devin", emptyEpoch, models); !ok || emptyEpoch == epoch || applied != emptyEpoch+1 {
 		t.Fatal("empty catalog cannot recover")
 	}
 	epoch = r.ClientRegistrationEpoch("account")
 	r.UnregisterClient("account")
-	if _, ok := r.ReplaceClientModels("account", "antigravity", epoch, models); ok {
+	if _, ok := r.ReplaceClientModels("account", "devin", epoch, models); ok {
 		t.Fatal("removed client resurrected")
 	}
 }

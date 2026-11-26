@@ -251,7 +251,8 @@ func (s *FileTokenStore) readAuthFiles(path, baseDir string) ([]*cliproxyauth.Au
 	}
 	provider, _ := metadata["type"].(string)
 	provider = strings.TrimSpace(provider)
-	if strings.EqualFold(provider, "gemini") {
+	switch strings.ToLower(provider) {
+	case "gemini", "gemini-cli", "gemini-interactions", "vertex", "aistudio", "antigravity", "google":
 		return nil, nil
 	}
 	info, errStat := os.Stat(path)

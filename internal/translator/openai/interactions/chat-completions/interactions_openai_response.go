@@ -70,9 +70,8 @@ func ConvertOpenAIResponseToInteractionsNonStream(ctx context.Context, modelName
 			steps = append(steps, interactionsTextStep("model_output", content.String()))
 		}
 		if toolCalls := message.Get("tool_calls"); toolCalls.Exists() && toolCalls.IsArray() {
-			forAntigravity := isAntigravityModel(modelName)
 			toolCalls.ForEach(func(_, toolCall ojson.Result) bool {
-				if step, ok := openAIToolCallToInteractionsStep(toolCall, forAntigravity); ok {
+				if step, ok := openAIToolCallToInteractionsStep(toolCall); ok {
 					steps = append(steps, step)
 				}
 				return true
@@ -153,9 +152,6 @@ func appendOpenAIToolCallDelta(out [][]byte, st *openAIToInteractionsStreamState
 	}
 	function := toolCall.Get("function")
 	if name := function.Get("name").String(); name != "" {
-		if isAntigravityModel(modelName) {
-			name = translatorcommon.AntigravityToolNameToUpstream(name)
-		}
 		st.ToolCallNames[index] = strings.Clone(name)
 	}
 	stepID := util.FirstNonEmpty(st.ToolCallIDs[index], fmt.Sprintf("call_%d", index))
@@ -327,7 +323,7 @@ func interactionsTextStep(stepType, text string) []byte {
 	return stepDoc.Bytes()
 }
 
-func openAIToolCallToInteractionsStep(toolCall ojson.Result, forAntigravity bool) ([]byte, bool) {
+func openAIToolCallToInteractionsStep(toolCall ojson.Result) ([]byte, bool) {
 	if toolType := toolCall.Get("type").String(); toolType != "" && toolType != "function" {
 		return nil, false
 	}
@@ -340,9 +336,6 @@ func openAIToolCallToInteractionsStep(toolCall ojson.Result, forAntigravity bool
 		_ = stepDoc.Set("id", id)
 	}
 	name := function.Get("name").String()
-	if forAntigravity {
-		name = translatorcommon.AntigravityToolNameToUpstream(name)
-	}
 	_ = stepDoc.Set("name", name)
 	setRawJSONValueDoc(stepDoc, "arguments", function.Get("arguments"), `{}`)
 	return stepDoc.Bytes(), true

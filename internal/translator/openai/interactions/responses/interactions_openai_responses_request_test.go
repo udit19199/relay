@@ -318,124 +318,6 @@ func TestConvertInteractionsRequestToOpenAIResponses_PreservesEnvironmentID(t *t
 	}
 }
 
-func TestConvertOpenAIResponsesRequestToInteractions_AntigravitySanitizesGenerationConfigAndSetsAgentConfig(t *testing.T) {
-	raw := []byte(`{
-		"model":"antigravity-preview-05-2026",
-		"input":"Search the web",
-		"previous_response_id":"v1_Chd3...",
-		"environment_id":"env_789",
-		"max_output_tokens":2048,
-		"temperature":0.7,
-		"top_p":0.95,
-		"tools":[{"type":"function","name":"web_search","parameters":{"type":"object"}}]
-	}`)
-	out, _ := ConvertOpenAIResponsesRequestToInteractions("antigravity-preview-05-2026", raw, false)
-	if got := ojson.GetBytesNoCopy(out, "previous_interaction_id").String(); got != "v1_Chd3..." {
-		t.Fatalf("previous_interaction_id = %q, want v1_Chd3.... Output: %s", got, string(out))
-	}
-	if got := ojson.GetBytesNoCopy(out, "environment_id").String(); got != "env_789" {
-		t.Fatalf("environment_id = %q, want env_789. Output: %s", got, string(out))
-	}
-	// temperature, top_p, max_output_tokens should be stripped from generation_config for Antigravity models
-	for _, knob := range []string{"temperature", "top_p", "top_k", "stop_sequences", "max_output_tokens"} {
-		if ojson.GetBytesNoCopy(out, "generation_config."+knob).Exists() {
-			t.Fatalf("generation_config.%s should be stripped for antigravity model. Output: %s", knob, string(out))
-		}
-	}
-	// max_output_tokens should be mapped to agent_config.max_total_tokens
-	if got := ojson.GetBytesNoCopy(out, "agent_config.max_total_tokens").Int(); got != 2048 {
-		t.Fatalf("agent_config.max_total_tokens = %d, want 2048. Output: %s", got, string(out))
-	}
-}
-
-func TestConvertOpenAIResponsesRequestToInteractionsRenamesConflictingAntigravityTools(t *testing.T) {
-	raw := []byte(`{
-		"model":"antigravity-preview-05-2026",
-		"input":[{"type":"message","role":"user","content":"read file"}],
-		"tools":[
-			{"type":"function","name":"read_file","parameters":{"type":"object"}},
-			{"type":"function","name":"write_file","parameters":{"type":"object"}},
-			{"type":"function","name":"execute_code","parameters":{"type":"object"}},
-			{"type":"function","name":"web_search","parameters":{"type":"object"}}
-		]
-	}`)
-	out, _ := ConvertOpenAIResponsesRequestToInteractions("antigravity-preview-05-2026", raw, false)
-	if got := ojson.GetBytesNoCopy(out, "tools.0.name").String(); got != "external_read_file" {
-		t.Fatalf("tools.0.name = %q, want external_read_file. Output: %s", got, string(out))
-	}
-	if got := ojson.GetBytesNoCopy(out, "tools.1.name").String(); got != "external_write_file" {
-		t.Fatalf("tools.1.name = %q, want external_write_file. Output: %s", got, string(out))
-	}
-	if got := ojson.GetBytesNoCopy(out, "tools.2.name").String(); got != "external_execute_code" {
-		t.Fatalf("tools.2.name = %q, want external_execute_code. Output: %s", got, string(out))
-	}
-	if got := ojson.GetBytesNoCopy(out, "tools.3.name").String(); got != "web_search" {
-		t.Fatalf("tools.3.name = %q, want web_search (unchanged). Output: %s", got, string(out))
-	}
-	outNonAnti, _ := ConvertOpenAIResponsesRequestToInteractions("gemini-3.1-flash-lite", raw, false)
-	if got := ojson.GetBytesNoCopy(outNonAnti, "tools.0.name").String(); got != "read_file" {
-		t.Fatalf("gemini tools.0.name = %q, want read_file. Output: %s", got, string(outNonAnti))
-	}
-}
-
-func TestConvertOpenAIResponsesRequestToInteractionsRenamesConflictingAntigravityToolCallsAndResultsInHistory(t *testing.T) {
-	raw := []byte(`{
-		"model":"antigravity-preview-05-2026",
-		"input":[
-			{"type":"message","role":"user","content":"read file"},
-			{"type":"function_call","name":"read_file","call_id":"call_1","arguments":"{\"path\":\"/tmp/x\"}"},
-			{"type":"function_call_output","name":"read_file","call_id":"call_1","output":"hello file"}
-		],
-		"tools":[
-			{"type":"function","name":"read_file","parameters":{"type":"object"}}
-		]
-	}`)
-	out, _ := ConvertOpenAIResponsesRequestToInteractions("antigravity-preview-05-2026", raw, false)
-	if got := ojson.GetBytesNoCopy(out, "input.1.name").String(); got != "external_read_file" {
-		t.Fatalf("input.1.name = %q, want external_read_file. Output: %s", got, string(out))
-	}
-	if got := ojson.GetBytesNoCopy(out, "input.2.name").String(); got != "external_read_file" {
-		t.Fatalf("input.2.name = %q, want external_read_file. Output: %s", got, string(out))
-	}
-}
-
-func TestConvertOpenAIResponsesRequestToInteractionsRenamesConflictingToolChoice(t *testing.T) {
-	raw := []byte(`{
-		"model":"antigravity-preview-05-2026",
-		"input":[{"type":"message","role":"user","content":"read file"}],
-		"tools":[{"type":"function","name":"read_file","parameters":{"type":"object"}}],
-		"tool_choice":{"type":"function","name":"read_file"}
-	}`)
-	out, _ := ConvertOpenAIResponsesRequestToInteractions("antigravity-preview-05-2026", raw, false)
-	if got := ojson.GetBytesNoCopy(out, "generation_config.tool_choice.name").String(); got != "external_read_file" {
-		t.Fatalf("generation_config.tool_choice.name = %q, want external_read_file. Output: %s", got, string(out))
-	}
-	outNonAnti, _ := ConvertOpenAIResponsesRequestToInteractions("gemini-3.1-flash-lite", raw, false)
-	if got := ojson.GetBytesNoCopy(outNonAnti, "generation_config.tool_choice.name").String(); got != "read_file" {
-		t.Fatalf("gemini tool_choice.name = %q, want read_file (no rename). Output: %s", got, string(outNonAnti))
-	}
-}
-
-func TestConvertOpenAIResponsesRequestToInteractions_NonAntigravityGenerationConfig(t *testing.T) {
-	raw := []byte(`{
-		"model":"devin/swe-2",
-		"input":[{"type":"message","role":"user","content":"write a poem"}],
-		"max_output_tokens":400,
-		"temperature":0.7,
-		"top_p":0.95
-	}`)
-	out, _ := ConvertOpenAIResponsesRequestToInteractions("devin/swe-2", raw, false)
-	if got := ojson.GetBytesNoCopy(out, "generation_config.max_output_tokens").Int(); got != 400 {
-		t.Fatalf("generation_config.max_output_tokens = %d, want 400. Output: %s", got, string(out))
-	}
-	if got := ojson.GetBytesNoCopy(out, "generation_config.temperature").Float(); got != 0.7 {
-		t.Fatalf("generation_config.temperature = %f, want 0.7. Output: %s", got, string(out))
-	}
-	if got := ojson.GetBytesNoCopy(out, "generation_config.top_p").Float(); got != 0.95 {
-		t.Fatalf("generation_config.top_p = %f, want 0.95. Output: %s", got, string(out))
-	}
-}
-
 func TestConvertOpenAIResponsesRequestToInteractions_FlattensNamespaceTools(t *testing.T) {
 	raw := []byte(`{
 		"model": "devin/gemini-3-7-flash",
@@ -602,19 +484,6 @@ func TestConvertOpenAIResponsesRequestToInteractions_HistoryNamespaceAndCustomTo
 	}
 	if got := ojson.GetBytesNoCopy(out, "input.3.result").String(); got != "file1.txt" {
 		t.Errorf("input.3.result = %q, want file1.txt", got)
-	}
-}
-
-func TestConvertOpenAIResponsesRequestToInteractions_AntigravityCustomToolRenamed(t *testing.T) {
-	raw := []byte(`{
-		"model": "antigravity-preview-05-2026",
-		"tools": [
-			{"type": "custom", "name": "read_file", "description": "Read file"}
-		]
-	}`)
-	out, _ := ConvertOpenAIResponsesRequestToInteractions("antigravity-preview-05-2026", raw, false)
-	if got := ojson.GetBytesNoCopy(out, "tools.0.name").String(); got != "external_read_file" {
-		t.Fatalf("tools.0.name = %q, want external_read_file", got)
 	}
 }
 
@@ -830,51 +699,6 @@ func TestConvertOpenAIResponsesRequestToInteractions_DevinToolsFilterAndObfuscat
 	// 6. tool_choice targeting the filtered automation_update should not be set
 	if tc := ojson.GetBytesNoCopy(out, "generation_config.tool_choice"); tc.Exists() {
 		t.Fatalf("expected generation_config.tool_choice to be omitted for filtered tool, got %s", tc.Raw)
-	}
-}
-
-func TestConvertOpenAIResponsesRequestToInteractions_AntigravityDoesNotFilterDevinTools(t *testing.T) {
-	responsesPayload := []byte(`{
-		"model": "antigravity-preview-05-2026",
-		"tools": [
-			{
-				"type": "namespace",
-				"name": "mcp__codex_app",
-				"tools": [
-					{
-						"type": "function",
-						"name": "automation_update",
-						"description": "Recurring automations",
-						"parameters": {"type": "object"}
-					}
-				]
-			},
-			{
-				"type": "function",
-				"name": "exec_command",
-				"description": "Runs a command in a bash shell, returning output or a session ID for ongoing interaction."
-			}
-		],
-		"input": "hello"
-	}`)
-
-	out, _ := ConvertOpenAIResponsesRequestToInteractions("antigravity-preview-05-2026", responsesPayload, false)
-
-	// In Antigravity, mcp__codex_app__automation_update should NOT be filtered by Devin rules
-	foundAuto := false
-	ojson.GetBytesNoCopy(out, "tools").ForEach(func(_, tool ojson.Result) bool {
-		if tool.Get("name").String() == "mcp__codex_app__automation_update" {
-			foundAuto = true
-		}
-		if tool.Get("name").String() == "exec_command" {
-			if strings.Contains(tool.Get("description").String(), "an session ID") {
-				t.Fatalf("exec_command description should not have 'an session ID' in antigravity: %s", tool.Get("description").String())
-			}
-		}
-		return true
-	})
-	if !foundAuto {
-		t.Fatalf("expected mcp__codex_app__automation_update to be kept in antigravity output: %s", string(out))
 	}
 }
 

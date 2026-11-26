@@ -54,29 +54,6 @@ func TestPatchPriorityForEveryProvider(t *testing.T) {
 			get:      func(cfg *config.Config) int { return cfg.CodexKey[0].Priority },
 		},
 		{
-			name:     "gemini",
-			setup:    func(cfg *config.Config) { cfg.GeminiKey = []config.GeminiKey{{APIKey: "key"}} },
-			patch:    (*Handler).PatchGeminiKey,
-			endpoint: "/v0/management/gemini-api-key",
-			get:      func(cfg *config.Config) int { return cfg.GeminiKey[0].Priority },
-		},
-		{
-			name:     "interactions",
-			setup:    func(cfg *config.Config) { cfg.InteractionsKey = []config.GeminiKey{{APIKey: "key"}} },
-			patch:    (*Handler).PatchInteractionsKey,
-			endpoint: "/v0/management/interactions-api-key",
-			get:      func(cfg *config.Config) int { return cfg.InteractionsKey[0].Priority },
-		},
-		{
-			name: "vertex",
-			setup: func(cfg *config.Config) {
-				cfg.VertexCompatAPIKey = []config.VertexCompatKey{{APIKey: "key", BaseURL: "https://example.com"}}
-			},
-			patch:    (*Handler).PatchVertexCompatKey,
-			endpoint: "/v0/management/vertex-api-key",
-			get:      func(cfg *config.Config) int { return cfg.VertexCompatAPIKey[0].Priority },
-		},
-		{
 			name: "openai compatibility",
 			setup: func(cfg *config.Config) {
 				cfg.OpenAICompatibility = []config.OpenAICompatibility{{

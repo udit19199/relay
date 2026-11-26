@@ -56,23 +56,13 @@ func TestRegistryTranslateRequestAppliesSummaryIntent(t *testing.T) {
 			wantExists: true,
 		},
 		{
-			name:       "responses null summary disables Gemini summaries",
+			name:       "responses null summary disables Interactions summaries",
 			from:       FormatOpenAIResponse,
-			to:         FormatClaude,
+			to:         FormatInteractions,
 			input:      `{"reasoning":{"effort":"high","summary":null}}`,
-			translated: `{"generationConfig":{"thinkingConfig":{"thinkingLevel":"high"}}}`,
-			path:       "generationConfig.thinkingConfig.includeThoughts",
-			want:       "false",
-			wantExists: true,
-		},
-		{
-			name:       "Google Chat extension overrides effort",
-			from:       FormatOpenAI,
-			to:         FormatClaude,
-			input:      `{"reasoning_effort":"high","extra_body":{"google":{"thinking_config":{"include_thoughts":false}}}}`,
-			translated: `{"generationConfig":{"thinkingConfig":{"thinkingLevel":"high","includeThoughts":true}}}`,
-			path:       "generationConfig.thinkingConfig.includeThoughts",
-			want:       "false",
+			translated: `{"generation_config":{"thinking_level":"high"}}`,
+			path:       "generation_config.thinking_summaries",
+			want:       "none",
 			wantExists: true,
 		},
 	}
@@ -170,18 +160,18 @@ func TestRegistryTranslateRequestPluginMissDoesNotMixSummary(t *testing.T) {
 func TestRegistryTranslateRequestAppliesSummaryAfterPluginTranslation(t *testing.T) {
 	registry := NewRegistry()
 	hooks := &fakePluginHooks{
-		requestTranslateBody: []byte(`{"generationConfig":{"thinkingConfig":{"thinkingLevel":"high"}}}`),
+		requestTranslateBody: []byte(`{"generation_config":{"thinking_level":"high"}}`),
 		requestTranslateOK:   true,
 	}
 	registry.SetPluginHooks(hooks)
 	out := registry.TranslateRequest(
 		FormatOpenAIResponse,
-		FormatClaude,
+		FormatInteractions,
 		"gemini-3.6-flash",
 		[]byte(`{"reasoning":{"summary":"auto"},"input":"hi"}`),
 		false,
 	)
-	if !ojson.GetBytesNoCopy(out, "generationConfig.thinkingConfig.includeThoughts").Bool() {
+	if ojson.GetBytesNoCopy(out, "generation_config.thinking_summaries").String() != "auto" {
 		t.Fatalf("plugin-translated request lost canonical summary: %s", out)
 	}
 }
@@ -191,7 +181,7 @@ func TestRegistryTranslateRequestPluginNormalizerOwnsSourceSummaryIntent(t *test
 		name       string
 		normalize  func([]byte) []byte
 		wantExists bool
-		want       bool
+		want       string
 	}{
 		{
 			name: "removed summary remains absent",
@@ -207,7 +197,7 @@ func TestRegistryTranslateRequestPluginNormalizerOwnsSourceSummaryIntent(t *test
 				return out
 			},
 			wantExists: true,
-			want:       false,
+			want:       "none",
 		},
 	}
 
@@ -216,24 +206,24 @@ func TestRegistryTranslateRequestPluginNormalizerOwnsSourceSummaryIntent(t *test
 			registry := NewRegistry()
 			hooks := &fakePluginHooks{
 				normalizeRequest:     test.normalize,
-				requestTranslateBody: []byte(`{"generationConfig":{"thinkingConfig":{"thinkingLevel":"high"}}}`),
+				requestTranslateBody: []byte(`{"generation_config":{"thinking_level":"high"}}`),
 				requestTranslateOK:   true,
 			}
 			registry.SetPluginHooks(hooks)
 
 			out := registry.TranslateRequest(
 				FormatOpenAIResponse,
-				FormatClaude,
+				FormatInteractions,
 				"gemini-3.6-flash",
 				[]byte(`{"reasoning":{"summary":"auto"},"input":"hi"}`),
 				false,
 			)
-			result := ojson.GetBytesNoCopy(out, "generationConfig.thinkingConfig.includeThoughts")
+			result := ojson.GetBytesNoCopy(out, "generation_config.thinking_summaries")
 			if result.Exists() != test.wantExists {
-				t.Fatalf("includeThoughts exists = %v, want %v; body=%s", result.Exists(), test.wantExists, out)
+				t.Fatalf("thinking_summaries exists = %v, want %v; body=%s", result.Exists(), test.wantExists, out)
 			}
-			if test.wantExists && result.Bool() != test.want {
-				t.Fatalf("includeThoughts = %v, want %v; body=%s", result.Bool(), test.want, out)
+			if test.wantExists && result.String() != test.want {
+				t.Fatalf("thinking_summaries = %v, want %v; body=%s", result.String(), test.want, out)
 			}
 		})
 	}
@@ -241,26 +231,26 @@ func TestRegistryTranslateRequestPluginNormalizerOwnsSourceSummaryIntent(t *test
 
 func TestRegistryTranslateRequestNormalizerOwnsFinalSummaryField(t *testing.T) {
 	registry := NewRegistry()
-	registry.Register(FormatOpenAIResponse, FormatClaude, func(_ string, _ []byte, _ bool) ([]byte, error) {
-		return []byte(`{"generationConfig":{"thinkingConfig":{"thinkingLevel":"high"}}}`), nil
+	registry.Register(FormatOpenAIResponse, FormatInteractions, func(_ string, _ []byte, _ bool) ([]byte, error) {
+		return []byte(`{"generation_config":{"thinking_level":"high"}}`), nil
 	}, ResponseTransform{})
 	hooks := &fakePluginHooks{normalizeRequest: func(body []byte) []byte {
-		if !ojson.GetBytesNoCopy(body, "generationConfig.thinkingConfig.includeThoughts").Bool() {
+		if ojson.GetBytesNoCopy(body, "generation_config.thinking_summaries").String() != "auto" {
 			t.Fatalf("normalizer did not receive canonical enabled summary: %s", body)
 		}
-		out, _ := ojson.DeleteBytes(body, "generationConfig.thinkingConfig.includeThoughts")
+		out, _ := ojson.DeleteBytes(body, "generation_config.thinking_summaries")
 		return out
 	}}
 	registry.SetPluginHooks(hooks)
 
 	out := registry.TranslateRequest(
 		FormatOpenAIResponse,
-		FormatClaude,
+		FormatInteractions,
 		"gemini-3.6-flash",
 		[]byte(`{"reasoning":{"effort":"high","summary":"auto"},"input":"hi"}`),
 		false,
 	)
-	if ojson.GetBytesNoCopy(out, "generationConfig.thinkingConfig.includeThoughts").Exists() {
+	if ojson.GetBytesNoCopy(out, "generation_config.thinking_summaries").Exists() {
 		t.Fatalf("summary post-processing overrode request normalizer: %s", out)
 	}
 }

@@ -273,7 +273,7 @@ func TestHostAffinityLookupCallback_Contract(t *testing.T) {
 		}
 	})
 
-	t.Run("extended namespaces resolve bare ID (task, clientreq, geminicache, execution)", func(t *testing.T) {
+	t.Run("extended namespaces resolve bare ID (task, clientreq, execution)", func(t *testing.T) {
 		testCases := []struct {
 			name   string
 			opts   cliproxyexecutor.Options
@@ -302,16 +302,6 @@ func TestHostAffinityLookupCallback_Contract(t *testing.T) {
 				auth:   authB,
 			},
 			{
-				name: "gemini cache payload",
-				opts: cliproxyexecutor.Options{
-					OriginalRequest: []byte(`{"cachedContent":"cached-gemini-3"}`),
-					Metadata:        make(map[string]any),
-				},
-				bareID: "cached-gemini-3",
-				qualID: "geminicache:cached-gemini-3",
-				auth:   authA,
-			},
-			{
 				name: "execution session metadata",
 				opts: cliproxyexecutor.Options{
 					Metadata: map[string]any{
@@ -320,7 +310,7 @@ func TestHostAffinityLookupCallback_Contract(t *testing.T) {
 				},
 				bareID: "exec-run-4",
 				qualID: "execution:exec-run-4",
-				auth:   authB,
+				auth:   authA,
 			},
 		}
 

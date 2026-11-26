@@ -44,7 +44,6 @@ type claudeCCHUpstreamKind uint8
 const (
 	claudeCCHUpstreamOther claudeCCHUpstreamKind = iota
 	claudeCCHUpstreamAnthropic
-	claudeCCHUpstreamVertex
 )
 
 func finalizeAnthropicMessagesBodyCCH(body []byte, fallbackBilling string) ([]byte, error) {
@@ -235,12 +234,11 @@ func stripClaudeCodeAttributionSystemDoc(doc *ojson.Doc) bool {
 //
 // Native gate, identical in Claude Code 2.1.220 through 2.1.234:
 //
-//	s = (provider === "firstParty" && isFirstPartyBaseURL()) || provider === "vertex"
-//	      ? " cch=00000;" : ""
+//	s = provider === "firstParty" && isFirstPartyBaseURL() ? " cch=00000;" : ""
 //
 // where isFirstPartyBaseURL() is true when ANTHROPIC_BASE_URL is unset or its
 // host is api.anthropic.com. Every other backend (bedrock, foundry, mantle,
-// anthropicAws, anthropicGoogleCloud, gateway, any custom base URL) sends the
+// anthropicAws, gateway, any custom base URL) sends the
 // billing header without cch.
 //
 // CPA maps that onto two authorities:
@@ -258,9 +256,6 @@ func stripClaudeCodeAttributionSystemDoc(doc *ojson.Doc) bool {
 // requires https and the default port, which native does not check.
 func claudeCCHSigningEnabled(apiKey string, kind claudeCCHUpstreamKind, cliFingerprint bool, origin string) bool {
 	if isClaudeOAuthToken(apiKey) {
-		return true
-	}
-	if kind == claudeCCHUpstreamVertex {
 		return true
 	}
 	if !cliFingerprint {

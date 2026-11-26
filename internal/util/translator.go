@@ -1700,38 +1700,6 @@ func cleanClaudeToolArgumentsByTranslatedSchema(argsJSON string, translatedSchem
 				}
 			}
 		}
-		// The Antigravity executor re-sanitizes tool schemas after translation (wrapping
-		// them so top-level objects become nested), which can inject placeholders that the
-		// translated request seen here does not yet contain. Re-running the same cleaning
-		// on the translated schema reproduces that final sent schema; if the placeholder
-		// appears there as required, it was injected post-translation. This simulation is
-		// only applied to closed objects (additionalProperties: false): open objects may
-		// legitimately carry the key as user data on routes without executor injection,
-		// and deleting based on a simulated injection would lose real arguments there.
-		if !injected && topLevel && originalInfo.forbidsDynamic {
-			for _, translated := range translatedSchemas {
-				// Mirror the executor's cleanNestedSchema wrapping: the schema is nested
-				// under a wrapper key before cleaning, so its top-level object counts as
-				// nested and can receive the "_" placeholder.
-				wrapped, errWrap := ojson.SetRaw("{}", "schema", translated.Raw)
-				if errWrap != nil {
-					continue
-				}
-				recleaned := ojson.Get(CleanJSONSchemaForAntigravity(wrapped), "schema")
-				if !recleaned.Exists() {
-					continue
-				}
-				recleanedInfo := analyzeClaudeObjectSchema(recleaned, recleaned)
-				if _, declaredRecleaned := recleanedInfo.properties[placeholder]; !declaredRecleaned {
-					continue
-				}
-				for _, req := range recleaned.Get("required").Array() {
-					if req.String() == placeholder {
-						injected = true
-					}
-				}
-			}
-		}
 		if injected {
 			placeholdersToDelete = append(placeholdersToDelete, joinPath(path, placeholder))
 		}

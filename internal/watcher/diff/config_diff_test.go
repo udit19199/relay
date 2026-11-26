@@ -78,9 +78,6 @@ func TestBuildConfigChangeDetails(t *testing.T) {
 	oldCfg := &config.Config{
 		Port:    8080,
 		AuthDir: "/tmp/auth-old",
-		GeminiKey: []config.GeminiKey{
-			{APIKey: "old", BaseURL: "http://old", ExcludedModels: []string{"old-model"}},
-		},
 		RemoteManagement: config.RemoteManagement{
 			AllowRemote:            false,
 			SecretKey:              "old",
@@ -106,9 +103,6 @@ func TestBuildConfigChangeDetails(t *testing.T) {
 		Port:    9090,
 		AuthDir: "/tmp/auth-new",
 		Codex:   config.CodexConfig{DisableCodexCloaking: true},
-		GeminiKey: []config.GeminiKey{
-			{APIKey: "old", BaseURL: "http://old", ExcludedModels: []string{"old-model", "extra"}},
-		},
 		RemoteManagement: config.RemoteManagement{
 			AllowRemote:            true,
 			SecretKey:              "new",
@@ -141,7 +135,6 @@ func TestBuildConfigChangeDetails(t *testing.T) {
 
 	expectContains(t, details, "port: 8080 -> 9090")
 	expectContains(t, details, "auth-dir: /tmp/auth-old -> /tmp/auth-new")
-	expectContains(t, details, "gemini[0].excluded-models: updated (1 -> 2 entries)")
 	expectContains(t, details, "remote-management.allow-remote: false -> true")
 	expectContains(t, details, "remote-management.disable-auto-update-panel: false -> true")
 	expectContains(t, details, "remote-management.secret-key: updated")
@@ -200,66 +193,6 @@ func TestBuildConfigChangeDetails_CodexLiveMediaRelay(t *testing.T) {
 			t.Fatalf("config change details leaked %q: %s", secret, joined)
 		}
 	}
-}
-
-func TestBuildConfigChangeDetails_GeminiVertexHeaders(t *testing.T) {
-	oldCfg := &config.Config{
-		GeminiKey: []config.GeminiKey{
-			{APIKey: "g1", Headers: map[string]string{"H": "1"}, ExcludedModels: []string{"a"}},
-		},
-		VertexCompatAPIKey: []config.VertexCompatKey{
-			{APIKey: "v1", BaseURL: "http://v-old", Models: []config.VertexCompatModel{{Name: "m1"}}},
-		},
-	}
-	newCfg := &config.Config{
-		GeminiKey: []config.GeminiKey{
-			{APIKey: "g1", Headers: map[string]string{"H": "2"}, ExcludedModels: []string{"a", "b"}},
-		},
-		VertexCompatAPIKey: []config.VertexCompatKey{
-			{APIKey: "v1", BaseURL: "http://v-new", Models: []config.VertexCompatModel{{Name: "m1"}, {Name: "m2"}}},
-		},
-	}
-
-	details := BuildConfigChangeDetails(oldCfg, newCfg)
-	expectContains(t, details, "gemini[0].headers: updated")
-	expectContains(t, details, "gemini[0].excluded-models: updated (1 -> 2 entries)")
-}
-
-func TestBuildConfigChangeDetails_ModelPrefixes(t *testing.T) {
-	oldCfg := &config.Config{
-		GeminiKey: []config.GeminiKey{
-			{APIKey: "g1", Prefix: "old-g", BaseURL: "http://g", ProxyURL: "http://gp"},
-		},
-		ClaudeKey: []config.ClaudeKey{
-			{APIKey: "c1", Prefix: "old-c", BaseURL: "http://c", ProxyURL: "http://cp"},
-		},
-		CodexKey: []config.CodexKey{
-			{APIKey: "x1", Prefix: "old-x", BaseURL: "http://x", ProxyURL: "http://xp"},
-		},
-		VertexCompatAPIKey: []config.VertexCompatKey{
-			{APIKey: "v1", Prefix: "old-v", BaseURL: "http://v", ProxyURL: "http://vp"},
-		},
-	}
-	newCfg := &config.Config{
-		GeminiKey: []config.GeminiKey{
-			{APIKey: "g1", Prefix: "new-g", BaseURL: "http://g", ProxyURL: "http://gp"},
-		},
-		ClaudeKey: []config.ClaudeKey{
-			{APIKey: "c1", Prefix: "new-c", BaseURL: "http://c", ProxyURL: "http://cp"},
-		},
-		CodexKey: []config.CodexKey{
-			{APIKey: "x1", Prefix: "new-x", BaseURL: "http://x", ProxyURL: "http://xp"},
-		},
-		VertexCompatAPIKey: []config.VertexCompatKey{
-			{APIKey: "v1", Prefix: "new-v", BaseURL: "http://v", ProxyURL: "http://vp"},
-		},
-	}
-
-	changes := BuildConfigChangeDetails(oldCfg, newCfg)
-	expectContains(t, changes, "gemini[0].prefix: old-g -> new-g")
-	expectContains(t, changes, "claude[0].prefix: old-c -> new-c")
-	expectContains(t, changes, "codex[0].prefix: old-x -> new-x")
-	expectContains(t, changes, "vertex[0].prefix: old-v -> new-v")
 }
 
 func TestBuildConfigChangeDetails_CodexAlphaSearch(t *testing.T) {
@@ -383,7 +316,6 @@ func TestBuildConfigChangeDetails_SecretsAndCounts(t *testing.T) {
 
 func TestBuildConfigChangeDetails_RedactsEndpointURLs(t *testing.T) {
 	oldCfg := &config.Config{
-		GeminiKey: []config.GeminiKey{{BaseURL: "https://old-user:old-pass@old.example/v1?token=old-token"}},
 		RemoteManagement: config.RemoteManagement{
 			PanelGitHubRepository: "https://old-user:old-pass@old-panel.example/private?token=old-token",
 		},
@@ -392,7 +324,6 @@ func TestBuildConfigChangeDetails_RedactsEndpointURLs(t *testing.T) {
 		}},
 	}
 	newCfg := &config.Config{
-		GeminiKey: []config.GeminiKey{{BaseURL: "https://new-user:new-pass@new.example/v1?token=new-token"}},
 		RemoteManagement: config.RemoteManagement{
 			PanelGitHubRepository: "https://new-user:new-pass@new-panel.example/private?token=new-token",
 		},
@@ -402,7 +333,6 @@ func TestBuildConfigChangeDetails_RedactsEndpointURLs(t *testing.T) {
 	}
 
 	details := BuildConfigChangeDetails(oldCfg, newCfg)
-	expectContains(t, details, "gemini[0].base-url: https://old.example -> https://new.example")
 	expectContains(t, details, "remote-management.panel-github-repository: https://old-panel.example -> https://new-panel.example")
 	joined := strings.Join(details, "\n")
 	for _, sensitive := range []string{"old-user", "new-user", "old-pass", "new-pass", "old-token", "new-token", "/private", "/v1"} {
@@ -413,8 +343,6 @@ func TestBuildConfigChangeDetails_RedactsEndpointURLs(t *testing.T) {
 }
 
 func TestBuildConfigChangeDetails_FlagsAndKeys(t *testing.T) {
-	oldPoolEnabled := false
-	newPoolEnabled := true
 	oldCfg := &config.Config{
 		Port:                          1000,
 		AuthDir:                       "/old",
@@ -428,17 +356,10 @@ func TestBuildConfigChangeDetails_FlagsAndKeys(t *testing.T) {
 		MaxRetryCredentials:           1,
 		MaxRetryInterval:              1,
 		WebsocketAuth:                 false,
-		QuotaExceeded:                 config.QuotaExceeded{SwitchProject: false, SwitchPreviewModel: false, AntigravityCredits: false},
-		Antigravity: config.AntigravityConfig{
-			SensitiveWords: []string{"old-word"},
-			ConnectionPool: config.AntigravityConnectionPoolConfig{
-				Enabled:         &oldPoolEnabled,
-				IdleConnTimeout: "30s",
-			},
-		},
-		ClaudeKey:        []config.ClaudeKey{{APIKey: "c1"}},
-		CodexKey:         []config.CodexKey{{APIKey: "x1"}},
-		RemoteManagement: config.RemoteManagement{DisableControlPanel: false, PanelGitHubRepository: "old/repo", SecretKey: "keep"},
+		QuotaExceeded:                 config.QuotaExceeded{SwitchProject: false, SwitchPreviewModel: false},
+		ClaudeKey:                     []config.ClaudeKey{{APIKey: "c1"}},
+		CodexKey:                      []config.CodexKey{{APIKey: "x1"}},
+		RemoteManagement:              config.RemoteManagement{DisableControlPanel: false, PanelGitHubRepository: "old/repo", SecretKey: "keep"},
 		SDKConfig: sdkconfig.SDKConfig{
 			RequestLog:                 false,
 			ProxyURL:                   "http://old-proxy",
@@ -460,16 +381,9 @@ func TestBuildConfigChangeDetails_FlagsAndKeys(t *testing.T) {
 		MaxRetryCredentials:           3,
 		MaxRetryInterval:              3,
 		WebsocketAuth:                 true,
-		QuotaExceeded:                 config.QuotaExceeded{SwitchProject: true, SwitchPreviewModel: true, AntigravityCredits: true},
-		Antigravity: config.AntigravityConfig{
-			SensitiveWords: []string{"new-word-1", "new-word-2"},
-			ConnectionPool: config.AntigravityConnectionPoolConfig{
-				Enabled:         &newPoolEnabled,
-				IdleConnTimeout: "10s",
-			},
-		},
-		XAI:    config.XAIConfig{InjectXSearch: true},
-		Claude: config.ClaudeConfig{ToolSearch: true},
+		QuotaExceeded:                 config.QuotaExceeded{SwitchProject: true, SwitchPreviewModel: true},
+		XAI:                           config.XAIConfig{InjectXSearch: true},
+		Claude:                        config.ClaudeConfig{ToolSearch: true},
 		ClaudeKey: []config.ClaudeKey{
 			{APIKey: "c1", BaseURL: "http://new", ProxyURL: "http://p", Headers: map[string]string{"H": "1"}, ExcludedModels: []string{"a"}},
 			{APIKey: "c2"},
@@ -516,10 +430,6 @@ func TestBuildConfigChangeDetails_FlagsAndKeys(t *testing.T) {
 	expectContains(t, details, "nonstream-keepalive-interval: 0 -> 5")
 	expectContains(t, details, "quota-exceeded.switch-project: false -> true")
 	expectContains(t, details, "quota-exceeded.switch-preview-model: false -> true")
-	expectContains(t, details, "quota-exceeded.antigravity-credits: false -> true")
-	expectContains(t, details, "antigravity.sensitive-words: 1 -> 2")
-	expectContains(t, details, "antigravity.connection-pool.enabled: false -> true")
-	expectContains(t, details, `antigravity.connection-pool.idle-conn-timeout: "30s" -> "10s"`)
 	expectContains(t, details, "xai.inject-x-search: false -> true")
 	expectContains(t, details, "claude.tool-search: false -> true")
 	expectContains(t, details, "api-keys count: 1 -> 2")
@@ -545,18 +455,12 @@ func TestBuildConfigChangeDetails_AllBranches(t *testing.T) {
 		MaxRetryCredentials:           1,
 		MaxRetryInterval:              1,
 		WebsocketAuth:                 false,
-		QuotaExceeded:                 config.QuotaExceeded{SwitchProject: false, SwitchPreviewModel: false, AntigravityCredits: false},
-		GeminiKey: []config.GeminiKey{
-			{APIKey: "g-old", BaseURL: "http://g-old", ProxyURL: "http://gp-old", Headers: map[string]string{"A": "1"}},
-		},
+		QuotaExceeded:                 config.QuotaExceeded{SwitchProject: false, SwitchPreviewModel: false},
 		ClaudeKey: []config.ClaudeKey{
 			{APIKey: "c-old", BaseURL: "http://c-old", ProxyURL: "http://cp-old", Headers: map[string]string{"H": "1"}, ExcludedModels: []string{"x"}},
 		},
 		CodexKey: []config.CodexKey{
 			{APIKey: "x-old", BaseURL: "http://x-old", ProxyURL: "http://xp-old", Headers: map[string]string{"H": "1"}, ExcludedModels: []string{"x"}},
-		},
-		VertexCompatAPIKey: []config.VertexCompatKey{
-			{APIKey: "v-old", BaseURL: "http://v-old", ProxyURL: "http://vp-old", Headers: map[string]string{"H": "1"}, Models: []config.VertexCompatModel{{Name: "m1"}}},
 		},
 		RemoteManagement: config.RemoteManagement{
 			AllowRemote:            false,
@@ -594,18 +498,12 @@ func TestBuildConfigChangeDetails_AllBranches(t *testing.T) {
 		MaxRetryCredentials:           3,
 		MaxRetryInterval:              3,
 		WebsocketAuth:                 true,
-		QuotaExceeded:                 config.QuotaExceeded{SwitchProject: true, SwitchPreviewModel: true, AntigravityCredits: true},
-		GeminiKey: []config.GeminiKey{
-			{APIKey: "g-new", BaseURL: "http://g-new", ProxyURL: "http://gp-new", Headers: map[string]string{"A": "2"}, ExcludedModels: []string{"x", "y"}},
-		},
+		QuotaExceeded:                 config.QuotaExceeded{SwitchProject: true, SwitchPreviewModel: true},
 		ClaudeKey: []config.ClaudeKey{
 			{APIKey: "c-new", BaseURL: "http://c-new", ProxyURL: "http://cp-new", Headers: map[string]string{"H": "2"}, ExcludedModels: []string{"x", "y"}},
 		},
 		CodexKey: []config.CodexKey{
 			{APIKey: "x-new", BaseURL: "http://x-new", ProxyURL: "http://xp-new", Headers: map[string]string{"H": "2"}, ExcludedModels: []string{"x", "y"}},
-		},
-		VertexCompatAPIKey: []config.VertexCompatKey{
-			{APIKey: "v-new", BaseURL: "http://v-new", ProxyURL: "http://vp-new", Headers: map[string]string{"H": "2"}, Models: []config.VertexCompatModel{{Name: "m1"}, {Name: "m2"}}},
 		},
 		RemoteManagement: config.RemoteManagement{
 			AllowRemote:            true,
@@ -654,13 +552,7 @@ func TestBuildConfigChangeDetails_AllBranches(t *testing.T) {
 	expectContains(t, changes, "ws-auth: false -> true")
 	expectContains(t, changes, "quota-exceeded.switch-project: false -> true")
 	expectContains(t, changes, "quota-exceeded.switch-preview-model: false -> true")
-	expectContains(t, changes, "quota-exceeded.antigravity-credits: false -> true")
 	expectContains(t, changes, "api-keys: values updated (count unchanged, redacted)")
-	expectContains(t, changes, "gemini[0].base-url: http://g-old -> http://g-new")
-	expectContains(t, changes, "gemini[0].proxy-url: http://gp-old -> http://gp-new")
-	expectContains(t, changes, "gemini[0].api-key: updated")
-	expectContains(t, changes, "gemini[0].headers: updated")
-	expectContains(t, changes, "gemini[0].excluded-models: updated (0 -> 2 entries)")
 	expectContains(t, changes, "claude[0].base-url: http://c-old -> http://c-new")
 	expectContains(t, changes, "claude[0].proxy-url: http://cp-old -> http://cp-new")
 	expectContains(t, changes, "claude[0].api-key: updated")
@@ -671,11 +563,6 @@ func TestBuildConfigChangeDetails_AllBranches(t *testing.T) {
 	expectContains(t, changes, "codex[0].api-key: updated")
 	expectContains(t, changes, "codex[0].headers: updated")
 	expectContains(t, changes, "codex[0].excluded-models: updated (1 -> 2 entries)")
-	expectContains(t, changes, "vertex[0].base-url: http://v-old -> http://v-new")
-	expectContains(t, changes, "vertex[0].proxy-url: http://vp-old -> http://vp-new")
-	expectContains(t, changes, "vertex[0].api-key: updated")
-	expectContains(t, changes, "vertex[0].models: updated (1 -> 2 entries)")
-	expectContains(t, changes, "vertex[0].headers: updated")
 	expectContains(t, changes, "oauth-excluded-models[p1]: updated (1 -> 2 entries)")
 	expectContains(t, changes, "oauth-excluded-models[p2]: added (1 entries)")
 	expectContains(t, changes, "remote-management.allow-remote: false -> true")
@@ -729,21 +616,15 @@ func TestBuildConfigChangeDetails_RemoteManagementSecretUpdated(t *testing.T) {
 func TestBuildConfigChangeDetails_CountBranches(t *testing.T) {
 	oldCfg := &config.Config{}
 	newCfg := &config.Config{
-		GeminiKey: []config.GeminiKey{{APIKey: "g"}},
 		ClaudeKey: []config.ClaudeKey{{APIKey: "c"}},
 		CodexKey:  []config.CodexKey{{APIKey: "c"}},
 		XAIKey:    []config.XAIKey{{APIKey: "x"}},
-		VertexCompatAPIKey: []config.VertexCompatKey{
-			{APIKey: "v", BaseURL: "http://v"},
-		},
 	}
 
 	changes := BuildConfigChangeDetails(oldCfg, newCfg)
-	expectContains(t, changes, "gemini-api-key count: 0 -> 1")
 	expectContains(t, changes, "claude-api-key count: 0 -> 1")
 	expectContains(t, changes, "codex-api-key count: 0 -> 1")
 	expectContains(t, changes, "xai-api-key count: 0 -> 1")
-	expectContains(t, changes, "vertex-api-key count: 0 -> 1")
 }
 
 func TestTrimStrings(t *testing.T) {

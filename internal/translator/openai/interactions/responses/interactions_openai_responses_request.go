@@ -37,12 +37,11 @@ func convertOpenAIResponsesRequestToInteractions(modelName string, inputRawJSON 
 	if agentConfig := root.Get("agent_config"); agentConfig.Exists() {
 		_ = outDoc.SetRaw("agent_config", agentConfig.Raw)
 	}
-	forAntigravity := isAntigravityModel(model)
-	forDevin := isDevinModel(model) || !forAntigravity
+	forDevin := true
 	if input := root.Get("input"); input.Exists() {
-		setResponsesInputOnInteractionsDoc(outDoc, input, forAntigravity, &drops)
+		setResponsesInputOnInteractionsDoc(outDoc, input, &drops)
 	}
-	appendResponsesToolsToInteractionsDoc(outDoc, root, forAntigravity, forDevin)
+	appendResponsesToolsToInteractionsDoc(outDoc, root, forDevin)
 	if toolChoice := root.Get("tool_choice"); toolChoice.Exists() {
 		if toolChoice.IsObject() {
 			tcRaw := []byte(toolChoice.Raw)
@@ -53,9 +52,6 @@ func convertOpenAIResponsesRequestToInteractions(modelName string, inputRawJSON 
 			}
 			if forDevin && (translatorcommon.IsDevinCodexAppAutomationUpdate(ns, fnName) || translatorcommon.IsDevinCodexAppAutomationUpdate("", fnName)) {
 				tcRaw = nil
-			}
-			if forAntigravity && fnName != "" {
-				fnName = translatorcommon.AntigravityToolNameToUpstream(fnName)
 			}
 			if fnName != "" && tcRaw != nil {
 				if toolChoice.Get("function.name").Exists() {
@@ -83,14 +79,6 @@ func convertOpenAIResponsesRequestToInteractions(modelName string, inputRawJSON 
 		_ = outDoc.SetRaw("response_format", format.Raw)
 	} else if format := root.Get("text.format"); format.Exists() {
 		_ = outDoc.SetRaw("response_format", format.Raw)
-	}
-	if isAntigravityModel(model) {
-		if maxOutputTokens := firstExisting(root.Get("max_output_tokens"), root.Get("max_tokens"), root.Get("max_completion_tokens")); maxOutputTokens.Exists() && !root.Get("agent_config.max_total_tokens").Exists() {
-			_ = outDoc.Set("agent_config.max_total_tokens", maxOutputTokens.Int())
-		}
-		for _, knob := range []string{"temperature", "top_p", "top_k", "stop_sequences", "max_output_tokens", "presence_penalty", "frequency_penalty", "candidate_count"} {
-			_ = outDoc.Delete("generation_config." + knob)
-		}
 	} else {
 		if maxOutputTokens := firstExisting(root.Get("max_output_tokens"), root.Get("max_tokens"), root.Get("max_completion_tokens")); maxOutputTokens.Exists() {
 			_ = outDoc.Set("generation_config.max_output_tokens", maxOutputTokens.Int())
@@ -134,11 +122,10 @@ func ConvertInteractionsRequestToOpenAIResponses(modelName string, inputRawJSON 
 	if agentConfig := root.Get("agent_config"); agentConfig.Exists() {
 		_ = outDoc.SetRaw("agent_config", agentConfig.Raw)
 	}
-	forAntigravity := isAntigravityModel(model)
 	if input := root.Get("input"); input.Exists() {
-		setInteractionsInputOnResponsesDoc(outDoc, input, forAntigravity)
+		setInteractionsInputOnResponsesDoc(outDoc, input)
 	}
-	appendInteractionsToolsToResponsesDoc(outDoc, root.Get("tools"), forAntigravity)
+	appendInteractionsToolsToResponsesDoc(outDoc, root.Get("tools"))
 	if toolChoice := root.Get("generation_config.tool_choice"); toolChoice.Exists() {
 		_ = outDoc.SetRaw("tool_choice", toolChoice.Raw)
 	} else if toolChoice := root.Get("tool_choice"); toolChoice.Exists() {
@@ -237,20 +224,20 @@ func interactionsThinkingEffort(root ojson.Result) string {
 	return ""
 }
 
-func setResponsesInputOnInteractionsDoc(outDoc *ojson.Doc, input ojson.Result, forAntigravity bool, drops *translatorcommon.UserTurnDrops) {
+func setResponsesInputOnInteractionsDoc(outDoc *ojson.Doc, input ojson.Result, drops *translatorcommon.UserTurnDrops) {
 	functionNamesByCallID := make(map[string]string)
 	items := make([][]byte, 0)
 	if input.Type == ojson.String {
 		items = append(items, interactionsTextStep("user_input", input.String()))
 	} else if input.IsArray() {
 		input.ForEach(func(_, item ojson.Result) bool {
-			if converted := responsesInputItemToInteractions(item, functionNamesByCallID, forAntigravity, drops); converted != nil {
+			if converted := responsesInputItemToInteractions(item, functionNamesByCallID, drops); converted != nil {
 				items = append(items, converted)
 			}
 			return true
 		})
 	} else if input.IsObject() {
-		if converted := responsesInputItemToInteractions(input, functionNamesByCallID, forAntigravity, drops); converted != nil {
+		if converted := responsesInputItemToInteractions(input, functionNamesByCallID, drops); converted != nil {
 			items = append(items, converted)
 		}
 	}
@@ -269,7 +256,7 @@ func responsesUserTurnDrops(role string, drops *translatorcommon.UserTurnDrops) 
 	return nil
 }
 
-func responsesInputItemToInteractions(item ojson.Result, functionNamesByCallID map[string]string, forAntigravity bool, drops *translatorcommon.UserTurnDrops) []byte {
+func responsesInputItemToInteractions(item ojson.Result, functionNamesByCallID map[string]string, drops *translatorcommon.UserTurnDrops) []byte {
 	switch item.Get("type").String() {
 	case "message":
 		stepType := "user_input"
@@ -292,7 +279,7 @@ func responsesInputItemToInteractions(item ojson.Result, functionNamesByCallID m
 		if callID != "" && name != "" {
 			functionNamesByCallID[callID] = name
 		}
-		return responsesFunctionCallToInteractions(item, forAntigravity)
+		return responsesFunctionCallToInteractions(item)
 	case "custom_tool_call":
 		callID := util.FirstNonEmpty(item.Get("call_id").String(), item.Get("id").String())
 		name := item.Get("name").String()
@@ -302,9 +289,9 @@ func responsesInputItemToInteractions(item ojson.Result, functionNamesByCallID m
 		if callID != "" && name != "" {
 			functionNamesByCallID[callID] = name
 		}
-		return responsesCustomToolCallToInteractions(item, forAntigravity)
+		return responsesCustomToolCallToInteractions(item)
 	case "function_call_output", "custom_tool_call_output":
-		return responsesFunctionOutputToInteractions(item, functionNamesByCallID, forAntigravity)
+		return responsesFunctionOutputToInteractions(item, functionNamesByCallID)
 	case "reasoning":
 		return responsesReasoningToInteractions(item)
 	case "input_text", "output_text", "text":
@@ -485,14 +472,11 @@ func responsesImagePartToInteractions(part ojson.Result) []byte {
 	return outDoc.Bytes()
 }
 
-func responsesFunctionCallToInteractions(item ojson.Result, forAntigravity bool) []byte {
+func responsesFunctionCallToInteractions(item ojson.Result) []byte {
 	outDoc := ojson.NewDocString(`{"type":"function_call","name":"","arguments":{}}`)
 	name := item.Get("name").String()
 	if ns := item.Get("namespace").String(); ns != "" && name != "" {
 		name = util.QualifyResponsesNamespaceToolName(ns, name)
-	}
-	if forAntigravity {
-		name = translatorcommon.AntigravityToolNameToUpstream(name)
 	}
 	_ = outDoc.Set("name", name)
 	if callID := util.FirstNonEmpty(item.Get("call_id").String(), item.Get("id").String()); callID != "" {
@@ -502,14 +486,11 @@ func responsesFunctionCallToInteractions(item ojson.Result, forAntigravity bool)
 	return outDoc.Bytes()
 }
 
-func responsesCustomToolCallToInteractions(item ojson.Result, forAntigravity bool) []byte {
+func responsesCustomToolCallToInteractions(item ojson.Result) []byte {
 	outDoc := ojson.NewDocString(`{"type":"function_call","name":"","arguments":{}}`)
 	name := item.Get("name").String()
 	if ns := item.Get("namespace").String(); ns != "" && name != "" {
 		name = util.QualifyResponsesNamespaceToolName(ns, name)
-	}
-	if forAntigravity {
-		name = translatorcommon.AntigravityToolNameToUpstream(name)
 	}
 	_ = outDoc.Set("name", name)
 	if callID := util.FirstNonEmpty(item.Get("call_id").String(), item.Get("id").String()); callID != "" {
@@ -523,7 +504,7 @@ func responsesCustomToolCallToInteractions(item ojson.Result, forAntigravity boo
 	return outDoc.Bytes()
 }
 
-func responsesFunctionOutputToInteractions(item ojson.Result, functionNamesByCallID map[string]string, forAntigravity bool) []byte {
+func responsesFunctionOutputToInteractions(item ojson.Result, functionNamesByCallID map[string]string) []byte {
 	outDoc := ojson.NewDocString(`{"type":"function_result","name":"","result":{}}`)
 	callID := util.FirstNonEmpty(item.Get("call_id").String(), item.Get("id").String())
 	name := item.Get("name").String()
@@ -534,9 +515,6 @@ func responsesFunctionOutputToInteractions(item ojson.Result, functionNamesByCal
 		name = functionNamesByCallID[callID]
 	}
 	if name != "" {
-		if forAntigravity {
-			name = translatorcommon.AntigravityToolNameToUpstream(name)
-		}
 		_ = outDoc.Set("name", name)
 	}
 	if callID != "" {
@@ -579,7 +557,7 @@ func interactionsTextStep(stepType, text string) []byte {
 	return stepDoc.Bytes()
 }
 
-func appendResponsesToolsToInteractionsDoc(outDoc *ojson.Doc, root ojson.Result, forAntigravity bool, forDevin bool) {
+func appendResponsesToolsToInteractionsDoc(outDoc *ojson.Doc, root ojson.Result, forDevin bool) {
 	if !root.Exists() {
 		return
 	}
@@ -610,9 +588,6 @@ func appendResponsesToolsToInteractionsDoc(outDoc *ojson.Doc, root ojson.Result,
 		}
 
 		name := descriptor.Name
-		if forAntigravity {
-			name = translatorcommon.AntigravityToolNameToUpstream(name)
-		}
 
 		itemDoc := ojson.NewDocString(`{"type":"function","name":""}`)
 		_ = itemDoc.Set("name", name)
@@ -649,19 +624,19 @@ func appendResponsesToolsToInteractionsDoc(outDoc *ojson.Doc, root ojson.Result,
 	}
 }
 
-func setInteractionsInputOnResponsesDoc(outDoc *ojson.Doc, input ojson.Result, forAntigravity bool) {
+func setInteractionsInputOnResponsesDoc(outDoc *ojson.Doc, input ojson.Result) {
 	items := make([][]byte, 0)
 	if input.Type == ojson.String {
 		items = append(items, interactionsTextMessage(input.String()))
 	} else if input.IsArray() {
 		input.ForEach(func(_, item ojson.Result) bool {
-			if converted := interactionsInputItemToResponses(item, forAntigravity); converted != nil {
+			if converted := interactionsInputItemToResponses(item); converted != nil {
 				items = append(items, converted)
 			}
 			return true
 		})
 	} else if input.IsObject() {
-		if converted := interactionsInputItemToResponses(input, forAntigravity); converted != nil {
+		if converted := interactionsInputItemToResponses(input); converted != nil {
 			items = append(items, converted)
 		}
 	}
@@ -676,7 +651,7 @@ func interactionsTextMessage(text string) []byte {
 	return item
 }
 
-func interactionsInputItemToResponses(item ojson.Result, forAntigravity bool) []byte {
+func interactionsInputItemToResponses(item ojson.Result) []byte {
 	switch item.Get("type").String() {
 	case "user_input":
 		return interactionsMessageToResponses(item, "user")
@@ -685,9 +660,9 @@ func interactionsInputItemToResponses(item ojson.Result, forAntigravity bool) []
 	case "thought":
 		return interactionsThoughtToResponses(item)
 	case "function_call":
-		return interactionsFunctionCallToResponses(item, forAntigravity)
+		return interactionsFunctionCallToResponses(item)
 	case "function_result":
-		return interactionsFunctionResultToResponses(item, forAntigravity)
+		return interactionsFunctionResultToResponses(item)
 	default:
 		if item.Type == ojson.String {
 			return interactionsTextMessage(item.String())
@@ -784,14 +759,11 @@ func interactionsContentPartToResponses(part ojson.Result, role string) ([]byte,
 	return nil, false
 }
 
-func interactionsFunctionCallToResponsesWithIdentity(item ojson.Result, forAntigravity bool, toolIdentityMap map[string]util.ResponsesToolIdentity) []byte {
+func interactionsFunctionCallToResponsesWithIdentity(item ojson.Result, toolIdentityMap map[string]util.ResponsesToolIdentity) []byte {
 	rawName := item.Get("name").String()
 	name := rawName
 	var namespace string
 	var isCustom bool
-	if forAntigravity {
-		name = translatorcommon.AntigravityUpstreamToolNameToClient(name)
-	}
 	if toolIdentityMap != nil {
 		if identity, ok := toolIdentityMap[rawName]; ok {
 			name = identity.Name
@@ -831,19 +803,16 @@ func interactionsFunctionCallToResponsesWithIdentity(item ojson.Result, forAntig
 	return outDoc.Bytes()
 }
 
-func interactionsFunctionCallToResponses(item ojson.Result, forAntigravity bool) []byte {
-	return interactionsFunctionCallToResponsesWithIdentity(item, forAntigravity, nil)
+func interactionsFunctionCallToResponses(item ojson.Result) []byte {
+	return interactionsFunctionCallToResponsesWithIdentity(item, nil)
 }
 
-func interactionsFunctionResultToResponses(item ojson.Result, forAntigravity bool) []byte {
+func interactionsFunctionResultToResponses(item ojson.Result) []byte {
 	outDoc := ojson.NewDocString(`{"type":"function_call_output","call_id":"","output":""}`)
 	if callID := util.FirstNonEmpty(item.Get("call_id").String(), item.Get("id").String()); callID != "" {
 		_ = outDoc.Set("call_id", callID)
 	}
 	if name := item.Get("name").String(); name != "" {
-		if forAntigravity {
-			name = translatorcommon.AntigravityUpstreamToolNameToClient(name)
-		}
 		_ = outDoc.Set("name", name)
 	}
 	result := item.Get("result")
@@ -854,18 +823,18 @@ func interactionsFunctionResultToResponses(item ojson.Result, forAntigravity boo
 	return outDoc.Bytes()
 }
 
-func appendInteractionsToolsToResponsesDoc(outDoc *ojson.Doc, tools ojson.Result, forAntigravity bool) {
+func appendInteractionsToolsToResponsesDoc(outDoc *ojson.Doc, tools ojson.Result) {
 	if !tools.Exists() || !tools.IsArray() {
 		return
 	}
 	var toolItems [][]byte
 	tools.ForEach(func(_, tool ojson.Result) bool {
-		if converted, ok := responsesToolFromInteractionsTool(tool, forAntigravity); ok {
+		if converted, ok := responsesToolFromInteractionsTool(tool); ok {
 			toolItems = append(toolItems, converted)
 		}
 		if decls := tool.Get("function_declarations"); decls.Exists() && decls.IsArray() {
 			decls.ForEach(func(_, decl ojson.Result) bool {
-				if converted, ok := responsesToolFromInteractionsTool(decl, forAntigravity); ok {
+				if converted, ok := responsesToolFromInteractionsTool(decl); ok {
 					toolItems = append(toolItems, converted)
 				}
 				return true
@@ -878,13 +847,10 @@ func appendInteractionsToolsToResponsesDoc(outDoc *ojson.Doc, tools ojson.Result
 	}
 }
 
-func responsesToolFromInteractionsTool(tool ojson.Result, forAntigravity bool) ([]byte, bool) {
+func responsesToolFromInteractionsTool(tool ojson.Result) ([]byte, bool) {
 	name := util.FirstNonEmpty(tool.Get("name").String(), tool.Get("function.name").String())
 	if name == "" {
 		return nil, false
-	}
-	if forAntigravity {
-		name = translatorcommon.AntigravityUpstreamToolNameToClient(name)
 	}
 	outDoc := ojson.NewDocString(`{"type":"function","name":""}`)
 	_ = outDoc.Set("name", name)
@@ -985,10 +951,6 @@ func copyOptionalRawDoc(outDoc *ojson.Doc, path string, value ojson.Result) {
 	if value.Exists() {
 		_ = outDoc.SetRaw(path, value.Raw)
 	}
-}
-
-func isAntigravityModel(model string) bool {
-	return strings.Contains(strings.ToLower(model), "antigravity")
 }
 
 func isDevinModel(model string) bool {

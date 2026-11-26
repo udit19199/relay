@@ -243,14 +243,6 @@ func compileAPIKeyModelCapabilitiesForAuth(cfg *internalconfig.Config, auth *Aut
 	}
 	out := make(map[string][]apiKeyModelCapabilityRoute)
 	switch strings.ToLower(strings.TrimSpace(auth.Provider)) {
-	case "gemini":
-		if entry := resolveGeminiAPIKeyConfig(cfg, auth); entry != nil {
-			compileConfiguredModelCapabilities(out, entry.Models, "gemini")
-		}
-	case "gemini-interactions":
-		if entry := resolveInteractionsAPIKeyConfig(cfg, auth); entry != nil {
-			compileConfiguredModelCapabilities(out, entry.Models, "interactions")
-		}
 	case "claude":
 		if entry := resolveClaudeAPIKeyConfig(cfg, auth); entry != nil {
 			compileConfiguredModelCapabilities(out, entry.Models, "claude")
@@ -268,22 +260,6 @@ func compileAPIKeyModelCapabilitiesForAuth(cfg *internalconfig.Config, auth *Aut
 	case "xai":
 		if entry := resolveXAIAPIKeyConfig(cfg, auth); entry != nil {
 			compileConfiguredModelCapabilities(out, entry.Models, "xai")
-		}
-	case "vertex":
-		if entry := resolveVertexAPIKeyConfig(cfg, auth); entry != nil {
-			for _, configured := range entry.Models {
-				support := configured.Thinking
-				openAPI := isVertexOpenAPIConfigModel(configured.Name)
-				if configured.OpenAPI != nil {
-					openAPI = *configured.OpenAPI
-				} else if entry.OpenAPI != nil {
-					openAPI = *entry.OpenAPI
-				}
-				if support == nil && openAPI && modelconfig.ResolveModelInfo(configured.Name, "gemini", nil).Thinking == nil {
-					support = &registry.ThinkingSupport{Levels: []string{"low", "medium", "high"}}
-				}
-				addConfiguredModelCapability(out, configured.Name, configured.Alias, "gemini", support, false)
-			}
 		}
 	case "meta":
 		if entry := resolveMetaAPIKeyConfig(cfg, auth); entry != nil {
@@ -365,20 +341,4 @@ func addConfiguredModelCapability(out map[string][]apiKeyModelCapabilityRoute, n
 		}
 	}
 	return modelInfo
-}
-
-// isVertexOpenAPIConfigModel recognizes partner models without depending on executors.
-func isVertexOpenAPIConfigModel(model string) bool {
-	base := strings.TrimSpace(thinking.ParseSuffix(model).ModelName)
-	if strings.HasPrefix(strings.ToLower(base), "publishers/") {
-		publisher, tail, ok := strings.Cut(base[len("publishers/"):], "/")
-		if !ok || !strings.HasPrefix(strings.ToLower(tail), "models/") {
-			return false
-		}
-		base = strings.TrimSpace(publisher) + "/" + strings.TrimSpace(tail[len("models/"):])
-	}
-	publisher, name, ok := strings.Cut(base, "/")
-	publisher, name = strings.TrimSpace(publisher), strings.TrimSpace(name)
-	return ok && publisher != "" && name != "" && !strings.Contains(name, "/") &&
-		!strings.EqualFold(publisher, "google") && !strings.EqualFold(publisher, "models") && !strings.EqualFold(publisher, "publishers")
 }

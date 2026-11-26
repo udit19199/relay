@@ -151,7 +151,7 @@ func ClaudeMetadataIdentities(payload []byte) (sessionID, parentSessionID, agent
 	userID := strings.TrimSpace(root.Get("metadata.user_id").String())
 	if userID == "" {
 		req := root.Get("request")
-		if req.Exists() && !root.Get("contents").Exists() {
+		if req.Exists() {
 			userID = strings.TrimSpace(req.Get("metadata.user_id").String())
 		}
 	}
@@ -390,7 +390,7 @@ func hasExplicitSession(headers map[string][]string, payload []byte) bool {
 	root := newSessionObject(util.ParseGJSONBytesNoCopy(payload))
 	reqRoot := root
 	req := root.Get("request")
-	hasNestedReq := req.Exists() && !root.Get("contents").Exists()
+	hasNestedReq := req.Exists()
 	if hasNestedReq {
 		reqRoot = newSessionObject(req)
 	}
@@ -573,28 +573,6 @@ func responsesRoot(body map[string]any) ([]string, []canonicalPart) {
 			if len(parts) > 0 {
 				return instructions, parts
 			}
-		}
-	}
-	return instructions, nil
-}
-
-func geminiRoot(body map[string]any) ([]string, []canonicalPart) {
-	if req, ok := body["request"].(map[string]any); ok {
-		body = req
-	}
-	instructions := make([]string, 0)
-	if value, ok := firstField(body, "systemInstruction", "system_instruction"); ok {
-		instructions = appendInstruction(instructions, contentValue(value))
-	}
-	contents, _ := body["contents"].([]any)
-	for _, rawContent := range contents {
-		content, okContent := rawContent.(map[string]any)
-		if !okContent || normalizedString(content["role"]) != "user" {
-			continue
-		}
-		parts := canonicalParts(contentValue(content))
-		if len(parts) > 0 {
-			return instructions, parts
 		}
 	}
 	return instructions, nil

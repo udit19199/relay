@@ -509,12 +509,12 @@ func TestSessionAffinitySelectorRebindOnQuotaLCPCompactionPreservesMetadataOnTra
 	low := &Auth{ID: "auth-low", Status: StatusActive, Attributes: map[string]string{"priority": "0"}}
 	auths := []*Auth{high, low}
 
-	firstPayload := []byte(`{"contents":[
-		{"role":"user","parts":[{"text":"step 1"}]},
-		{"role":"model","parts":[{"text":"ack 1"}]},
-		{"role":"user","parts":[{"text":"step 2"}]},
-		{"role":"model","parts":[{"text":"ack 2"}]},
-		{"role":"user","parts":[{"text":"step 3"}]}
+	firstPayload := []byte(`{"messages":[
+		{"role":"user","content":"step 1"},
+		{"role":"assistant","content":"ack 1"},
+		{"role":"user","content":"step 2"},
+		{"role":"assistant","content":"ack 2"},
+		{"role":"user","content":"step 3"}
 	]}`)
 	firstOpts := cliproxyexecutor.Options{
 		SourceFormat:    sdktranslator.FormatClaude,
@@ -523,14 +523,14 @@ func TestSessionAffinitySelectorRebindOnQuotaLCPCompactionPreservesMetadataOnTra
 			cliproxyexecutor.CallerScopeMetadataKey: "caller-compaction-quota",
 		},
 	}
-	firstAuth, errFirst := selector.Pick(ctx, "google", "gemini-2.5-pro", firstOpts, auths)
+	firstAuth, errFirst := selector.Pick(ctx, "claude", "claude-sonnet-4", firstOpts, auths)
 	if errFirst != nil || firstAuth == nil || firstAuth.ID != high.ID {
 		t.Fatalf("first Pick() = %v (err=%v), want %q", firstAuth, errFirst, high.ID)
 	}
 	selector.OnResult(Result{
 		AuthID:   firstAuth.ID,
-		Provider: "google",
-		Model:    "gemini-2.5-pro",
+		Provider: "claude",
+		Model:    "claude-sonnet-4",
 		Options:  firstOpts,
 		Success:  true,
 	})
@@ -544,11 +544,11 @@ func TestSessionAffinitySelectorRebindOnQuotaLCPCompactionPreservesMetadataOnTra
 		LastError:      &Error{HTTPStatus: http.StatusBadGateway, Message: "502 overloaded"},
 		Attributes:     map[string]string{"priority": "1"},
 	}
-	compactedPayload := []byte(`{"contents":[
-		{"role":"user","parts":[{"text":"<summary>Steps 1 and 2 completed</summary>"}]},
-		{"role":"model","parts":[{"text":"ack 2"}]},
-		{"role":"user","parts":[{"text":"step 3"}]},
-		{"role":"user","parts":[{"text":"step 4"}]}
+	compactedPayload := []byte(`{"messages":[
+		{"role":"user","content":"<summary>Steps 1 and 2 completed</summary>"},
+		{"role":"assistant","content":"ack 2"},
+		{"role":"user","content":"step 3"},
+		{"role":"user","content":"step 4"}
 	]}`)
 	compactedOpts := cliproxyexecutor.Options{
 		SourceFormat:    sdktranslator.FormatClaude,
@@ -557,7 +557,7 @@ func TestSessionAffinitySelectorRebindOnQuotaLCPCompactionPreservesMetadataOnTra
 			cliproxyexecutor.CallerScopeMetadataKey: "caller-compaction-quota",
 		},
 	}
-	compactedAuth, errCompacted := selector.Pick(ctx, "google", "gemini-2.5-pro", compactedOpts, []*Auth{highTransient, low})
+	compactedAuth, errCompacted := selector.Pick(ctx, "claude", "claude-sonnet-4", compactedOpts, []*Auth{highTransient, low})
 	if errCompacted != nil || compactedAuth == nil || compactedAuth.ID != low.ID {
 		t.Fatalf("compacted transient failover Pick() = %v (err=%v), want %q", compactedAuth, errCompacted, low.ID)
 	}
@@ -569,19 +569,19 @@ func TestSessionAffinitySelectorRebindOnQuotaLCPCompactionPreservesMetadataOnTra
 	}
 	selector.OnResult(Result{
 		AuthID:   compactedAuth.ID,
-		Provider: "google",
-		Model:    "gemini-2.5-pro",
+		Provider: "claude",
+		Model:    "claude-sonnet-4",
 		Options:  compactedOpts,
 		Success:  true,
 	})
 
 	// Next turn after high recovers must still route back to high.
-	nextPayload := []byte(`{"contents":[
-		{"role":"user","parts":[{"text":"<summary>Steps 1 and 2 completed</summary>"}]},
-		{"role":"model","parts":[{"text":"ack 2"}]},
-		{"role":"user","parts":[{"text":"step 3"}]},
-		{"role":"user","parts":[{"text":"step 4"}]},
-		{"role":"model","parts":[{"text":"ack 4"}]}
+	nextPayload := []byte(`{"messages":[
+		{"role":"user","content":"<summary>Steps 1 and 2 completed</summary>"},
+		{"role":"assistant","content":"ack 2"},
+		{"role":"user","content":"step 3"},
+		{"role":"user","content":"step 4"},
+		{"role":"assistant","content":"ack 4"}
 	]}`)
 	nextOpts := cliproxyexecutor.Options{
 		SourceFormat:    sdktranslator.FormatClaude,
@@ -590,7 +590,7 @@ func TestSessionAffinitySelectorRebindOnQuotaLCPCompactionPreservesMetadataOnTra
 			cliproxyexecutor.CallerScopeMetadataKey: "caller-compaction-quota",
 		},
 	}
-	nextAuth, errNext := selector.Pick(ctx, "google", "gemini-2.5-pro", nextOpts, auths)
+	nextAuth, errNext := selector.Pick(ctx, "claude", "claude-sonnet-4", nextOpts, auths)
 	if errNext != nil || nextAuth == nil || nextAuth.ID != high.ID {
 		t.Fatalf("next Pick() after compaction transient recovery = %v (err=%v), want %q", nextAuth, errNext, high.ID)
 	}

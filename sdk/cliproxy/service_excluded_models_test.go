@@ -10,62 +10,6 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/config"
 )
 
-func TestRegisterModelsForAuth_CredentialExcludedModelsOverrideGlobal(t *testing.T) {
-	service := &Service{
-		cfg: &config.Config{
-			OAuthExcludedModels: map[string][]string{
-				"gemini": {"gemini-2.5-pro"},
-			},
-		},
-	}
-	auth := &coreauth.Auth{
-		ID:       "auth-gemini",
-		Provider: "gemini",
-		Status:   coreauth.StatusActive,
-		Attributes: map[string]string{
-			"auth_kind":       "oauth",
-			"excluded_models": "gemini-2.5-flash",
-		},
-	}
-
-	registry := GlobalModelRegistry()
-	registry.UnregisterClient(auth.ID)
-	t.Cleanup(func() {
-		registry.UnregisterClient(auth.ID)
-	})
-
-	service.registerModelsForAuth(context.Background(), auth)
-
-	models := registry.GetAvailableModelsByProvider("gemini")
-	if len(models) == 0 {
-		t.Fatal("expected gemini models to be registered")
-	}
-
-	for _, model := range models {
-		if model == nil {
-			continue
-		}
-		modelID := strings.TrimSpace(model.ID)
-		if strings.EqualFold(modelID, "gemini-2.5-flash") {
-			t.Fatalf("expected model %q to be excluded by auth attribute", modelID)
-		}
-	}
-
-	seenGlobalExcluded := false
-	for _, model := range models {
-		if model == nil {
-			continue
-		}
-		if strings.EqualFold(strings.TrimSpace(model.ID), "gemini-2.5-pro") {
-			seenGlobalExcluded = true
-			break
-		}
-	}
-	if !seenGlobalExcluded {
-		t.Fatal("expected global excluded model to be present when attribute override is set")
-	}
-}
-
 func TestRegisterModelsForAuth_MetaOAuthAliasAndExcludedModels(t *testing.T) {
 	service := &Service{
 		cfg: &config.Config{

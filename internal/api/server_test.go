@@ -2459,9 +2459,9 @@ func TestModelsForCPAClientSerializesWebSearchCapabilities(t *testing.T) {
 		{"cpa-web-search-codex", "codex", "cpa-search-codex-model"},
 		{"cpa-web-search-xai", "xai", "cpa-search-xai-model"},
 		{"cpa-web-search-claude", "claude", "cpa-search-claude-model"},
-		{"cpa-web-search-gemini", "gemini", "cpa-no-search-gemini-model"},
+		{"cpa-web-search-openai", "openai", "cpa-no-search-openai-model"},
 		{"cpa-web-search-mixed-codex", "codex", "cpa-mixed-search-model"},
-		{"cpa-web-search-mixed-gemini", "gemini", "cpa-mixed-search-model"},
+		{"cpa-web-search-mixed-openai", "openai", "cpa-mixed-search-model"},
 		{"cpa-web-search-prefixed", "codex", "team/cpa-prefixed-search-model"},
 	}
 	webSearch := true
@@ -2502,7 +2502,7 @@ func TestModelsForCPAClientSerializesWebSearchCapabilities(t *testing.T) {
 	for _, modelID := range []string{"cpa-search-codex-model", "cpa-search-xai-model", "cpa-search-claude-model", "team/cpa-prefixed-search-model"} {
 		assertSerializedCPAWebSearch(t, entries[modelID], true)
 	}
-	for _, modelID := range []string{"cpa-no-search-gemini-model", "cpa-mixed-search-model"} {
+	for _, modelID := range []string{"cpa-no-search-openai-model", "cpa-mixed-search-model"} {
 		assertSerializedCPAWebSearch(t, entries[modelID], false)
 	}
 

@@ -106,60 +106,10 @@ func TestThinkingE2EMatrix_Suffix(t *testing.T) {
 			expectErr:   false,
 		},
 		// Case 6: No suffix from gemini → injected default → medium
-		{
-			name:        "6",
-			from:        "gemini",
-			to:          "codex",
-			model:       "level-model",
-			inputJSON:   `{"model":"level-model","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField: "reasoning.effort",
-			expectValue: "medium",
-			expectErr:   false,
-		},
 		// Case 7: Budget 8192 → medium
-		{
-			name:        "7",
-			from:        "gemini",
-			to:          "codex",
-			model:       "level-model(8192)",
-			inputJSON:   `{"model":"level-model(8192)","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField: "reasoning.effort",
-			expectValue: "medium",
-			expectErr:   false,
-		},
 		// Case 8: Budget 64000 → clamped to high
-		{
-			name:        "8",
-			from:        "gemini",
-			to:          "codex",
-			model:       "level-model(64000)",
-			inputJSON:   `{"model":"level-model(64000)","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField: "reasoning.effort",
-			expectValue: "high",
-			expectErr:   false,
-		},
 		// Case 9: Budget 0 → clamped to minimal (ZeroAllowed=false)
-		{
-			name:        "9",
-			from:        "gemini",
-			to:          "codex",
-			model:       "level-model(0)",
-			inputJSON:   `{"model":"level-model(0)","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField: "reasoning.effort",
-			expectValue: "minimal",
-			expectErr:   false,
-		},
 		// Case 10: Budget -1 → auto → DynamicAllowed=false → medium (mid-range)
-		{
-			name:        "10",
-			from:        "gemini",
-			to:          "codex",
-			model:       "level-model(-1)",
-			inputJSON:   `{"model":"level-model(-1)","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField: "reasoning.effort",
-			expectValue: "medium",
-			expectErr:   false,
-		},
 		// Case 11: Claude source no suffix → passthrough (no thinking)
 		{
 			name:        "11",
@@ -218,28 +168,7 @@ func TestThinkingE2EMatrix_Suffix(t *testing.T) {
 		// level-subset-model (Levels=low/high, ZeroAllowed=false, DynamicAllowed=false)
 
 		// Case 16: Budget 8192 → medium → rounded down to low
-		{
-			name:        "16",
-			from:        "gemini",
-			to:          "openai",
-			model:       "level-subset-model(8192)",
-			inputJSON:   `{"model":"level-subset-model(8192)","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField: "reasoning_effort",
-			expectValue: "low",
-			expectErr:   false,
-		},
 		// Case 17: Budget 1 → minimal → clamped to low (min supported)
-		{
-			name:            "17",
-			from:            "claude",
-			to:              "gemini",
-			model:           "level-subset-model(1)",
-			inputJSON:       `{"model":"level-subset-model(1)","messages":[{"role":"user","content":"hi"}]}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingLevel",
-			expectValue:     "low",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 17A: auto → medium → clamped to low when low/high are equally close
 		{
 			name:        "17A",
@@ -255,240 +184,28 @@ func TestThinkingE2EMatrix_Suffix(t *testing.T) {
 		// gemini-budget-model (Min=128, Max=20000, ZeroAllowed=false, DynamicAllowed=true)
 
 		// Case 18: No suffix → passthrough
-		{
-			name:        "18",
-			from:        "openai",
-			to:          "gemini",
-			model:       "gemini-budget-model",
-			inputJSON:   `{"model":"gemini-budget-model","messages":[{"role":"user","content":"hi"}]}`,
-			expectField: "",
-			expectErr:   false,
-		},
 		// Case 19: Effort medium → 8192
-		{
-			name:            "19",
-			from:            "openai",
-			to:              "gemini",
-			model:           "gemini-budget-model(medium)",
-			inputJSON:       `{"model":"gemini-budget-model(medium)","messages":[{"role":"user","content":"hi"}]}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "8192",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 20: Effort xhigh → clamped to 20000 (max)
-		{
-			name:            "20",
-			from:            "openai",
-			to:              "gemini",
-			model:           "gemini-budget-model(xhigh)",
-			inputJSON:       `{"model":"gemini-budget-model(xhigh)","messages":[{"role":"user","content":"hi"}]}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "20000",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 21: Effort none → clamped to 128 (min)
-		{
-			name:            "21",
-			from:            "openai",
-			to:              "gemini",
-			model:           "gemini-budget-model(none)",
-			inputJSON:       `{"model":"gemini-budget-model(none)","messages":[{"role":"user","content":"hi"}]}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "128",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 22: Effort auto → DynamicAllowed=true → -1
-		{
-			name:            "22",
-			from:            "openai",
-			to:              "gemini",
-			model:           "gemini-budget-model(auto)",
-			inputJSON:       `{"model":"gemini-budget-model(auto)","messages":[{"role":"user","content":"hi"}]}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "-1",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 23: Claude source no suffix → passthrough
-		{
-			name:        "23",
-			from:        "claude",
-			to:          "gemini",
-			model:       "gemini-budget-model",
-			inputJSON:   `{"model":"gemini-budget-model","messages":[{"role":"user","content":"hi"}]}`,
-			expectField: "",
-			expectErr:   false,
-		},
 		// Case 24: Budget 8192 → 8192
-		{
-			name:            "24",
-			from:            "claude",
-			to:              "gemini",
-			model:           "gemini-budget-model(8192)",
-			inputJSON:       `{"model":"gemini-budget-model(8192)","messages":[{"role":"user","content":"hi"}]}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "8192",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 25: Budget 64000 → clamped to 20000 (max)
-		{
-			name:            "25",
-			from:            "claude",
-			to:              "gemini",
-			model:           "gemini-budget-model(64000)",
-			inputJSON:       `{"model":"gemini-budget-model(64000)","messages":[{"role":"user","content":"hi"}]}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "20000",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 26: Budget 0 → clamped to 128 (min)
-		{
-			name:            "26",
-			from:            "claude",
-			to:              "gemini",
-			model:           "gemini-budget-model(0)",
-			inputJSON:       `{"model":"gemini-budget-model(0)","messages":[{"role":"user","content":"hi"}]}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "128",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 27: Budget -1 → DynamicAllowed=true → -1
-		{
-			name:            "27",
-			from:            "claude",
-			to:              "gemini",
-			model:           "gemini-budget-model(-1)",
-			inputJSON:       `{"model":"gemini-budget-model(-1)","messages":[{"role":"user","content":"hi"}]}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "-1",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 
 		// gemini-mixed-model (Min=128, Max=32768, Levels=low/high, ZeroAllowed=false, DynamicAllowed=true)
 
 		// Case 28: OpenAI source no suffix → passthrough
-		{
-			name:        "28",
-			from:        "openai",
-			to:          "gemini",
-			model:       "gemini-mixed-model",
-			inputJSON:   `{"model":"gemini-mixed-model","messages":[{"role":"user","content":"hi"}]}`,
-			expectField: "",
-			expectErr:   false,
-		},
 		// Case 29: Effort high → low/high supported → high
-		{
-			name:            "29",
-			from:            "openai",
-			to:              "gemini",
-			model:           "gemini-mixed-model(high)",
-			inputJSON:       `{"model":"gemini-mixed-model(high)","messages":[{"role":"user","content":"hi"}]}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingLevel",
-			expectValue:     "high",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 30: Effort xhigh → clamped to high
-		{
-			name:            "30",
-			from:            "openai",
-			to:              "gemini",
-			model:           "gemini-mixed-model(xhigh)",
-			inputJSON:       `{"model":"gemini-mixed-model(xhigh)","messages":[{"role":"user","content":"hi"}]}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingLevel",
-			expectValue:     "high",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 31: Effort none → clamped to low (min supported)
-		{
-			name:            "31",
-			from:            "openai",
-			to:              "gemini",
-			model:           "gemini-mixed-model(none)",
-			inputJSON:       `{"model":"gemini-mixed-model(none)","messages":[{"role":"user","content":"hi"}]}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingLevel",
-			expectValue:     "low",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 32: Effort auto → DynamicAllowed=true → -1 (budget)
-		{
-			name:            "32",
-			from:            "openai",
-			to:              "gemini",
-			model:           "gemini-mixed-model(auto)",
-			inputJSON:       `{"model":"gemini-mixed-model(auto)","messages":[{"role":"user","content":"hi"}]}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "-1",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 33: Claude source no suffix → passthrough
-		{
-			name:        "33",
-			from:        "claude",
-			to:          "gemini",
-			model:       "gemini-mixed-model",
-			inputJSON:   `{"model":"gemini-mixed-model","messages":[{"role":"user","content":"hi"}]}`,
-			expectField: "",
-			expectErr:   false,
-		},
 		// Case 34: Budget 8192 → 8192 (keep budget)
-		{
-			name:            "34",
-			from:            "claude",
-			to:              "gemini",
-			model:           "gemini-mixed-model(8192)",
-			inputJSON:       `{"model":"gemini-mixed-model(8192)","messages":[{"role":"user","content":"hi"}]}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "8192",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 35: Budget 64000 → clamped to 32768 (max)
-		{
-			name:            "35",
-			from:            "claude",
-			to:              "gemini",
-			model:           "gemini-mixed-model(64000)",
-			inputJSON:       `{"model":"gemini-mixed-model(64000)","messages":[{"role":"user","content":"hi"}]}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "32768",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 36: Budget 0 → minimal → clamped to low (min level)
-		{
-			name:            "36",
-			from:            "claude",
-			to:              "gemini",
-			model:           "gemini-mixed-model(0)",
-			inputJSON:       `{"model":"gemini-mixed-model(0)","messages":[{"role":"user","content":"hi"}]}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingLevel",
-			expectValue:     "low",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 37: Budget -1 → DynamicAllowed=true → -1 (budget)
-		{
-			name:            "37",
-			from:            "claude",
-			to:              "gemini",
-			model:           "gemini-mixed-model(-1)",
-			inputJSON:       `{"model":"gemini-mixed-model(-1)","messages":[{"role":"user","content":"hi"}]}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "-1",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 
 		// claude-budget-model (Min=1024, Max=128000, ZeroAllowed=true, DynamicAllowed=false)
 
@@ -547,221 +264,30 @@ func TestThinkingE2EMatrix_Suffix(t *testing.T) {
 			expectErr:   false,
 		},
 		// Case 43: Gemini source no suffix → passthrough
-		{
-			name:        "43",
-			from:        "gemini",
-			to:          "claude",
-			model:       "claude-budget-model",
-			inputJSON:   `{"model":"claude-budget-model","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField: "",
-			expectErr:   false,
-		},
 		// Case 44: Budget 8192 → 8192
-		{
-			name:        "44",
-			from:        "gemini",
-			to:          "claude",
-			model:       "claude-budget-model(8192)",
-			inputJSON:   `{"model":"claude-budget-model(8192)","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField: "thinking.budget_tokens",
-			expectValue: "8192",
-			expectErr:   false,
-		},
 		// Case 45: Budget 200000 → clamped to 128000 (max)
-		{
-			name:        "45",
-			from:        "gemini",
-			to:          "claude",
-			model:       "claude-budget-model(200000)",
-			inputJSON:   `{"model":"claude-budget-model(200000)","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField: "thinking.budget_tokens",
-			expectValue: "128000",
-			expectErr:   false,
-		},
 		// Case 46: Budget 0 → ZeroAllowed=true → disabled
-		{
-			name:        "46",
-			from:        "gemini",
-			to:          "claude",
-			model:       "claude-budget-model(0)",
-			inputJSON:   `{"model":"claude-budget-model(0)","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField: "thinking.type",
-			expectValue: "disabled",
-			expectErr:   false,
-		},
 		// Case 47: Budget -1 → auto → DynamicAllowed=false → 64512 (mid-range)
-		{
-			name:        "47",
-			from:        "gemini",
-			to:          "claude",
-			model:       "claude-budget-model(-1)",
-			inputJSON:   `{"model":"claude-budget-model(-1)","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField: "thinking.budget_tokens",
-			expectValue: "64512",
-			expectErr:   false,
-		},
 
 		// antigravity-budget-model (Min=128, Max=20000, ZeroAllowed=true, DynamicAllowed=true)
 
 		// Case 48: Gemini to Antigravity no suffix → passthrough
-		{
-			name:        "48",
-			from:        "gemini",
-			to:          "antigravity",
-			model:       "antigravity-budget-model",
-			inputJSON:   `{"model":"antigravity-budget-model","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField: "",
-			expectErr:   false,
-		},
 		// Case 49: Effort medium → 8192
-		{
-			name:            "49",
-			from:            "gemini",
-			to:              "antigravity",
-			model:           "antigravity-budget-model(medium)",
-			inputJSON:       `{"model":"antigravity-budget-model(medium)","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField:     "request.generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "8192",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 50: Effort xhigh → clamped to 20000 (max)
-		{
-			name:            "50",
-			from:            "gemini",
-			to:              "antigravity",
-			model:           "antigravity-budget-model(xhigh)",
-			inputJSON:       `{"model":"antigravity-budget-model(xhigh)","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField:     "request.generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "20000",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 51: Effort none → ZeroAllowed=true → 0
-		{
-			name:            "51",
-			from:            "gemini",
-			to:              "antigravity",
-			model:           "antigravity-budget-model(none)",
-			inputJSON:       `{"model":"antigravity-budget-model(none)","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField:     "request.generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "0",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 52: Effort auto → DynamicAllowed=true → -1
-		{
-			name:            "52",
-			from:            "gemini",
-			to:              "antigravity",
-			model:           "antigravity-budget-model(auto)",
-			inputJSON:       `{"model":"antigravity-budget-model(auto)","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField:     "request.generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "-1",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 53: Claude to Antigravity no suffix → passthrough
-		{
-			name:        "53",
-			from:        "claude",
-			to:          "antigravity",
-			model:       "antigravity-budget-model",
-			inputJSON:   `{"model":"antigravity-budget-model","messages":[{"role":"user","content":"hi"}]}`,
-			expectField: "",
-			expectErr:   false,
-		},
 		// Case 54: Budget 8192 → 8192
-		{
-			name:            "54",
-			from:            "claude",
-			to:              "antigravity",
-			model:           "antigravity-budget-model(8192)",
-			inputJSON:       `{"model":"antigravity-budget-model(8192)","messages":[{"role":"user","content":"hi"}]}`,
-			expectField:     "request.generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "8192",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 55: Budget 64000 → clamped to 20000 (max)
-		{
-			name:            "55",
-			from:            "claude",
-			to:              "antigravity",
-			model:           "antigravity-budget-model(64000)",
-			inputJSON:       `{"model":"antigravity-budget-model(64000)","messages":[{"role":"user","content":"hi"}]}`,
-			expectField:     "request.generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "20000",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 56: Budget 0 → ZeroAllowed=true → 0
-		{
-			name:            "56",
-			from:            "claude",
-			to:              "antigravity",
-			model:           "antigravity-budget-model(0)",
-			inputJSON:       `{"model":"antigravity-budget-model(0)","messages":[{"role":"user","content":"hi"}]}`,
-			expectField:     "request.generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "0",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 57: Budget -1 → DynamicAllowed=true → -1
-		{
-			name:            "57",
-			from:            "claude",
-			to:              "antigravity",
-			model:           "antigravity-budget-model(-1)",
-			inputJSON:       `{"model":"antigravity-budget-model(-1)","messages":[{"role":"user","content":"hi"}]}`,
-			expectField:     "request.generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "-1",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 
 		// no-thinking-model (Thinking=nil)
 
 		// Case 58: No thinking support → no configuration
-		{
-			name:        "58",
-			from:        "gemini",
-			to:          "openai",
-			model:       "no-thinking-model",
-			inputJSON:   `{"model":"no-thinking-model","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField: "",
-			expectErr:   false,
-		},
 		// Case 59: Budget 8192 → no thinking support → suffix stripped → no configuration
-		{
-			name:        "59",
-			from:        "gemini",
-			to:          "openai",
-			model:       "no-thinking-model(8192)",
-			inputJSON:   `{"model":"no-thinking-model(8192)","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField: "",
-			expectErr:   false,
-		},
 		// Case 60: Budget 0 → suffix stripped → no configuration
-		{
-			name:        "60",
-			from:        "gemini",
-			to:          "openai",
-			model:       "no-thinking-model(0)",
-			inputJSON:   `{"model":"no-thinking-model(0)","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField: "",
-			expectErr:   false,
-		},
 		// Case 61: Budget -1 → suffix stripped → no configuration
-		{
-			name:        "61",
-			from:        "gemini",
-			to:          "openai",
-			model:       "no-thinking-model(-1)",
-			inputJSON:   `{"model":"no-thinking-model(-1)","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField: "",
-			expectErr:   false,
-		},
 		// Case 62: Claude source no suffix → no configuration
 		{
 			name:        "62",
@@ -806,59 +332,10 @@ func TestThinkingE2EMatrix_Suffix(t *testing.T) {
 		// user-defined-model (UserDefined=true, Thinking=nil)
 
 		// Case 66: User defined model no suffix → passthrough
-		{
-			name:        "66",
-			from:        "gemini",
-			to:          "openai",
-			model:       "user-defined-model",
-			inputJSON:   `{"model":"user-defined-model","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField: "",
-			expectErr:   false,
-		},
 		// Case 67: Budget 8192 → passthrough logic → medium
-		{
-			name:        "67",
-			from:        "gemini",
-			to:          "openai",
-			model:       "user-defined-model(8192)",
-			inputJSON:   `{"model":"user-defined-model(8192)","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField: "reasoning_effort",
-			expectValue: "medium",
-			expectErr:   false,
-		},
 		// Case 68: Budget 64000 → passthrough logic → xhigh
-		{
-			name:        "68",
-			from:        "gemini",
-			to:          "openai",
-			model:       "user-defined-model(64000)",
-			inputJSON:   `{"model":"user-defined-model(64000)","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField: "reasoning_effort",
-			expectValue: "xhigh",
-			expectErr:   false,
-		},
 		// Case 69: Budget 0 → passthrough logic → none
-		{
-			name:        "69",
-			from:        "gemini",
-			to:          "openai",
-			model:       "user-defined-model(0)",
-			inputJSON:   `{"model":"user-defined-model(0)","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField: "reasoning_effort",
-			expectValue: "none",
-			expectErr:   false,
-		},
 		// Case 70: Budget -1 → passthrough logic → auto
-		{
-			name:        "70",
-			from:        "gemini",
-			to:          "openai",
-			model:       "user-defined-model(-1)",
-			inputJSON:   `{"model":"user-defined-model(-1)","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField: "reasoning_effort",
-			expectValue: "auto",
-			expectErr:   false,
-		},
 		// Case 71: Claude to Codex no suffix → injected default → medium
 		{
 			name:        "71",
@@ -915,17 +392,6 @@ func TestThinkingE2EMatrix_Suffix(t *testing.T) {
 			expectErr:   false,
 		},
 		// Case 76: OpenAI to Gemini budget 8192 → passthrough → 8192
-		{
-			name:            "76",
-			from:            "openai",
-			to:              "gemini",
-			model:           "user-defined-model(8192)",
-			inputJSON:       `{"model":"user-defined-model(8192)","messages":[{"role":"user","content":"hi"}]}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "8192",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 77: OpenAI to Claude budget 8192 → passthrough → 8192
 		{
 			name:        "77",
@@ -938,17 +404,6 @@ func TestThinkingE2EMatrix_Suffix(t *testing.T) {
 			expectErr:   false,
 		},
 		// Case 78: OpenAI-Response to Gemini budget 8192 → passthrough → 8192
-		{
-			name:            "78",
-			from:            "openai-response",
-			to:              "gemini",
-			model:           "user-defined-model(8192)",
-			inputJSON:       `{"model":"user-defined-model(8192)","input":[{"role":"user","content":"hi"}]}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "8192",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 79: OpenAI-Response to Claude budget 8192 → passthrough → 8192
 		{
 			name:        "79",
@@ -1006,29 +461,7 @@ func TestThinkingE2EMatrix_Suffix(t *testing.T) {
 			expectErr:   true,
 		},
 		// Case 84: Gemini to Gemini, budget 8192 → passthrough thinkingBudget
-		{
-			name:            "84",
-			from:            "gemini",
-			to:              "gemini",
-			model:           "gemini-budget-model(8192)",
-			inputJSON:       `{"model":"gemini-budget-model(8192)","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "8192",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 85: Gemini to Gemini, budget 64000 → clamped to Max
-		{
-			name:            "85",
-			from:            "gemini",
-			to:              "gemini",
-			model:           "gemini-budget-model(64000)",
-			inputJSON:       `{"model":"gemini-budget-model(64000)","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "20000",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 86: Claude to Claude, budget 8192 → passthrough thinking.budget_tokens
 		{
 			name:        "86",
@@ -1055,29 +488,7 @@ func TestThinkingE2EMatrix_Suffix(t *testing.T) {
 		// Tests that gemini/antigravity as same API family should have consistent validation behavior
 
 		// Case 88: Gemini to Antigravity, budget 64000 (suffix) → clamped to Max
-		{
-			name:            "88",
-			from:            "gemini",
-			to:              "antigravity",
-			model:           "gemini-budget-model(64000)",
-			inputJSON:       `{"model":"gemini-budget-model(64000)","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField:     "request.generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "20000",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 89: Gemini to Antigravity, budget 8192 → passthrough (normal value)
-		{
-			name:            "89",
-			from:            "gemini",
-			to:              "antigravity",
-			model:           "gemini-budget-model(8192)",
-			inputJSON:       `{"model":"gemini-budget-model(8192)","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField:     "request.generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "8192",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 	}
 
 	runThinkingTests(t, cases)
@@ -1150,60 +561,10 @@ func TestThinkingE2EMatrix_Body(t *testing.T) {
 			expectErr:   false,
 		},
 		// Case 6: No param from gemini → injected default → medium
-		{
-			name:        "6",
-			from:        "gemini",
-			to:          "codex",
-			model:       "level-model",
-			inputJSON:   `{"model":"level-model","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField: "reasoning.effort",
-			expectValue: "medium",
-			expectErr:   false,
-		},
 		// Case 7: thinkingBudget=8192 → medium
-		{
-			name:        "7",
-			from:        "gemini",
-			to:          "codex",
-			model:       "level-model",
-			inputJSON:   `{"model":"level-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingBudget":8192}}}`,
-			expectField: "reasoning.effort",
-			expectValue: "medium",
-			expectErr:   false,
-		},
 		// Case 8: thinkingBudget=64000 → clamped to high
-		{
-			name:        "8",
-			from:        "gemini",
-			to:          "codex",
-			model:       "level-model",
-			inputJSON:   `{"model":"level-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingBudget":64000}}}`,
-			expectField: "reasoning.effort",
-			expectValue: "high",
-			expectErr:   false,
-		},
 		// Case 9: thinkingBudget=0 → clamped to minimal
-		{
-			name:        "9",
-			from:        "gemini",
-			to:          "codex",
-			model:       "level-model",
-			inputJSON:   `{"model":"level-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingBudget":0}}}`,
-			expectField: "reasoning.effort",
-			expectValue: "minimal",
-			expectErr:   false,
-		},
 		// Case 10: thinkingBudget=-1 → medium (DynamicAllowed=false)
-		{
-			name:        "10",
-			from:        "gemini",
-			to:          "codex",
-			model:       "level-model",
-			inputJSON:   `{"model":"level-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingBudget":-1}}}`,
-			expectField: "reasoning.effort",
-			expectValue: "medium",
-			expectErr:   false,
-		},
 		// Case 11: Claude no param → passthrough (no thinking)
 		{
 			name:        "11",
@@ -1262,307 +623,38 @@ func TestThinkingE2EMatrix_Body(t *testing.T) {
 		// level-subset-model (Levels=low/high, ZeroAllowed=false, DynamicAllowed=false)
 
 		// Case 16: thinkingBudget=8192 → medium → rounded down to low
-		{
-			name:        "16",
-			from:        "gemini",
-			to:          "openai",
-			model:       "level-subset-model",
-			inputJSON:   `{"model":"level-subset-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingBudget":8192}}}`,
-			expectField: "reasoning_effort",
-			expectValue: "low",
-			expectErr:   false,
-		},
 		// Case 17: thinking.budget_tokens=1 → minimal → clamped to low
-		{
-			name:            "17",
-			from:            "claude",
-			to:              "gemini",
-			model:           "level-subset-model",
-			inputJSON:       `{"model":"level-subset-model","messages":[{"role":"user","content":"hi"}],"thinking":{"type":"enabled","budget_tokens":1}}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingLevel",
-			expectValue:     "low",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 
 		// gemini-budget-model (Min=128, Max=20000, ZeroAllowed=false, DynamicAllowed=true)
 
 		// Case 18: No param → passthrough
-		{
-			name:        "18",
-			from:        "openai",
-			to:          "gemini",
-			model:       "gemini-budget-model",
-			inputJSON:   `{"model":"gemini-budget-model","messages":[{"role":"user","content":"hi"}]}`,
-			expectField: "",
-			expectErr:   false,
-		},
 		// Case 19: reasoning_effort=medium → 8192
-		{
-			name:            "19",
-			from:            "openai",
-			to:              "gemini",
-			model:           "gemini-budget-model",
-			inputJSON:       `{"model":"gemini-budget-model","messages":[{"role":"user","content":"hi"}],"reasoning_effort":"medium"}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "8192",
-			includeThoughts: "true",
-			expectErr:       false,
-		},
 		// Case 20: reasoning_effort=xhigh → clamped to 20000
-		{
-			name:            "20",
-			from:            "openai",
-			to:              "gemini",
-			model:           "gemini-budget-model",
-			inputJSON:       `{"model":"gemini-budget-model","messages":[{"role":"user","content":"hi"}],"reasoning_effort":"xhigh"}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "20000",
-			includeThoughts: "true",
-			expectErr:       false,
-		},
 		// Case 21: reasoning_effort=none → clamped to 128 → includeThoughts=false
-		{
-			name:            "21",
-			from:            "openai",
-			to:              "gemini",
-			model:           "gemini-budget-model",
-			inputJSON:       `{"model":"gemini-budget-model","messages":[{"role":"user","content":"hi"}],"reasoning_effort":"none"}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "128",
-			includeThoughts: "false",
-			expectErr:       false,
-		},
 		// Case 22: reasoning_effort=auto → -1 (DynamicAllowed=true)
-		{
-			name:            "22",
-			from:            "openai",
-			to:              "gemini",
-			model:           "gemini-budget-model",
-			inputJSON:       `{"model":"gemini-budget-model","messages":[{"role":"user","content":"hi"}],"reasoning_effort":"auto"}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "-1",
-			includeThoughts: "true",
-			expectErr:       false,
-		},
 		// Case 23: Claude no param → passthrough
-		{
-			name:        "23",
-			from:        "claude",
-			to:          "gemini",
-			model:       "gemini-budget-model",
-			inputJSON:   `{"model":"gemini-budget-model","messages":[{"role":"user","content":"hi"}]}`,
-			expectField: "",
-			expectErr:   false,
-		},
 		// Case 24: thinking.budget_tokens=8192 → 8192
-		{
-			name:            "24",
-			from:            "claude",
-			to:              "gemini",
-			model:           "gemini-budget-model",
-			inputJSON:       `{"model":"gemini-budget-model","messages":[{"role":"user","content":"hi"}],"thinking":{"type":"enabled","budget_tokens":8192}}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "8192",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 25: thinking.budget_tokens=64000 → clamped to 20000
-		{
-			name:            "25",
-			from:            "claude",
-			to:              "gemini",
-			model:           "gemini-budget-model",
-			inputJSON:       `{"model":"gemini-budget-model","messages":[{"role":"user","content":"hi"}],"thinking":{"type":"enabled","budget_tokens":64000}}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "20000",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 26: thinking.budget_tokens=0 → clamped to 128
-		{
-			name:            "26",
-			from:            "claude",
-			to:              "gemini",
-			model:           "gemini-budget-model",
-			inputJSON:       `{"model":"gemini-budget-model","messages":[{"role":"user","content":"hi"}],"thinking":{"type":"enabled","budget_tokens":0}}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "128",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 27: thinking.budget_tokens=-1 → -1 (DynamicAllowed=true)
-		{
-			name:            "27",
-			from:            "claude",
-			to:              "gemini",
-			model:           "gemini-budget-model",
-			inputJSON:       `{"model":"gemini-budget-model","messages":[{"role":"user","content":"hi"}],"thinking":{"type":"enabled","budget_tokens":-1}}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "-1",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 
 		// gemini-mixed-model (Min=128, Max=32768, Levels=low/high, ZeroAllowed=false, DynamicAllowed=true)
 
 		// Case 28: No param → passthrough
-		{
-			name:        "28",
-			from:        "openai",
-			to:          "gemini",
-			model:       "gemini-mixed-model",
-			inputJSON:   `{"model":"gemini-mixed-model","messages":[{"role":"user","content":"hi"}]}`,
-			expectField: "",
-			expectErr:   false,
-		},
 		// Case 29: reasoning_effort=high → high
-		{
-			name:            "29",
-			from:            "openai",
-			to:              "gemini",
-			model:           "gemini-mixed-model",
-			inputJSON:       `{"model":"gemini-mixed-model","messages":[{"role":"user","content":"hi"}],"reasoning_effort":"high"}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingLevel",
-			expectValue:     "high",
-			includeThoughts: "true",
-			expectErr:       false,
-		},
 		// Case 30: reasoning_effort=xhigh → clamped to high
-		{
-			name:            "30",
-			from:            "openai",
-			to:              "gemini",
-			model:           "gemini-mixed-model",
-			inputJSON:       `{"model":"gemini-mixed-model","messages":[{"role":"user","content":"hi"}],"reasoning_effort":"xhigh"}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingLevel",
-			expectValue:     "high",
-			includeThoughts: "true",
-			expectErr:       false,
-		},
 		// Case 31: reasoning_effort=none → clamped to low → includeThoughts=false
-		{
-			name:            "31",
-			from:            "openai",
-			to:              "gemini",
-			model:           "gemini-mixed-model",
-			inputJSON:       `{"model":"gemini-mixed-model","messages":[{"role":"user","content":"hi"}],"reasoning_effort":"none"}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingLevel",
-			expectValue:     "low",
-			includeThoughts: "false",
-			expectErr:       false,
-		},
 		// Case 31A: reasoning_effort=none with zero allowed removes the entire
 		// thinking config. includeThoughts alone would restore the model default.
-		{
-			name:        "31A",
-			from:        "openai",
-			to:          "gemini",
-			model:       "gemini-toggle-mixed-model",
-			inputJSON:   `{"model":"gemini-toggle-mixed-model","messages":[{"role":"user","content":"hi"}],"reasoning_effort":"none"}`,
-			expectField: "",
-			expectErr:   false,
-		},
 		// Case 31B: Antigravity keeps the same fully disabled representation.
-		{
-			name:        "31B",
-			from:        "openai",
-			to:          "antigravity",
-			model:       "gemini-toggle-mixed-model",
-			inputJSON:   `{"model":"gemini-toggle-mixed-model","messages":[{"role":"user","content":"hi"}],"reasoning_effort":"none"}`,
-			expectField: "",
-			expectErr:   false,
-		},
 		// Case 31C: reasoning.effort=none with zero allowed → delete thinkingConfig
-		{
-			name:        "31C",
-			from:        "openai-response",
-			to:          "gemini",
-			model:       "gemini-toggle-mixed-model",
-			inputJSON:   `{"model":"gemini-toggle-mixed-model","input":[{"role":"user","content":"hi"}],"reasoning":{"effort":"none"}}`,
-			expectField: "",
-			expectErr:   false,
-		},
 		// Case 31D: reasoning.effort=none with zero allowed to Antigravity → delete thinkingConfig
-		{
-			name:        "31D",
-			from:        "openai-response",
-			to:          "antigravity",
-			model:       "gemini-toggle-mixed-model",
-			inputJSON:   `{"model":"gemini-toggle-mixed-model","input":[{"role":"user","content":"hi"}],"reasoning":{"effort":"none"}}`,
-			expectField: "",
-			expectErr:   false,
-		},
 		// Case 32: reasoning_effort=auto → -1 (DynamicAllowed=true)
-		{
-			name:            "32",
-			from:            "openai",
-			to:              "gemini",
-			model:           "gemini-mixed-model",
-			inputJSON:       `{"model":"gemini-mixed-model","messages":[{"role":"user","content":"hi"}],"reasoning_effort":"auto"}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "-1",
-			includeThoughts: "true",
-			expectErr:       false,
-		},
 		// Case 33: Claude no param → passthrough
-		{
-			name:        "33",
-			from:        "claude",
-			to:          "gemini",
-			model:       "gemini-mixed-model",
-			inputJSON:   `{"model":"gemini-mixed-model","messages":[{"role":"user","content":"hi"}]}`,
-			expectField: "",
-			expectErr:   false,
-		},
 		// Case 34: thinking.budget_tokens=8192 → 8192 (keeps budget)
-		{
-			name:            "34",
-			from:            "claude",
-			to:              "gemini",
-			model:           "gemini-mixed-model",
-			inputJSON:       `{"model":"gemini-mixed-model","messages":[{"role":"user","content":"hi"}],"thinking":{"type":"enabled","budget_tokens":8192}}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "8192",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 35: thinking.budget_tokens=64000 → clamped to 32768 (keeps budget)
-		{
-			name:            "35",
-			from:            "claude",
-			to:              "gemini",
-			model:           "gemini-mixed-model",
-			inputJSON:       `{"model":"gemini-mixed-model","messages":[{"role":"user","content":"hi"}],"thinking":{"type":"enabled","budget_tokens":64000}}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "32768",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 36: thinking.budget_tokens=0 → clamped to low
-		{
-			name:            "36",
-			from:            "claude",
-			to:              "gemini",
-			model:           "gemini-mixed-model",
-			inputJSON:       `{"model":"gemini-mixed-model","messages":[{"role":"user","content":"hi"}],"thinking":{"type":"enabled","budget_tokens":0}}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingLevel",
-			expectValue:     "low",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 37: thinking.budget_tokens=-1 → -1 (DynamicAllowed=true)
-		{
-			name:            "37",
-			from:            "claude",
-			to:              "gemini",
-			model:           "gemini-mixed-model",
-			inputJSON:       `{"model":"gemini-mixed-model","messages":[{"role":"user","content":"hi"}],"thinking":{"type":"enabled","budget_tokens":-1}}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "-1",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 
 		// claude-budget-model (Min=1024, Max=128000, ZeroAllowed=true, DynamicAllowed=false)
 
@@ -1621,221 +713,30 @@ func TestThinkingE2EMatrix_Body(t *testing.T) {
 			expectErr:   false,
 		},
 		// Case 43: Gemini no param → passthrough
-		{
-			name:        "43",
-			from:        "gemini",
-			to:          "claude",
-			model:       "claude-budget-model",
-			inputJSON:   `{"model":"claude-budget-model","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField: "",
-			expectErr:   false,
-		},
 		// Case 44: thinkingBudget=8192 → 8192
-		{
-			name:        "44",
-			from:        "gemini",
-			to:          "claude",
-			model:       "claude-budget-model",
-			inputJSON:   `{"model":"claude-budget-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingBudget":8192}}}`,
-			expectField: "thinking.budget_tokens",
-			expectValue: "8192",
-			expectErr:   false,
-		},
 		// Case 45: thinkingBudget=200000 → clamped to 128000
-		{
-			name:        "45",
-			from:        "gemini",
-			to:          "claude",
-			model:       "claude-budget-model",
-			inputJSON:   `{"model":"claude-budget-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingBudget":200000}}}`,
-			expectField: "thinking.budget_tokens",
-			expectValue: "128000",
-			expectErr:   false,
-		},
 		// Case 46: thinkingBudget=0 → disabled
-		{
-			name:        "46",
-			from:        "gemini",
-			to:          "claude",
-			model:       "claude-budget-model",
-			inputJSON:   `{"model":"claude-budget-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingBudget":0}}}`,
-			expectField: "thinking.type",
-			expectValue: "disabled",
-			expectErr:   false,
-		},
 		// Case 47: thinkingBudget=-1 → 64512 (mid-range)
-		{
-			name:        "47",
-			from:        "gemini",
-			to:          "claude",
-			model:       "claude-budget-model",
-			inputJSON:   `{"model":"claude-budget-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingBudget":-1}}}`,
-			expectField: "thinking.budget_tokens",
-			expectValue: "64512",
-			expectErr:   false,
-		},
 
 		// antigravity-budget-model (Min=128, Max=20000, ZeroAllowed=true, DynamicAllowed=true)
 
 		// Case 48: Gemini no param → passthrough
-		{
-			name:        "48",
-			from:        "gemini",
-			to:          "antigravity",
-			model:       "antigravity-budget-model",
-			inputJSON:   `{"model":"antigravity-budget-model","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField: "",
-			expectErr:   false,
-		},
 		// Case 49: thinkingLevel=medium → 8192
-		{
-			name:            "49",
-			from:            "gemini",
-			to:              "antigravity",
-			model:           "antigravity-budget-model",
-			inputJSON:       `{"model":"antigravity-budget-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingLevel":"medium"}}}`,
-			expectField:     "request.generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "8192",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 50: thinkingLevel=xhigh → clamped to 20000
-		{
-			name:            "50",
-			from:            "gemini",
-			to:              "antigravity",
-			model:           "antigravity-budget-model",
-			inputJSON:       `{"model":"antigravity-budget-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingLevel":"xhigh"}}}`,
-			expectField:     "request.generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "20000",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 51: thinkingLevel=none → 0 (ZeroAllowed=true)
-		{
-			name:            "51",
-			from:            "gemini",
-			to:              "antigravity",
-			model:           "antigravity-budget-model",
-			inputJSON:       `{"model":"antigravity-budget-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingLevel":"none"}}}`,
-			expectField:     "request.generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "0",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 52: thinkingBudget=-1 → -1 (DynamicAllowed=true)
-		{
-			name:            "52",
-			from:            "gemini",
-			to:              "antigravity",
-			model:           "antigravity-budget-model",
-			inputJSON:       `{"model":"antigravity-budget-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingBudget":-1}}}`,
-			expectField:     "request.generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "-1",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 53: Claude no param → passthrough
-		{
-			name:        "53",
-			from:        "claude",
-			to:          "antigravity",
-			model:       "antigravity-budget-model",
-			inputJSON:   `{"model":"antigravity-budget-model","messages":[{"role":"user","content":"hi"}]}`,
-			expectField: "",
-			expectErr:   false,
-		},
 		// Case 54: thinking.budget_tokens=8192 → 8192
-		{
-			name:            "54",
-			from:            "claude",
-			to:              "antigravity",
-			model:           "antigravity-budget-model",
-			inputJSON:       `{"model":"antigravity-budget-model","messages":[{"role":"user","content":"hi"}],"thinking":{"type":"enabled","budget_tokens":8192}}`,
-			expectField:     "request.generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "8192",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 55: thinking.budget_tokens=64000 → clamped to 20000
-		{
-			name:            "55",
-			from:            "claude",
-			to:              "antigravity",
-			model:           "antigravity-budget-model",
-			inputJSON:       `{"model":"antigravity-budget-model","messages":[{"role":"user","content":"hi"}],"thinking":{"type":"enabled","budget_tokens":64000}}`,
-			expectField:     "request.generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "20000",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 56: thinking.budget_tokens=0 → 0 (ZeroAllowed=true)
-		{
-			name:            "56",
-			from:            "claude",
-			to:              "antigravity",
-			model:           "antigravity-budget-model",
-			inputJSON:       `{"model":"antigravity-budget-model","messages":[{"role":"user","content":"hi"}],"thinking":{"type":"enabled","budget_tokens":0}}`,
-			expectField:     "request.generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "0",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 57: thinking.budget_tokens=-1 → -1 (DynamicAllowed=true)
-		{
-			name:            "57",
-			from:            "claude",
-			to:              "antigravity",
-			model:           "antigravity-budget-model",
-			inputJSON:       `{"model":"antigravity-budget-model","messages":[{"role":"user","content":"hi"}],"thinking":{"type":"enabled","budget_tokens":-1}}`,
-			expectField:     "request.generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "-1",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 
 		// no-thinking-model (Thinking=nil)
 
 		// Case 58: Gemini no param → passthrough
-		{
-			name:        "58",
-			from:        "gemini",
-			to:          "openai",
-			model:       "no-thinking-model",
-			inputJSON:   `{"model":"no-thinking-model","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField: "",
-			expectErr:   false,
-		},
 		// Case 59: thinkingBudget=8192 → stripped
-		{
-			name:        "59",
-			from:        "gemini",
-			to:          "openai",
-			model:       "no-thinking-model",
-			inputJSON:   `{"model":"no-thinking-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingBudget":8192}}}`,
-			expectField: "",
-			expectErr:   false,
-		},
 		// Case 60: thinkingBudget=0 → stripped
-		{
-			name:        "60",
-			from:        "gemini",
-			to:          "openai",
-			model:       "no-thinking-model",
-			inputJSON:   `{"model":"no-thinking-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingBudget":0}}}`,
-			expectField: "",
-			expectErr:   false,
-		},
 		// Case 61: thinkingBudget=-1 → stripped
-		{
-			name:        "61",
-			from:        "gemini",
-			to:          "openai",
-			model:       "no-thinking-model",
-			inputJSON:   `{"model":"no-thinking-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingBudget":-1}}}`,
-			expectField: "",
-			expectErr:   false,
-		},
 		// Case 62: Claude no param → passthrough
 		{
 			name:        "62",
@@ -1880,59 +781,10 @@ func TestThinkingE2EMatrix_Body(t *testing.T) {
 		// user-defined-model (UserDefined=true, Thinking=nil)
 
 		// Case 66: Gemini no param → passthrough
-		{
-			name:        "66",
-			from:        "gemini",
-			to:          "openai",
-			model:       "user-defined-model",
-			inputJSON:   `{"model":"user-defined-model","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField: "",
-			expectErr:   false,
-		},
 		// Case 67: thinkingBudget=8192 → medium
-		{
-			name:        "67",
-			from:        "gemini",
-			to:          "openai",
-			model:       "user-defined-model",
-			inputJSON:   `{"model":"user-defined-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingBudget":8192}}}`,
-			expectField: "reasoning_effort",
-			expectValue: "medium",
-			expectErr:   false,
-		},
 		// Case 68: thinkingBudget=64000 → xhigh (passthrough)
-		{
-			name:        "68",
-			from:        "gemini",
-			to:          "openai",
-			model:       "user-defined-model",
-			inputJSON:   `{"model":"user-defined-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingBudget":64000}}}`,
-			expectField: "reasoning_effort",
-			expectValue: "xhigh",
-			expectErr:   false,
-		},
 		// Case 69: thinkingBudget=0 → none
-		{
-			name:        "69",
-			from:        "gemini",
-			to:          "openai",
-			model:       "user-defined-model",
-			inputJSON:   `{"model":"user-defined-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingBudget":0}}}`,
-			expectField: "reasoning_effort",
-			expectValue: "none",
-			expectErr:   false,
-		},
 		// Case 70: thinkingBudget=-1 → auto
-		{
-			name:        "70",
-			from:        "gemini",
-			to:          "openai",
-			model:       "user-defined-model",
-			inputJSON:   `{"model":"user-defined-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingBudget":-1}}}`,
-			expectField: "reasoning_effort",
-			expectValue: "auto",
-			expectErr:   false,
-		},
 		// Case 71: Claude no param → injected default → medium
 		{
 			name:        "71",
@@ -1989,17 +841,6 @@ func TestThinkingE2EMatrix_Body(t *testing.T) {
 			expectErr:   false,
 		},
 		// Case 76: OpenAI reasoning_effort=medium to Gemini → 8192
-		{
-			name:            "76",
-			from:            "openai",
-			to:              "gemini",
-			model:           "user-defined-model",
-			inputJSON:       `{"model":"user-defined-model","messages":[{"role":"user","content":"hi"}],"reasoning_effort":"medium"}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "8192",
-			includeThoughts: "true",
-			expectErr:       false,
-		},
 		// Case 77: OpenAI reasoning_effort=medium to Claude → 8192
 		{
 			name:        "77",
@@ -2012,17 +853,6 @@ func TestThinkingE2EMatrix_Body(t *testing.T) {
 			expectErr:   false,
 		},
 		// Case 78: OpenAI-Response reasoning.effort=medium to Gemini → 8192
-		{
-			name:            "78",
-			from:            "openai-response",
-			to:              "gemini",
-			model:           "user-defined-model",
-			inputJSON:       `{"model":"user-defined-model","input":[{"role":"user","content":"hi"}],"reasoning":{"effort":"medium"}}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "8192",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 79: OpenAI-Response reasoning.effort=medium to Claude → 8192
 		{
 			name:        "79",
@@ -2080,27 +910,7 @@ func TestThinkingE2EMatrix_Body(t *testing.T) {
 			expectErr:   true,
 		},
 		// Case 84: Gemini to Gemini, thinkingBudget=8192 → passthrough
-		{
-			name:            "84",
-			from:            "gemini",
-			to:              "gemini",
-			model:           "gemini-budget-model",
-			inputJSON:       `{"model":"gemini-budget-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingBudget":8192}}}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "8192",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 		// Case 85: Gemini to Gemini, thinkingBudget=64000 → exceeds Max error
-		{
-			name:        "85",
-			from:        "gemini",
-			to:          "gemini",
-			model:       "gemini-budget-model",
-			inputJSON:   `{"model":"gemini-budget-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingBudget":64000}}}`,
-			expectField: "",
-			expectErr:   true,
-		},
 		// Case 86: Claude to Claude, thinking.budget_tokens=8192 → passthrough
 		{
 			name:        "86",
@@ -2126,27 +936,7 @@ func TestThinkingE2EMatrix_Body(t *testing.T) {
 		// Tests that gemini/antigravity as same API family should have consistent validation behavior
 
 		// Case 88: Gemini to Antigravity, thinkingBudget=64000 → exceeds Max error (same family strict validation)
-		{
-			name:        "88",
-			from:        "gemini",
-			to:          "antigravity",
-			model:       "gemini-budget-model",
-			inputJSON:   `{"model":"gemini-budget-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingBudget":64000}}}`,
-			expectField: "",
-			expectErr:   true,
-		},
 		// Case 89: Gemini to Antigravity, thinkingBudget=8192 → passthrough (normal value)
-		{
-			name:            "89",
-			from:            "gemini",
-			to:              "antigravity",
-			model:           "gemini-budget-model",
-			inputJSON:       `{"model":"gemini-budget-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingBudget":8192}}}`,
-			expectField:     "request.generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "8192",
-			includeThoughts: "",
-			expectErr:       false,
-		},
 	}
 
 	runThinkingTests(t, cases)
@@ -2191,15 +981,6 @@ func TestThinkingE2EProviderTargets(t *testing.T) {
 			expectValue: "high",
 		},
 		{
-			name:        "X4",
-			from:        "gemini",
-			to:          "xai",
-			model:       "xai-level-model(512)",
-			inputJSON:   `{"model":"xai-level-model(512)","contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-			expectField: "reasoning.effort",
-			expectValue: "low",
-		},
-		{
 			name:        "X5",
 			from:        "claude",
 			to:          "xai",
@@ -2225,15 +1006,6 @@ func TestThinkingE2EProviderTargets(t *testing.T) {
 			inputJSON:   `{"model":"xai-level-model","input":[{"role":"user","content":"hi"}],"reasoning":{"effort":"minimal"}}`,
 			expectField: "reasoning.effort",
 			expectValue: "low",
-		},
-		{
-			name:        "X8",
-			from:        "gemini",
-			to:          "xai",
-			model:       "xai-level-model",
-			inputJSON:   `{"model":"xai-level-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingBudget":32768}}}`,
-			expectField: "reasoning.effort",
-			expectValue: "high",
 		},
 		{
 			name:        "X9",
@@ -2296,17 +1068,6 @@ func TestThinkingE2EProviderTargets(t *testing.T) {
 			expectField: "reasoning_effort",
 			expectValue: "minimal",
 		},
-
-		{
-			name:            "R4",
-			from:            "openai-response",
-			to:              "antigravity",
-			model:           "antigravity-budget-model",
-			inputJSON:       `{"model":"antigravity-budget-model","input":"hi","reasoning":{"effort":"medium"}}`,
-			expectField:     "request.generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "8192",
-			includeThoughts: "true",
-		},
 	}
 
 	runThinkingTests(t, cases)
@@ -2357,15 +1118,6 @@ func TestThinkingE2EInteractionsMatrix(t *testing.T) {
 			inputJSON:   `{"model":"level-model","input":"hi","reasoning":{"effort":"low"}}`,
 			expectField: "generation_config.thinking_level",
 			expectValue: "low",
-		},
-		{
-			name:        "IN4",
-			from:        "gemini",
-			to:          "interactions",
-			model:       "level-model",
-			inputJSON:   `{"model":"level-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"includeThoughts":true,"thinkingBudget":20000}}}`,
-			expectField: "generation_config.thinking_level",
-			expectValue: "high",
 		},
 		// A level the model does not publish falls back to its highest level.
 		{
@@ -2469,25 +1221,6 @@ func TestThinkingE2EInteractionsMatrix(t *testing.T) {
 			expectField: "reasoning.effort",
 			expectValue: "low",
 		},
-		{
-			name:        "OUT4",
-			from:        "interactions",
-			to:          "gemini",
-			model:       "gemini-budget-model",
-			inputJSON:   `{"model":"gemini-budget-model","generation_config":{"thinking_level":"medium"},"input":"hi"}`,
-			expectField: "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue: "8192",
-		},
-		{
-			name:            "OUT5",
-			from:            "interactions",
-			to:              "antigravity",
-			model:           "antigravity-budget-model",
-			inputJSON:       `{"model":"antigravity-budget-model","generation_config":{"thinking_level":"medium"},"input":"hi"}`,
-			expectField:     "request.generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "8192",
-			includeThoughts: "",
-		},
 
 		{
 			name:        "OUT7",
@@ -2509,38 +1242,11 @@ func TestThinkingE2EInteractionsMatrix(t *testing.T) {
 			expectField: "thinking.type",
 			expectValue: "disabled",
 		},
-		{
-			name:            "OUT9",
-			from:            "interactions",
-			to:              "antigravity",
-			model:           "antigravity-budget-model",
-			inputJSON:       `{"model":"antigravity-budget-model","generation_config":{"thinking_level":"none"},"input":"hi"}`,
-			expectField:     "request.generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "0",
-			includeThoughts: "",
-		},
 
 		// A level+budget model that allows zero expresses off by dropping
 		// thinkingConfig entirely, so an Interactions client reaches the same shape a
 		// chat or Responses client does.
-		{
-			name:         "OUT11",
-			from:         "interactions",
-			to:           "gemini",
-			model:        "gemini-toggle-mixed-model",
-			inputJSON:    `{"model":"gemini-toggle-mixed-model","generation_config":{"thinking_level":"none"},"input":"hi"}`,
-			expectAbsent: []string{"generationConfig.thinkingConfig"},
-		},
 		// Auto reaches a dynamic-capable provider as dynamic thinking.
-		{
-			name:        "OUT12",
-			from:        "interactions",
-			to:          "gemini",
-			model:       "gemini-budget-model",
-			inputJSON:   `{"model":"gemini-budget-model","generation_config":{"thinking_level":"auto"},"input":"hi"}`,
-			expectField: "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue: "-1",
-		},
 	}
 
 	runThinkingTests(t, cases)
@@ -2639,146 +1345,6 @@ func TestThinkingE2EClaudeAdaptive_Body(t *testing.T) {
 		},
 
 		// B subgroup: Gemini -> Claude (thinkingLevel/thinkingBudget -> output_config.effort)
-		{
-			name:        "B1",
-			from:        "gemini",
-			to:          "claude",
-			model:       "claude-sonnet-4-6-model",
-			inputJSON:   `{"model":"claude-sonnet-4-6-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingLevel":"minimal"}}}`,
-			expectField: "output_config.effort",
-			expectValue: "low",
-			expectErr:   false,
-		},
-		{
-			name:        "B2",
-			from:        "gemini",
-			to:          "claude",
-			model:       "claude-sonnet-4-6-model",
-			inputJSON:   `{"model":"claude-sonnet-4-6-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingLevel":"low"}}}`,
-			expectField: "output_config.effort",
-			expectValue: "low",
-			expectErr:   false,
-		},
-		{
-			name:        "B3",
-			from:        "gemini",
-			to:          "claude",
-			model:       "claude-sonnet-4-6-model",
-			inputJSON:   `{"model":"claude-sonnet-4-6-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingLevel":"medium"}}}`,
-			expectField: "output_config.effort",
-			expectValue: "medium",
-			expectErr:   false,
-		},
-		{
-			name:        "B4",
-			from:        "gemini",
-			to:          "claude",
-			model:       "claude-sonnet-4-6-model",
-			inputJSON:   `{"model":"claude-sonnet-4-6-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingLevel":"high"}}}`,
-			expectField: "output_config.effort",
-			expectValue: "high",
-			expectErr:   false,
-		},
-		{
-			name:        "B5",
-			from:        "gemini",
-			to:          "claude",
-			model:       "claude-opus-4-6-model",
-			inputJSON:   `{"model":"claude-opus-4-6-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingLevel":"xhigh"}}}`,
-			expectField: "output_config.effort",
-			expectValue: "max",
-			expectErr:   false,
-		},
-		{
-			name:        "B6",
-			from:        "gemini",
-			to:          "claude",
-			model:       "claude-sonnet-4-6-model",
-			inputJSON:   `{"model":"claude-sonnet-4-6-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingLevel":"xhigh"}}}`,
-			expectField: "output_config.effort",
-			expectValue: "high",
-			expectErr:   false,
-		},
-		{
-			name:        "B7",
-			from:        "gemini",
-			to:          "claude",
-			model:       "claude-sonnet-4-6-model",
-			inputJSON:   `{"model":"claude-sonnet-4-6-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingBudget":512}}}`,
-			expectField: "output_config.effort",
-			expectValue: "low",
-			expectErr:   false,
-		},
-		{
-			name:        "B8",
-			from:        "gemini",
-			to:          "claude",
-			model:       "claude-sonnet-4-6-model",
-			inputJSON:   `{"model":"claude-sonnet-4-6-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingBudget":1024}}}`,
-			expectField: "output_config.effort",
-			expectValue: "low",
-			expectErr:   false,
-		},
-		{
-			name:        "B9",
-			from:        "gemini",
-			to:          "claude",
-			model:       "claude-sonnet-4-6-model",
-			inputJSON:   `{"model":"claude-sonnet-4-6-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingBudget":8192}}}`,
-			expectField: "output_config.effort",
-			expectValue: "medium",
-			expectErr:   false,
-		},
-		{
-			name:        "B10",
-			from:        "gemini",
-			to:          "claude",
-			model:       "claude-sonnet-4-6-model",
-			inputJSON:   `{"model":"claude-sonnet-4-6-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingBudget":24576}}}`,
-			expectField: "output_config.effort",
-			expectValue: "high",
-			expectErr:   false,
-		},
-		{
-			name:        "B11",
-			from:        "gemini",
-			to:          "claude",
-			model:       "claude-opus-4-6-model",
-			inputJSON:   `{"model":"claude-opus-4-6-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingBudget":32768}}}`,
-			expectField: "output_config.effort",
-			expectValue: "max",
-			expectErr:   false,
-		},
-		{
-			name:        "B12",
-			from:        "gemini",
-			to:          "claude",
-			model:       "claude-sonnet-4-6-model",
-			inputJSON:   `{"model":"claude-sonnet-4-6-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingBudget":32768}}}`,
-			expectField: "output_config.effort",
-			expectValue: "high",
-			expectErr:   false,
-		},
-		{
-			name:        "B13",
-			from:        "gemini",
-			to:          "claude",
-			model:       "claude-sonnet-4-6-model",
-			inputJSON:   `{"model":"claude-sonnet-4-6-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingBudget":0}}}`,
-			expectField: "thinking.type",
-			expectValue: "disabled",
-			expectErr:   false,
-		},
-		{
-			name:        "B14",
-			from:        "gemini",
-			to:          "claude",
-			model:       "claude-sonnet-4-6-model",
-			inputJSON:   `{"model":"claude-sonnet-4-6-model","contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"thinkingConfig":{"thinkingBudget":-1}}}`,
-			expectField: "output_config.effort",
-			expectValue: "high",
-			expectErr:   false,
-		},
 
 		// C subgroup: Claude adaptive + effort cross-protocol conversion
 		{
@@ -2852,73 +1418,6 @@ func TestThinkingE2EClaudeAdaptive_Body(t *testing.T) {
 		},
 
 		{
-			name:            "C8",
-			from:            "claude",
-			to:              "gemini",
-			model:           "level-subset-model",
-			inputJSON:       `{"model":"level-subset-model","messages":[{"role":"user","content":"hi"}],"thinking":{"type":"adaptive"},"output_config":{"effort":"high"}}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingLevel",
-			expectValue:     "high",
-			includeThoughts: "",
-			expectErr:       false,
-		},
-		{
-			name:            "C9",
-			from:            "claude",
-			to:              "gemini",
-			model:           "gemini-budget-model",
-			inputJSON:       `{"model":"gemini-budget-model","messages":[{"role":"user","content":"hi"}],"thinking":{"type":"adaptive"},"output_config":{"effort":"low"}}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "1024",
-			includeThoughts: "",
-			expectErr:       false,
-		},
-		{
-			name:            "C10",
-			from:            "claude",
-			to:              "gemini",
-			model:           "gemini-budget-model",
-			inputJSON:       `{"model":"gemini-budget-model","messages":[{"role":"user","content":"hi"}],"thinking":{"type":"adaptive"},"output_config":{"effort":"medium"}}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "8192",
-			includeThoughts: "",
-			expectErr:       false,
-		},
-		{
-			name:            "C11",
-			from:            "claude",
-			to:              "gemini",
-			model:           "gemini-budget-model",
-			inputJSON:       `{"model":"gemini-budget-model","messages":[{"role":"user","content":"hi"}],"thinking":{"type":"adaptive"},"output_config":{"effort":"high"}}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "20000",
-			includeThoughts: "",
-			expectErr:       false,
-		},
-		{
-			name:            "C12",
-			from:            "claude",
-			to:              "gemini",
-			model:           "gemini-budget-model",
-			inputJSON:       `{"model":"gemini-budget-model","messages":[{"role":"user","content":"hi"}],"thinking":{"type":"adaptive"}}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "20000",
-			includeThoughts: "",
-			expectErr:       false,
-		},
-		{
-			name:            "C13",
-			from:            "claude",
-			to:              "gemini",
-			model:           "gemini-mixed-model",
-			inputJSON:       `{"model":"gemini-mixed-model","messages":[{"role":"user","content":"hi"}],"thinking":{"type":"adaptive"},"output_config":{"effort":"high"}}`,
-			expectField:     "generationConfig.thinkingConfig.thinkingLevel",
-			expectValue:     "high",
-			includeThoughts: "",
-			expectErr:       false,
-		},
-
-		{
 			name:        "C14",
 			from:        "claude",
 			to:          "codex",
@@ -2967,17 +1466,6 @@ func TestThinkingE2EClaudeAdaptive_Body(t *testing.T) {
 			expectField: "reasoning.effort",
 			expectValue: "high",
 			expectErr:   false,
-		},
-		{
-			name:            "C19",
-			from:            "claude",
-			to:              "antigravity",
-			model:           "antigravity-budget-model",
-			inputJSON:       `{"model":"antigravity-budget-model","messages":[{"role":"user","content":"hi"}],"thinking":{"type":"adaptive"}}`,
-			expectField:     "request.generationConfig.thinkingConfig.thinkingBudget",
-			expectValue:     "20000",
-			includeThoughts: "",
-			expectErr:       false,
 		},
 
 		{

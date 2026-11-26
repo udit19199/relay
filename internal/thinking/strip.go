@@ -58,10 +58,6 @@ func stripThinkingFieldsDoc(doc *ojson.Doc, format string, keepTopLevelEffort ..
 		} else {
 			paths = []string{"thinking", "output_config.effort"}
 		}
-	case "gemini":
-		paths = []string{"generationConfig.thinkingConfig"}
-	case "antigravity":
-		paths = []string{"request.generationConfig.thinkingConfig"}
 	case "interactions":
 		paths = []string{
 			"generation_config.thinking_level",

@@ -3052,23 +3052,6 @@ func TestClaudeExecutor_CountTokensCountsLocallyWithoutUpstreamRequest(t *testin
 		})
 	}
 
-	executor := NewClaudeExecutor(&config.Config{})
-	resp, err := executor.CountTokens(context.Background(), nil, cliproxyexecutor.Request{
-		Model:   "claude-sonnet-4-5",
-		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:   sdktranslator.FormatClaude,
-		ResponseFormat: sdktranslator.FormatClaude,
-	})
-	if err != nil {
-		t.Fatalf("CountTokens() Gemini response error = %v", err)
-	}
-	if got := ojson.GetBytes(resp.Payload, "totalTokens").Int(); got != expectedCount {
-		t.Fatalf("Gemini totalTokens = %d, want %d; payload = %s", got, expectedCount, resp.Payload)
-	}
-	if got := ojson.GetBytes(resp.Payload, "promptTokensDetails.0.tokenCount").Int(); got != expectedCount {
-		t.Fatalf("Gemini prompt token detail = %d, want %d; payload = %s", got, expectedCount, resp.Payload)
-	}
 }
 
 func TestClaudeExecutor_CountTokensRejectsInvalidRequests(t *testing.T) {
@@ -10490,18 +10473,6 @@ func TestClaudeExecutor_ChatCompletionsDefaultMaxTokensAndPayloadDefaultRule(t *
 				name:      "responses explicit max_output_tokens preserved",
 				format:    sdktranslator.FormatOpenAIResponse,
 				payload:   `{"model":"claude-opus-5-5","max_output_tokens":4096,"input":"hi"}`,
-				wantLimit: 4096,
-			},
-			{
-				name:      "gemini omitted maxOutputTokens uses payload.default",
-				format:    sdktranslator.FormatClaude,
-				payload:   `{"contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
-				wantLimit: 16384,
-			},
-			{
-				name:      "gemini explicit maxOutputTokens preserved",
-				format:    sdktranslator.FormatClaude,
-				payload:   `{"contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"maxOutputTokens":4096}}`,
 				wantLimit: 4096,
 			},
 		}

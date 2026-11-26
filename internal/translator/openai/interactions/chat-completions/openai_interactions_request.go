@@ -32,10 +32,9 @@ func convertOpenAIRequestToInteractions(modelName string, inputRawJSON []byte, s
 	if agentConfig := root.Get("agent_config"); agentConfig.Exists() {
 		_ = outDoc.SetRaw("agent_config", agentConfig.Raw)
 	}
-	forAntigravity := isAntigravityModel(model)
-	errMessages := appendOpenAIMessagesToInteractionsDoc(outDoc, root.Get("messages"), forAntigravity)
+	errMessages := appendOpenAIMessagesToInteractionsDoc(outDoc, root.Get("messages"))
 	copyOpenAIChatGenerationConfigToInteractionsDoc(outDoc, root, model)
-	appendOpenAIChatToolsToInteractionsDoc(outDoc, root.Get("tools"), forAntigravity)
+	appendOpenAIChatToolsToInteractionsDoc(outDoc, root.Get("tools"))
 	return outDoc.Bytes(), errMessages
 }
 
@@ -49,7 +48,7 @@ func openAIRequestStreamValue(root ojson.Result, stream bool) (bool, bool) {
 	return false, false
 }
 
-func appendOpenAIMessagesToInteractionsDoc(outDoc *ojson.Doc, messages ojson.Result, forAntigravity bool) error {
+func appendOpenAIMessagesToInteractionsDoc(outDoc *ojson.Doc, messages ojson.Result) error {
 	if !messages.Exists() || !messages.IsArray() {
 		return nil
 	}
@@ -68,7 +67,7 @@ func appendOpenAIMessagesToInteractionsDoc(outDoc *ojson.Doc, messages ojson.Res
 				systemBuilder.WriteString(text)
 			}
 		default:
-			appendOpenAIMessageToInteractions(&inputItems, message, forAntigravity, toolNamesByID, &drops)
+			appendOpenAIMessageToInteractions(&inputItems, message, toolNamesByID, &drops)
 		}
 		return true
 	})
@@ -79,7 +78,7 @@ func appendOpenAIMessagesToInteractionsDoc(outDoc *ojson.Doc, messages ojson.Res
 	return drops.Err()
 }
 
-func appendOpenAIMessageToInteractions(items *[][]byte, message ojson.Result, forAntigravity bool, toolNamesByID map[string]string, drops *translatorcommon.UserTurnDrops) {
+func appendOpenAIMessageToInteractions(items *[][]byte, message ojson.Result, toolNamesByID map[string]string, drops *translatorcommon.UserTurnDrops) {
 	role := strings.ToLower(strings.TrimSpace(message.Get("role").String()))
 	switch role {
 	case "assistant":
@@ -98,14 +97,14 @@ func appendOpenAIMessageToInteractions(items *[][]byte, message ojson.Result, fo
 						toolNamesByID[id] = name
 					}
 				}
-				if step, ok := openAIToolCallToInteractionsStep(toolCall, forAntigravity); ok {
+				if step, ok := openAIToolCallToInteractionsStep(toolCall); ok {
 					*items = append(*items, step)
 				}
 				return true
 			})
 		}
 	case "tool", "function":
-		*items = append(*items, openAIToolResultToInteractions(message, forAntigravity, toolNamesByID))
+		*items = append(*items, openAIToolResultToInteractions(message, toolNamesByID))
 	default:
 		if step, ok := openAIChatContentStep("user_input", message.Get("content"), drops); ok {
 			*items = append(*items, step)
@@ -248,7 +247,7 @@ func openAIChatImagePartToInteractions(part ojson.Result) []byte {
 	return outDoc.Bytes()
 }
 
-func openAIToolResultToInteractions(message ojson.Result, forAntigravity bool, toolNamesByID map[string]string) []byte {
+func openAIToolResultToInteractions(message ojson.Result, toolNamesByID map[string]string) []byte {
 	outDoc := ojson.NewDocString(`{"type":"function_result","result":""}`)
 	callID := util.FirstNonEmpty(message.Get("tool_call_id").String(), message.Get("id").String())
 	if callID != "" {
@@ -259,9 +258,6 @@ func openAIToolResultToInteractions(message ojson.Result, forAntigravity bool, t
 		name = toolNamesByID[callID]
 	}
 	if name != "" {
-		if forAntigravity {
-			name = translatorcommon.AntigravityToolNameToUpstream(name)
-		}
 		_ = outDoc.Set("name", name)
 	}
 	content := message.Get("content")
@@ -273,38 +269,18 @@ func openAIToolResultToInteractions(message ojson.Result, forAntigravity bool, t
 	return outDoc.Bytes()
 }
 
-func isAntigravityModel(model string) bool {
-	return strings.Contains(strings.ToLower(model), "antigravity")
-}
-
-func copyOpenAIChatGenerationConfigToInteractionsDoc(outDoc *ojson.Doc, root ojson.Result, model string) {
-	if isAntigravityModel(model) {
-		if maxOutputTokens := firstExisting(root.Get("max_completion_tokens"), root.Get("max_tokens"), root.Get("max_output_tokens")); maxOutputTokens.Exists() && !root.Get("agent_config.max_total_tokens").Exists() {
-			_ = outDoc.Set("agent_config.max_total_tokens", maxOutputTokens.Int())
-		}
-	} else {
-		copyNumberDoc(outDoc, "generation_config.max_output_tokens", firstExisting(root.Get("max_completion_tokens"), root.Get("max_tokens")))
-		copyNumberDoc(outDoc, "generation_config.temperature", root.Get("temperature"))
-		copyNumberDoc(outDoc, "generation_config.top_p", root.Get("top_p"))
-		copyNumberDoc(outDoc, "generation_config.presence_penalty", root.Get("presence_penalty"))
-		copyNumberDoc(outDoc, "generation_config.frequency_penalty", root.Get("frequency_penalty"))
-		copyNumberDoc(outDoc, "generation_config.candidate_count", root.Get("n"))
-		if stop := root.Get("stop"); stop.Exists() {
-			_ = outDoc.SetRaw("generation_config.stop_sequences", stop.Raw)
-		}
+func copyOpenAIChatGenerationConfigToInteractionsDoc(outDoc *ojson.Doc, root ojson.Result, _ string) {
+	copyNumberDoc(outDoc, "generation_config.max_output_tokens", firstExisting(root.Get("max_completion_tokens"), root.Get("max_tokens")))
+	copyNumberDoc(outDoc, "generation_config.temperature", root.Get("temperature"))
+	copyNumberDoc(outDoc, "generation_config.top_p", root.Get("top_p"))
+	copyNumberDoc(outDoc, "generation_config.presence_penalty", root.Get("presence_penalty"))
+	copyNumberDoc(outDoc, "generation_config.frequency_penalty", root.Get("frequency_penalty"))
+	copyNumberDoc(outDoc, "generation_config.candidate_count", root.Get("n"))
+	if stop := root.Get("stop"); stop.Exists() {
+		_ = outDoc.SetRaw("generation_config.stop_sequences", stop.Raw)
 	}
 	if toolChoice := root.Get("tool_choice"); toolChoice.Exists() {
-		if isAntigravityModel(model) && toolChoice.IsObject() {
-			tcRaw := []byte(toolChoice.Raw)
-			if fnName := toolChoice.Get("function.name").String(); fnName != "" {
-				tcRaw, _ = ojson.SetBytes(tcRaw, "function.name", translatorcommon.AntigravityToolNameToUpstream(fnName))
-			} else if name := toolChoice.Get("name").String(); name != "" {
-				tcRaw, _ = ojson.SetBytes(tcRaw, "name", translatorcommon.AntigravityToolNameToUpstream(name))
-			}
-			_ = outDoc.SetRawBytes("generation_config.tool_choice", tcRaw)
-		} else {
-			_ = outDoc.SetRaw("generation_config.tool_choice", toolChoice.Raw)
-		}
+		_ = outDoc.SetRaw("generation_config.tool_choice", toolChoice.Raw)
 	}
 	if effort := root.Get("reasoning_effort"); effort.Exists() && effort.Type == ojson.String {
 		_ = outDoc.Set("generation_config.thinking_level", strings.ToLower(strings.TrimSpace(effort.String())))
@@ -320,13 +296,13 @@ func copyOpenAIChatGenerationConfigToInteractionsDoc(outDoc *ojson.Doc, root ojs
 	}
 }
 
-func appendOpenAIChatToolsToInteractionsDoc(outDoc *ojson.Doc, tools ojson.Result, forAntigravity bool) {
+func appendOpenAIChatToolsToInteractionsDoc(outDoc *ojson.Doc, tools ojson.Result) {
 	if !tools.Exists() || !tools.IsArray() {
 		return
 	}
 	var toolItems [][]byte
 	tools.ForEach(func(_, tool ojson.Result) bool {
-		if converted, ok := openAIChatToolToInteractions(tool, forAntigravity); ok {
+		if converted, ok := openAIChatToolToInteractions(tool); ok {
 			toolItems = append(toolItems, converted)
 		}
 		return true
@@ -336,7 +312,7 @@ func appendOpenAIChatToolsToInteractionsDoc(outDoc *ojson.Doc, tools ojson.Resul
 	}
 }
 
-func openAIChatToolToInteractions(tool ojson.Result, forAntigravity bool) ([]byte, bool) {
+func openAIChatToolToInteractions(tool ojson.Result) ([]byte, bool) {
 	toolType := strings.ToLower(strings.TrimSpace(tool.Get("type").String()))
 	if toolType != "" && toolType != "function" {
 		return nil, false
@@ -344,9 +320,6 @@ func openAIChatToolToInteractions(tool ojson.Result, forAntigravity bool) ([]byt
 	name := util.FirstNonEmpty(tool.Get("function.name").String(), tool.Get("name").String())
 	if name == "" {
 		return nil, false
-	}
-	if forAntigravity {
-		name = translatorcommon.AntigravityToolNameToUpstream(name)
 	}
 	outDoc := ojson.NewDocString(`{"type":"function","name":""}`)
 	_ = outDoc.Set("name", name)

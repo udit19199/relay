@@ -20,22 +20,6 @@ func TestPatchDisableCoolingOverrideForEveryFamily(t *testing.T) {
 		get   func(*config.Config) *bool
 	}{
 		{
-			name: "gemini",
-			setup: func(cfg *config.Config) {
-				cfg.GeminiKey = []config.GeminiKey{{APIKey: "key", DisableCooling: &initial}}
-			},
-			patch: (*Handler).PatchGeminiKey,
-			get:   func(cfg *config.Config) *bool { return cfg.GeminiKey[0].DisableCooling },
-		},
-		{
-			name: "interactions",
-			setup: func(cfg *config.Config) {
-				cfg.InteractionsKey = []config.GeminiKey{{APIKey: "key", DisableCooling: &initial}}
-			},
-			patch: (*Handler).PatchInteractionsKey,
-			get:   func(cfg *config.Config) *bool { return cfg.InteractionsKey[0].DisableCooling },
-		},
-		{
 			name: "claude",
 			setup: func(cfg *config.Config) {
 				cfg.ClaudeKey = []config.ClaudeKey{{APIKey: "key", DisableCooling: &initial}}
@@ -55,18 +39,6 @@ func TestPatchDisableCoolingOverrideForEveryFamily(t *testing.T) {
 			},
 			patch: (*Handler).PatchOpenAICompat,
 			get:   func(cfg *config.Config) *bool { return cfg.OpenAICompatibility[0].DisableCooling },
-		},
-		{
-			name: "vertex",
-			setup: func(cfg *config.Config) {
-				cfg.VertexCompatAPIKey = []config.VertexCompatKey{{
-					APIKey:         "key",
-					BaseURL:        "https://vertex.example.com",
-					DisableCooling: &initial,
-				}}
-			},
-			patch: (*Handler).PatchVertexCompatKey,
-			get:   func(cfg *config.Config) *bool { return cfg.VertexCompatAPIKey[0].DisableCooling },
 		},
 		{
 			name: "codex",

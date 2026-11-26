@@ -21,12 +21,10 @@ var providerAppliersMu sync.RWMutex
 
 // nativeProviderAppliers maps built-in provider names to their implementations.
 var nativeProviderAppliers = map[string]ProviderApplier{
-	"gemini":      nil,
-	"claude":      nil,
-	"openai":      nil,
-	"codex":       nil,
-	"antigravity": nil,
-	"xai":         nil,
+	"claude": nil,
+	"openai": nil,
+	"codex":  nil,
+	"xai":    nil,
 }
 
 // pluginProviderAppliers maps plugin-owned provider names to their implementations.
@@ -704,8 +702,6 @@ func extractThinkingConfigFromGetter(get func(string) ojson.Result, provider str
 	switch provider {
 	case "claude":
 		return extractClaudeConfigFromGetter(get)
-	case "gemini", "antigravity":
-		return extractGeminiConfigFromGetter(get, provider)
 	case "interactions":
 		return extractInteractionsConfigFromGetter(get)
 	case "openai":
@@ -870,53 +866,6 @@ func extractClaudeConfigFromGetter(get func(string) ojson.Result) ThinkingConfig
 			}
 		}
 		return ThinkingConfig{Mode: ModeAuto, Budget: -1}
-	}
-
-	return ThinkingConfig{}
-}
-
-func extractGeminiConfig(body []byte, provider string) ThinkingConfig {
-	return extractGeminiConfigFromGetter(func(path string) ojson.Result {
-		return ojson.GetBytesNoCopy(body, path)
-	}, provider)
-}
-
-func extractGeminiConfigFromGetter(get func(string) ojson.Result, provider string) ThinkingConfig {
-	prefix := "generationConfig.thinkingConfig"
-	if provider == "antigravity" {
-		prefix = "request.generationConfig.thinkingConfig"
-	}
-
-	level := get(prefix + ".thinkingLevel")
-	if !level.Exists() {
-		level = get(prefix + ".thinking_level")
-	}
-	if level.Exists() {
-		value := level.String()
-		switch value {
-		case "none":
-			return ThinkingConfig{Mode: ModeNone, Budget: 0}
-		case "auto":
-			return ThinkingConfig{Mode: ModeAuto, Budget: -1}
-		default:
-			return ThinkingConfig{Mode: ModeLevel, Level: ThinkingLevel(value)}
-		}
-	}
-
-	budget := get(prefix + ".thinkingBudget")
-	if !budget.Exists() {
-		budget = get(prefix + ".thinking_budget")
-	}
-	if budget.Exists() {
-		value := int(budget.Int())
-		switch value {
-		case 0:
-			return ThinkingConfig{Mode: ModeNone, Budget: 0}
-		case -1:
-			return ThinkingConfig{Mode: ModeAuto, Budget: -1}
-		default:
-			return ThinkingConfig{Mode: ModeBudget, Budget: value}
-		}
 	}
 
 	return ThinkingConfig{}

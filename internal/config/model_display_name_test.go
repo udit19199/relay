@@ -23,23 +23,13 @@ claude-api-key:
       - name: claude-upstream
         alias: claude-alias
         display-name: Claude Name
-gemini-api-key:
-  - models:
-      - name: gemini-upstream
-        alias: gemini-alias
-        display-name: Gemini Name
-vertex-api-key:
-  - models:
-      - name: vertex-upstream
-        alias: vertex-alias
-        display-name: Vertex Name
 openai-compatibility:
   - models:
       - name: compat-upstream
         alias: compat-alias
         display-name: Compatibility Name
 `
-	const jsonConfig = `{"codex-api-key":[{"models":[{"name":"codex-upstream","alias":"codex-alias","display-name":"Codex Name"}]}],"xai-api-key":[{"models":[{"name":"xai-upstream","alias":"xai-alias","display-name":"xAI Name"}]}],"claude-api-key":[{"models":[{"name":"claude-upstream","alias":"claude-alias","display-name":"Claude Name"}]}],"gemini-api-key":[{"models":[{"name":"gemini-upstream","alias":"gemini-alias","display-name":"Gemini Name"}]}],"vertex-api-key":[{"models":[{"name":"vertex-upstream","alias":"vertex-alias","display-name":"Vertex Name"}]}],"openai-compatibility":[{"models":[{"name":"compat-upstream","alias":"compat-alias","display-name":"Compatibility Name"}]}]}`
+	const jsonConfig = `{"codex-api-key":[{"models":[{"name":"codex-upstream","alias":"codex-alias","display-name":"Codex Name"}]}],"xai-api-key":[{"models":[{"name":"xai-upstream","alias":"xai-alias","display-name":"xAI Name"}]}],"claude-api-key":[{"models":[{"name":"claude-upstream","alias":"claude-alias","display-name":"Claude Name"}]}],"openai-compatibility":[{"models":[{"name":"compat-upstream","alias":"compat-alias","display-name":"Compatibility Name"}]}]}`
 
 	for _, tt := range []struct {
 		name   string
@@ -71,12 +61,6 @@ openai-compatibility:
 			}
 			if got := cfg.ClaudeKey[0].Models[0].DisplayName; got != "Claude Name" {
 				t.Fatalf("Claude display name = %q", got)
-			}
-			if got := cfg.GeminiKey[0].Models[0].DisplayName; got != "Gemini Name" {
-				t.Fatalf("Gemini display name = %q", got)
-			}
-			if got := cfg.VertexCompatAPIKey[0].Models[0].DisplayName; got != "Vertex Name" {
-				t.Fatalf("Vertex display name = %q", got)
 			}
 			if got := cfg.OpenAICompatibility[0].Models[0].DisplayName; got != "Compatibility Name" {
 				t.Fatalf("OpenAI compatibility display name = %q", got)

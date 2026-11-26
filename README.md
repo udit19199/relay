@@ -3,7 +3,7 @@
 Relay keeps your coding agent working when an AI plan hits its limit. It runs
 on your Mac at `127.0.0.1:8317`, holds the subscriptions you already pay for
 (Claude Pro or Max, ChatGPT through Codex, OpenCode Go and a few others), and
-serves them to any tool that speaks the OpenAI, Anthropic, or Gemini API. When
+serves them to any tool that speaks the OpenAI or Anthropic API. When
 one account runs out, the next request goes to another account, or to another
 plan in the fallback order you set.
 
@@ -22,7 +22,7 @@ flowchart LR
     subgraph clients[Your tools]
         CC[Claude Code]
         OC[OpenCode]
-        AN[Any OpenAI / Anthropic / Gemini client]
+        AN[Any OpenAI / Anthropic client]
     end
     subgraph mac[Your Mac]
         R[Relay<br/>127.0.0.1:8317]
@@ -66,9 +66,10 @@ flowchart LR
 | Devin | `relay accounts add devin` | No, comes from CLIProxyAPI |
 | Meta | `relay accounts add meta` | No, comes from CLIProxyAPI |
 
-Relay turns off the Google providers that CLIProxyAPI has (Gemini, Gemini CLI,
-Vertex, AI Studio, Antigravity). Clients can still call Relay with the Gemini
-request format; Relay translates it for the accounts above.
+Relay removes the Google providers that CLIProxyAPI has (Gemini, Gemini CLI,
+Vertex, AI Studio, Antigravity), including the Gemini inbound API format.
+Gemini-named models can still appear when a retained provider such as Devin
+serves them.
 
 OpenCode Go models show up as `opencode-go/<model>`, for example
 `opencode-go/deepseek-v4.1-flash`. Relay asks OpenCode Go for its model list on
@@ -85,7 +86,6 @@ accounts:
 | OpenAI chat completions (plain, streaming, tool calls) | Works |
 | Anthropic messages (plain, streaming, tool use, `count_tokens`, `x-api-key`) | Works |
 | OpenAI Responses API (plain and streaming) | Works |
-| Gemini `generateContent` and `streamGenerateContent` into Claude | Works |
 | Thinking level in the model name, like `claude-sonnet-4-6(low)` | Works |
 | OpenCode Go through the OpenAI and Anthropic formats, with tools | Works |
 | Rotation across accounts, skipping a rate-limited one | Works |

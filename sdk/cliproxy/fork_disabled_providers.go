@@ -11,14 +11,7 @@ import (
 // forkDisabledProviders lists providers stripped in this fork.
 // This fork keeps Claude/Codex/xAI/Devin/Meta and drops all
 // Google families (Gemini, Vertex, AI Studio) plus Antigravity.
-var forkDisabledProviders = map[string]bool{
-	"antigravity":         true,
-	"gemini":              true,
-	"gemini-interactions": true,
-	"gemini-cli":          true,
-	"vertex":              true,
-	"aistudio":            true,
-}
+var forkDisabledProviders = map[string]bool{}
 
 // isForkDisabledProvider reports whether a provider key is stripped in this fork.
 func isForkDisabledProvider(provider string) bool {

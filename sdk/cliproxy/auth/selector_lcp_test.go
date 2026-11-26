@@ -346,27 +346,27 @@ func TestSessionAffinitySelectorLCPUsesCanonicalFormatWhenSourceFormatMissing(t 
 
 	auths := []*Auth{{ID: "auth-a"}, {ID: "auth-b"}}
 	first := cliproxyexecutor.Options{
-		OriginalRequest: []byte(`{"contents":[{"role":"user","parts":[{"text":"hello"}]}]}`),
+		OriginalRequest: []byte(`{"messages":[{"role":"user","content":"hello"}]}`),
 		Metadata: map[string]any{
-			cliproxyexecutor.CallerScopeMetadataKey: "caller-gemini",
+			cliproxyexecutor.CallerScopeMetadataKey: "caller-claude",
 		},
 	}
 	second := cliproxyexecutor.Options{
-		OriginalRequest: []byte(`{"contents":[{"role":"user","parts":[{"text":"hello"}]},{"role":"model","parts":[{"text":"hi"}]}]}`),
+		OriginalRequest: []byte(`{"messages":[{"role":"user","content":"hello"},{"role":"assistant","content":"hi"}]}`),
 		Metadata: map[string]any{
-			cliproxyexecutor.CallerScopeMetadataKey: "caller-gemini",
+			cliproxyexecutor.CallerScopeMetadataKey: "caller-claude",
 		},
 	}
-	firstAuth, errFirst := selector.Pick(context.Background(), "gemini", "model", first, auths)
+	firstAuth, errFirst := selector.Pick(context.Background(), "claude", "model", first, auths)
 	if errFirst != nil {
 		t.Fatalf("first Pick() error = %v", errFirst)
 	}
-	secondAuth, errSecond := selector.Pick(context.Background(), "gemini", "model", second, auths)
+	secondAuth, errSecond := selector.Pick(context.Background(), "claude", "model", second, auths)
 	if errSecond != nil {
 		t.Fatalf("second Pick() error = %v", errSecond)
 	}
 	if secondAuth.ID != firstAuth.ID {
-		t.Fatalf("inferred Gemini format changed auth from %q to %q", firstAuth.ID, secondAuth.ID)
+		t.Fatalf("inferred Claude format changed auth from %q to %q", firstAuth.ID, secondAuth.ID)
 	}
 }
 
@@ -795,20 +795,6 @@ func TestSessionAffinityExtendedHeadersAndPayloadIdentities(t *testing.T) {
 
 	auths := []*Auth{{ID: "auth-a"}, {ID: "auth-b"}}
 
-	// 1. Antigravity X-Http-Session-Id
-	agyOpts := cliproxyexecutor.Options{
-		Headers:         http.Header{"X-Http-Session-Id": []string{"agy-sess-456"}},
-		OriginalRequest: []byte(`{"contents":[{"role":"user","parts":[{"text":"hello"}]}]}`),
-		Metadata:        map[string]any{},
-	}
-	_, errAgy := selector.Pick(context.Background(), "gemini", "model", agyOpts, auths)
-	if errAgy != nil {
-		t.Fatalf("agy Pick() error = %v", errAgy)
-	}
-	if got := agyOpts.Metadata[cliproxyexecutor.CanonicalSessionIDMetadataKey]; got != "agy:agy-sess-456" {
-		t.Fatalf("agy canonical session ID = %v, want agy:agy-sess-456", got)
-	}
-
 	// 2. Pi Slot Session
 	slotOpts := cliproxyexecutor.Options{
 		Headers:         http.Header{"X-Slot-Session-Id": []string{"pi-slot-789"}},
@@ -821,19 +807,6 @@ func TestSessionAffinityExtendedHeadersAndPayloadIdentities(t *testing.T) {
 	}
 	if got := slotOpts.Metadata[cliproxyexecutor.CanonicalSessionIDMetadataKey]; got != "slot:pi-slot-789" {
 		t.Fatalf("slot canonical session ID = %v, want slot:pi-slot-789", got)
-	}
-
-	// 3. Google Gemini Context Caching
-	geminiCacheOpts := cliproxyexecutor.Options{
-		OriginalRequest: []byte(`{"cachedContent":"projects/123/locations/us-central1/cachedContents/456","contents":[{"role":"user","parts":[{"text":"query"}]}]}`),
-		Metadata:        map[string]any{},
-	}
-	_, errGemini := selector.Pick(context.Background(), "gemini", "model", geminiCacheOpts, auths)
-	if errGemini != nil {
-		t.Fatalf("gemini cache Pick() error = %v", errGemini)
-	}
-	if got := geminiCacheOpts.Metadata[cliproxyexecutor.CanonicalSessionIDMetadataKey]; got != "geminicache:projects/123/locations/us-central1/cachedContents/456" {
-		t.Fatalf("gemini cache canonical session ID = %v, want geminicache:...", got)
 	}
 
 	// 4. OpenAI Assistants Thread ID Header & Body
@@ -1355,12 +1328,12 @@ func TestSessionAffinitySelectorLCPCompactionPreservesAffinityAndLineage(t *test
 	}
 
 	// 1. Initial 5-turn conversation without explicit session headers (relies on LCP)
-	firstPayload := []byte(`{"contents":[
-		{"role":"user","parts":[{"text":"step 1"}]},
-		{"role":"model","parts":[{"text":"ack 1"}]},
-		{"role":"user","parts":[{"text":"step 2"}]},
-		{"role":"model","parts":[{"text":"ack 2"}]},
-		{"role":"user","parts":[{"text":"step 3"}]}
+	firstPayload := []byte(`{"messages":[
+		{"role":"user","content":"step 1"},
+		{"role":"assistant","content":"ack 1"},
+		{"role":"user","content":"step 2"},
+		{"role":"assistant","content":"ack 2"},
+		{"role":"user","content":"step 3"}
 	]}`)
 	firstOpts := cliproxyexecutor.Options{
 		SourceFormat:    sdktranslator.FormatClaude,
@@ -1370,7 +1343,7 @@ func TestSessionAffinitySelectorLCPCompactionPreservesAffinityAndLineage(t *test
 		},
 	}
 	ctx := context.Background()
-	firstAuth, errFirst := selector.Pick(ctx, "google", "gemini-2.5-pro", firstOpts, auths)
+	firstAuth, errFirst := selector.Pick(ctx, "claude", "claude-sonnet-4", firstOpts, auths)
 	if errFirst != nil {
 		t.Fatalf("first Pick() error = %v", errFirst)
 	}
@@ -1382,19 +1355,19 @@ func TestSessionAffinitySelectorLCPCompactionPreservesAffinityAndLineage(t *test
 	// Complete initial request
 	selector.OnResult(Result{
 		AuthID:   firstAuth.ID,
-		Provider: "google",
-		Model:    "gemini-2.5-pro",
+		Provider: "claude",
+		Model:    "claude-sonnet-4",
 		Options:  firstOpts,
 		Success:  true,
 	})
 
 	// 2. Downstream harness compacts context:
 	// Early steps (1..2) summarized into a single turn, preserving step 3 and appending step 4
-	compactedPayload := []byte(`{"contents":[
-		{"role":"user","parts":[{"text":"<summary>Steps 1 and 2 completed</summary>"}]},
-		{"role":"model","parts":[{"text":"ack 2"}]},
-		{"role":"user","parts":[{"text":"step 3"}]},
-		{"role":"user","parts":[{"text":"step 4"}]}
+	compactedPayload := []byte(`{"messages":[
+		{"role":"user","content":"<summary>Steps 1 and 2 completed</summary>"},
+		{"role":"assistant","content":"ack 2"},
+		{"role":"user","content":"step 3"},
+		{"role":"user","content":"step 4"}
 	]}`)
 	compactedOpts := cliproxyexecutor.Options{
 		SourceFormat:    sdktranslator.FormatClaude,
@@ -1404,7 +1377,7 @@ func TestSessionAffinitySelectorLCPCompactionPreservesAffinityAndLineage(t *test
 		},
 	}
 
-	compactedAuth, errCompacted := selector.Pick(ctx, "google", "gemini-2.5-pro", compactedOpts, auths)
+	compactedAuth, errCompacted := selector.Pick(ctx, "claude", "claude-sonnet-4", compactedOpts, auths)
 	if errCompacted != nil {
 		t.Fatalf("compacted Pick() error = %v", errCompacted)
 	}
@@ -1434,19 +1407,19 @@ func TestSessionAffinitySelectorLCPCompactionPreservesAffinityAndLineage(t *test
 	// Complete compacted request
 	selector.OnResult(Result{
 		AuthID:   compactedAuth.ID,
-		Provider: "google",
-		Model:    "gemini-2.5-pro",
+		Provider: "claude",
+		Model:    "claude-sonnet-4",
 		Options:  compactedOpts,
 		Success:  true,
 	})
 
 	// 3. Subsequent turn grows linearly from compaction boundary
-	nextPayload := []byte(`{"contents":[
-		{"role":"user","parts":[{"text":"<summary>Steps 1 and 2 completed</summary>"}]},
-		{"role":"model","parts":[{"text":"ack 2"}]},
-		{"role":"user","parts":[{"text":"step 3"}]},
-		{"role":"user","parts":[{"text":"step 4"}]},
-		{"role":"model","parts":[{"text":"ack 4"}]}
+	nextPayload := []byte(`{"messages":[
+		{"role":"user","content":"<summary>Steps 1 and 2 completed</summary>"},
+		{"role":"assistant","content":"ack 2"},
+		{"role":"user","content":"step 3"},
+		{"role":"user","content":"step 4"},
+		{"role":"assistant","content":"ack 4"}
 	]}`)
 	nextOpts := cliproxyexecutor.Options{
 		SourceFormat:    sdktranslator.FormatClaude,
@@ -1455,7 +1428,7 @@ func TestSessionAffinitySelectorLCPCompactionPreservesAffinityAndLineage(t *test
 			cliproxyexecutor.CallerScopeMetadataKey: "caller-harness-1",
 		},
 	}
-	nextAuth, errNext := selector.Pick(ctx, "google", "gemini-2.5-pro", nextOpts, auths)
+	nextAuth, errNext := selector.Pick(ctx, "claude", "claude-sonnet-4", nextOpts, auths)
 	if errNext != nil {
 		t.Fatalf("next Pick() error = %v", errNext)
 	}
@@ -1480,17 +1453,17 @@ func TestSessionAffinitySelectorLookupAffinityProviderAlias(t *testing.T) {
 	})
 	defer selector.Stop()
 
-	auths := []*Auth{{ID: "auth-gemini-1", Status: StatusActive}}
+	auths := []*Auth{{ID: "auth-openai-1", Status: StatusActive}}
 	opts := cliproxyexecutor.Options{
 		SourceFormat:    sdktranslator.FormatClaude,
-		OriginalRequest: []byte(`{"contents":[{"role":"user","parts":[{"text":"hello lookup"}]}]}`),
+		OriginalRequest: []byte(`{"messages":[{"role":"user","content":"hello lookup"}]}`),
 		Metadata: map[string]any{
 			cliproxyexecutor.CallerScopeMetadataKey:             "caller-lookup",
-			cliproxyexecutor.SessionAffinityProviderMetadataKey: "google",
+			cliproxyexecutor.SessionAffinityProviderMetadataKey: "openai",
 		},
 	}
 	ctx := context.Background()
-	picked, errPick := selector.Pick(ctx, "google", "gemini-2.5-pro", opts, auths)
+	picked, errPick := selector.Pick(ctx, "openai", "gpt-5.4", opts, auths)
 	if errPick != nil || picked == nil {
 		t.Fatalf("Pick() failed: %v", errPick)
 	}
@@ -1500,16 +1473,16 @@ func TestSessionAffinitySelectorLookupAffinityProviderAlias(t *testing.T) {
 		t.Fatal("expected LCPAffinitySessionIDMetadataKey to be set")
 	}
 
-	// Query with alias "gemini" instead of "google"
-	boundAuth, status := selector.LookupAffinity("gemini", "gemini-2.5-pro", lcpID)
-	if status != "bound" || boundAuth != "auth-gemini-1" {
-		t.Fatalf("LookupAffinity(gemini) = (%q, %q), want (auth-gemini-1, bound)", boundAuth, status)
+	// Query with alias "codex" instead of "openai"
+	boundAuth, status := selector.LookupAffinity("codex", "gpt-5.4", lcpID)
+	if status != "bound" || boundAuth != "auth-openai-1" {
+		t.Fatalf("LookupAffinity(codex) = (%q, %q), want (auth-openai-1, bound)", boundAuth, status)
 	}
 
-	// Query with "google"
-	boundAuthGoogle, statusGoogle := selector.LookupAffinity("google", "gemini-2.5-pro", lcpID)
-	if statusGoogle != "bound" || boundAuthGoogle != "auth-gemini-1" {
-		t.Fatalf("LookupAffinity(google) = (%q, %q), want (auth-gemini-1, bound)", boundAuthGoogle, statusGoogle)
+	// Query with "openai"
+	boundAuthOpenAI, statusOpenAI := selector.LookupAffinity("openai", "gpt-5.4", lcpID)
+	if statusOpenAI != "bound" || boundAuthOpenAI != "auth-openai-1" {
+		t.Fatalf("LookupAffinity(openai) = (%q, %q), want (auth-openai-1, bound)", boundAuthOpenAI, statusOpenAI)
 	}
 }
 

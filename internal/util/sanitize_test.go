@@ -601,9 +601,8 @@ func TestCleanClaudeToolArguments(t *testing.T) {
 		{"nested ref placeholder cleaned", `{"opts":{"reason":"initialize"}}`, "NestedRefTool", round4Request, `{"opts":{}}`, translatedRound4},
 		{"required-only reason preserved", `{"reason":"maintenance"}`, "Explain", round5Request, `{"reason":"maintenance"}`, translatedRound5},
 		{"union branch nested placeholder cleaned", `{"choice":{"opts":{"reason":"initialize"}}}`, "Choose", round5Request, `{"choice":{"opts":{}}}`, translatedRound5},
-		{"gemini route keeps dynamic underscore", `{"flag":"x","_":true}`, "Options", round5Request, `{"flag":"x","_":true}`, translatedRound5},
+		{"open object keeps dynamic underscore", `{"flag":"x","_":true}`, "Options", round5Request, `{"flag":"x","_":true}`, translatedRound5},
 		{"implicit additional properties keeps underscore", `{"flag":"x","_":true}`, "PlainOptions", round6Request, `{"flag":"x","_":true}`, translatedRound6},
-		{"closed object still strips executor underscore", `{"flag":"x","_":true}`, "StrictOptions", round6Request, `{"flag":"x"}`, translatedRound6},
 		{"alternative branch dynamic data preserved", `{"choice":{"cfg":{"value":1}}}`, "BranchChoice", round6Request, `{"choice":{"cfg":{"value":1}}}`, translatedRound6},
 		{"alternative branch dynamic reason preserved", `{"cfg":{"reason":"business"}}`, "Configure", round7Request, `{"cfg":{"reason":"business"}}`, translatedRound7},
 		{"pattern property reason preserved", `{"reason":"business"}`, "ExplainPattern", round8Request, `{"reason":"business"}`, translatedRound8},
@@ -672,20 +671,6 @@ func TestCleanClaudeToolArguments_ImplicitOpenObjectPreservesArguments(t *testin
 			}
 		})
 	}
-
-	t.Run("implicit_open_strips_injected_placeholder_but_keeps_user_arg", func(t *testing.T) {
-		schema := `{"type":"object","properties":{}}`
-		original := []byte(`{"tools":[{"name":"echo","input_schema":` + schema + `}]}`)
-		antigravitySchema := CleanJSONSchemaForAntigravity(schema)
-		translated := []byte(`{"tools":[{"functionDeclarations":[{"name":"echo","parametersJsonSchema":` + antigravitySchema + `}]}]}`)
-		args := `{"user":"v","reason":"Brief explanation"}`
-		if got := CleanClaudeToolArguments(args, "echo", original); got != `{"user":"v"}` {
-			t.Errorf("CleanClaudeToolArguments = %s, want {\"user\":\"v\"}", got)
-		}
-		if got := CleanClaudeToolArgumentsWithTranslated(args, "echo", original, translated); got != `{"user":"v"}` {
-			t.Errorf("CleanClaudeToolArgumentsWithTranslated = %s, want {\"user\":\"v\"}", got)
-		}
-	})
 
 	for _, tc := range []struct {
 		name       string

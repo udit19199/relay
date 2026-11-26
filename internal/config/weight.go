@@ -32,8 +32,8 @@ func validateCredentialWeightYAML(data []byte) error {
 		return err
 	}
 	families := map[string]struct{}{
-		"gemini-api-key": {}, "interactions-api-key": {}, "claude-api-key": {},
-		"vertex-api-key": {}, "codex-api-key": {}, "xai-api-key": {}, "meta-api-key": {},
+		"claude-api-key": {},
+		"codex-api-key":  {}, "xai-api-key": {}, "meta-api-key": {},
 	}
 	for index := 0; root != nil && root.Kind == yaml.MappingNode && index+1 < len(root.Content); index += 2 {
 		name := root.Content[index].Value
@@ -114,24 +114,9 @@ func (cfg *Config) ValidateCredentialWeights() error {
 	if cfg == nil {
 		return nil
 	}
-	for index := range cfg.GeminiKey {
-		if errValidate := ValidateCredentialWeight(cfg.GeminiKey[index].Weight); errValidate != nil {
-			return fmt.Errorf("gemini-api-key[%d].weight: %w", index, errValidate)
-		}
-	}
-	for index := range cfg.InteractionsKey {
-		if errValidate := ValidateCredentialWeight(cfg.InteractionsKey[index].Weight); errValidate != nil {
-			return fmt.Errorf("interactions-api-key[%d].weight: %w", index, errValidate)
-		}
-	}
 	for index := range cfg.ClaudeKey {
 		if errValidate := ValidateCredentialWeight(cfg.ClaudeKey[index].Weight); errValidate != nil {
 			return fmt.Errorf("claude-api-key[%d].weight: %w", index, errValidate)
-		}
-	}
-	for index := range cfg.VertexCompatAPIKey {
-		if errValidate := ValidateCredentialWeight(cfg.VertexCompatAPIKey[index].Weight); errValidate != nil {
-			return fmt.Errorf("vertex-api-key[%d].weight: %w", index, errValidate)
 		}
 	}
 	for index := range cfg.CodexKey {

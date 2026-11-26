@@ -106,9 +106,6 @@ func synthesizeFileAuths(ctx *SynthesisContext, fullPath string, data []byte) ([
 	}
 	t, _ := metadata["type"].(string)
 	provider := strings.ToLower(strings.TrimSpace(t))
-	if provider == "gemini" {
-		provider = "gemini-cli"
-	}
 	if ctx.PluginAuthParser != nil {
 		auths, handled, errParse := parsePluginFileAuths(ctx.PluginAuthParser, pluginapi.AuthParseRequest{
 			Provider: provider,
@@ -206,7 +203,7 @@ func synthesizeFileAuths(ctx *SynthesisContext, fullPath string, data []byte) ([
 			return auths, nil
 		}
 	}
-	if provider == "" || provider == "gemini-cli" || provider == "vertex" || provider == "aistudio" || provider == "antigravity" {
+	if provider == "" || removedGoogleAuthProvider(provider) {
 		return nil, nil
 	}
 	label := provider
@@ -279,7 +276,6 @@ func synthesizeFileAuths(ctx *SynthesisContext, fullPath string, data []byte) ([
 	}
 	coreauth.ApplyCustomHeadersFromMetadata(a)
 	coreauth.SetOAuthModelAliasesAttribute(a, perAccountModelAliases)
-	applyOpenAPIModelsAttribute(a, metadata)
 	ApplyAuthExcludedModelsMeta(a, perAccountExcluded, "oauth")
 	applyFingerprintProfileAttribute(a, metadata)
 	if provider == openCodeGoProvider {
@@ -333,6 +329,15 @@ func applyOpenCodeGoAttributes(a *coreauth.Auth, metadata map[string]any) {
 	}
 	if a.Prefix == "" {
 		a.Prefix = openCodeGoProvider
+	}
+}
+
+func removedGoogleAuthProvider(provider string) bool {
+	switch strings.ToLower(strings.TrimSpace(provider)) {
+	case "gemini", "gemini-cli", "gemini-interactions", "vertex", "aistudio", "antigravity", "google":
+		return true
+	default:
+		return false
 	}
 }
 
@@ -406,60 +411,6 @@ func extractOAuthModelAliasesFromMetadata(metadata map[string]any) []config.OAut
 	}
 	cfg.SanitizeOAuthModelAlias()
 	return cfg.OAuthModelAlias["auth"]
-}
-
-func applyOpenAPIModelsAttribute(auth *coreauth.Auth, metadata map[string]any) {
-	if auth == nil || metadata == nil {
-		return
-	}
-	var names []string
-	seen := make(map[string]struct{})
-	add := func(raw string) {
-		trimmed := strings.TrimSpace(raw)
-		if trimmed == "" {
-			return
-		}
-		key := strings.ToLower(trimmed)
-		if _, exists := seen[key]; exists {
-			return
-		}
-		seen[key] = struct{}{}
-		names = append(names, trimmed)
-	}
-	for _, key := range []string{"openapi_models", "openapi-models", "models"} {
-		raw, ok := metadata[key]
-		if !ok || raw == nil {
-			continue
-		}
-		switch v := raw.(type) {
-		case string:
-			for _, part := range strings.Split(v, ",") {
-				add(part)
-			}
-		case []string:
-			for _, item := range v {
-				add(item)
-			}
-		case []any:
-			for _, item := range v {
-				switch elem := item.(type) {
-				case string:
-					add(elem)
-				case map[string]any:
-					if name, okName := elem["name"].(string); okName {
-						add(name)
-					}
-				}
-			}
-		}
-	}
-	if len(names) == 0 {
-		return
-	}
-	if auth.Attributes == nil {
-		auth.Attributes = make(map[string]string)
-	}
-	auth.Attributes["openapi_models"] = strings.Join(names, ",")
 }
 
 // ExtractExcludedModelsFromMetadata reads per-account excluded models from the OAuth JSON metadata.

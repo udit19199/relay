@@ -7,19 +7,7 @@ import (
 )
 
 func TestAPIKeyModelIsCompatConfigDecoding(t *testing.T) {
-	const yamlConfig = `gemini-api-key:
-  - models:
-      - name: gemini-upstream
-        alias: gemini-alias
-        is-compat: true
-      - name: gemini-native
-        alias: gemini-native
-interactions-api-key:
-  - models:
-      - name: interactions-upstream
-        alias: interactions-alias
-        is-compat: true
-xai-api-key:
+	const yamlConfig = `xai-api-key:
   - models:
       - name: xai-upstream
         alias: xai-alias
@@ -49,15 +37,6 @@ openai-compatibility:
 		t.Fatalf("decode error: %v", errDecode)
 	}
 
-	if len(cfg.GeminiKey) != 1 || !cfg.GeminiKey[0].Models[0].IsCompat {
-		t.Fatalf("gemini-api-key IsCompat = %+v, want true", cfg.GeminiKey)
-	}
-	if cfg.GeminiKey[0].Models[1].IsCompat {
-		t.Fatal("gemini-api-key omitted IsCompat = true, want default false")
-	}
-	if len(cfg.InteractionsKey) != 1 || !cfg.InteractionsKey[0].Models[0].IsCompat {
-		t.Fatalf("interactions-api-key IsCompat = %+v, want true", cfg.InteractionsKey)
-	}
 	if len(cfg.XAIKey) != 1 || !cfg.XAIKey[0].Models[0].IsCompat {
 		t.Fatalf("xai-api-key IsCompat = %+v, want true", cfg.XAIKey)
 	}

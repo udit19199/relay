@@ -71,32 +71,6 @@ func TestComputeOpenAICompatModelsHashPreservesRoutingOrderAndDuplicates(t *test
 	}
 }
 
-func TestComputeVertexCompatModelsHash_DifferentInputs(t *testing.T) {
-	models := []config.VertexCompatModel{{Name: "gemini-pro", Alias: "pro"}}
-	hash1 := ComputeVertexCompatModelsHash(models)
-	hash2 := ComputeVertexCompatModelsHash([]config.VertexCompatModel{{Name: "gemini-1.5-pro", Alias: "pro"}})
-	if hash1 == "" || hash2 == "" {
-		t.Fatal("hashes should not be empty for non-empty models")
-	}
-	if hash1 == hash2 {
-		t.Fatal("hash should differ when model content differs")
-	}
-}
-
-func TestComputeVertexCompatModelsHashPreservesDuplicates(t *testing.T) {
-	a := []config.VertexCompatModel{
-		{Name: "m1", Alias: "a1"},
-		{Name: " "},
-		{Name: "M1", Alias: "A1"},
-	}
-	b := []config.VertexCompatModel{
-		{Name: "m1", Alias: "a1"},
-	}
-	if h1, h2 := ComputeVertexCompatModelsHash(a), ComputeVertexCompatModelsHash(b); h1 == "" || h1 == h2 {
-		t.Fatalf("expected duplicate routing entries to change hash, got %q / %q", h1, h2)
-	}
-}
-
 func TestComputeClaudeModelsHash_Empty(t *testing.T) {
 	if got := ComputeClaudeModelsHash(nil); got != "" {
 		t.Fatalf("expected empty hash for nil models, got %q", got)
@@ -155,11 +129,6 @@ func TestComputeModelHashesIncludeDisplayName(t *testing.T) {
 			changed: ComputeOpenAICompatModelsHash([]config.OpenAICompatibilityModel{{Name: "m", Alias: "a", DisplayName: "Two"}}),
 		},
 		{
-			name:    "vertex",
-			base:    ComputeVertexCompatModelsHash([]config.VertexCompatModel{{Name: "m", Alias: "a", DisplayName: "One"}}),
-			changed: ComputeVertexCompatModelsHash([]config.VertexCompatModel{{Name: "m", Alias: "a", DisplayName: "Two"}}),
-		},
-		{
 			name:    "claude",
 			base:    ComputeClaudeModelsHash([]config.ClaudeModel{{Name: "m", Alias: "a", DisplayName: "One"}}),
 			changed: ComputeClaudeModelsHash([]config.ClaudeModel{{Name: "m", Alias: "a", DisplayName: "Two"}}),
@@ -168,11 +137,6 @@ func TestComputeModelHashesIncludeDisplayName(t *testing.T) {
 			name:    "codex",
 			base:    ComputeCodexModelsHash([]config.CodexModel{{Name: "m", Alias: "a", DisplayName: "One"}}),
 			changed: ComputeCodexModelsHash([]config.CodexModel{{Name: "m", Alias: "a", DisplayName: "Two"}}),
-		},
-		{
-			name:    "gemini",
-			base:    ComputeGeminiModelsHash([]config.GeminiModel{{Name: "m", Alias: "a", DisplayName: "One"}}),
-			changed: ComputeGeminiModelsHash([]config.GeminiModel{{Name: "m", Alias: "a", DisplayName: "Two"}}),
 		},
 	}
 
@@ -197,14 +161,8 @@ func TestComputeOtherModelHashesIncludeForceMapping(t *testing.T) {
 	if ComputeOpenAICompatModelsHash([]config.OpenAICompatibilityModel{{Name: "m"}}) == ComputeOpenAICompatModelsHash([]config.OpenAICompatibilityModel{{Name: "m", ForceMapping: true}}) {
 		t.Fatal("OpenAI compatibility force-mapping did not change model hash")
 	}
-	if ComputeVertexCompatModelsHash([]config.VertexCompatModel{{Name: "m"}}) == ComputeVertexCompatModelsHash([]config.VertexCompatModel{{Name: "m", ForceMapping: true}}) {
-		t.Fatal("Vertex force-mapping did not change model hash")
-	}
 	if ComputeClaudeModelsHash([]config.ClaudeModel{{Name: "m"}}) == ComputeClaudeModelsHash([]config.ClaudeModel{{Name: "m", ForceMapping: true}}) {
 		t.Fatal("Claude force-mapping did not change model hash")
-	}
-	if ComputeGeminiModelsHash([]config.GeminiModel{{Name: "m"}}) == ComputeGeminiModelsHash([]config.GeminiModel{{Name: "m", ForceMapping: true}}) {
-		t.Fatal("Gemini force-mapping did not change model hash")
 	}
 }
 
@@ -239,18 +197,6 @@ func TestComputeOpenAICompatModelsHash_Empty(t *testing.T) {
 		t.Fatalf("expected empty hash for empty slice, got %q", got)
 	}
 	if got := ComputeOpenAICompatModelsHash([]config.OpenAICompatibilityModel{{Name: " "}, {Alias: ""}}); got != "" {
-		t.Fatalf("expected empty hash for blank models, got %q", got)
-	}
-}
-
-func TestComputeVertexCompatModelsHash_Empty(t *testing.T) {
-	if got := ComputeVertexCompatModelsHash(nil); got != "" {
-		t.Fatalf("expected empty hash for nil input, got %q", got)
-	}
-	if got := ComputeVertexCompatModelsHash([]config.VertexCompatModel{}); got != "" {
-		t.Fatalf("expected empty hash for empty slice, got %q", got)
-	}
-	if got := ComputeVertexCompatModelsHash([]config.VertexCompatModel{{Name: " "}}); got != "" {
 		t.Fatalf("expected empty hash for blank models, got %q", got)
 	}
 }
@@ -300,10 +246,8 @@ func TestComputeModelHashesIncludeThinking(t *testing.T) {
 		high string
 	}{
 		{name: "openai compatibility", low: ComputeOpenAICompatModelsHash([]config.OpenAICompatibilityModel{{Name: "m", Thinking: low}}), high: ComputeOpenAICompatModelsHash([]config.OpenAICompatibilityModel{{Name: "m", Thinking: high}})},
-		{name: "vertex", low: ComputeVertexCompatModelsHash([]config.VertexCompatModel{{Name: "m", Thinking: low}}), high: ComputeVertexCompatModelsHash([]config.VertexCompatModel{{Name: "m", Thinking: high}})},
 		{name: "claude", low: ComputeClaudeModelsHash([]config.ClaudeModel{{Name: "m", Thinking: low}}), high: ComputeClaudeModelsHash([]config.ClaudeModel{{Name: "m", Thinking: high}})},
 		{name: "codex", low: ComputeCodexModelsHash([]config.CodexModel{{Name: "m", Thinking: low}}), high: ComputeCodexModelsHash([]config.CodexModel{{Name: "m", Thinking: high}})},
-		{name: "gemini", low: ComputeGeminiModelsHash([]config.GeminiModel{{Name: "m", Thinking: low}}), high: ComputeGeminiModelsHash([]config.GeminiModel{{Name: "m", Thinking: high}})},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

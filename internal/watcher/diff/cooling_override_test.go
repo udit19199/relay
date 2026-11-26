@@ -17,18 +17,6 @@ func TestBuildConfigChangeDetailsIncludesAllCoolingOverrides(t *testing.T) {
 		want   string
 	}{
 		{
-			name:   "gemini inherit to false",
-			oldCfg: &config.Config{GeminiKey: []config.GeminiKey{{APIKey: "gemini-key"}}},
-			newCfg: &config.Config{GeminiKey: []config.GeminiKey{{APIKey: "gemini-key", DisableCooling: &enabled}}},
-			want:   "gemini[0].disable-cooling: inherit -> false",
-		},
-		{
-			name:   "interactions false to true",
-			oldCfg: &config.Config{InteractionsKey: []config.GeminiKey{{APIKey: "interactions-key", DisableCooling: &enabled}}},
-			newCfg: &config.Config{InteractionsKey: []config.GeminiKey{{APIKey: "interactions-key", DisableCooling: &disabled}}},
-			want:   "interactions[0].disable-cooling: false -> true",
-		},
-		{
 			name:   "claude false to true",
 			oldCfg: &config.Config{ClaudeKey: []config.ClaudeKey{{APIKey: "claude-key", DisableCooling: &enabled}}},
 			newCfg: &config.Config{ClaudeKey: []config.ClaudeKey{{APIKey: "claude-key", DisableCooling: &disabled}}},
@@ -55,12 +43,6 @@ func TestBuildConfigChangeDetailsIncludesAllCoolingOverrides(t *testing.T) {
 				Name: "compat", BaseURL: "https://compat.example.com",
 			}}},
 			want: "disable-cooling false -> inherit",
-		},
-		{
-			name:   "vertex inherit to false",
-			oldCfg: &config.Config{VertexCompatAPIKey: []config.VertexCompatKey{{APIKey: "vertex-key"}}},
-			newCfg: &config.Config{VertexCompatAPIKey: []config.VertexCompatKey{{APIKey: "vertex-key", DisableCooling: &enabled}}},
-			want:   "vertex[0].disable-cooling: inherit -> false",
 		},
 	}
 

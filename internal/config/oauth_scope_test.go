@@ -13,8 +13,7 @@ func TestV8OAuthScopeSurvivesSnapshotsAndSaves(t *testing.T) {
 	raw := []byte(`codex: {stream-bootstrap-buffering: true}
 oauth:
   providers:
-    codex: {disable-codex-cloaking: true, model-level-cooling: true}
-    aistudio: {ws-auth: true}
+    codex: {ws-auth: true, disable-codex-cloaking: true, model-level-cooling: true}
     claude:
       disable-claude-cloak-mode: true
       header-defaults: {user-agent: oauth-agent}

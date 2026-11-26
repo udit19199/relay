@@ -41,44 +41,6 @@ func toggleConfigAPIKeyExcludedAll(cfg *config.Config, auth *coreauth.Auth, disa
 
 	idGen := synthesizer.NewStableIDGenerator()
 
-	for i := range cfg.GeminiKey {
-		entry := &cfg.GeminiKey[i]
-		key := strings.TrimSpace(entry.APIKey)
-		base := strings.TrimSpace(entry.BaseURL)
-		proxyURL := strings.TrimSpace(entry.ProxyURL)
-		prefix := strings.TrimSpace(entry.Prefix)
-		if key == "" && base == "" {
-			continue
-		}
-		idParts := []string{key, base, proxyURL, prefix, config.FormatSortedHeaders(entry.Headers)}
-		if poolID := config.FormatConnectionPoolDedupID(entry.ConnectionPool); poolID != "" {
-			idParts = append(idParts, poolID)
-		}
-		id, _ := idGen.Next("gemini:apikey", idParts...)
-		if id == authID {
-			entry.ExcludedModels = setConfigAPIKeyExcludedAll(entry.ExcludedModels, disable)
-			return true, nil
-		}
-	}
-	for i := range cfg.InteractionsKey {
-		entry := &cfg.InteractionsKey[i]
-		key := strings.TrimSpace(entry.APIKey)
-		base := strings.TrimSpace(entry.BaseURL)
-		proxyURL := strings.TrimSpace(entry.ProxyURL)
-		prefix := strings.TrimSpace(entry.Prefix)
-		if key == "" && base == "" {
-			continue
-		}
-		idParts := []string{key, base, proxyURL, prefix, config.FormatSortedHeaders(entry.Headers)}
-		if poolID := config.FormatConnectionPoolDedupID(entry.ConnectionPool); poolID != "" {
-			idParts = append(idParts, poolID)
-		}
-		id, _ := idGen.Next("gemini-interactions:apikey", idParts...)
-		if id == authID {
-			entry.ExcludedModels = setConfigAPIKeyExcludedAll(entry.ExcludedModels, disable)
-			return true, nil
-		}
-	}
 	for i := range cfg.ClaudeKey {
 		entry := &cfg.ClaudeKey[i]
 		key := strings.TrimSpace(entry.APIKey)
@@ -150,21 +112,6 @@ func toggleConfigAPIKeyExcludedAll(cfg *config.Config, auth *coreauth.Auth, disa
 			idParts = append(idParts, poolID)
 		}
 		id, _ := idGen.Next("meta:apikey", idParts...)
-		if id == authID {
-			entry.ExcludedModels = setConfigAPIKeyExcludedAll(entry.ExcludedModels, disable)
-			return true, nil
-		}
-	}
-	for i := range cfg.VertexCompatAPIKey {
-		entry := &cfg.VertexCompatAPIKey[i]
-		key := strings.TrimSpace(entry.APIKey)
-		base := strings.TrimSpace(entry.BaseURL)
-		proxy := strings.TrimSpace(entry.ProxyURL)
-		idParts := []string{key, base, proxy}
-		if poolID := config.FormatConnectionPoolDedupID(entry.ConnectionPool); poolID != "" {
-			idParts = append(idParts, poolID)
-		}
-		id, _ := idGen.Next("vertex:apikey", idParts...)
 		if id == authID {
 			entry.ExcludedModels = setConfigAPIKeyExcludedAll(entry.ExcludedModels, disable)
 			return true, nil

@@ -15,42 +15,6 @@ func TestCloneForRuntimeNil(t *testing.T) {
 	}
 }
 
-func TestParseConfigBytes_AntigravitySensitiveWords(t *testing.T) {
-	cfg, errParse := ParseConfigBytes([]byte(`antigravity:
-  sensitive-words:
-    - "API"
-    - "proxy"
-`))
-	if errParse != nil {
-		t.Fatalf("ParseConfigBytes() error = %v", errParse)
-	}
-	want := []string{"API", "proxy"}
-	if !reflect.DeepEqual(cfg.Antigravity.SensitiveWords, want) {
-		t.Fatalf("Antigravity.SensitiveWords = %#v, want %#v", cfg.Antigravity.SensitiveWords, want)
-	}
-}
-
-func TestParseConfigBytes_AntigravityConnectionPool(t *testing.T) {
-	cfg, errParse := ParseConfigBytes([]byte(`antigravity:
-  connection-pool:
-    enabled: false
-    idle-conn-timeout: "15s"
-    max-idle-conns-per-host: 4
-`))
-	if errParse != nil {
-		t.Fatalf("ParseConfigBytes() error = %v", errParse)
-	}
-	if cfg.Antigravity.ConnectionPool.Enabled == nil || *cfg.Antigravity.ConnectionPool.Enabled != false {
-		t.Fatalf("Enabled = %v, want false", cfg.Antigravity.ConnectionPool.Enabled)
-	}
-	if cfg.Antigravity.ConnectionPool.IdleConnTimeout != "15s" {
-		t.Fatalf("IdleConnTimeout = %q, want 15s", cfg.Antigravity.ConnectionPool.IdleConnTimeout)
-	}
-	if cfg.Antigravity.ConnectionPool.MaxIdleConnsPerHost == nil || *cfg.Antigravity.ConnectionPool.MaxIdleConnsPerHost != 4 {
-		t.Fatalf("MaxIdleConnsPerHost = %v, want 4", cfg.Antigravity.ConnectionPool.MaxIdleConnsPerHost)
-	}
-}
-
 func TestCloneForRuntimeDeepCopiesConfig(t *testing.T) {
 	cfg := sampleCloneRuntimeConfig()
 
@@ -120,8 +84,6 @@ func TestCloneForRuntimeDoesNotShareReferenceFields(t *testing.T) {
 }
 
 func sampleCloneRuntimeConfig() *Config {
-	cacheStrict := true
-	bypassStrict := false
 	pluginEnabled := false
 	cacheUserID := true
 
@@ -146,14 +108,6 @@ func sampleCloneRuntimeConfig() *Config {
 				},
 			},
 		},
-		AntigravitySignatureCacheEnabled: &cacheStrict,
-		AntigravitySignatureBypassStrict: &bypassStrict,
-		GeminiKey: []GeminiKey{{
-			APIKey:         "gemini-key",
-			Models:         []GeminiModel{{Name: "gemini-upstream", Alias: "gemini-upstream-alias"}},
-			Headers:        map[string]string{"X-Gemini": "one"},
-			ExcludedModels: []string{"gemini-hidden"},
-		}},
 		CodexKey: []CodexKey{{
 			APIKey:         "codex-key",
 			Models:         []CodexModel{{Name: "codex-upstream", Alias: "codex-client"}},
@@ -179,12 +133,6 @@ func sampleCloneRuntimeConfig() *Config {
 				Thinking: &registry.ThinkingSupport{Levels: []string{"low", "high"}},
 			}},
 			Headers: map[string]string{"X-Compat": "one"},
-		}},
-		VertexCompatAPIKey: []VertexCompatKey{{
-			APIKey:         "vertex-key",
-			Headers:        map[string]string{"X-Vertex": "one"},
-			Models:         []VertexCompatModel{{Name: "vertex-upstream", Alias: "vertex-client"}},
-			ExcludedModels: []string{"vertex-hidden"},
 		}},
 		OAuthExcludedModels: map[string][]string{
 			"codex": {"hidden-model"},

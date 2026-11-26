@@ -173,14 +173,6 @@ func createAuthForChannel(channel string) *Auth {
 	}
 }
 
-func TestOAuthModelAliasChannel_APIKeyOnlyProviderUnsupported(t *testing.T) {
-	t.Parallel()
-
-	if got := OAuthModelAliasChannel("gemini", "oauth"); got != "" {
-		t.Fatalf("OAuthModelAliasChannel() = %q, want empty channel for API-key-only provider", got)
-	}
-}
-
 func TestOAuthModelAliasChannel_Kimi(t *testing.T) {
 	t.Parallel()
 

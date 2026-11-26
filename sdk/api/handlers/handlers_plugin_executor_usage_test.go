@@ -327,45 +327,6 @@ func TestHandlerPluginExecutorPublishesUsageStreamClaude(t *testing.T) {
 	}
 }
 
-func TestHandlerPluginExecutorPublishesUsageGemini(t *testing.T) {
-	targetPluginID := "custom-gemini-plugin"
-	plugin := newCapturePluginExecutorUsagePlugin(targetPluginID)
-	registerUsagePluginForTest(t, "test-plugin-executor-usage-gemini", plugin)
-
-	originalModel := "gemini-2.5-flash"
-
-	geminiResponseBody := []byte(`{"candidates":[{"content":{"parts":[{"text":"hello"}]}}],"usageMetadata":{"promptTokenCount":40,"candidatesTokenCount":60,"totalTokenCount":100}}`)
-
-	mockHost := &mockPluginUsageHost{
-		execResp: coreexecutor.Response{
-			Payload: geminiResponseBody,
-		},
-	}
-	mockHost.hasRouters = true
-	mockHost.route = func(ctx context.Context, req pluginapi.ModelRouteRequest) (pluginapi.ModelRouteResponse, bool) {
-		return pluginapi.ModelRouteResponse{Handled: true, TargetKind: pluginapi.ModelRouteTargetExecutor, Target: targetPluginID}, true
-	}
-
-	handler := NewBaseAPIHandlers(&sdkconfig.SDKConfig{}, nil)
-	handler.SetModelRouterHost(mockHost)
-
-	body, _, errMsg := handler.ExecuteWithAuthManager(context.Background(), "gemini", originalModel, []byte(fmt.Sprintf(`{"contents":[{"parts":[{"text":"hi"}]}]}`)), "")
-	if errMsg != nil {
-		t.Fatalf("ExecuteWithAuthManager() error = %+v", errMsg)
-	}
-	if len(body) == 0 {
-		t.Fatal("empty response body")
-	}
-
-	record := plugin.waitRecord(t)
-	if record.Provider != targetPluginID {
-		t.Errorf("record.Provider = %q, want %q", record.Provider, targetPluginID)
-	}
-	if record.Detail.InputTokens != 40 || record.Detail.OutputTokens != 60 || record.Detail.TotalTokens != 100 {
-		t.Errorf("record.Detail = %+v, want prompt=40 candidates=60 total=100", record.Detail)
-	}
-}
-
 func TestHandlerPluginExecutorPublishesUsageStreamInteractions(t *testing.T) {
 	targetPluginID := "custom-interactions-stream-plugin"
 	plugin := newCapturePluginExecutorUsagePlugin(targetPluginID)
@@ -412,47 +373,6 @@ func TestHandlerPluginExecutorPublishesUsageStreamInteractions(t *testing.T) {
 		tb.Input.TotalTokens != 100 || tb.Input.UncachedTokens != 80 || tb.Input.CacheReadTokens != 20 ||
 		tb.Output.TotalTokens != 40 || tb.Output.NonReasoningTokens != 30 || tb.Output.ReasoningTokens != 10 {
 		t.Errorf("record.Detail.TokenBreakdown = %+v, want valid separate-reasoning breakdown with total=140 input=(100/80/20/0) output=(40/30/10)", tb)
-	}
-}
-
-func TestHandlerPluginExecutorPublishesUsageStreamAntigravity(t *testing.T) {
-	targetPluginID := "custom-antigravity-stream-plugin"
-	plugin := newCapturePluginExecutorUsagePlugin(targetPluginID)
-	registerUsagePluginForTest(t, "test-plugin-executor-usage-stream-antigravity", plugin)
-
-	originalModel := "claude-3-5-sonnet"
-
-	chunks := make(chan coreexecutor.StreamChunk, 2)
-	chunks <- coreexecutor.StreamChunk{Payload: []byte("data: {\"response\":{\"usageMetadata\":{\"promptTokenCount\":33,\"candidatesTokenCount\":67,\"totalTokenCount\":100}}}\n\n")}
-	chunks <- coreexecutor.StreamChunk{Payload: []byte("data: [DONE]\n\n")}
-	close(chunks)
-
-	mockHost := &mockPluginUsageHost{
-		streamResult: &coreexecutor.StreamResult{Chunks: chunks},
-	}
-	mockHost.hasRouters = true
-	mockHost.route = func(ctx context.Context, req pluginapi.ModelRouteRequest) (pluginapi.ModelRouteResponse, bool) {
-		return pluginapi.ModelRouteResponse{Handled: true, TargetKind: pluginapi.ModelRouteTargetExecutor, Target: targetPluginID}, true
-	}
-
-	handler := NewBaseAPIHandlers(&sdkconfig.SDKConfig{}, nil)
-	handler.SetModelRouterHost(mockHost)
-
-	dataChan, _, errChan := handler.ExecuteStreamWithAuthManager(context.Background(), "antigravity", originalModel, []byte(fmt.Sprintf(`{"model":%q,"stream":true}`, originalModel)), "")
-	for range dataChan {
-	}
-	for err := range errChan {
-		if err != nil {
-			t.Fatalf("stream error = %+v", err)
-		}
-	}
-
-	record := plugin.waitRecord(t)
-	if record.Provider != targetPluginID {
-		t.Errorf("record.Provider = %q, want %q", record.Provider, targetPluginID)
-	}
-	if record.Detail.InputTokens != 33 || record.Detail.OutputTokens != 67 || record.Detail.TotalTokens != 100 {
-		t.Errorf("record.Detail = %+v, want prompt=33 candidates=67 total=100", record.Detail)
 	}
 }
 

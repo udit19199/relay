@@ -21,7 +21,7 @@ func TestAPIKeyWeightValidation(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, errParse := ParseConfigBytes([]byte("gemini-api-key:\n  - api-key: key\n    weight: " + test.weight + "\n"))
+			_, errParse := ParseConfigBytes([]byte("xai-api-key:\n  - api-key: key\n    weight: " + test.weight + "\n"))
 			if (errParse == nil) != test.valid {
 				t.Fatalf("ParseConfigBytes(weight=%s) error = %v, want valid=%v", test.weight, errParse, test.valid)
 			}

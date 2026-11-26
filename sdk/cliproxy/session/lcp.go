@@ -113,7 +113,7 @@ func ExtractCanonicalTurns(format sdktranslator.Format, payload []byte) []Canoni
 }
 
 func inferCanonicalFormat(root ojson.Result) sdktranslator.Format {
-	if req := root.Get("request"); req.Exists() && !root.Get("contents").Exists() {
+	if req := root.Get("request"); req.Exists() {
 		root = req
 	}
 	if root.Get("instructions").Exists() {
@@ -205,40 +205,6 @@ func appendResponsesTurns(turns *[]CanonicalTurn, root ojson.Result) {
 		parts := canonicalPartsFromJSON(content)
 		if len(parts) == 0 && !content.Exists() {
 			parts = canonicalPartsFromJSON(item)
-		}
-		appendTurn(turns, role, parts)
-		return true
-	})
-}
-
-func appendGeminiTurns(turns *[]CanonicalTurn, root ojson.Result) {
-	if req := root.Get("request"); req.Exists() && !root.Get("contents").Exists() {
-		root = req
-	}
-	cached := root.Get("cachedContent")
-	if !cached.Exists() {
-		cached = root.Get("cached_content")
-	}
-	if cached.Exists() {
-		appendTurn(turns, "system", []CanonicalPart{canonicalResourcePart(cached)})
-	}
-	if system := root.Get("systemInstruction"); system.Exists() {
-		appendTurn(turns, "system", canonicalPartsFromJSON(system))
-	} else if system := root.Get("system_instruction"); system.Exists() {
-		appendTurn(turns, "system", canonicalPartsFromJSON(system))
-	}
-	root.Get("contents").ForEach(func(_, content ojson.Result) bool {
-		if !hasCanonicalTurnCapacity(turns) {
-			return false
-		}
-		role := canonicalRole(content.Get("role").String())
-		if role == "" {
-			role = "unknown"
-		}
-		contentParts := content.Get("parts")
-		parts := canonicalPartsFromJSON(contentParts)
-		if len(parts) == 0 && !contentParts.Exists() {
-			parts = canonicalPartsFromJSON(content)
 		}
 		appendTurn(turns, role, parts)
 		return true

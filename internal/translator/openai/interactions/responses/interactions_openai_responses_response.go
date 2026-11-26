@@ -36,7 +36,6 @@ type interactionsToResponsesStreamState struct {
 	PendingIdentityErrors map[int]error
 	ItemIdentityIndexes   map[string]int
 	CallIdentityIndexes   map[string]int
-	ForAntigravity        bool
 }
 
 type interactionsFunctionCallState struct {
@@ -93,7 +92,6 @@ func ConvertInteractionsResponseToOpenAIResponses(ctx context.Context, modelName
 	if st.ItemIDPrefix == "" {
 		st.ItemIDPrefix = uuid.NewString()
 	}
-	st.ForAntigravity = isAntigravityModel(modelName)
 	if st.FunctionCalls == nil {
 		st.FunctionCalls = make(map[int]*interactionsFunctionCallState)
 	}
@@ -118,7 +116,7 @@ func ConvertInteractionsResponseToOpenAIResponses(ctx context.Context, modelName
 			reqJSON = requestRawJSON
 		}
 		if len(reqJSON) > 0 {
-			st.ToolIdentityMap = interactionsToolIdentityMap(reqJSON, st.ForAntigravity)
+			st.ToolIdentityMap = interactionsToolIdentityMap(reqJSON)
 		}
 	}
 	return convertInteractionsEventToResponses(modelName, originalRequestRawJSON, requestRawJSON, rawJSON, st)
@@ -136,14 +134,13 @@ func ConvertInteractionsResponseToOpenAIResponsesNonStream(ctx context.Context, 
 	if !steps.Exists() {
 		steps = root.Get("interaction.steps")
 	}
-	forAntigravity := isAntigravityModel(responseModel(modelName, root))
 	reqJSON := originalRequestRawJSON
 	if len(reqJSON) == 0 {
 		reqJSON = requestRawJSON
 	}
 	var toolIdentityMap map[string]util.ResponsesToolIdentity
 	if len(reqJSON) > 0 {
-		toolIdentityMap = interactionsToolIdentityMap(reqJSON, forAntigravity)
+		toolIdentityMap = interactionsToolIdentityMap(reqJSON)
 	}
 	patchEnabled := false
 	for _, identity := range toolIdentityMap {
@@ -178,7 +175,7 @@ func ConvertInteractionsResponseToOpenAIResponsesNonStream(ctx context.Context, 
 				return false
 			}
 		}
-		if item, ok := interactionsStepToResponsesOutput(step, forAntigravity, toolIdentityMap); ok {
+		if item, ok := interactionsStepToResponsesOutput(step, toolIdentityMap); ok {
 			outputs = append(outputs, item)
 		}
 		return true
@@ -319,7 +316,7 @@ func convertInteractionsEventToResponses(modelName string, originalRequestRawJSO
 	return nil
 }
 
-func interactionsStepToResponsesOutput(step ojson.Result, forAntigravity bool, toolIdentityMap map[string]util.ResponsesToolIdentity) ([]byte, bool) {
+func interactionsStepToResponsesOutput(step ojson.Result, toolIdentityMap map[string]util.ResponsesToolIdentity) ([]byte, bool) {
 	switch step.Get("type").String() {
 	case "model_output":
 		itemDoc := ojson.NewDocString(`{"type":"message","role":"assistant","content":[]}`)
@@ -361,7 +358,7 @@ func interactionsStepToResponsesOutput(step ojson.Result, forAntigravity bool, t
 		}
 		return itemDoc.Bytes(), true
 	case "function_call":
-		item := interactionsFunctionCallToResponsesWithIdentity(step, forAntigravity, toolIdentityMap)
+		item := interactionsFunctionCallToResponsesWithIdentity(step, toolIdentityMap)
 		item, _ = ojson.SetBytes(item, "status", "completed")
 		return item, true
 	}
@@ -1003,10 +1000,9 @@ func ConvertOpenAIResponsesResponseToInteractionsNonStream(ctx context.Context, 
 	}
 	_ = outDoc.Set("id", root.Get("id").String())
 	_ = outDoc.Set("model", responseModel(modelName, root))
-	forAntigravity := isAntigravityModel(modelName)
 	var stepItems [][]byte
 	root.Get("output").ForEach(func(_, item ojson.Result) bool {
-		if step, ok := openAIResponsesOutputItemToInteractionsStep(item, forAntigravity); ok {
+		if step, ok := openAIResponsesOutputItemToInteractionsStep(item); ok {
 			stepItems = append(stepItems, step)
 		}
 		return true
@@ -1056,7 +1052,7 @@ func convertOpenAIResponsesEventToInteractions(modelName string, rawJSON []byte,
 	return nil
 }
 
-func openAIResponsesOutputItemToInteractionsStep(item ojson.Result, forAntigravity bool) ([]byte, bool) {
+func openAIResponsesOutputItemToInteractionsStep(item ojson.Result) ([]byte, bool) {
 	switch item.Get("type").String() {
 	case "message":
 		var parts [][]byte
@@ -1072,7 +1068,7 @@ func openAIResponsesOutputItemToInteractionsStep(item ojson.Result, forAntigravi
 		}
 		return step, true
 	case "function_call":
-		return responsesFunctionCallToInteractions(item, forAntigravity), true
+		return responsesFunctionCallToInteractions(item), true
 	case "reasoning":
 		var parts [][]byte
 		item.Get("summary").ForEach(func(_, summary ojson.Result) bool {
@@ -1100,9 +1096,6 @@ func openAIResponsesOutputItemAddedToInteractions(modelName string, root ojson.R
 		out = appendInteractionsStepStopDirect(out, st)
 		stepDoc := ojson.NewDocString(`{"type":"function_call","name":"","arguments":{}}`)
 		name := item.Get("name").String()
-		if isAntigravityModel(modelName) {
-			name = translatorcommon.AntigravityToolNameToUpstream(name)
-		}
 		_ = stepDoc.Set("name", name)
 		if callID := util.FirstNonEmpty(item.Get("call_id").String(), item.Get("id").String()); callID != "" {
 			_ = stepDoc.Set("id", callID)
@@ -1324,9 +1317,6 @@ func ensureInteractionsFunctionCallStep(out [][]byte, st *responsesToInteraction
 	}
 	stepDoc := ojson.NewDocString(`{"type":"function_call","name":"","arguments":{}}`)
 	name := item.Get("name").String()
-	if isAntigravityModel(modelName) {
-		name = translatorcommon.AntigravityToolNameToUpstream(name)
-	}
 	_ = stepDoc.Set("name", name)
 	if callID := util.FirstNonEmpty(item.Get("call_id").String(), item.Get("id").String(), root.Get("call_id").String(), root.Get("item_id").String()); callID != "" {
 		_ = stepDoc.Set("id", callID)
@@ -1541,7 +1531,7 @@ func (st *responsesToInteractionsStreamState) hasSentFunctionArgs(keys []string)
 }
 
 // Interactions uses qualified names directly, rather than Gemini's sanitized names.
-func interactionsToolIdentityMap(rawJSON []byte, forAntigravity bool) map[string]util.ResponsesToolIdentity {
+func interactionsToolIdentityMap(rawJSON []byte) map[string]util.ResponsesToolIdentity {
 	root := util.ParseGJSONBytesNoCopy(rawJSON)
 	if request := root.Get("request"); request.Exists() {
 		root = request
@@ -1549,9 +1539,6 @@ func interactionsToolIdentityMap(rawJSON []byte, forAntigravity bool) map[string
 	identities := make(map[string]util.ResponsesToolIdentity)
 	for name, descriptor := range util.CollectResponsesToolWinners(root) {
 		identity := util.ResponsesToolIdentity{Name: strings.Clone(descriptor.LocalName), Namespace: strings.Clone(descriptor.Namespace), Custom: descriptor.ToolType == "custom", ApplyPatch: applypatch.IsCustomTool(descriptor.Tool)}
-		if forAntigravity {
-			name = translatorcommon.AntigravityToolNameToUpstream(name)
-		}
 		identities[strings.Clone(name)] = identity
 	}
 	return identities
@@ -1774,9 +1761,6 @@ func interactionsUpdateFunctionCall(index int, step ojson.Result, st *interactio
 		call.IsCustom = identity.Custom
 	} else {
 		call.Name = call.RawName
-		if st.ForAntigravity {
-			call.Name = translatorcommon.AntigravityUpstreamToolNameToClient(call.RawName)
-		}
 	}
 	if identity.ApplyPatch {
 		if st.PendingEnvelopeError != nil {

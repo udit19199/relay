@@ -26,8 +26,6 @@ func extractResponseModelEvent(payload []byte, provider string) (model string, t
 		return extractCodexResponseModelEvent(payload)
 	case "claude":
 		return extractClaudeResponseModelEvent(data)
-	case "gemini", "gemini-interactions", "vertex", "aistudio", "antigravity":
-		return extractGeminiResponseModelEvent(data)
 	default:
 		return extractGenericResponseModelEvent(data)
 	}

@@ -24,13 +24,13 @@ func TestV8ExampleLoadsAndRoundTrips(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load active v8 example: %v", err)
 	}
-	if active.Port != 8317 || len(active.APIKeys) != 3 || active.RequestRetry != 3 || !active.QuotaExceeded.AntigravityCredits {
+	if active.Port != 8317 || len(active.APIKeys) != 3 || active.RequestRetry != 3 {
 		t.Fatal("v8 template lost its default configuration")
 	}
 	if err = ValidateV8Config(example); err != nil {
 		t.Fatalf("active template must use the v8 layout: %v", err)
 	}
-	for _, count := range []int{len(active.GeminiKey), len(active.CodexKey), len(active.ClaudeKey), len(active.VertexCompatAPIKey), len(active.XAIKey), len(active.MetaKey), len(active.InteractionsKey), len(active.OpenAICompatibility)} {
+	for _, count := range []int{len(active.CodexKey), len(active.ClaudeKey), len(active.XAIKey), len(active.MetaKey), len(active.OpenAICompatibility)} {
 		if count != 0 {
 			t.Fatal("placeholder upstream credentials must remain commented")
 		}
@@ -67,10 +67,10 @@ func TestV8ExampleLoadsAndRoundTrips(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Port != 8317 || len(cfg.APIKeys) != 3 || len(cfg.GeminiKey) != 3 || len(cfg.CodexKey) != 1 || len(cfg.ClaudeKey) != 2 || len(cfg.VertexCompatAPIKey) != 1 || len(cfg.XAIKey) != 1 || len(cfg.MetaKey) != 1 || len(cfg.InteractionsKey) != 1 || len(cfg.OpenAICompatibility) != 1 {
+	if cfg.Port != 8317 || len(cfg.APIKeys) != 3 || len(cfg.CodexKey) != 1 || len(cfg.ClaudeKey) != 2 || len(cfg.XAIKey) != 1 || len(cfg.MetaKey) != 1 || len(cfg.OpenAICompatibility) != 1 {
 		t.Fatal("v8 example fields did not reach runtime config")
 	}
-	if !cfg.QuotaExceeded.AntigravityCredits || cfg.QuotaExceeded.SwitchProject || cfg.QuotaExceeded.SwitchPreviewModel {
+	if cfg.QuotaExceeded.SwitchProject || cfg.QuotaExceeded.SwitchPreviewModel {
 		t.Fatal("legacy-only quota examples must remain commented")
 	}
 	path := filepath.Join(t.TempDir(), "config.yaml")
@@ -99,7 +99,7 @@ func TestV8ExampleLoadsAndRoundTrips(t *testing.T) {
 	if err = yaml.Unmarshal(saved, &node); err != nil {
 		t.Fatal(err)
 	}
-	if groups := yamlPath(node.Content[0], "api-keys.gemini"); groups == nil || len(groups.Content) != 2 || yamlPath(groups.Content[0], "name").Value != "gemini-1" {
+	if groups := yamlPath(node.Content[0], "api-keys.claude"); groups == nil || len(groups.Content) != 2 || yamlPath(groups.Content[0], "name").Value != "claude-1" {
 		t.Fatal("save lost upstream group identity")
 	}
 }
@@ -145,7 +145,7 @@ func TestV8PresencePrecedenceAndCleanup(t *testing.T) {
 }
 
 func TestV8KeyInheritance(t *testing.T) {
-	for _, provider := range []string{"gemini", "interactions", "vertex", "codex", "claude", "xai", "meta"} {
+	for _, provider := range []string{"codex", "claude", "xai", "meta"} {
 		t.Run(provider, func(t *testing.T) {
 			raw := "request-retry: 9\napi-keys:\n  " + provider + ":\n" + `    - name: shared
       base-url: https://example.invalid
@@ -525,7 +525,6 @@ func TestV8MigrationPreservesEmptyLegacyContainers(t *testing.T) {
 		{"codex-header-defaults", "oauth.providers.codex.header-defaults"},
 		{"claude", "upstream.claude"}, {"claude-code", "upstream.claude"},
 		{"claude-header-defaults", "upstream.claude.header-defaults"},
-		{"antigravity", "oauth.providers.antigravity"}, {"antigravity.connection-pool", "oauth.providers.antigravity.connection-pool"},
 		{"xai", "upstream.xai"}, {"devin", "oauth.providers.devin"},
 	} {
 		for _, empty := range []string{"{}", "null"} {
@@ -659,7 +658,7 @@ func TestV8PrivateIPAliasPrecedenceAndMigration(t *testing.T) {
 
 func TestV8SaveLegacyAdapterAndManualFallback(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.yaml")
-	raw := "config-version: 8\nrouting: {retry: {request-retry: 1}}\noauth: {providers: {aistudio: {ws-auth: true}}}\n"
+	raw := "config-version: 8\nrouting: {retry: {request-retry: 1}}\noauth: {providers: {codex: {ws-auth: true}}}\n"
 	if err := os.WriteFile(path, []byte(raw), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -772,7 +771,7 @@ codex-api-key:
   - <<: *key
     api-key: second
 api-keys:
-  gemini:
+  claude:
     - &upstream
       name: first
       base-url: https://example.invalid
@@ -794,10 +793,10 @@ api-keys:
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(before, after) || len(after.CodexKey) != 2 || len(after.GeminiKey) != 2 {
+	if !reflect.DeepEqual(before, after) || len(after.CodexKey) != 2 || len(after.ClaudeKey) != 2 {
 		t.Fatal("alias migration changed effective credentials")
 	}
-	if *after.GeminiKey[0].RequestRetry != 2 || *after.GeminiKey[1].RequestRetry != 0 {
+	if *after.ClaudeKey[0].RequestRetry != 2 || *after.ClaudeKey[1].RequestRetry != 0 {
 		t.Fatal("merge override precedence changed")
 	}
 }

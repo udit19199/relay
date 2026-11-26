@@ -168,10 +168,6 @@ func TestAPICallTransportAPIKeyAuthFallsBackToConfigProxyURL(t *testing.T) {
 	h := &Handler{
 		cfg: &config.Config{
 			SDKConfig: sdkconfig.SDKConfig{ProxyURL: "http://global-proxy.example.com:8080"},
-			GeminiKey: []config.GeminiKey{{
-				APIKey:   "gemini-key",
-				ProxyURL: "http://gemini-proxy.example.com:8080",
-			}},
 			ClaudeKey: []config.ClaudeKey{{
 				APIKey:   "claude-key",
 				ProxyURL: "http://claude-proxy.example.com:8080",
@@ -204,14 +200,6 @@ func TestAPICallTransportAPIKeyAuthFallsBackToConfigProxyURL(t *testing.T) {
 		auth      *coreauth.Auth
 		wantProxy string
 	}{
-		{
-			name: "gemini",
-			auth: &coreauth.Auth{
-				Provider:   "gemini",
-				Attributes: map[string]string{"api_key": "gemini-key"},
-			},
-			wantProxy: "http://gemini-proxy.example.com:8080",
-		},
 		{
 			name: "claude",
 			auth: &coreauth.Auth{

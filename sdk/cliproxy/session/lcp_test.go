@@ -38,12 +38,6 @@ func TestExtractCanonicalTurnsProtocols(t *testing.T) {
 			roles:  []string{"system", "user", "assistant"},
 		},
 		{
-			name:   "gemini",
-			format: sdktranslator.FormatClaude,
-			body:   `{"systemInstruction":{"parts":[{"text":"Be helpful"}]},"contents":[{"role":"user","parts":[{"text":"hello"}]},{"role":"model","parts":[{"text":"hi"}]}]}`,
-			roles:  []string{"system", "user", "assistant"},
-		},
-		{
 			name:   "interactions",
 			format: sdktranslator.FormatInteractions,
 			body:   `{"system_instruction":"Be helpful","input":[{"type":"user_input","content":[{"type":"text","text":"hello"}]},{"type":"model_output","content":[{"type":"text","text":"hi"}]}]}`,
@@ -159,16 +153,16 @@ func TestExtractCanonicalTurnsGrowthAndCrossProtocolNormalization(t *testing.T) 
 
 	firstOpenAI := []byte(`{"messages":[{"role":"system","content":"Be helpful"},{"role":"user","content":"hello"}]}`)
 	grownOpenAI := []byte(`{"messages":[{"role":"system","content":"Be helpful"},{"role":"user","content":"hello"},{"role":"assistant","content":"hi"},{"role":"user","content":"continue"}]}`)
-	firstGemini := []byte(`{"systemInstruction":{"parts":[{"text":"Be helpful"}]},"contents":[{"role":"user","parts":[{"text":"hello"}]}]}`)
+	firstInteractions := []byte(`{"system_instruction":"Be helpful","input":[{"type":"user_input","content":[{"type":"text","text":"hello"}]}]}`)
 
 	openAITurns := ExtractCanonicalTurns(sdktranslator.FormatOpenAI, firstOpenAI)
 	grownTurns := ExtractCanonicalTurns(sdktranslator.FormatOpenAI, grownOpenAI)
-	geminiTurns := ExtractCanonicalTurns(sdktranslator.FormatClaude, firstGemini)
-	if len(openAITurns) != 2 || len(grownTurns) != 4 || len(geminiTurns) != 2 {
-		t.Fatalf("unexpected turn counts: openai=%d grown=%d gemini=%d", len(openAITurns), len(grownTurns), len(geminiTurns))
+	interactionTurns := ExtractCanonicalTurns(sdktranslator.FormatInteractions, firstInteractions)
+	if len(openAITurns) != 2 || len(grownTurns) != 4 || len(interactionTurns) != 2 {
+		t.Fatalf("unexpected turn counts: openai=%d grown=%d interactions=%d", len(openAITurns), len(grownTurns), len(interactionTurns))
 	}
 	for index := range openAITurns {
-		if FastTurnFingerprint(openAITurns[index]) != FastTurnFingerprint(geminiTurns[index]) {
+		if FastTurnFingerprint(openAITurns[index]) != FastTurnFingerprint(interactionTurns[index]) {
 			t.Fatalf("cross-protocol fingerprint %d differs", index)
 		}
 		if FastTurnFingerprint(openAITurns[index]) != FastTurnFingerprint(grownTurns[index]) {

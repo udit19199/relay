@@ -110,7 +110,7 @@ func ExtractSessionInfo(headers http.Header, payload []byte, metadata map[string
 		root = newSessionObject(util.ParseGJSONBytesNoCopy(payload))
 		reqRoot = root
 		req := root.Get("request")
-		hasNestedReq = req.Exists() && !root.Get("contents").Exists()
+		hasNestedReq = req.Exists()
 		if hasNestedReq {
 			reqRoot = newSessionObject(req)
 		}
@@ -645,24 +645,6 @@ func ExtractSessionInfo(headers http.Header, payload []byte, metadata map[string
 
 	// 6. Payload inspection
 	if len(payload) > 0 && root.Exists() {
-		// Gemini context caching
-		for _, cachePath := range []string{"cachedContent", "cached_content"} {
-			cacheID := normalizedSessionCandidate(root.Get(cachePath).String())
-			if cacheID == "" && hasNestedReq {
-				cacheID = normalizedSessionCandidate(reqRoot.Get(cachePath).String())
-			}
-			if cacheID != "" {
-				info.ClientType = "gemini"
-				info.SessionID = "geminicache:" + cacheID
-				if parentCandidate != "" && parentCandidate != cacheID {
-					info.ParentSessionID = "geminicache:" + parentCandidate
-					info.AgentName = "subagent"
-				} else {
-					info.AgentName = "main"
-				}
-				return finalizeSessionInfo(info)
-			}
-		}
 
 		// OpenAI thread in payload
 		for _, threadPath := range []string{"thread_id", "threadId", "metadata.thread_id"} {

@@ -1522,8 +1522,6 @@ func (s *SessionAffinitySelector) pickLCP(ctx context.Context, provider, model s
 func canonicalLCPProvider(provider string) string {
 	provider = strings.ToLower(strings.TrimSpace(provider))
 	switch provider {
-	case "google", "gemini", "vertex", "aistudio":
-		return "google"
 	case "codex", "openai":
 		return "openai"
 	case "claude", "anthropic":
@@ -1991,7 +1989,7 @@ func extractConversationAlias(payload []byte) string {
 	conversation := root.Get("conversation")
 	if !conversation.Exists() {
 		req := root.Get("request")
-		if req.Exists() && !root.Get("contents").Exists() {
+		if req.Exists() {
 			conversation = req.Get("conversation")
 		}
 	}

@@ -29,7 +29,6 @@ const placeholderReasonDescription = "Brief explanation of why you are calling t
 type jsonSchemaCleanOptions struct {
 	addPlaceholder       bool
 	addMissingArrayItems bool
-	antigravitySemantics bool
 	removeToolTitle      bool
 	removeGeminiMetadata bool
 	flattenUnions        bool
@@ -43,64 +42,6 @@ type jsonSchemaCleanOptions struct {
 	preserveAdditionalPropertiesFalse bool
 	preserveAllAdditionalProperties   bool
 	preserveStandardConstraints       bool
-}
-
-// CleanJSONSchemaForAntigravity transforms a tool schema to be compatible with Antigravity API.
-// It handles unsupported keywords, type flattening, and schema simplification while preserving
-// semantic information as description hints and adding placeholders required by VALIDATED mode.
-func CleanJSONSchemaForAntigravity(jsonStr string) string {
-	return CleanJSONSchemaForAntigravityTool(jsonStr, true)
-}
-
-// CleanJSONSchemaForAntigravityTool transforms an Antigravity function schema. The private
-// backend accepts enum members only as strings, but the declared type still controls the JSON
-// type of generated function arguments, so numeric and boolean types must not be rewritten.
-// requirePlaceholder is used only for Claude VALIDATED mode.
-func CleanJSONSchemaForAntigravityTool(jsonStr string, requirePlaceholder bool) string {
-	return cleanJSONSchemaForAntigravityTool(jsonStr, requirePlaceholder, false)
-}
-
-// CleanJSONSchemaForAntigravityClaudeTool is the Antigravity tool cleaner for Claude
-// models. It applies the same Antigravity schema cleanup, but flattens multi-branch
-// anyOf/oneOf unions to a single strongest branch: the Antigravity Claude backend
-// converts Gemini function declarations into Claude custom.input_schema and rejects
-// nested multi-branch unions with "JSON schema is invalid", while the Gemini
-// backends accept preserved unions (see Issue 3662 and its regression follow-up).
-func CleanJSONSchemaForAntigravityClaudeTool(jsonStr string, requirePlaceholder bool) string {
-	return cleanJSONSchemaForAntigravityTool(jsonStr, requirePlaceholder, true)
-}
-
-func cleanJSONSchemaForAntigravityTool(jsonStr string, requirePlaceholder, flattenMultiBranchUnions bool) string {
-	return cleanJSONSchema(jsonStr, jsonSchemaCleanOptions{
-		addPlaceholder:           requirePlaceholder,
-		addMissingArrayItems:     true,
-		antigravitySemantics:     true,
-		removeToolTitle:          !requirePlaceholder,
-		flattenUnions:            true,
-		flattenMultiBranchUnions: flattenMultiBranchUnions,
-		dropAllEnums:             true,
-	})
-}
-
-// CleanJSONSchemaForAntigravityResponse transforms a response schema without applying tool-only
-// compatibility rewrites that would alter the client's structured output contract.
-//
-// Sanitization policy:
-//   - Passthrough: type, properties, items, required, description, enum, nullable, and
-//     additionalProperties: false (which Antigravity natively enforces for response schemas).
-//   - Description hints + deletion: unsupported or accepted-but-ignored constraints.
-//   - Flattened: allOf merged into properties/required.
-//   - Unions: multi-branch anyOf/oneOf unions are preserved; single-type nullable unions ([T, null]) project to T with nullable:true.
-//   - Resolved: local $ref targets are inlined before $defs/definitions are removed.
-//   - Dropped: unresolved $ref (after a hint), metadata, unsupported object-key constraints,
-//     conditional keywords (after non-conflicting properties are retained), and x-* extensions.
-func CleanJSONSchemaForAntigravityResponse(jsonStr string) string {
-	return cleanJSONSchema(jsonStr, jsonSchemaCleanOptions{
-		antigravitySemantics:              true,
-		flattenUnions:                     true,
-		dropBooleanEnums:                  true,
-		preserveAdditionalPropertiesFalse: true,
-	})
 }
 
 // CleanJSONSchemaForGemini transforms a JSON schema to be compatible with Gemini tool calling.
@@ -141,7 +82,7 @@ func cleanJSONSchema(jsonStr string, options jsonSchemaCleanOptions) string {
 	// Phase 1: Convert and add hints. Every cleaner removes $defs/definitions later, so local
 	// references must be expanded here for every route; otherwise nested fields are lost.
 	jsonStr = inlineLocalRefsForClean(jsonStr)
-	jsonStr = convertRefsToHints(jsonStr, options.antigravitySemantics)
+	jsonStr = convertRefsToHints(jsonStr, false)
 	jsonStr = convertConstToEnum(jsonStr)
 	jsonStr = convertEnumValuesToStrings(jsonStr, options.forceEnumStringType)
 	jsonStr = addEnumHints(jsonStr)
@@ -150,9 +91,6 @@ func cleanJSONSchema(jsonStr string, options jsonSchemaCleanOptions) string {
 		jsonStr = addAdditionalPropertiesHints(jsonStr)
 	}
 	jsonStr = moveConstraintsToDescription(jsonStr, options)
-	if options.antigravitySemantics {
-		jsonStr = moveNotToDescription(jsonStr)
-	}
 
 	// Phase 2: Flatten complex structures. Once a JSON Schema contains a conjunction,
 	// local shape assumptions are unsafe in ancestors, siblings, and descendants alike.
@@ -166,7 +104,7 @@ func cleanJSONSchema(jsonStr string, options jsonSchemaCleanOptions) string {
 		if options.flattenUnions {
 			jsonStr = flattenAnyOfOneOf(jsonStr, options.preserveStandardConstraints, options.flattenMultiBranchUnions)
 		}
-		jsonStr = flattenTypeArrays(jsonStr, options.antigravitySemantics)
+		jsonStr = flattenTypeArrays(jsonStr, false)
 	}
 
 	// Phase 3: Cleanup
@@ -1665,9 +1603,6 @@ func constraintKeywords(options jsonSchemaCleanOptions) []string {
 		return nil
 	}
 	keywords := append([]string(nil), unsupportedConstraints...)
-	if options.antigravitySemantics {
-		keywords = append(keywords, "minimum", "maximum", "multipleOf")
-	}
 	return keywords
 }
 
@@ -2246,9 +2181,6 @@ func removeUnsupportedKeywords(jsonStr string, options jsonSchemaCleanOptions) s
 		"$comment", "enumDescriptions", "enumTitles", "prefill", "deprecated", "encrypted", "discriminator", "readOnly", "writeOnly", // Schema metadata fields unsupported by Gemini
 		"additionalItems", "unevaluatedProperties", "unevaluatedItems", "contentSchema", "contentMediaType", "contentEncoding",
 	)
-	if options.antigravitySemantics {
-		keywords = append(keywords, "not")
-	}
 
 	deletePaths := make([]string, 0)
 	pathsByField := findPathsByFields(jsonStr, keywords)

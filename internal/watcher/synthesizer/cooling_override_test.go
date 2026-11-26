@@ -18,20 +18,6 @@ func TestConfigSynthesizerPreservesExplicitFalseCoolingOverrides(t *testing.T) {
 		cfg  *config.Config
 	}{
 		{
-			name: "gemini",
-			cfg: &config.Config{GeminiKey: []config.GeminiKey{{
-				APIKey:         "gemini-key",
-				DisableCooling: &disableCooling,
-			}}},
-		},
-		{
-			name: "interactions",
-			cfg: &config.Config{InteractionsKey: []config.GeminiKey{{
-				APIKey:         "interactions-key",
-				DisableCooling: &disableCooling,
-			}}},
-		},
-		{
 			name: "claude",
 			cfg: &config.Config{ClaudeKey: []config.ClaudeKey{{
 				APIKey:         "claude-key",
@@ -61,14 +47,6 @@ func TestConfigSynthesizerPreservesExplicitFalseCoolingOverrides(t *testing.T) {
 				BaseURL:        "https://compat.example.com",
 				DisableCooling: &disableCooling,
 				APIKeyEntries:  []config.OpenAICompatibilityAPIKey{{APIKey: "compat-key"}},
-			}}},
-		},
-		{
-			name: "vertex",
-			cfg: &config.Config{VertexCompatAPIKey: []config.VertexCompatKey{{
-				APIKey:         "vertex-key",
-				BaseURL:        "https://vertex.example.com",
-				DisableCooling: &disableCooling,
 			}}},
 		},
 	}

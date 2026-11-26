@@ -177,7 +177,6 @@ func TestApplyRequestThinkingConfigurationUpdateCrossProtocol(t *testing.T) {
 		{name: "Codex uses current update without bound model", format: "codex", body: `{"reasoning":{"effort":"xhigh"},"input":[{"role":"user","content":"ok"}]}`, path: "reasoning.effort", want: "high"},
 		{name: "OpenAI Chat uses current update", format: "openai", body: `{"reasoning_effort":"medium","messages":[]}`, path: "reasoning_effort", want: "high"},
 		{name: "Claude uses current update", format: "claude", body: `{"thinking":{"type":"adaptive"},"output_config":{"effort":"medium"},"max_tokens":4096}`, path: "output_config.effort", want: "high"},
-		{name: "Gemini uses current update", format: "gemini", body: `{"generationConfig":{"thinkingConfig":{"thinkingBudget":8192}}}`, path: "generationConfig.thinkingConfig.thinkingBudget", want: "24576"},
 		{name: "empty current payload falls back to original", format: "openai", body: `{"reasoning_effort":"medium","messages":[]}`, path: "reasoning_effort", want: "low", noSource: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

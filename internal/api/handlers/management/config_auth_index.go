@@ -12,11 +12,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type geminiKeyWithAuthIndex struct {
-	config.GeminiKey
-	AuthIndex string `json:"auth-index,omitempty"`
-}
-
 type claudeKeyWithAuthIndex struct {
 	config.ClaudeKey
 	AuthIndex string `json:"auth-index,omitempty"`
@@ -34,11 +29,6 @@ type xaiKeyWithAuthIndex struct {
 
 type metaKeyWithAuthIndex struct {
 	config.MetaKey
-	AuthIndex string `json:"auth-index,omitempty"`
-}
-
-type vertexCompatKeyWithAuthIndex struct {
-	config.VertexCompatKey
 	AuthIndex string `json:"auth-index,omitempty"`
 }
 
@@ -392,48 +382,6 @@ func (h *Handler) injectV8APIKeyAuthIndexesLocked(root *yaml.Node, data []byte) 
 		}
 	}
 
-	providerAuthMap := make(map[string]map[string]string)
-	for _, p := range []string{"gemini", "interactions", "vertex"} {
-		providerAuthMap[p] = make(map[string]string)
-	}
-
-	for _, a := range authsByProvider["gemini"] {
-		if a == nil || a.Attributes == nil {
-			continue
-		}
-		idx, errConv := strconv.Atoi(a.Attributes["config_index"])
-		if errConv != nil || idx < 0 || idx >= len(cfg.GeminiKey) {
-			continue
-		}
-		e := cfg.GeminiKey[idx]
-		key := formatCredentialDedupKey(e.APIKey, e.BaseURL, e.ProxyURL, e.Prefix, e.Headers, e.ConnectionPool)
-		providerAuthMap["gemini"][key] = resolveAuthIndex(a)
-	}
-	for _, a := range authsByProvider["gemini-interactions"] {
-		if a == nil || a.Attributes == nil {
-			continue
-		}
-		idx, errConv := strconv.Atoi(a.Attributes["config_index"])
-		if errConv != nil || idx < 0 || idx >= len(cfg.InteractionsKey) {
-			continue
-		}
-		e := cfg.InteractionsKey[idx]
-		key := formatCredentialDedupKey(e.APIKey, e.BaseURL, e.ProxyURL, e.Prefix, e.Headers, e.ConnectionPool)
-		providerAuthMap["interactions"][key] = resolveAuthIndex(a)
-	}
-	for _, a := range authsByProvider["vertex"] {
-		if a == nil || a.Attributes == nil {
-			continue
-		}
-		idx, errConv := strconv.Atoi(a.Attributes["config_index"])
-		if errConv != nil || idx < 0 || idx >= len(cfg.VertexCompatAPIKey) {
-			continue
-		}
-		e := cfg.VertexCompatAPIKey[idx]
-		key := strings.TrimSpace(e.APIKey) + "|" + strings.TrimSpace(e.BaseURL) + "\x00" + config.FormatConnectionPoolDedupID(e.ConnectionPool)
-		providerAuthMap["vertex"][key] = resolveAuthIndex(a)
-	}
-
 	authByConfigIndex := make(map[string]map[string]*coreauth.Auth)
 	for _, p := range []string{"codex", "claude", "xai", "meta"} {
 		authByConfigIndex[p] = make(map[string]*coreauth.Auth)
@@ -599,113 +547,7 @@ func (h *Handler) injectV8APIKeyAuthIndexesLocked(root *yaml.Node, data []byte) 
 			continue
 		}
 
-		for _, group := range groupsNode.Content {
-			if group == nil || group.Kind != yaml.MappingNode {
-				continue
-			}
-			groupBase := strings.TrimSpace(yamlMapScalar(group, "base-url"))
-			keysNode := configV8Node(group, []string{"keys"})
-			if keysNode == nil || keysNode.Kind != yaml.SequenceNode {
-				continue
-			}
-			for _, keyNode := range keysNode.Content {
-				if keyNode == nil || keyNode.Kind != yaml.MappingNode {
-					continue
-				}
-				apiKey := strings.TrimSpace(yamlMapScalar(keyNode, "api-key"))
-				pool := resolveInheritedConnectionPool(keyNode, group)
-				if providerName == "vertex" {
-					vertexKey := apiKey + "|" + groupBase + "\x00" + config.FormatConnectionPoolDedupID(pool)
-					if idx, ok := providerAuthMap["vertex"][vertexKey]; ok {
-						setMapScalar(keyNode, "auth_index", idx)
-					}
-					continue
-				}
-
-				proxyURL := resolveInheritedScalar(keyNode, group, "proxy-url")
-				prefix := resolveInheritedScalar(keyNode, group, "prefix")
-				headers := resolveInheritedHeaders(keyNode, group, "headers")
-				dedupKey := formatCredentialDedupKey(apiKey, groupBase, proxyURL, prefix, headers, pool)
-				if idx, ok := providerAuthMap[providerName][dedupKey]; ok {
-					setMapScalar(keyNode, "auth_index", idx)
-				}
-			}
-		}
 	}
-}
-
-func (h *Handler) geminiKeysWithAuthIndex() []geminiKeyWithAuthIndex {
-	if h == nil {
-		return nil
-	}
-	liveIndexByID := h.liveAuthIndexByID()
-
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if h.cfg == nil {
-		return nil
-	}
-
-	idGen := synthesizer.NewStableIDGenerator()
-	out := make([]geminiKeyWithAuthIndex, len(h.cfg.GeminiKey))
-	for i := range h.cfg.GeminiKey {
-		entry := h.cfg.GeminiKey[i]
-		authIndex := ""
-		key := strings.TrimSpace(entry.APIKey)
-		base := strings.TrimSpace(entry.BaseURL)
-		proxyURL := strings.TrimSpace(entry.ProxyURL)
-		prefix := strings.TrimSpace(entry.Prefix)
-		if key != "" || base != "" {
-			idParts := []string{key, base, proxyURL, prefix, config.FormatSortedHeaders(entry.Headers)}
-			if poolID := config.FormatConnectionPoolDedupID(entry.ConnectionPool); poolID != "" {
-				idParts = append(idParts, poolID)
-			}
-			id, _ := idGen.Next("gemini:apikey", idParts...)
-			authIndex = liveIndexByID[id]
-		}
-		out[i] = geminiKeyWithAuthIndex{
-			GeminiKey: entry,
-			AuthIndex: authIndex,
-		}
-	}
-	return out
-}
-
-func (h *Handler) interactionsKeysWithAuthIndex() []geminiKeyWithAuthIndex {
-	if h == nil {
-		return nil
-	}
-	liveIndexByID := h.liveAuthIndexByID()
-
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if h.cfg == nil {
-		return nil
-	}
-
-	idGen := synthesizer.NewStableIDGenerator()
-	out := make([]geminiKeyWithAuthIndex, len(h.cfg.InteractionsKey))
-	for i := range h.cfg.InteractionsKey {
-		entry := h.cfg.InteractionsKey[i]
-		authIndex := ""
-		key := strings.TrimSpace(entry.APIKey)
-		base := strings.TrimSpace(entry.BaseURL)
-		proxyURL := strings.TrimSpace(entry.ProxyURL)
-		prefix := strings.TrimSpace(entry.Prefix)
-		if key != "" || base != "" {
-			idParts := []string{key, base, proxyURL, prefix, config.FormatSortedHeaders(entry.Headers)}
-			if poolID := config.FormatConnectionPoolDedupID(entry.ConnectionPool); poolID != "" {
-				idParts = append(idParts, poolID)
-			}
-			id, _ := idGen.Next("gemini-interactions:apikey", idParts...)
-			authIndex = liveIndexByID[id]
-		}
-		out[i] = geminiKeyWithAuthIndex{
-			GeminiKey: entry,
-			AuthIndex: authIndex,
-		}
-	}
-	return out
 }
 
 func (h *Handler) claudeKeysWithAuthIndex() []claudeKeyWithAuthIndex {
@@ -851,36 +693,6 @@ func (h *Handler) metaKeysWithAuthIndex() []metaKeyWithAuthIndex {
 		out[i] = metaKeyWithAuthIndex{
 			MetaKey:   entry,
 			AuthIndex: authIndex,
-		}
-	}
-	return out
-}
-
-func (h *Handler) vertexCompatKeysWithAuthIndex() []vertexCompatKeyWithAuthIndex {
-	if h == nil {
-		return nil
-	}
-	liveIndexByID := h.liveAuthIndexByID()
-
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if h.cfg == nil {
-		return nil
-	}
-
-	idGen := synthesizer.NewStableIDGenerator()
-	out := make([]vertexCompatKeyWithAuthIndex, len(h.cfg.VertexCompatAPIKey))
-	for i := range h.cfg.VertexCompatAPIKey {
-		entry := h.cfg.VertexCompatAPIKey[i]
-		idParts := []string{entry.APIKey, entry.BaseURL, entry.ProxyURL}
-		if poolID := config.FormatConnectionPoolDedupID(entry.ConnectionPool); poolID != "" {
-			idParts = append(idParts, poolID)
-		}
-		id, _ := idGen.Next("vertex:apikey", idParts...)
-		authIndex := liveIndexByID[id]
-		out[i] = vertexCompatKeyWithAuthIndex{
-			VertexCompatKey: entry,
-			AuthIndex:       authIndex,
 		}
 	}
 	return out

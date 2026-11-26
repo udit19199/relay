@@ -41,8 +41,8 @@ func TestCORSPreflightExplicitlyAllowsAuthorization(t *testing.T) {
 			name:           "alternative credential headers",
 			method:         http.MethodGet,
 			path:           "/v1/models",
-			requestHeaders: "x-api-key,x-goog-api-key",
-			wantAllowed:    []string{"X-Api-Key", "X-Goog-Api-Key"},
+			requestHeaders: "x-api-key",
+			wantAllowed:    []string{"X-Api-Key"},
 		},
 		{
 			name:           "anthropic headers",

@@ -23,10 +23,9 @@ func ConvertInteractionsRequestToOpenAI(modelName string, inputRawJSON []byte, s
 	}
 	messageItems := translatorcommon.NewRawArrayItems(messageCapacity)
 	appendInteractionsSystemToOpenAI(&messageItems, root)
-	forAntigravity := isAntigravityModel(model)
-	appendInteractionsInputToOpenAIMessages(&messageItems, root.Get("input"), forAntigravity)
+	appendInteractionsInputToOpenAIMessages(&messageItems, root.Get("input"))
 	translatorcommon.SetRawArrayItemsDoc(outDoc, "messages", messageItems)
-	copyInteractionsToolsToOpenAIDoc(outDoc, root, forAntigravity)
+	copyInteractionsToolsToOpenAIDoc(outDoc, root)
 	copyInteractionsGenerationConfigToOpenAIDoc(outDoc, root)
 	copyInteractionsOpenAITopLevelDoc(outDoc, root)
 	return outDoc.Bytes(), nil
@@ -42,7 +41,7 @@ func appendInteractionsSystemToOpenAI(items *[][]byte, root ojson.Result) {
 	*items = append(*items, msg)
 }
 
-func appendInteractionsInputToOpenAIMessages(items *[][]byte, input ojson.Result, forAntigravity bool) {
+func appendInteractionsInputToOpenAIMessages(items *[][]byte, input ojson.Result) {
 	if input.Type == ojson.String {
 		msg := []byte(`{"role":"user","content":""}`)
 		msg, _ = ojson.SetBytes(msg, "content", input.String())
@@ -51,17 +50,17 @@ func appendInteractionsInputToOpenAIMessages(items *[][]byte, input ojson.Result
 	}
 	if input.IsArray() {
 		input.ForEach(func(_, step ojson.Result) bool {
-			appendInteractionsStepToOpenAI(items, step, "user", forAntigravity)
+			appendInteractionsStepToOpenAI(items, step, "user")
 			return true
 		})
 		return
 	}
 	if input.IsObject() {
-		appendInteractionsStepToOpenAI(items, input, "user", forAntigravity)
+		appendInteractionsStepToOpenAI(items, input, "user")
 	}
 }
 
-func appendInteractionsStepToOpenAI(items *[][]byte, step ojson.Result, defaultRole string, forAntigravity bool) {
+func appendInteractionsStepToOpenAI(items *[][]byte, step ojson.Result, defaultRole string) {
 	switch step.Get("type").String() {
 	case "user_input":
 		appendInteractionsMessageToOpenAI(items, step, "user")
@@ -70,7 +69,7 @@ func appendInteractionsStepToOpenAI(items *[][]byte, step ojson.Result, defaultR
 	case "thought":
 		appendInteractionsThoughtToOpenAI(items, step)
 	case "function_call":
-		appendInteractionsFunctionCallToOpenAI(items, step, forAntigravity)
+		appendInteractionsFunctionCallToOpenAI(items, step)
 	case "function_result":
 		appendInteractionsFunctionResultToOpenAI(items, step)
 	default:
@@ -141,15 +140,12 @@ func appendInteractionsContentToOpenAIMessageDoc(msgDoc *ojson.Doc, content ojso
 	}
 }
 
-func appendInteractionsFunctionCallToOpenAI(items *[][]byte, step ojson.Result, forAntigravity bool) {
+func appendInteractionsFunctionCallToOpenAI(items *[][]byte, step ojson.Result) {
 	msg := []byte(`{"role":"assistant","content":"","tool_calls":[]}`)
 	toolCallDoc := ojson.NewDocString(`{"id":"","type":"function","function":{"name":"","arguments":"{}"}}`)
 	callID := util.FirstNonEmpty(step.Get("call_id").String(), step.Get("id").String(), "call_0")
 	_ = toolCallDoc.Set("id", callID)
 	name := step.Get("name").String()
-	if forAntigravity {
-		name = translatorcommon.AntigravityUpstreamToolNameToClient(name)
-	}
 	_ = toolCallDoc.Set("function.name", name)
 	_ = toolCallDoc.Set("function.arguments", jsonStringValue(step.Get("arguments"), "{}"))
 	msg = translatorcommon.SetRawArrayItems(msg, "tool_calls", [][]byte{toolCallDoc.Bytes()})
@@ -163,19 +159,19 @@ func appendInteractionsFunctionResultToOpenAI(items *[][]byte, step ojson.Result
 	*items = append(*items, msgDoc.Bytes())
 }
 
-func copyInteractionsToolsToOpenAIDoc(outDoc *ojson.Doc, root ojson.Result, forAntigravity bool) {
+func copyInteractionsToolsToOpenAIDoc(outDoc *ojson.Doc, root ojson.Result) {
 	tools := root.Get("tools")
 	if !tools.Exists() || !tools.IsArray() {
 		return
 	}
 	var toolItems [][]byte
 	tools.ForEach(func(_, tool ojson.Result) bool {
-		if converted, ok := openAIToolFromInteractionsTool(tool, forAntigravity); ok {
+		if converted, ok := openAIToolFromInteractionsTool(tool); ok {
 			toolItems = append(toolItems, converted)
 		}
 		if decls := firstExisting(tool.Get("function_declarations"), tool.Get("functionDeclarations")); decls.Exists() && decls.IsArray() {
 			decls.ForEach(func(_, decl ojson.Result) bool {
-				if converted, ok := openAIToolFromInteractionsTool(decl, forAntigravity); ok {
+				if converted, ok := openAIToolFromInteractionsTool(decl); ok {
 					toolItems = append(toolItems, converted)
 				}
 				return true
@@ -273,13 +269,10 @@ func interactionsContentPartToOpenAI(part ojson.Result, role string) ([]byte, bo
 	return nil, false
 }
 
-func openAIToolFromInteractionsTool(tool ojson.Result, forAntigravity bool) ([]byte, bool) {
+func openAIToolFromInteractionsTool(tool ojson.Result) ([]byte, bool) {
 	name := util.FirstNonEmpty(tool.Get("name").String(), tool.Get("function.name").String())
 	if name == "" {
 		return nil, false
-	}
-	if forAntigravity {
-		name = translatorcommon.AntigravityUpstreamToolNameToClient(name)
 	}
 	outDoc := ojson.NewDocString(`{"type":"function","function":{"name":""}}`)
 	_ = outDoc.Set("function.name", name)

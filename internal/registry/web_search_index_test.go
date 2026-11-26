@@ -181,12 +181,12 @@ func TestWebSearchIndexEmptyClientExclusion(t *testing.T) {
 	for _, clientID := range []string{"", "supporter"} {
 		t.Run(fmt.Sprintf("client=%q", clientID), func(t *testing.T) {
 			reg := newTestModelRegistry()
-			reg.RegisterClient(clientID, "antigravity", []*ModelInfo{{ID: "m", SupportsWebSearch: true}})
-			reg.RegisterClient("observer", "antigravity", []*ModelInfo{{ID: "m"}})
+			reg.RegisterClient(clientID, "devin", []*ModelInfo{{ID: "m", SupportsWebSearch: true}})
+			reg.RegisterClient("observer", "devin", []*ModelInfo{{ID: "m"}})
 
 			reg.mutex.RLock()
 			defer reg.mutex.RUnlock()
-			for _, provider := range []string{"", "antigravity", "gemini"} {
+			for _, provider := range []string{"", "devin", "gemini"} {
 				for _, exclude := range []string{"", "supporter", "observer", "missing"} {
 					want := provider != "gemini" && clientID != exclude
 					if got := referenceHasClientSupportingWebSearch(reg, "m", provider, exclude); got != want {
@@ -205,12 +205,12 @@ func TestWebSearchIndexPublishedViewsAfterSupporterUnregister(t *testing.T) {
 	for _, clientID := range []string{"", "supporter"} {
 		t.Run(fmt.Sprintf("client=%q", clientID), func(t *testing.T) {
 			reg := newTestModelRegistry()
-			reg.RegisterClient(clientID, "antigravity", []*ModelInfo{{ID: "m", SupportsWebSearch: true}})
-			reg.RegisterClient("observer", "antigravity", []*ModelInfo{{ID: "m"}})
-			assertPublishedWebSearchSupport(t, reg, "m", "antigravity", true)
+			reg.RegisterClient(clientID, "devin", []*ModelInfo{{ID: "m", SupportsWebSearch: true}})
+			reg.RegisterClient("observer", "devin", []*ModelInfo{{ID: "m"}})
+			assertPublishedWebSearchSupport(t, reg, "m", "devin", true)
 
 			reg.UnregisterClient(clientID)
-			assertPublishedWebSearchSupport(t, reg, "m", "antigravity", false)
+			assertPublishedWebSearchSupport(t, reg, "m", "devin", false)
 			assertWebSearchIndexMatchesScan(t, reg, "supporter unregistered")
 		})
 	}
@@ -218,8 +218,8 @@ func TestWebSearchIndexPublishedViewsAfterSupporterUnregister(t *testing.T) {
 
 func TestWebSearchIndexPreservesRealSupporterOnOrphanAddition(t *testing.T) {
 	reg := newTestModelRegistry()
-	reg.RegisterClient("real", "antigravity", []*ModelInfo{{ID: "m", SupportsWebSearch: true}})
-	reg.RegisterClient("ghost", "antigravity", []*ModelInfo{{ID: "m", SupportsWebSearch: true}})
+	reg.RegisterClient("real", "devin", []*ModelInfo{{ID: "m", SupportsWebSearch: true}})
+	reg.RegisterClient("ghost", "devin", []*ModelInfo{{ID: "m", SupportsWebSearch: true}})
 	// Artificially leave orphaned metadata and index entries. Normal registry
 	// operations keep these maps together; this exercises defensive cleanup.
 	reg.mutex.Lock()
@@ -227,8 +227,8 @@ func TestWebSearchIndexPreservesRealSupporterOnOrphanAddition(t *testing.T) {
 	reg.mutex.Unlock()
 	assertWebSearchIndexMatchesScan(t, reg, "orphan seeded beside real supporter")
 
-	reg.RegisterClient("ghost", "antigravity", []*ModelInfo{{ID: "m"}})
-	assertPublishedWebSearchSupport(t, reg, "m", "antigravity", true)
+	reg.RegisterClient("ghost", "devin", []*ModelInfo{{ID: "m"}})
+	assertPublishedWebSearchSupport(t, reg, "m", "devin", true)
 	assertWebSearchIndexMatchesScan(t, reg, "orphan replaced beside real supporter")
 }
 
@@ -236,20 +236,20 @@ func TestWebSearchIndexRefreshesOrphanedModelsOnPureAddition(t *testing.T) {
 	for _, realSupportsWebSearch := range []bool{false, true} {
 		t.Run(fmt.Sprintf("real_supports_web_search=%v", realSupportsWebSearch), func(t *testing.T) {
 			reg := newTestModelRegistry()
-			reg.RegisterClient("real", "antigravity", []*ModelInfo{{ID: "m", SupportsWebSearch: realSupportsWebSearch}})
-			reg.RegisterClient("ghost", "antigravity", []*ModelInfo{{ID: "m", SupportsWebSearch: true}})
+			reg.RegisterClient("real", "devin", []*ModelInfo{{ID: "m", SupportsWebSearch: realSupportsWebSearch}})
+			reg.RegisterClient("ghost", "devin", []*ModelInfo{{ID: "m", SupportsWebSearch: true}})
 			// Artificially orphan the old catalog to exercise defensive cleanup.
 			reg.mutex.Lock()
 			delete(reg.clientModels, "ghost")
 			reg.mutex.Unlock()
-			assertPublishedWebSearchSupport(t, reg, "m", "antigravity", true)
+			assertPublishedWebSearchSupport(t, reg, "m", "devin", true)
 			assertWebSearchIndexMatchesScan(t, reg, "orphan seeded before catalog replacement")
 
 			// The old model is absent from the new catalog, so additions cannot
 			// refresh its published capability as a side effect.
-			reg.RegisterClient("ghost", "antigravity", []*ModelInfo{{ID: "n"}})
-			assertPublishedWebSearchSupport(t, reg, "m", "antigravity", realSupportsWebSearch)
-			assertPublishedWebSearchSupport(t, reg, "n", "antigravity", false)
+			reg.RegisterClient("ghost", "devin", []*ModelInfo{{ID: "n"}})
+			assertPublishedWebSearchSupport(t, reg, "m", "devin", realSupportsWebSearch)
+			assertPublishedWebSearchSupport(t, reg, "n", "devin", false)
 			assertWebSearchIndexMatchesScan(t, reg, "orphan replaced with a different catalog")
 		})
 	}
@@ -259,8 +259,8 @@ func TestWebSearchIndexCleansOrphanOnUnregister(t *testing.T) {
 	for _, realSupportsWebSearch := range []bool{false, true} {
 		t.Run(fmt.Sprintf("real_supports_web_search=%v", realSupportsWebSearch), func(t *testing.T) {
 			reg := newTestModelRegistry()
-			reg.RegisterClient("real", "antigravity", []*ModelInfo{{ID: "m", SupportsWebSearch: realSupportsWebSearch}})
-			reg.RegisterClient("ghost", "antigravity", []*ModelInfo{{ID: "m", SupportsWebSearch: true}})
+			reg.RegisterClient("real", "devin", []*ModelInfo{{ID: "m", SupportsWebSearch: realSupportsWebSearch}})
+			reg.RegisterClient("ghost", "devin", []*ModelInfo{{ID: "m", SupportsWebSearch: true}})
 			// This inconsistent state is constructed only to test orphan cleanup.
 			reg.mutex.Lock()
 			delete(reg.clientModels, "ghost")
@@ -272,7 +272,7 @@ func TestWebSearchIndexCleansOrphanOnUnregister(t *testing.T) {
 				t.Error("unregister left orphaned client model metadata")
 			}
 			reg.mutex.RUnlock()
-			assertPublishedWebSearchSupport(t, reg, "m", "antigravity", realSupportsWebSearch)
+			assertPublishedWebSearchSupport(t, reg, "m", "devin", realSupportsWebSearch)
 
 			// Repeated cleanup must not retract the real client's contribution.
 			reg.UnregisterClient("ghost")
@@ -284,14 +284,14 @@ func TestWebSearchIndexCleansOrphanOnUnregister(t *testing.T) {
 			if got := reg.webSearchClientCounts["m"]; got != wantCount {
 				t.Errorf("global count after repeated orphan cleanup = %d, want %d", got, wantCount)
 			}
-			if got := reg.webSearchProviderCounts["m"]["antigravity"]; got != wantCount {
+			if got := reg.webSearchProviderCounts["m"]["devin"]; got != wantCount {
 				t.Errorf("provider count after repeated orphan cleanup = %d, want %d", got, wantCount)
 			}
 			reg.mutex.RUnlock()
 			assertWebSearchIndexMatchesScan(t, reg, "orphan unregistered twice")
 
-			reg.RegisterClient("ghost", "antigravity", []*ModelInfo{{ID: "m"}})
-			assertPublishedWebSearchSupport(t, reg, "m", "antigravity", realSupportsWebSearch)
+			reg.RegisterClient("ghost", "devin", []*ModelInfo{{ID: "m"}})
+			assertPublishedWebSearchSupport(t, reg, "m", "devin", realSupportsWebSearch)
 			assertWebSearchIndexMatchesScan(t, reg, "orphan re-registered after cleanup")
 		})
 	}

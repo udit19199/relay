@@ -199,7 +199,7 @@ func TestLookupModelInfoIncludesClaudeSonnet5(t *testing.T) {
 
 func TestApplyClientModelCapabilities_UpdatesAllViews(t *testing.T) {
 	r := newTestModelRegistry()
-	r.RegisterClient("ag-client-1", "antigravity", []*ModelInfo{{
+	r.RegisterClient("ag-client-1", "devin", []*ModelInfo{{
 		ID:                "gemini-3.1-flash-lite",
 		SupportsWebSearch: false,
 	}})
@@ -221,7 +221,7 @@ func TestApplyClientModelCapabilities_UpdatesAllViews(t *testing.T) {
 	}
 
 	// 2. Check GetModelInfo (both with provider and global)
-	infoByProv := r.GetModelInfo("gemini-3.1-flash-lite", "antigravity")
+	infoByProv := r.GetModelInfo("gemini-3.1-flash-lite", "devin")
 	if infoByProv == nil || !infoByProv.SupportsWebSearch {
 		t.Fatalf("GetModelInfo with provider: expected SupportsWebSearch=true, got %+v", infoByProv)
 	}
@@ -248,7 +248,7 @@ func TestMultiClientRegistration_PreservesProbedCapabilities(t *testing.T) {
 	r := newTestModelRegistry()
 
 	// 1. Client A registers model
-	r.RegisterClient("client-A", "antigravity", []*ModelInfo{{
+	r.RegisterClient("client-A", "devin", []*ModelInfo{{
 		ID:                "gemini-3.1-flash-lite",
 		SupportsWebSearch: false,
 	}})
@@ -262,13 +262,13 @@ func TestMultiClientRegistration_PreservesProbedCapabilities(t *testing.T) {
 	})
 
 	// 2. Client B registers the same model with static info (SupportsWebSearch = false)
-	r.RegisterClient("client-B", "antigravity", []*ModelInfo{{
+	r.RegisterClient("client-B", "devin", []*ModelInfo{{
 		ID:                "gemini-3.1-flash-lite",
 		SupportsWebSearch: false,
 	}})
 
 	// Check that global views preserve SupportsWebSearch=true because Client A is still registered and has the capability
-	info := r.GetModelInfo("gemini-3.1-flash-lite", "antigravity")
+	info := r.GetModelInfo("gemini-3.1-flash-lite", "devin")
 	if info == nil || !info.SupportsWebSearch {
 		t.Fatalf("GetModelInfo: expected SupportsWebSearch=true to be preserved after client B registered, got %+v", info)
 	}
@@ -287,7 +287,7 @@ func TestMultiClientRegistration_PreservesProbedCapabilities(t *testing.T) {
 
 	// 3. Client A unregisters -> Now neither client supports web search, so global view should drop it
 	r.UnregisterClient("client-A")
-	infoAfterA := r.GetModelInfo("gemini-3.1-flash-lite", "antigravity")
+	infoAfterA := r.GetModelInfo("gemini-3.1-flash-lite", "devin")
 	if infoAfterA == nil || infoAfterA.SupportsWebSearch {
 		t.Fatalf("GetModelInfo: expected SupportsWebSearch=false after client A unregistered, got %+v", infoAfterA)
 	}
@@ -297,7 +297,7 @@ func TestReRegisterClient_ClearsStaleProbedCapabilitiesWhenNoOtherClientSupports
 	r := newTestModelRegistry()
 
 	// 1. Client A registers model and probes successfully (SupportsWebSearch=true)
-	r.RegisterClient("client-A", "antigravity", []*ModelInfo{{
+	r.RegisterClient("client-A", "devin", []*ModelInfo{{
 		ID:                "gemini-3.1-flash-lite",
 		SupportsWebSearch: false,
 	}})
@@ -309,21 +309,21 @@ func TestReRegisterClient_ClearsStaleProbedCapabilitiesWhenNoOtherClientSupports
 	})
 
 	// 2. Client B registers the same model without web search support
-	r.RegisterClient("client-B", "antigravity", []*ModelInfo{{
+	r.RegisterClient("client-B", "devin", []*ModelInfo{{
 		ID:                "gemini-3.1-flash-lite",
 		SupportsWebSearch: false,
 	}})
 
 	// 3. Client A now re-registers with new model definitions where SupportsWebSearch=false
 	// (e.g. config reload or model catalog update)
-	r.RegisterClient("client-A", "antigravity", []*ModelInfo{{
+	r.RegisterClient("client-A", "devin", []*ModelInfo{{
 		ID:                "gemini-3.1-flash-lite",
 		SupportsWebSearch: false,
 	}})
 
 	// Global view must NOT keep client A's stale pre-re-registration capability snapshot!
 	// Since neither A nor B now has SupportsWebSearch=true, the global and provider view must be false.
-	info := r.GetModelInfo("gemini-3.1-flash-lite", "antigravity")
+	info := r.GetModelInfo("gemini-3.1-flash-lite", "devin")
 	if info == nil || info.SupportsWebSearch {
 		t.Fatalf("GetModelInfo: expected SupportsWebSearch=false after client A re-registered with false, got %+v", info)
 	}

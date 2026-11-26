@@ -164,13 +164,7 @@ func (cfg *Config) SanitizeOAuthModelAlias() {
 				continue
 			}
 			seenAlias[aliasKey] = struct{}{}
-			var openAPI *bool
-			if entry.OpenAPI != nil {
-				value := *entry.OpenAPI
-				openAPI = &value
-			}
 			clean = append(clean, OAuthModelAlias{
-				OpenAPI:      openAPI,
 				Name:         name,
 				Alias:        alias,
 				Fork:         entry.Fork,
@@ -212,13 +206,7 @@ func (cfg *Config) SanitizeOAuthSettings() {
 				continue
 			}
 			seen[key] = struct{}{}
-			var openAPI *bool
-			if entry.OpenAPI != nil {
-				value := *entry.OpenAPI
-				openAPI = &value
-			}
 			reversed = append(reversed, OAuthModelSetting{
-				OpenAPI:          openAPI,
 				Name:             name,
 				Alias:            alias,
 				MaxContextLength: entry.MaxContextLength,
@@ -425,46 +413,6 @@ func (cfg *Config) SanitizeClaudeKeys() {
 	}
 }
 
-func sanitizeGeminiKeyEntries(entries []GeminiKey) []GeminiKey {
-	seen := make(map[string]struct{}, len(entries))
-	out := entries[:0]
-	for i := range entries {
-		entry := entries[i]
-		entry.APIKey = strings.TrimSpace(entry.APIKey)
-		entry.BaseURL = strings.TrimSpace(entry.BaseURL)
-		if entry.APIKey == "" && entry.BaseURL == "" {
-			continue
-		}
-		entry.Prefix = normalizeModelPrefix(entry.Prefix)
-		entry.ProxyURL = strings.TrimSpace(entry.ProxyURL)
-		entry.Headers = NormalizeHeaders(entry.Headers)
-		entry.ExcludedModels = NormalizeExcludedModels(entry.ExcludedModels)
-		uniqueKey := formatGeminiKeyDedupID(entry)
-		if _, exists := seen[uniqueKey]; exists {
-			continue
-		}
-		seen[uniqueKey] = struct{}{}
-		out = append(out, entry)
-	}
-	return out
-}
-
-func formatGeminiKeyDedupID(entry GeminiKey) string {
-	var b strings.Builder
-	b.WriteString(entry.APIKey)
-	b.WriteByte(0)
-	b.WriteString(entry.BaseURL)
-	b.WriteByte(0)
-	b.WriteString(entry.ProxyURL)
-	b.WriteByte(0)
-	b.WriteString(entry.Prefix)
-	b.WriteByte(0)
-	b.WriteString(FormatSortedHeaders(entry.Headers))
-	b.WriteByte(0)
-	b.WriteString(FormatConnectionPoolDedupID(entry.ConnectionPool))
-	return b.String()
-}
-
 // FormatConnectionPoolDedupID serializes a per-credential connection-pool override
 // deterministically for credential deduplication and auth-index mapping.
 func FormatConnectionPoolDedupID(pool *ProxyConnectionPoolConfig) string {
@@ -503,24 +451,6 @@ func FormatSortedHeaders(headers map[string]string) string {
 		b.WriteByte(0)
 	}
 	return b.String()
-}
-
-// SanitizeGeminiKeys deduplicates and normalizes Gemini credentials.
-// It uses API key, base URL, proxy URL, prefix, and custom headers as the uniqueness key.
-func (cfg *Config) SanitizeGeminiKeys() {
-	if cfg == nil {
-		return
-	}
-	cfg.GeminiKey = sanitizeGeminiKeyEntries(cfg.GeminiKey)
-}
-
-// SanitizeInteractionsKeys deduplicates and normalizes native Interactions credentials.
-// It uses API key, base URL, proxy URL, prefix, and custom headers as the uniqueness key.
-func (cfg *Config) SanitizeInteractionsKeys() {
-	if cfg == nil {
-		return
-	}
-	cfg.InteractionsKey = sanitizeGeminiKeyEntries(cfg.InteractionsKey)
 }
 
 func normalizeModelPrefix(prefix string) string {

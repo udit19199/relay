@@ -111,39 +111,8 @@ func BuildConfigChangeDetails(oldCfg, newCfg *config.Config) []string {
 	if oldCfg.QuotaExceeded.SwitchPreviewModel != newCfg.QuotaExceeded.SwitchPreviewModel {
 		changes = append(changes, fmt.Sprintf("quota-exceeded.switch-preview-model: %t -> %t", oldCfg.QuotaExceeded.SwitchPreviewModel, newCfg.QuotaExceeded.SwitchPreviewModel))
 	}
-	if oldCfg.QuotaExceeded.AntigravityCredits != newCfg.QuotaExceeded.AntigravityCredits {
-		changes = append(changes, fmt.Sprintf("quota-exceeded.antigravity-credits: %t -> %t", oldCfg.QuotaExceeded.AntigravityCredits, newCfg.QuotaExceeded.AntigravityCredits))
-	}
-	if !reflect.DeepEqual(oldCfg.Antigravity.SensitiveWords, newCfg.Antigravity.SensitiveWords) {
-		changes = append(changes, fmt.Sprintf("antigravity.sensitive-words: %d -> %d", len(oldCfg.Antigravity.SensitiveWords), len(newCfg.Antigravity.SensitiveWords)))
-	}
 	if !reflect.DeepEqual(oldCfg.Devin.SensitiveWords, newCfg.Devin.SensitiveWords) {
 		changes = append(changes, fmt.Sprintf("devin.sensitive-words: %d -> %d", len(oldCfg.Devin.SensitiveWords), len(newCfg.Devin.SensitiveWords)))
-	}
-	oldEnabled := "<nil>"
-	if oldCfg.Antigravity.ConnectionPool.Enabled != nil {
-		oldEnabled = fmt.Sprintf("%t", *oldCfg.Antigravity.ConnectionPool.Enabled)
-	}
-	newEnabled := "<nil>"
-	if newCfg.Antigravity.ConnectionPool.Enabled != nil {
-		newEnabled = fmt.Sprintf("%t", *newCfg.Antigravity.ConnectionPool.Enabled)
-	}
-	if oldEnabled != newEnabled {
-		changes = append(changes, fmt.Sprintf("antigravity.connection-pool.enabled: %s -> %s", oldEnabled, newEnabled))
-	}
-	if oldCfg.Antigravity.ConnectionPool.IdleConnTimeout != newCfg.Antigravity.ConnectionPool.IdleConnTimeout {
-		changes = append(changes, fmt.Sprintf("antigravity.connection-pool.idle-conn-timeout: %q -> %q", oldCfg.Antigravity.ConnectionPool.IdleConnTimeout, newCfg.Antigravity.ConnectionPool.IdleConnTimeout))
-	}
-	oldMaxIdle := "<nil>"
-	if oldCfg.Antigravity.ConnectionPool.MaxIdleConnsPerHost != nil {
-		oldMaxIdle = fmt.Sprintf("%d", *oldCfg.Antigravity.ConnectionPool.MaxIdleConnsPerHost)
-	}
-	newMaxIdle := "<nil>"
-	if newCfg.Antigravity.ConnectionPool.MaxIdleConnsPerHost != nil {
-		newMaxIdle = fmt.Sprintf("%d", *newCfg.Antigravity.ConnectionPool.MaxIdleConnsPerHost)
-	}
-	if oldMaxIdle != newMaxIdle {
-		changes = append(changes, fmt.Sprintf("antigravity.connection-pool.max-idle-conns-per-host: %s -> %s", oldMaxIdle, newMaxIdle))
 	}
 
 	if oldCfg.Codex.DisableCodexCloaking != newCfg.Codex.DisableCodexCloaking {
@@ -213,79 +182,6 @@ func BuildConfigChangeDetails(oldCfg, newCfg *config.Config) []string {
 	} else if !reflect.DeepEqual(trimStrings(oldCfg.APIKeys), trimStrings(newCfg.APIKeys)) {
 		changes = append(changes, "api-keys: values updated (count unchanged, redacted)")
 	}
-	if len(oldCfg.GeminiKey) != len(newCfg.GeminiKey) {
-		changes = append(changes, fmt.Sprintf("gemini-api-key count: %d -> %d", len(oldCfg.GeminiKey), len(newCfg.GeminiKey)))
-	} else {
-		for i := range oldCfg.GeminiKey {
-			o := oldCfg.GeminiKey[i]
-			n := newCfg.GeminiKey[i]
-			if strings.TrimSpace(o.BaseURL) != strings.TrimSpace(n.BaseURL) {
-				changes = append(changes, fmt.Sprintf("gemini[%d].base-url: %s -> %s", i, formatURL(o.BaseURL), formatURL(n.BaseURL)))
-			}
-			if strings.TrimSpace(o.ProxyURL) != strings.TrimSpace(n.ProxyURL) {
-				changes = append(changes, fmt.Sprintf("gemini[%d].proxy-url: %s -> %s", i, formatProxyURL(o.ProxyURL), formatProxyURL(n.ProxyURL)))
-			}
-			changes = appendConnectionPoolChanges(changes, fmt.Sprintf("gemini[%d].connection-pool", i), o.ConnectionPool, n.ConnectionPool)
-			if strings.TrimSpace(o.Prefix) != strings.TrimSpace(n.Prefix) {
-				changes = append(changes, fmt.Sprintf("gemini[%d].prefix: %s -> %s", i, strings.TrimSpace(o.Prefix), strings.TrimSpace(n.Prefix)))
-			}
-			changes = appendOptionalBoolChange(changes, fmt.Sprintf("gemini[%d].disable-cooling", i), o.DisableCooling, n.DisableCooling)
-			if strings.TrimSpace(o.APIKey) != strings.TrimSpace(n.APIKey) {
-				changes = append(changes, fmt.Sprintf("gemini[%d].api-key: updated", i))
-			}
-			if !equalStringMap(o.Headers, n.Headers) {
-				changes = append(changes, fmt.Sprintf("gemini[%d].headers: updated", i))
-			}
-			oldModels := SummarizeGeminiModels(o.Models)
-			newModels := SummarizeGeminiModels(n.Models)
-			if oldModels.hash != newModels.hash {
-				changes = append(changes, fmt.Sprintf("gemini[%d].models: updated (%d -> %d entries)", i, oldModels.count, newModels.count))
-			}
-			oldExcluded := SummarizeExcludedModels(o.ExcludedModels)
-			newExcluded := SummarizeExcludedModels(n.ExcludedModels)
-			if oldExcluded.hash != newExcluded.hash {
-				changes = append(changes, fmt.Sprintf("gemini[%d].excluded-models: updated (%d -> %d entries)", i, oldExcluded.count, newExcluded.count))
-			}
-			changes = appendOptionalIntChange(changes, fmt.Sprintf("gemini[%d].request-retry", i), o.RequestRetry, n.RequestRetry)
-		}
-	}
-	if len(oldCfg.InteractionsKey) != len(newCfg.InteractionsKey) {
-		changes = append(changes, fmt.Sprintf("interactions-api-key count: %d -> %d", len(oldCfg.InteractionsKey), len(newCfg.InteractionsKey)))
-	} else {
-		for i := range oldCfg.InteractionsKey {
-			o := oldCfg.InteractionsKey[i]
-			n := newCfg.InteractionsKey[i]
-			if strings.TrimSpace(o.BaseURL) != strings.TrimSpace(n.BaseURL) {
-				changes = append(changes, fmt.Sprintf("interactions[%d].base-url: %s -> %s", i, formatURL(o.BaseURL), formatURL(n.BaseURL)))
-			}
-			if strings.TrimSpace(o.ProxyURL) != strings.TrimSpace(n.ProxyURL) {
-				changes = append(changes, fmt.Sprintf("interactions[%d].proxy-url: %s -> %s", i, formatProxyURL(o.ProxyURL), formatProxyURL(n.ProxyURL)))
-			}
-			changes = appendConnectionPoolChanges(changes, fmt.Sprintf("interactions[%d].connection-pool", i), o.ConnectionPool, n.ConnectionPool)
-			if strings.TrimSpace(o.Prefix) != strings.TrimSpace(n.Prefix) {
-				changes = append(changes, fmt.Sprintf("interactions[%d].prefix: %s -> %s", i, strings.TrimSpace(o.Prefix), strings.TrimSpace(n.Prefix)))
-			}
-			changes = appendOptionalBoolChange(changes, fmt.Sprintf("interactions[%d].disable-cooling", i), o.DisableCooling, n.DisableCooling)
-			if strings.TrimSpace(o.APIKey) != strings.TrimSpace(n.APIKey) {
-				changes = append(changes, fmt.Sprintf("interactions[%d].api-key: updated", i))
-			}
-			if !equalStringMap(o.Headers, n.Headers) {
-				changes = append(changes, fmt.Sprintf("interactions[%d].headers: updated", i))
-			}
-			oldModels := SummarizeGeminiModels(o.Models)
-			newModels := SummarizeGeminiModels(n.Models)
-			if oldModels.hash != newModels.hash {
-				changes = append(changes, fmt.Sprintf("interactions[%d].models: updated (%d -> %d entries)", i, oldModels.count, newModels.count))
-			}
-			oldExcluded := SummarizeExcludedModels(o.ExcludedModels)
-			newExcluded := SummarizeExcludedModels(n.ExcludedModels)
-			if oldExcluded.hash != newExcluded.hash {
-				changes = append(changes, fmt.Sprintf("interactions[%d].excluded-models: updated (%d -> %d entries)", i, oldExcluded.count, newExcluded.count))
-			}
-			changes = appendOptionalIntChange(changes, fmt.Sprintf("interactions[%d].request-retry", i), o.RequestRetry, n.RequestRetry)
-		}
-	}
-
 	// Claude keys (do not print key material)
 	if len(oldCfg.ClaudeKey) != len(newCfg.ClaudeKey) {
 		changes = append(changes, fmt.Sprintf("claude-api-key count: %d -> %d", len(oldCfg.ClaudeKey), len(newCfg.ClaudeKey)))
@@ -518,48 +414,6 @@ func BuildConfigChangeDetails(oldCfg, newCfg *config.Config) []string {
 		changes = append(changes, "openai-compatibility:")
 		for _, c := range compat {
 			changes = append(changes, "  "+c)
-		}
-	}
-
-	// Vertex-compatible API keys
-	if len(oldCfg.VertexCompatAPIKey) != len(newCfg.VertexCompatAPIKey) {
-		changes = append(changes, fmt.Sprintf("vertex-api-key count: %d -> %d", len(oldCfg.VertexCompatAPIKey), len(newCfg.VertexCompatAPIKey)))
-	} else {
-		for i := range oldCfg.VertexCompatAPIKey {
-			o := oldCfg.VertexCompatAPIKey[i]
-			n := newCfg.VertexCompatAPIKey[i]
-			if strings.TrimSpace(o.BaseURL) != strings.TrimSpace(n.BaseURL) {
-				changes = append(changes, fmt.Sprintf("vertex[%d].base-url: %s -> %s", i, formatURL(o.BaseURL), formatURL(n.BaseURL)))
-			}
-			if strings.TrimSpace(o.ProxyURL) != strings.TrimSpace(n.ProxyURL) {
-				changes = append(changes, fmt.Sprintf("vertex[%d].proxy-url: %s -> %s", i, formatProxyURL(o.ProxyURL), formatProxyURL(n.ProxyURL)))
-			}
-			changes = appendConnectionPoolChanges(changes, fmt.Sprintf("vertex[%d].connection-pool", i), o.ConnectionPool, n.ConnectionPool)
-			if strings.TrimSpace(o.Prefix) != strings.TrimSpace(n.Prefix) {
-				changes = append(changes, fmt.Sprintf("vertex[%d].prefix: %s -> %s", i, strings.TrimSpace(o.Prefix), strings.TrimSpace(n.Prefix)))
-			}
-			changes = appendOptionalBoolChange(changes, fmt.Sprintf("vertex[%d].disable-cooling", i), o.DisableCooling, n.DisableCooling)
-			changes = appendOptionalBoolChange(changes, fmt.Sprintf("vertex[%d].openapi", i), o.OpenAPI, n.OpenAPI)
-			if strings.TrimSpace(o.OpenAPILocation) != strings.TrimSpace(n.OpenAPILocation) {
-				changes = append(changes, fmt.Sprintf("vertex[%d].openapi-location: %s -> %s", i, strings.TrimSpace(o.OpenAPILocation), strings.TrimSpace(n.OpenAPILocation)))
-			}
-			if strings.TrimSpace(o.APIKey) != strings.TrimSpace(n.APIKey) {
-				changes = append(changes, fmt.Sprintf("vertex[%d].api-key: updated", i))
-			}
-			oldModels := SummarizeVertexModels(o.Models)
-			newModels := SummarizeVertexModels(n.Models)
-			if oldModels.hash != newModels.hash {
-				changes = append(changes, fmt.Sprintf("vertex[%d].models: updated (%d -> %d entries)", i, oldModels.count, newModels.count))
-			}
-			oldExcluded := SummarizeExcludedModels(o.ExcludedModels)
-			newExcluded := SummarizeExcludedModels(n.ExcludedModels)
-			if oldExcluded.hash != newExcluded.hash {
-				changes = append(changes, fmt.Sprintf("vertex[%d].excluded-models: updated (%d -> %d entries)", i, oldExcluded.count, newExcluded.count))
-			}
-			if !equalStringMap(o.Headers, n.Headers) {
-				changes = append(changes, fmt.Sprintf("vertex[%d].headers: updated", i))
-			}
-			changes = appendOptionalIntChange(changes, fmt.Sprintf("vertex[%d].request-retry", i), o.RequestRetry, n.RequestRetry)
 		}
 	}
 

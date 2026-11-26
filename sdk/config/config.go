@@ -28,15 +28,12 @@ type PayloadFilterRule = internalconfig.PayloadFilterRule
 type PayloadModelRule = internalconfig.PayloadModelRule
 
 type ProxyConnectionPoolConfig = internalconfig.ProxyConnectionPoolConfig
-type GeminiKey = internalconfig.GeminiKey
 type CodexKey = internalconfig.CodexKey
 type XAIKey = internalconfig.XAIKey
 type XAIModel = internalconfig.XAIModel
 type MetaKey = internalconfig.MetaKey
 type MetaModel = internalconfig.MetaModel
 type ClaudeKey = internalconfig.ClaudeKey
-type VertexCompatKey = internalconfig.VertexCompatKey
-type VertexCompatModel = internalconfig.VertexCompatModel
 type OpenAICompatibility = internalconfig.OpenAICompatibility
 type OpenAICompatibilityAPIKey = internalconfig.OpenAICompatibilityAPIKey
 type OpenAICompatibilityModel = internalconfig.OpenAICompatibilityModel

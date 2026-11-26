@@ -6,26 +6,6 @@ import (
 
 func TestParseConfigRequestScopedErrors(t *testing.T) {
 	const yamlConfig = `
-gemini-api-key:
-  - api-key: gemini-key-1
-    request-scoped-errors:
-      - status: 400
-        match:
-          - "maximum_context_length"
-          - "context_length_exceeded"
-        match-regexr:
-          - "maximum_context_length$"
-          - "^context_length_exceeded"
-        action: stop
-
-interactions-api-key:
-  - api-key: interactions-key-1
-    request-scoped-errors:
-      - status: 400
-        match:
-          - "invalid_argument"
-        action: continue
-
 codex-api-key:
   - api-key: codex-key-1
     base-url: https://api.openai.com/v1
@@ -71,22 +51,6 @@ openai-compatibility:
 	cfg, errParse := ParseConfigBytes([]byte(yamlConfig))
 	if errParse != nil {
 		t.Fatalf("ParseConfigBytes() error = %v", errParse)
-	}
-
-	if len(cfg.GeminiKey) != 1 || len(cfg.GeminiKey[0].RequestScopedErrors) != 1 {
-		t.Fatalf("gemini[0].request-scoped-errors len = %d, want 1", len(cfg.GeminiKey[0].RequestScopedErrors))
-	}
-	gRule := cfg.GeminiKey[0].RequestScopedErrors[0]
-	if gRule.Status != 400 || len(gRule.Match) != 2 || len(gRule.MatchRegexr) != 2 || gRule.Action != "stop" {
-		t.Fatalf("unexpected gemini rule: %+v", gRule)
-	}
-
-	if len(cfg.InteractionsKey) != 1 || len(cfg.InteractionsKey[0].RequestScopedErrors) != 1 {
-		t.Fatalf("interactions[0].request-scoped-errors len = %d, want 1", len(cfg.InteractionsKey[0].RequestScopedErrors))
-	}
-	iRule := cfg.InteractionsKey[0].RequestScopedErrors[0]
-	if iRule.Status != 400 || len(iRule.Match) != 1 || iRule.Action != "continue" {
-		t.Fatalf("unexpected interactions rule: %+v", iRule)
 	}
 
 	if len(cfg.CodexKey) != 1 || len(cfg.CodexKey[0].RequestScopedErrors) != 1 {

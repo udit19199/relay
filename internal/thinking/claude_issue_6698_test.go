@@ -219,25 +219,6 @@ func TestApplyThinking_ClaudeAdaptiveOnlyModelsConvertBudgetAndAuto(t *testing.T
 			}
 		})
 
-		t.Run(model+"/translated_budget", func(t *testing.T) {
-			info := registry.LookupModelInfo(model, "claude")
-			body := `{"model":"` + model + `","max_tokens":32000,"messages":[{"role":"user","content":"hi"}]}`
-			source := `{"generationConfig":{"thinkingConfig":{"thinkingBudget":4096}}}`
-			out, err := thinking.ApplyThinkingWithModelInfo([]byte(body), []byte(source), model, "gemini", "claude", "claude", info)
-			if err != nil {
-				t.Fatalf("ApplyThinkingWithModelInfo: %v", err)
-			}
-			if got := ojson.GetBytes(out, "thinking.type").String(); got != "adaptive" {
-				t.Fatalf("thinking.type = %q, want adaptive; body=%s", got, out)
-			}
-			if ojson.GetBytes(out, "thinking.budget_tokens").Exists() {
-				t.Fatalf("thinking.budget_tokens still present: %s", out)
-			}
-			if got := ojson.GetBytes(out, "output_config.effort").String(); got != "medium" {
-				t.Fatalf("output_config.effort = %q, want medium; body=%s", got, out)
-			}
-		})
-
 		t.Run(model+"/auto_suffix", func(t *testing.T) {
 			body := `{"model":"` + model + `","max_tokens":32000,"messages":[{"role":"user","content":"hi"}]}`
 			out, err := thinking.ApplyThinking([]byte(body), model+"(auto)", "claude", "claude", "claude")

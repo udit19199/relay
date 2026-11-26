@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Go 1.26+ proxy server providing OpenAI/Gemini/Claude/Codex compatible APIs with OAuth and round-robin load balancing, plus its native macOS notch app in `notch/`.
+Go 1.26+ proxy server providing OpenAI/Claude/Codex compatible APIs with OAuth and round-robin load balancing, plus its native macOS notch app in `notch/`.
 
 ## Repository
 - GitHub: https://github.com/udit19199/relay (personal fork of https://github.com/router-for-me/CLIProxyAPI)
@@ -44,7 +44,6 @@ go build -o test-output ./cmd/server && rm test-output # Verify compile (REQUIRE
 - `internal/managementasset/` — Config snapshots and management assets
 - `internal/cache/` — Request signature caching
 - `internal/watcher/` — Config hot-reload and watchers
-- `internal/wsrelay/` — WebSocket relay sessions
 - `internal/usage/` — Usage and token accounting
 - `sdk/cliproxy/` — Embeddable SDK entry (service/builder/watchers/pipeline)
 - `internal/relaycli/` — Relay's own commands (`setup`, `status`, `doctor`, `accounts`, `fallback`), dispatched from the top of `main()` in `cmd/server/main.go`. They talk to the running proxy only through `/v8/management` (plus `/v0/management/quota/fetch`, which has no v8 route), print one JSON object with `--json`, and are what coding agents use to install and run Relay (README "Agent setup"). `RELAY_HOME` overrides `~/.relay`. Fallback chains are credential `priority` plus per-credential `model_aliases`, with each credential's place recorded under `relay_fallback`; OpenCode Go aliases are published without the `opencode-go/` prefix (`withOpenCodeGoAliases`) so a chain can include it.
@@ -67,6 +66,6 @@ go build -o test-output ./cmd/server && rm test-output # Verify compile (REQUIRE
 - Wrap defer errors: `defer func() { if err := f.Close(); err != nil { log.Errorf(...) } }()`
 - Use logrus structured logging; avoid leaking secrets/tokens in logs
 - Avoid panics in HTTP handlers; prefer logged errors and meaningful HTTP status codes
-- Timeouts are allowed only during credential acquisition; after an upstream connection is established, do not set timeouts for any subsequent network behavior. Intentional exceptions that must remain allowed are the Codex websocket liveness deadlines in `internal/runtime/executor/codex_websockets_executor.go`, the wsrelay session deadlines in `internal/wsrelay/session.go`, the management APICall timeout in `internal/api/handlers/management/api_tools.go`, the OpenCode Go quota fetch timeout in `internal/api/handlers/management/opencode_go_quota.go`, the Claude quota fetch timeout in `internal/api/handlers/management/claude_quota.go`, the OpenCode Go model-list fetch timeout in `sdk/cliproxy/opencode_go_models.go`, and the `cmd/fetch_antigravity_models` utility timeouts
+- Timeouts are allowed only during credential acquisition; after an upstream connection is established, do not set timeouts for any subsequent network behavior. Intentional exceptions that must remain allowed are the Codex websocket liveness deadlines in `internal/runtime/executor/codex_websockets_executor.go`, the management APICall timeout in `internal/api/handlers/management/api_tools.go`, the OpenCode Go quota fetch timeout in `internal/api/handlers/management/opencode_go_quota.go`, the Claude quota fetch timeout in `internal/api/handlers/management/claude_quota.go`, the OpenCode Go model-list fetch timeout in `sdk/cliproxy/opencode_go_models.go`
 - Avoid wall-clock `time.Sleep` in TTL, expiration, ordering, or cache-eviction unit tests due to platform timer granularity (e.g. Windows default timer resolution of ~15.6ms) and CI jitter under load; prefer controllable clocks (`nowFunc` / mock clock), explicit timestamp manipulation, or deterministic synchronization primitives.
 - Endpoints under the `/v0/management` base URL are deprecated and no longer maintained. For any feature changes, do not modify endpoints under `/v0/management` unless necessary to fix compilation errors. Exception: `/v0/management/quota/fetch` is the notch app's only quota route, so providers add their live readings there.

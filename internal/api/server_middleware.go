@@ -51,7 +51,6 @@ var corsAllowedRequestHeaders = []string{
 	"Authorization",
 	"Content-Type",
 	"X-Api-Key",
-	"X-Goog-Api-Key",
 	"Anthropic-Version",
 	"Anthropic-Beta",
 }

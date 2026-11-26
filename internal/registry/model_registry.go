@@ -82,7 +82,7 @@ type ModelInfo struct {
 	SupportedInputModalities []string `json:"supportedInputModalities,omitempty"`
 	// SupportedOutputModalities lists supported output modalities (e.g., TEXT, IMAGE)
 	SupportedOutputModalities []string `json:"supportedOutputModalities,omitempty"`
-	// SupportsWebSearch indicates this Antigravity model is listed by
+	// SupportsWebSearch indicates this model is listed by
 	// fetchAvailableModels.webSearchModelIds and can execute native googleSearch.
 	SupportsWebSearch bool `json:"supports_web_search,omitempty"`
 
@@ -90,7 +90,7 @@ type ModelInfo struct {
 	SupportConfigurationUpdate bool `json:"-"`
 
 	// NativeCapabilities contains internal, static per-model capability metadata.
-	// It is intentionally separate from Antigravity's dynamically probed capability.
+	// It is intentionally separate from dynamically probed provider capability.
 	NativeCapabilities *NativeCapabilities `json:"-"`
 
 	// Thinking holds provider-specific reasoning/thinking budget capabilities.
@@ -327,9 +327,9 @@ func ResolveResponsesWebSearchCapability(routes []NativeCapabilityRoute) *bool {
 func responsesWebSearchProviderPathSupport(provider string) *bool {
 	provider = strings.ToLower(strings.TrimSpace(provider))
 	switch provider {
-	case "codex", "xai", "claude", "antigravity":
+	case "codex", "xai", "claude":
 		return boolPointer(true)
-	case "openai", "openai-compatibility", "gemini", "aistudio", "vertex", "interactions", "gemini-interactions":
+	case "openai", "openai-compatibility", "interactions":
 		return boolPointer(false)
 	default:
 		if strings.HasPrefix(provider, "openai-compatible-") {
@@ -1622,7 +1622,7 @@ func cloneModelMapValue(value any) any {
 
 // GetAvailableModelsByProvider returns models available for the given provider identifier.
 // Parameters:
-//   - provider: Provider identifier (e.g., "codex", "gemini", "antigravity")
+//   - provider: Provider identifier (e.g., "codex", "claude", "devin")
 //
 // Returns:
 //   - []*ModelInfo: List of available models for the provider
@@ -1916,47 +1916,6 @@ func (r *ModelRegistry) convertModelToMap(model *ModelInfo, handlerType string) 
 		}
 		result["max_input_tokens"] = maxInput
 		result["max_tokens"] = maxOutput
-		return result
-
-	case "gemini":
-		result := map[string]any{}
-		if model.Name != "" {
-			result["name"] = model.Name
-		} else {
-			result["name"] = model.ID
-		}
-		if model.Version != "" {
-			result["version"] = model.Version
-		}
-		if model.DisplayName != "" {
-			result["displayName"] = model.DisplayName
-		}
-		if model.Description != "" {
-			result["description"] = model.Description
-		}
-		inputTokenLimit := model.InputTokenLimit
-		if inputTokenLimit <= 0 {
-			inputTokenLimit = model.ContextLength
-		}
-		if inputTokenLimit > 0 {
-			result["inputTokenLimit"] = inputTokenLimit
-		}
-		outputTokenLimit := model.OutputTokenLimit
-		if outputTokenLimit <= 0 {
-			outputTokenLimit = model.MaxCompletionTokens
-		}
-		if outputTokenLimit > 0 {
-			result["outputTokenLimit"] = outputTokenLimit
-		}
-		if len(model.SupportedGenerationMethods) > 0 {
-			result["supportedGenerationMethods"] = append([]string(nil), model.SupportedGenerationMethods...)
-		}
-		if len(model.SupportedInputModalities) > 0 {
-			result["supportedInputModalities"] = append([]string(nil), model.SupportedInputModalities...)
-		}
-		if len(model.SupportedOutputModalities) > 0 {
-			result["supportedOutputModalities"] = append([]string(nil), model.SupportedOutputModalities...)
-		}
 		return result
 
 	default:

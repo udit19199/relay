@@ -147,7 +147,6 @@ retain the corresponding business operation's fields.
 | `/credentials/fields` | PATCH | Change credential fields. |
 | `/credentials/refresh` | POST | Refresh credentials. |
 | `/credentials/verify` | POST | Run an operator-triggered, account-pinned inference verification using an isolated session and minimal 1-token prompt. |
-| `/oauth/import?provider=vertex` | POST | Import a Vertex service account using a multipart `file` upload. |
 | `/oauth/auth-url?provider=<provider>` | GET, POST | Start built-in or plugin OAuth (supports `name`/`auth_index` for targeted credential recovery and optional `verify` opt-in). |
 | `/oauth/siwc/bind` | POST | Start SIWC binding to an existing file-backed Codex OAuth credential. |
 | `/oauth/siwc/status` | GET | Read local SIWC credential status (`off`, `valid`, or `invalid`). |
@@ -163,8 +162,8 @@ retain the corresponding business operation's fields.
 ## OAuth
 
 The login URL is shared by all providers. Set the required `provider` query
-parameter to `claude`, `codex`, `antigravity`, `xai`, `devin`,
-`meta`, or a registered plugin provider ID. For example:
+parameter to `claude`, `codex`, `xai`, `devin`, `meta`, or a registered
+plugin provider ID. For example:
 
 ```http
 GET /v8/management/oauth/auth-url?provider=codex
@@ -189,8 +188,6 @@ an explicit provider must match that state. Poll until the status is `ok` or
 `error`; `wait` means the login is still pending. Callback acceptance alone does
 not mean credential exchange and persistence have completed.
 
-Import uses `POST /v8/management/oauth/import?provider=vertex`. The `provider`
-query parameter is required; Vertex is currently the supported import provider.
 
 ### Sign in with ChatGPT (SIWC) binding
 

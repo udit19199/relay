@@ -264,66 +264,6 @@ func TestExtractSessionInfoClaudeNestedParent(t *testing.T) {
 	}
 }
 
-func TestExtractSessionInfoGeminiAndAntigravityHierarchy(t *testing.T) {
-	t.Parallel()
-
-	// Gemini cachedContent with parent_session_id
-	geminiPayload := []byte(`{"cachedContent":"cache-child-1","parent_session_id":"cache-parent-1"}`)
-	info, ok := ExtractSessionInfo(nil, geminiPayload, nil)
-	if !ok {
-		t.Fatal("ExtractSessionInfo failed on Gemini cachedContent")
-	}
-	if info.SessionID != "geminicache:cache-child-1" {
-		t.Fatalf("expected session geminicache:cache-child-1, got %q", info.SessionID)
-	}
-	if info.ParentSessionID != "geminicache:cache-parent-1" {
-		t.Fatalf("expected parent geminicache:cache-parent-1, got %q", info.ParentSessionID)
-	}
-	if info.AgentName != "subagent" {
-		t.Fatalf("expected subagent, got %q", info.AgentName)
-	}
-
-	// Antigravity headers with parent
-	headers := http.Header{}
-	headers.Set("X-Http-Session-Id", "agy-child-2")
-	headers.Set("X-Parent-Session-ID", "agy-parent-2")
-	info2, ok := ExtractSessionInfo(headers, nil, nil)
-	if !ok {
-		t.Fatal("ExtractSessionInfo failed on Antigravity headers")
-	}
-	if info2.SessionID != "agy:agy-child-2" {
-		t.Fatalf("expected session agy:agy-child-2, got %q", info2.SessionID)
-	}
-	if info2.ParentSessionID != "agy:agy-parent-2" {
-		t.Fatalf("expected parent agy:agy-parent-2, got %q", info2.ParentSessionID)
-	}
-	if info2.AgentName != "subagent" {
-		t.Fatalf("expected subagent, got %q", info2.AgentName)
-	}
-}
-
-func TestExtractSessionInfoNestedAntigravityRequest(t *testing.T) {
-	t.Parallel()
-
-	payload := []byte(`{
-		"project_id": "proj-123",
-		"request": {
-			"parentSessionId": "parent-sess-456",
-			"sessionId": "child-sess-789"
-		}
-	}`)
-	info, ok := ExtractSessionInfo(nil, payload, nil)
-	if !ok {
-		t.Fatal("ExtractSessionInfo failed on nested Antigravity payload")
-	}
-	if info.SessionID != "session:child-sess-789" {
-		t.Fatalf("SessionID = %q, want session:child-sess-789", info.SessionID)
-	}
-	if info.ParentSessionID != "session:parent-sess-456" {
-		t.Fatalf("ParentSessionID = %q, want session:parent-sess-456", info.ParentSessionID)
-	}
-}
-
 func TestExtractSessionInfoThreadAndConversation(t *testing.T) {
 	t.Parallel()
 
