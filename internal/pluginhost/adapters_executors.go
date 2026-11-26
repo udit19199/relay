@@ -585,9 +585,6 @@ func (a *executorAdapter) prepareExecutorCall(req coreexecutor.Request, opts cor
 				finalizeOpts.Metadata = mergeExecutorMetadata(req.Metadata, opts.Metadata)
 			}
 			root := ""
-			if inputFormat == sdktranslator.FormatAntigravity {
-				root = "request"
-			}
 			finalize := helps.NewPayloadFinalizer(cfg, a.provider, baseModel, inputFormat.String(), root, originalTranslated, req, finalizeOpts)
 			helps.FinalizePayloadDoc(helps.WithPayloadFinalizer(context.Background(), finalize), doc)
 		}
@@ -1255,9 +1252,6 @@ func pluginExecutorTokenCount(format sdktranslator.Format, payload []byte) (int6
 	}
 	// response.usage.input_tokens is the native Codex count shape.
 	paths := []string{"usage.prompt_tokens", "input_tokens", "response.usage.input_tokens", "totalTokens", "total_tokens"}
-	if format == sdktranslator.FormatGemini {
-		paths = []string{"totalTokens", "usageMetadata.promptTokenCount", "input_tokens", "total_tokens"}
-	}
 	for _, path := range paths {
 		value := ojson.GetBytesNoCopy(payload, path)
 		if value.Exists() && value.Type == ojson.Number {

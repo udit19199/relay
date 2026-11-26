@@ -5,8 +5,6 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	antigravityclaude "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/antigravity/claude"
-	geminiclaude "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/gemini/claude"
 	interactionsclaude "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/interactions/claude"
 	openaiclaude "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/openai/claude"
 )
@@ -47,31 +45,6 @@ func TestCommentaryMarkerRestoredByOpenAIChatTranslator(t *testing.T) {
 	}
 }
 
-func TestCommentaryMarkerRestoredByGeminiTranslator(t *testing.T) {
-	out, err := geminiclaude.ConvertClaudeRequestToGemini("test-model", []byte(crossFormatCommentaryPayload), false)
-	assertCommentaryRestoredAsText(t, "gemini default", out, err)
-	if strings.Contains(string(out), `"thought":true`) && strings.Contains(string(out), "COMMENTARY_SENTINEL") {
-		for _, part := range ojson.GetBytesNoCopy(out, "contents.1.parts").Array() {
-			if part.Get("text").String() == "COMMENTARY_SENTINEL" && part.Get("thought").Bool() {
-				t.Fatalf("gemini default: commentary must not become a thought part: %s", out)
-			}
-		}
-	}
-
-	out, err = geminiclaude.ConvertClaudeRequestToGeminiWithCompat("test-model", []byte(crossFormatCommentaryPayload), false)
-	assertCommentaryRestoredAsText(t, "gemini compat", out, err)
-	for _, content := range ojson.GetBytesNoCopy(out, "contents").Array() {
-		for _, part := range content.Get("parts").Array() {
-			if part.Get("text").String() == "COMMENTARY_SENTINEL" && part.Get("thought").Bool() {
-				t.Fatalf("gemini compat: commentary must not become a thought part: %s", out)
-			}
-			if part.Get("thoughtSignature").String() == "cpa:commentary:v1" {
-				t.Fatalf("gemini compat: internal marker became a thoughtSignature: %s", out)
-			}
-		}
-	}
-}
-
 func TestCommentaryMarkerRestoredByInteractionsTranslator(t *testing.T) {
 	out, err := interactionsclaude.ConvertClaudeRequestToInteractions("test-model", []byte(crossFormatCommentaryPayload), false)
 	assertCommentaryRestoredAsText(t, "interactions default", out, err)
@@ -80,17 +53,5 @@ func TestCommentaryMarkerRestoredByInteractionsTranslator(t *testing.T) {
 	assertCommentaryRestoredAsText(t, "interactions compat", out, err)
 	if strings.Contains(string(out), `"type":"thought"`) {
 		t.Fatalf("interactions compat: commentary must not become a thought step: %s", out)
-	}
-}
-
-func TestCommentaryMarkerRestoredByAntigravityTranslator(t *testing.T) {
-	out, err := antigravityclaude.ConvertClaudeRequestToAntigravity("test-model", []byte(crossFormatCommentaryPayload), false)
-	assertCommentaryRestoredAsText(t, "antigravity", out, err)
-	for _, content := range ojson.GetBytesNoCopy(out, "request.contents").Array() {
-		for _, part := range content.Get("parts").Array() {
-			if part.Get("text").String() == "COMMENTARY_SENTINEL" && part.Get("thought").Bool() {
-				t.Fatalf("antigravity: commentary must not become a thought part: %s", out)
-			}
-		}
 	}
 }

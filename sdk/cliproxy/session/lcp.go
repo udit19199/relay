@@ -102,8 +102,6 @@ func ExtractCanonicalTurns(format sdktranslator.Format, payload []byte) []Canoni
 	switch {
 	case formatEqual(format, sdktranslator.FormatClaude):
 		appendMessagesTurns(&turns, root, true)
-	case formatEqual(format, sdktranslator.FormatGemini), formatEqual(format, sdktranslator.FormatAntigravity):
-		appendGeminiTurns(&turns, root)
 	case formatEqual(format, sdktranslator.FormatInteractions):
 		appendInteractionTurns(&turns, root)
 	case formatEqual(format, sdktranslator.FormatOpenAIResponse), formatEqual(format, sdktranslator.FormatCodex):
@@ -117,9 +115,6 @@ func ExtractCanonicalTurns(format sdktranslator.Format, payload []byte) []Canoni
 func inferCanonicalFormat(root ojson.Result) sdktranslator.Format {
 	if req := root.Get("request"); req.Exists() && !root.Get("contents").Exists() {
 		root = req
-	}
-	if root.Get("contents").IsArray() || root.Get("systemInstruction").Exists() || root.Get("system_instruction").Exists() {
-		return sdktranslator.FormatGemini
 	}
 	if root.Get("instructions").Exists() {
 		return sdktranslator.FormatOpenAIResponse

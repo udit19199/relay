@@ -327,10 +327,6 @@ func stripTranslatedDefaultMaxTokens(from sdktranslator.Format, originalPayload,
 		if hasExplicitMaxTokens("max_output_tokens") {
 			return originalTranslated
 		}
-	case sdktranslator.FormatGemini:
-		if hasExplicitMaxTokens("generationConfig.maxOutputTokens") {
-			return originalTranslated
-		}
 	default:
 		return originalTranslated
 	}
