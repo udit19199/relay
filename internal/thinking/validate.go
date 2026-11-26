@@ -58,7 +58,7 @@ func ValidateConfig(config ThinkingConfig, modelInfo *registry.ModelInfo, fromFo
 	// model supports discrete levels. Same-family conversions require strict validation.
 	//
 	// modelFamilyMismatch covers providers that reuse another protocol on the wire
-	// (e.g. Kimi serving Claude-compatible /v1/messages). In that path fromFormat and
+	// (e.g. a delegated Claude-compatible /v1/messages upstream). In that path fromFormat and
 	// toFormat both look like "claude", but the model itself is not Claude-family, so
 	// unsupported levels such as "max" should clamp to the nearest supported level
 	// (typically "high") instead of failing validation.
@@ -425,7 +425,7 @@ func isOpenAIFamily(provider string) bool {
 
 func isKnownProviderFamily(provider string) bool {
 	switch provider {
-	case "gemini", "antigravity", "claude", "openai", "openai-response", "codex", "kimi", "kimi-ai", "kimi.ai", "kimi.com", "xai", "interactions", "devin":
+	case "gemini", "antigravity", "claude", "openai", "openai-response", "codex", "xai", "interactions", "devin":
 		return true
 	default:
 		return false

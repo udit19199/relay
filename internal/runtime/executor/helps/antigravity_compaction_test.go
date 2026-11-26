@@ -275,7 +275,7 @@ func TestExpandResponsesCompactionCapsulesAndBuildFromSummary(t *testing.T) {
 		}
 	}`)
 
-	compactionResp, errBuild := BuildResponsesCompactionResponseFromSummary("kimi-k3", summaryPayload)
+	compactionResp, errBuild := BuildResponsesCompactionResponseFromSummary("muse-spark-1.3", summaryPayload)
 	if errBuild != nil {
 		t.Fatalf("BuildResponsesCompactionResponseFromSummary failed: %v", errBuild)
 	}
@@ -286,7 +286,7 @@ func TestExpandResponsesCompactionCapsulesAndBuildFromSummary(t *testing.T) {
 		t.Fatalf("reasoning_tokens = %d, want 2", got)
 	}
 
-	chunks, errChunks := BuildResponsesCompactionStreamChunksFromResponse("kimi-k3", compactionResp)
+	chunks, errChunks := BuildResponsesCompactionStreamChunksFromResponse("muse-spark-1.3", compactionResp)
 	if errChunks != nil {
 		t.Fatalf("BuildResponsesCompactionStreamChunksFromResponse failed: %v", errChunks)
 	}
@@ -301,7 +301,7 @@ func TestExpandResponsesCompactionCapsulesAndBuildFromSummary(t *testing.T) {
 	if !HasResponsesCompactionTriggerRequest(req, opts) {
 		t.Fatal("expected HasResponsesCompactionTriggerRequest to be true")
 	}
-	if errExpand := ExpandResponsesCompactionCapsules(&req, &opts, "kimi"); errExpand != nil {
+	if errExpand := ExpandResponsesCompactionCapsules(&req, &opts, "meta"); errExpand != nil {
 		t.Fatalf("ExpandResponsesCompactionCapsules failed: %v", errExpand)
 	}
 	items := ojson.GetBytes(req.Payload, "input").Array()
@@ -322,7 +322,7 @@ func TestExpandResponsesCompactionCapsulesAndBuildFromSummary(t *testing.T) {
 			}
 		]
 	}`)
-	if _, errInc := BuildResponsesCompactionResponseFromSummary("kimi-k3", incompletePayload); errInc == nil {
+	if _, errInc := BuildResponsesCompactionResponseFromSummary("muse-spark-1.3", incompletePayload); errInc == nil {
 		t.Fatal("expected error for incomplete summary response, got nil")
 	}
 }

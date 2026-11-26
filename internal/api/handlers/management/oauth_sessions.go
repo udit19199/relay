@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	// oauthSessionTTL must cover device-code flows (xAI ~30m, Kimi ~15m).
+	// oauthSessionTTL must cover device-code flows (xAI ~30m).
 	oauthSessionTTL          = 30 * time.Minute
 	oauthCompletedSessionTTL = time.Minute
 	maxOAuthStateLength      = 128

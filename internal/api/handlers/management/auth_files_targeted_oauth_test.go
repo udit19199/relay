@@ -15,7 +15,6 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/antigravity"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/claude"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/devin"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/kimi"
 	metaauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/meta"
 	xaiauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/xai"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
@@ -57,41 +56,6 @@ func (s *targetedTestAntigravityOAuthService) FetchUserInfo(_ context.Context, _
 
 func (s *targetedTestAntigravityOAuthService) FetchProjectID(_ context.Context, _ string) (string, error) {
 	return "ag-project-1", nil
-}
-
-type targetedTestKimiOAuthService struct {
-	domain       string
-	accessToken  string
-	refreshToken string
-	deviceID     string
-}
-
-func (s *targetedTestKimiOAuthService) StartDeviceFlow(_ context.Context) (*kimi.DeviceCodeResponse, error) {
-	return &kimi.DeviceCodeResponse{
-		DeviceCode:              "kimi-dev-code",
-		UserCode:                "KIMI-1234",
-		VerificationURI:         "https://auth.kimi.com/verify",
-		VerificationURIComplete: "https://auth.kimi.com/verify?user_code=KIMI-1234",
-		ExpiresIn:               600,
-		Interval:                1,
-	}, nil
-}
-
-func (s *targetedTestKimiOAuthService) WaitForAuthorization(_ context.Context, _ *kimi.DeviceCodeResponse) (*kimi.KimiAuthBundle, error) {
-	return &kimi.KimiAuthBundle{
-		TokenData: &kimi.KimiTokenData{
-			AccessToken:  s.accessToken,
-			RefreshToken: s.refreshToken,
-			TokenType:    "Bearer",
-			ExpiresAt:    time.Now().Add(time.Hour).Unix(),
-			Scope:        "coding",
-		},
-		DeviceID: s.deviceID,
-	}, nil
-}
-
-func (s *targetedTestKimiOAuthService) CreateTokenStorage(bundle *kimi.KimiAuthBundle) *kimi.KimiTokenStorage {
-	return kimi.NewKimiAuthWithDomain(nil, s.domain).CreateTokenStorage(bundle)
 }
 
 type targetedTestClaudeOAuthService struct {
@@ -285,8 +249,6 @@ func TestStartOAuthV8TargetedSessionRegistrationAcrossBuiltinProviders(t *testin
 	}{
 		{provider: "codex", fileName: "codex-target.json", meta: map[string]any{"type": "codex", "email": "a@x.test", "account_id": "acc-1"}},
 		{provider: "antigravity", fileName: "antigravity-target.json", meta: map[string]any{"type": "antigravity", "email": "a@x.test"}},
-		{provider: "kimi", fileName: "kimi-target.json", meta: map[string]any{"type": "kimi", "domain": "kimi.com"}},
-		{provider: "kimi-ai", fileName: "kimi-ai-target.json", meta: map[string]any{"type": "kimi-ai", "domain": "kimi.ai"}},
 		{provider: "claude", fileName: "claude-target.json", meta: map[string]any{"type": "claude", "email": "a@x.test", "account_uuid": "uuid-1"}},
 		{provider: "xai", fileName: "xai-target.json", meta: map[string]any{"type": "xai", "email": "a@x.test", "sub": "sub-1"}},
 		{provider: "meta", fileName: "meta-target.json", meta: map[string]any{"type": "meta", "email": "a@x.test"}},
@@ -449,111 +411,6 @@ func TestTargetedOAuthReloginAntigravityRejectsMismatchedAccountAndUpdatesMatchi
 	savedRaw, errRead := os.ReadFile(targetPath)
 	if errRead != nil || !strings.Contains(string(savedRaw), "ag-fresh-token-match") {
 		t.Fatalf("expected target file updated with fresh token, got %q (err=%v)", string(savedRaw), errRead)
-	}
-}
-
-func TestTargetedOAuthReloginKimiUpdatesTargetFileWithoutAddingNewFiles(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	authDir := t.TempDir()
-	targetFile := "kimi-1700000000000.json"
-	targetPath := filepath.Join(authDir, targetFile)
-	initialContent := `{"type":"kimi","domain":"kimi.com","access_token":"old-kimi-access","refresh_token":"old-kimi-refresh","device_id":"dev-old"}`
-	if errWrite := os.WriteFile(targetPath, []byte(initialContent), 0o600); errWrite != nil {
-		t.Fatalf("write kimi target file: %v", errWrite)
-	}
-
-	manager := coreauth.NewManager(nil, nil, nil)
-	_, _ = manager.Register(context.Background(), &coreauth.Auth{
-		ID:             targetFile,
-		FileName:       targetFile,
-		Provider:       "kimi",
-		RequiresSignIn: true,
-		Metadata: map[string]any{
-			"type":          "kimi",
-			"domain":        "kimi.com",
-			"access_token":  "old-kimi-access",
-			"refresh_token": "old-kimi-refresh",
-		},
-		Attributes: map[string]string{
-			coreauth.AttributePath: targetPath,
-			"domain":               "kimi.com",
-		},
-	})
-
-	kimiSvc := &targetedTestKimiOAuthService{
-		domain:       kimi.KimiDefaultDomain,
-		accessToken:  "kimi-access-1",
-		refreshToken: "kimi-refresh-1",
-		deviceID:     "dev-1",
-	}
-	origKimiFactory := newKimiOAuthService
-	newKimiOAuthService = func(_ *config.Config, domain string) kimiOAuthService {
-		kimiSvc.domain = domain
-		return kimiSvc
-	}
-	t.Cleanup(func() { newKimiOAuthService = origKimiFactory })
-
-	h := NewHandlerWithoutConfigFilePath(&config.Config{AuthDir: authDir, Port: 8317}, manager)
-	router := gin.New()
-	router.POST("/v8/management/oauth/auth-url", h.StartOAuthV8)
-	router.GET("/v8/management/oauth/status", h.GetAuthStatus)
-
-	// Domain mismatch ("kimi" with domain "kimi.ai" targeting a kimi.com credential) must return 400.
-	wDomainMismatch := httptest.NewRecorder()
-	reqDomainMismatch := httptest.NewRequest(http.MethodPost, "/v8/management/oauth/auth-url", strings.NewReader(`{"provider":"kimi","domain":"kimi.ai","name":"kimi-1700000000000.json"}`))
-	reqDomainMismatch.Header.Set("Content-Type", "application/json")
-	router.ServeHTTP(wDomainMismatch, reqDomainMismatch)
-	if wDomainMismatch.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400 for kimi.ai domain against kimi.com target, got %d: %s", wDomainMismatch.Code, wDomainMismatch.Body.String())
-	}
-
-	// Two targeted logins in a row must both update kimi-1700000000000.json in place and keep file count at 1.
-	for i, tok := range []string{"kimi-access-relogin-1", "kimi-access-relogin-2"} {
-		kimiSvc.accessToken = tok
-		kimiSvc.refreshToken = "kimi-refresh-" + tok
-		wStart := httptest.NewRecorder()
-		reqStart := httptest.NewRequest(http.MethodPost, "/v8/management/oauth/auth-url", strings.NewReader(`{"provider":"kimi","name":"kimi-1700000000000.json"}`))
-		reqStart.Header.Set("Content-Type", "application/json")
-		router.ServeHTTP(wStart, reqStart)
-		if wStart.Code != http.StatusOK {
-			t.Fatalf("run %d: StartOAuthV8 status = %d: %s", i+1, wStart.Code, wStart.Body.String())
-		}
-		var startResp struct {
-			State        string `json:"state"`
-			TargetAuthID string `json:"target_auth_id"`
-		}
-		if errUnmarshal := json.Unmarshal(wStart.Body.Bytes(), &startResp); errUnmarshal != nil {
-			t.Fatalf("run %d: unmarshal startResp: %v", i+1, errUnmarshal)
-		}
-		t.Cleanup(func() { CancelOAuthSession(startResp.State) })
-		if startResp.TargetAuthID != targetFile {
-			t.Fatalf("run %d: target_auth_id = %q, want %q", i+1, startResp.TargetAuthID, targetFile)
-		}
-
-		status := pollOAuthStatusUntilDone(t, router, startResp.State)
-		if status["status"] != "ok" || status["auth_id"] != targetFile || status["saved"] != true || status["adopted"] != true {
-			t.Fatalf("run %d: unexpected status: %#v", i+1, status)
-		}
-
-		entries, errDir := os.ReadDir(authDir)
-		if errDir != nil {
-			t.Fatalf("run %d: ReadDir: %v", i+1, errDir)
-		}
-		var jsonFiles []string
-		for _, entry := range entries {
-			if strings.HasSuffix(entry.Name(), ".json") {
-				jsonFiles = append(jsonFiles, entry.Name())
-			}
-		}
-		if len(jsonFiles) != 1 || jsonFiles[0] != targetFile {
-			t.Fatalf("run %d: expected only [%s] in authDir, got %v", i+1, targetFile, jsonFiles)
-		}
-
-		rawSaved, errRead := os.ReadFile(targetPath)
-		if errRead != nil || !strings.Contains(string(rawSaved), tok) {
-			t.Fatalf("run %d: expected target file to contain %q, got %s (err=%v)", i+1, tok, string(rawSaved), errRead)
-		}
 	}
 }
 
@@ -744,73 +601,12 @@ func TestTargetedOAuthReloginReviewEdgeCasesAndVerification(t *testing.T) {
 
 	authDir := t.TempDir()
 	manager := coreauth.NewManager(nil, nil, nil)
-
-	// 1. Kimi domain isolation when provider is omitted or auth_index is used.
-	kimiComAuth := &coreauth.Auth{
-		ID:             "kimi-com-target.json",
-		FileName:       "kimi-com-target.json",
-		Provider:       "kimi",
-		RequiresSignIn: true,
-		Attributes:     map[string]string{"domain": "kimi.com"},
-		Metadata:       map[string]any{"type": "kimi", "domain": "kimi.com", "access_token": "old-com", "refresh_token": "old-com"},
-	}
-	kimiComAuth.EnsureIndex()
-	registeredKimiCom, errRegKimiCom := manager.Register(context.Background(), kimiComAuth)
-	if errRegKimiCom != nil {
-		t.Fatalf("register kimi-com: %v", errRegKimiCom)
-	}
-	kimiAIAuth := &coreauth.Auth{
-		ID:             "kimi-ai-target.json",
-		FileName:       "kimi-ai-target.json",
-		Provider:       "kimi-ai",
-		RequiresSignIn: true,
-		Attributes:     map[string]string{"domain": "kimi.ai"},
-		Metadata:       map[string]any{"type": "kimi-ai", "domain": "kimi.ai", "access_token": "old-ai", "refresh_token": "old-ai"},
-	}
-	kimiAIAuth.EnsureIndex()
-	if _, errRegKimiAI := manager.Register(context.Background(), kimiAIAuth); errRegKimiAI != nil {
-		t.Fatalf("register kimi-ai: %v", errRegKimiAI)
-	}
-
 	h := NewHandlerWithoutConfigFilePath(&config.Config{AuthDir: authDir, Port: 8317}, manager)
 	router := gin.New()
 	router.POST("/v8/management/oauth/auth-url", h.StartOAuthV8)
 	router.GET("/v8/management/oauth/status", h.GetAuthStatus)
 
-	for _, body := range []string{
-		`{"name":"kimi-com-target.json","domain":"kimi.ai"}`,
-		`{"auth_index":"` + registeredKimiCom.Index + `","domain":"kimi.ai"}`,
-		`{"name":"kimi-ai-target.json","domain":"kimi.com"}`,
-		`{"provider":"kimi-ai","name":"kimi-ai-target.json","domain":"kimi.com"}`,
-	} {
-		w := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/v8/management/oauth/auth-url", strings.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		router.ServeHTTP(w, req)
-		if w.Code != http.StatusBadRequest {
-			t.Fatalf("body %s status = %d, want 400: %s", body, w.Code, w.Body.String())
-		}
-	}
-
-	// Commit-time guard also rejects cross-domain Kimi overwrite.
-	crossDomainState := "kimi-cross-domain-commit"
-	RegisterOAuthSession(crossDomainState, "kimi")
-	SetOAuthSessionTarget(crossDomainState, oauthRecoveryTarget{
-		AuthID:   "kimi-com-target.json",
-		FileName: "kimi-com-target.json",
-		Provider: "kimi",
-	})
-	t.Cleanup(func() { CompleteOAuthSession(crossDomainState) })
-	if _, ok := h.commitAndCompleteBuiltinOAuthSession(context.Background(), crossDomainState, "kimi-ai", "", &coreauth.Auth{
-		ID:       "kimi-ai-fresh.json",
-		FileName: "kimi-ai-fresh.json",
-		Provider: "kimi-ai",
-		Metadata: map[string]any{"type": "kimi-ai", "access_token": "ai-tok"},
-	}, "save failed", false); ok {
-		t.Fatalf("expected commitAndCompleteBuiltinOAuthSession to reject cross-domain kimi-ai record for kimi target")
-	}
-
-	// 2. Claude organization_uuid isolation: same email + account_uuid in a different organization_uuid must be rejected.
+	// Claude organization_uuid isolation: same email + account_uuid in a different organization_uuid must be rejected.
 	claudeOrgSvc := &targetedTestClaudeOAuthService{
 		authDir:     authDir,
 		email:       "a@x.test",

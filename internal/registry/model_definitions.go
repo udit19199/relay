@@ -36,7 +36,6 @@ type staticModelsJSON struct {
 	CodexTeam   []*ModelInfo `json:"codex-team"`
 	CodexPlus   []*ModelInfo `json:"codex-plus"`
 	CodexPro    []*ModelInfo `json:"codex-pro"`
-	Kimi        []*ModelInfo `json:"kimi"`
 	Antigravity []*ModelInfo `json:"antigravity"`
 	XAI         []*ModelInfo `json:"xai"`
 	Devin       []*ModelInfo `json:"devin"`
@@ -81,11 +80,6 @@ func GetCodexPlusModels() []*ModelInfo {
 // GetCodexProModels returns model definitions for the Codex pro plan tier.
 func GetCodexProModels() []*ModelInfo {
 	return WithCodexBuiltins(cloneModelInfos(getModels().CodexPro))
-}
-
-// GetKimiModels returns the standard Kimi (Moonshot AI) model definitions.
-func GetKimiModels() []*ModelInfo {
-	return cloneModelInfos(getModels().Kimi)
 }
 
 // GetAntigravityModels returns the standard Antigravity model definitions.
@@ -561,7 +555,6 @@ func cloneModelInfos(models []*ModelInfo) []*ModelInfo {
 //   - vertex
 //   - aistudio
 //   - codex
-//   - kimi
 //   - antigravity
 //   - xai
 //   - devin
@@ -581,8 +574,6 @@ func GetStaticModelDefinitionsByChannel(channel string) []*ModelInfo {
 		return GetAIStudioModels()
 	case "codex":
 		return GetCodexProModels()
-	case "kimi", "kimi-ai", "kimi.ai", "kimi.com":
-		return GetKimiModels()
 	case "antigravity":
 		return GetAntigravityModels()
 	case "xai", "x-ai", "grok":
@@ -640,7 +631,6 @@ func LookupStaticModelInfo(modelID string) *ModelInfo {
 		data.Vertex,
 		data.AIStudio,
 		data.CodexPro,
-		data.Kimi,
 		data.Antigravity,
 		data.XAI,
 		GetDevinModels(),

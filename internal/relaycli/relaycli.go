@@ -53,7 +53,7 @@ Commands:
   relay status                      accounts, limits left, and fallback order
   relay doctor                      check the install and print a fix for each problem
   relay accounts add <provider> [--no-browser]
-                                    sign in (claude, codex, kimi, xai, devin, meta), or add
+                                    sign in (claude, codex, xai, devin, meta), or add
                                     opencode-go from OPENCODE_API_KEY or --key-stdin
   relay accounts remove <name>      delete a credential
   relay fallback                    show fallback chains

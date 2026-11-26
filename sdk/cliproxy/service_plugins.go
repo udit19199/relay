@@ -361,13 +361,6 @@ func (s *Service) registerModelRefreshCallback() {
 			norm := strings.ToLower(strings.TrimSpace(p))
 			if norm != "" {
 				providerSet[norm] = true
-				switch norm {
-				case "kimi", "kimi-ai", "kimi.ai", "kimi.com":
-					providerSet["kimi"] = true
-					providerSet["kimi-ai"] = true
-					providerSet["kimi.ai"] = true
-					providerSet["kimi.com"] = true
-				}
 			}
 		}
 

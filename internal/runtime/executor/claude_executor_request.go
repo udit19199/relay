@@ -938,9 +938,9 @@ func claudeRequestedBetas(incomingBetas string, extraBetas []string) map[string]
 // first-party API.
 //
 // Every rule that reconstructs Claude Code's identity must key on this rather
-// than on the cloaked flag. Kimi rewrites base_url to api.kimi.com and custom
-// gateways set their own host, yet both delegate to ClaudeExecutor and are
-// therefore cloaked; a cloak-keyed rule silently rewrites their traffic too.
+// than on the cloaked flag. Custom gateways set their own host yet delegate to
+// ClaudeExecutor and are therefore cloaked; a cloak-keyed rule silently rewrites
+// their traffic too.
 func isAnthropicUpstreamURL(u *url.URL) bool {
 	return helps.IsAnthropicUpstreamURL(u)
 }
@@ -1598,7 +1598,7 @@ func applyClaudeHeadersWithNativeProfile(
 			return
 		}
 		if stream && !isAnthropicBase {
-			// Other Anthropic-compatible upstreams (Kimi, custom gateways) may select
+			// Other Anthropic-compatible upstreams and custom gateways may select
 			// SSE from Accept and need not compress predictably, so they keep the
 			// conservative contract.
 			r.Header.Set("Accept", "text/event-stream")

@@ -827,7 +827,7 @@ upstream:
 #           # fingerprint-profile (optional, top-level on this api-keys.claude key entry; not a cloak sub-field):
 #           # OAuth and API-key fingerprints are different contracts.
 #           #   - Real Claude OAuth stays on the strict Claude Code CLI wire fingerprint.
-#           #   - API keys (official Anthropic, custom gateways, Kimi) stay loose and
+#           #   - API keys (official Anthropic and custom gateways) stay loose and
 #           #     caller-owned unless this field is set.
 #           #
 #           # Default (omit / empty): keep the caller request fingerprint and headers.
@@ -848,15 +848,14 @@ upstream:
 #           #                         delegated OAuth providers use stable auth ID instead of
 #           #                         rotating access tokens. "oauth-cli" is a legacy alias.
 #           #
-#           # count_tokens keeps the native model/messages/tools shape for every origin, including
-#           # Kimi opt-in. It does not send billing/CCH, currentDate, metadata, or diagnostics.
+#           # count_tokens keeps the native model/messages/tools shape for every origin. It does not
+#           # send billing/CCH, currentDate, metadata, or diagnostics.
 #           #
 #           # CCH: the billing block may carry a per-request cch hash. CPA emits it exactly where
 #           # Claude Code does, which is api.anthropic.com (first-party) and Vertex only. An opt-in
-#           # on any other gateway (including Kimi) still sends the billing block, but without cch,
+#           # on any other gateway still sends the billing block, but without cch,
 #           # so a per-request hash cannot bust that gateway's prompt cache. api.anthropic.com
-#           # strips the block itself (0 tokens, no cache impact). Kimi drops the whole block by
-#           # default and keeps it, unsigned, after an explicit fingerprint opt-in.
+#           # strips the block itself (0 tokens, no cache impact).
 #           # A real Claude OAuth credential always signs, on every upstream: a downstream Claude
 #           # Code pointed at CPA cannot produce that value itself.
 #           #
@@ -869,14 +868,8 @@ upstream:
 #           #         cloak:
 #           #           mode: "always"   # recommended when upstream rejects non-CLI clients
 #           #
-#           # Delegated Anthropic Messages OAuth files (Kimi, etc.) use "fingerprint_profile"
-#           # in the auth JSON. Refresh keeps it. Example:
-#           #   {
-#           #     "type": "kimi",
-#           #     "access_token": "...",
-#           #     "refresh_token": "...",
-#           #     "fingerprint_profile": "claude-code-cli"
-#           #   }
+#           # Delegated Anthropic Messages OAuth files use "fingerprint_profile"
+#           # in the auth JSON. Refresh keeps it.
 #           #   Legacy "fingerprint-profile" credentials remain supported and are normalized at load time.
 #           # fingerprint-profile: "claude-code-cli" # optional api-keys.claude key field; default is empty (caller-owned); uncomment to opt in
 #           experimental-cch-signing: false # deprecated compatibility field; CCH is generated automatically
@@ -945,7 +938,7 @@ upstream:
 #   openai-compatibility:
 #     - name: "openrouter" # The name of the provider; it will be used in the user agent and other places.
 #       disabled: false # optional: set to true to disable this provider without removing it
-#       prefix: "test" # optional: require calls like "test/kimi-k2" to target this provider's credentials
+#       prefix: "test" # optional: require calls like "test/gpt-5" to target this provider's credentials
 #       base-url: "https://openrouter.ai/api/v1" # The base URL of the provider.
 #       support-prompt-cache-key: false # optional: derive prompt_cache_key for requests from all input protocols
 #       disable-cooling: false # optional provider override: true disables cooling, false enables it; omit to inherit global
@@ -973,9 +966,9 @@ upstream:
 #           #   enabled: true
 #         - api-key: "sk-or-v1-...b781" # without proxy-url
 #       models: # The models supported by the provider.
-#         - name: "moonshotai/kimi-k2:free" # The actual model name.
-#           alias: "kimi-k2"               # The alias used in the API.
-#           display-name: "Kimi K2"         # optional catalog display name
+#         - name: "openai/gpt-5"            # The actual model name.
+#           alias: "gpt-5"                 # The alias used in the API.
+#           display-name: "GPT-5"          # optional catalog display name
 #           max-context-length: 1048576    # optional: override Codex client context window metadata
 #           image: false                   # optional: set true to allow this model on /v1/images/generations and /v1/images/edits (not chat/responses image input)
 #           input-modalities: [text, image] # optional: declare /v1/chat/completions and /v1/responses multimodal input for Codex clients. Use [text] for upstreams that reject multimodal tool result content.
@@ -993,8 +986,6 @@ upstream:
 #           alias: "claude-opus-4.66"
 #         - name: "glm-5"
 #           alias: "claude-opus-4.66"
-#         - name: "kimi-k2.5"
-#           alias: "claude-opus-4.66"
 
 # END API KEY EXAMPLES
 
@@ -1009,7 +1000,7 @@ oauth:
 
   # Global OAuth model name aliases (per channel)
   # These aliases rename model IDs for both model listing and request routing.
-  # Supported channels: vertex, aistudio, antigravity, claude, codex, kimi, xai, meta.
+  # Supported channels: vertex, aistudio, antigravity, claude, codex, xai, meta.
   # NOTE: These aliases do not apply to any of the upstream groups under api-keys.
   # NOTE: Because aliases affect the merged /v1 model list and merged request routing, overlapping
   # client-visible names can become ambiguous across providers. For strict backend pinning, use
@@ -1050,9 +1041,6 @@ oauth:
   #   codex:
   #     - name: "gpt-5"
   #       alias: "g5"
-  #   kimi:
-  #     - name: "kimi-k2.5"
-  #       alias: "k2.5"
   #   xai:
   #     - name: "grok-4.3"
   #       alias: "grok-latest"
@@ -1065,7 +1053,7 @@ oauth:
 
   # OAuth provider model settings (per channel)
   # Allows overriding model-level capabilities (such as context window) for OAuth credentials.
-  # Supported channels: vertex, aistudio, antigravity, claude, codex, kimi, xai, meta.
+  # Supported channels: vertex, aistudio, antigravity, claude, codex, xai, meta.
   # settings:
   #   codex:
   #     - name: "gpt-6-sol"
@@ -1090,8 +1078,6 @@ oauth:
   #     - "claude-3-5-haiku-20241022"
   #   codex:
   #     - "gpt-5-codex-mini"
-  #   kimi:
-  #     - "kimi-k2-thinking"
   #   xai:
   #     - "grok-3-mini"
   #   meta:
@@ -1127,11 +1113,6 @@ oauth:
   #     - status: 400
   #       match:
   #         - "context_window_exceeded"
-  #       action: "stop"
-  #   kimi:
-  #     - status: 400
-  #       match:
-  #         - "length_limit"
   #       action: "stop"
   #   xai:
   #     - status: 400

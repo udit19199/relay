@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/kimi"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/clienterror"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
@@ -320,16 +319,6 @@ func (h *Handler) StartOAuthV8(c *gin.Context) {
 		}
 	}
 
-	reqDomain := util.FirstNonEmptyTrimmed(c.Query("domain"), c.Query("channel"), oauthSessionDomainFromContext(c))
-	if provider != "" {
-		normalizedProvider, okProvider := normalizeOAuthProviderWithDomain(provider, reqDomain)
-		if !okProvider {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid domain"})
-			return
-		}
-		provider = normalizedProvider
-	}
-
 	if targetName != "" || targetAuthIndex != "" {
 		targetAuth, okTarget := h.lookupAuthFile(targetName, targetAuthIndex)
 		if !okTarget || targetAuth == nil {
@@ -367,14 +356,6 @@ func (h *Handler) StartOAuthV8(c *gin.Context) {
 		}
 		if provider == "" {
 			provider = h.resolveTargetOAuthProvider(effectiveTargetAuth)
-			if reqDomain != "" {
-				normalizedProvider, okProvider := normalizeOAuthProviderWithDomain(provider, reqDomain)
-				if !okProvider {
-					c.JSON(http.StatusBadRequest, gin.H{"error": "provider does not match target credential"})
-					return
-				}
-				provider = normalizedProvider
-			}
 		}
 		if provider != "" && !h.oauthTargetAuthMatches(effectiveTargetAuth, provider) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "provider does not match target credential"})
@@ -410,10 +391,6 @@ func (h *Handler) StartOAuthV8(c *gin.Context) {
 		h.RequestCodexToken(c)
 	case "antigravity":
 		h.RequestAntigravityToken(c)
-	case "kimi":
-		h.RequestKimiToken(c)
-	case "kimi-ai":
-		h.RequestKimiAIToken(c)
 	case "xai":
 		h.RequestXAIToken(c)
 	case "devin":
@@ -425,30 +402,6 @@ func (h *Handler) StartOAuthV8(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "provider_not_found"})
 		}
 	}
-}
-
-func normalizeOAuthProviderWithDomain(provider, reqDomain string) (string, bool) {
-	provider = strings.TrimSpace(provider)
-	reqDomain = strings.TrimSpace(reqDomain)
-	if reqDomain == "" {
-		return provider, true
-	}
-	if strings.EqualFold(provider, "kimi") {
-		if kimi.IsKimiAIDomain(reqDomain) {
-			return "kimi-ai", true
-		}
-		if kimi.IsKimiComDomain(reqDomain) {
-			return "kimi", true
-		}
-		return "", false
-	}
-	if strings.EqualFold(provider, "kimi-ai") {
-		if kimi.IsKimiAIDomain(reqDomain) {
-			return "kimi-ai", true
-		}
-		return "", false
-	}
-	return provider, true
 }
 
 func (h *Handler) resolveTargetOAuthProvider(targetAuth *coreauth.Auth) string {
@@ -476,16 +429,7 @@ func (h *Handler) resolveTargetOAuthProvider(targetAuth *coreauth.Auth) string {
 			}
 		}
 	}
-	rawProvider := strings.TrimSpace(targetAuth.Provider)
-	switch strings.ToLower(rawProvider) {
-	case "kimi", "kimi-ai", "kimi.ai", "kimi.com":
-		if kimi.IsKimiAIAuth(targetAuth) {
-			return "kimi-ai"
-		}
-		return "kimi"
-	default:
-		return rawProvider
-	}
+	return strings.TrimSpace(targetAuth.Provider)
 }
 
 func (h *Handler) oauthTargetAuthMatches(targetAuth *coreauth.Auth, requestedProvider string) bool {

@@ -36,11 +36,6 @@ oauth-request-scoped-errors:
       match:
         - "context_window_exceeded"
       action: "stop"
-  kimi:
-    - status: 400
-      match:
-        - "length_limit"
-      action: "stop"
   xai:
     - status: 400
       match:
@@ -58,8 +53,8 @@ oauth-request-scoped-errors:
 		t.Fatalf("ParseConfigFromBytes failed: %v", err)
 	}
 
-	if len(cfg.OAuthRequestScopedErrors) != 8 {
-		t.Fatalf("cfg.OAuthRequestScopedErrors len = %d, want 8", len(cfg.OAuthRequestScopedErrors))
+	if len(cfg.OAuthRequestScopedErrors) != 7 {
+		t.Fatalf("cfg.OAuthRequestScopedErrors len = %d, want 7", len(cfg.OAuthRequestScopedErrors))
 	}
 
 	vertexRules, ok := cfg.OAuthRequestScopedErrors["vertex"]

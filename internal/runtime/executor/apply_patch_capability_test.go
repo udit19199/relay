@@ -13,7 +13,7 @@ func TestApplyPatchActualExecutors(t *testing.T) {
 		NewOpenAICompatExecutor("arbitrary-plugin-provider", cfg), NewClaudeExecutor(cfg),
 		NewGeminiExecutor(cfg), NewGeminiInteractionsExecutor(cfg), NewGeminiVertexExecutor(cfg),
 		NewAntigravityExecutor(cfg), NewAIStudioExecutor(cfg, "aistudio", nil), NewDevinExecutor(cfg),
-		NewKimiExecutor(cfg), NewCodexExecutor(cfg), NewCodexWebsocketsExecutor(cfg), NewCodexAutoExecutor(cfg),
+		NewCodexExecutor(cfg), NewCodexWebsocketsExecutor(cfg), NewCodexAutoExecutor(cfg),
 		NewXAIExecutor(cfg), NewXAIWebsocketsExecutor(cfg), NewXAIAutoExecutor(cfg), NewMetaExecutor(cfg),
 	} {
 		support, okSupport := exec.(coreauth.ApplyPatchSupport)

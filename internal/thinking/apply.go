@@ -26,10 +26,6 @@ var nativeProviderAppliers = map[string]ProviderApplier{
 	"openai":      nil,
 	"codex":       nil,
 	"antigravity": nil,
-	"kimi":        nil,
-	"kimi-ai":     nil,
-	"kimi.ai":     nil,
-	"kimi.com":    nil,
 	"xai":         nil,
 }
 
@@ -716,8 +712,6 @@ func extractThinkingConfigFromGetter(get func(string) ojson.Result, provider str
 		return extractOpenAIConfigFromGetter(get)
 	case "codex", "xai":
 		return extractCodexConfigFromGetter(get)
-	case "kimi", "kimi-ai", "kimi.ai", "kimi.com":
-		return extractKimiConfigFromGetter(get)
 	default:
 		return ThinkingConfig{}
 	}
@@ -999,46 +993,6 @@ func extractOpenAIConfigFromGetter(get func(string) ojson.Result) ThinkingConfig
 		return ThinkingConfig{Mode: ModeLevel, Level: ThinkingLevel(value)}
 	}
 	return ThinkingConfig{}
-}
-
-func extractKimiConfig(body []byte) ThinkingConfig {
-	return extractKimiConfigFromGetter(func(path string) ojson.Result {
-		return ojson.GetBytesNoCopy(body, path)
-	})
-}
-
-func extractKimiConfigFromGetter(get func(string) ojson.Result) ThinkingConfig {
-	thinkingType := get("thinking.type")
-	if thinkingType.Exists() {
-		switch strings.ToLower(strings.TrimSpace(thinkingType.String())) {
-		case "disabled":
-			return ThinkingConfig{Mode: ModeNone, Budget: 0}
-		case "enabled":
-			if !get("thinking.effort").Exists() {
-				return ThinkingConfig{}
-			}
-		}
-	}
-
-	if effort := get("thinking.effort"); effort.Exists() {
-		value := strings.ToLower(strings.TrimSpace(effort.String()))
-		switch value {
-		case "":
-			return ThinkingConfig{}
-		case "none":
-			return ThinkingConfig{Mode: ModeNone, Budget: 0}
-		case "auto":
-			return ThinkingConfig{Mode: ModeAuto, Budget: -1}
-		default:
-			return ThinkingConfig{Mode: ModeLevel, Level: ThinkingLevel(value)}
-		}
-	}
-
-	if thinkingType.Exists() {
-		return ThinkingConfig{}
-	}
-
-	return extractOpenAIConfigFromGetter(get)
 }
 
 func extractCodexConfig(body []byte) ThinkingConfig {

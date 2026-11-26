@@ -53,7 +53,7 @@ func (e *ClaudeExecutor) Execute(ctx context.Context, auth *cliproxyauth.Auth, r
 		req, replayScope = prepareClaudeThinkingReplayRequest(ctx, auth, req, opts)
 	}
 	defer func() {
-		if err != nil && replayScope.replayApplied && shouldClearKimiThinkingReplayAfterError(err) {
+		if err != nil && replayScope.replayApplied && shouldClearThinkingReplayAfterError(err) {
 			clearClaudeThinkingReplayContent(ctx, replayScope)
 		}
 	}()
@@ -241,7 +241,6 @@ func (e *ClaudeExecutor) Execute(ctx context.Context, auth *cliproxyauth.Auth, r
 			return resp, fmt.Errorf("finalize Claude CCH: %w", err)
 		}
 	}
-	stripDefaultKimiClaudeCodeAttributionDoc(auth, url, fp.ProfileClaudeCodeCLI, doc)
 	if claudeCompactionSummaryFromContext(ctx) {
 		finalizeClaudeCompactionSummaryBodyDoc(doc)
 	}

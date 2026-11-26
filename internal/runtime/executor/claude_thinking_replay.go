@@ -16,8 +16,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// claudeThinkingReplayScope reuses the bounded replay state shape shared with Kimi.
-type claudeThinkingReplayScope = kimiThinkingReplayScope
+// claudeThinkingReplayScope reuses the bounded replay state shape shared by replay-capable Claude executors.
+type claudeThinkingReplayScope = thinkingReplayScope
 
 func claudeThinkingReplayEnabled(auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) bool {
 	if auth == nil || !sourceFormatEqual(opts.SourceFormat, sdktranslator.FormatClaude) {
@@ -96,7 +96,7 @@ func restoreClaudeThinkingReplayContents(body []byte, cachedContents [][]byte) (
 	doc := ojson.NewDoc(body)
 	restored := false
 	for _, cachedContent := range cachedContents {
-		if restoreKimiThinkingReplayContentDoc(doc, cachedContent) {
+		if restoreThinkingReplayContentDoc(doc, cachedContent) {
 			restored = true
 		}
 	}
@@ -112,7 +112,7 @@ func cacheClaudeThinkingReplayResponse(ctx context.Context, scope claudeThinking
 		cacheClaudeThinkingReplayContent(ctx, scope, []byte(content.Raw))
 		return
 	}
-	accumulator := newKimiThinkingReplayStreamAccumulator()
+	accumulator := newThinkingReplayStreamAccumulator()
 	accumulator.observe(response)
 	if content, completed := accumulator.content(); completed {
 		cacheClaudeThinkingReplayContent(ctx, scope, content)
@@ -123,7 +123,7 @@ func cacheClaudeThinkingReplayContent(ctx context.Context, scope claudeThinkingR
 	if !scope.valid() || !scope.cacheReady {
 		return
 	}
-	if kimiThinkingReplayContentIsReplayable(content) {
+	if thinkingReplayContentIsReplayable(content) {
 		if _, errReplace := internalcache.ReplaceClaudeThinkingReplayIfUnchanged(ctx, scope.modelFamily, scope.sessionKey, scope.snapshot, content); errReplace != nil {
 			log.Warnf("claude compatible thinking replay cache replace failed: %v", errReplace)
 		}

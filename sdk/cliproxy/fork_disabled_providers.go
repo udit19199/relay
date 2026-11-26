@@ -9,7 +9,7 @@ import (
 )
 
 // forkDisabledProviders lists providers stripped in this fork.
-// This fork keeps Claude/Codex/Kimi/xAI/Devin/Meta and drops all
+// This fork keeps Claude/Codex/xAI/Devin/Meta and drops all
 // Google families (Gemini, Vertex, AI Studio) plus Antigravity.
 var forkDisabledProviders = map[string]bool{
 	"antigravity":         true,

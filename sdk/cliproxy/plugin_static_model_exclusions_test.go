@@ -50,7 +50,7 @@ func newPluginStaticModelHost(t *testing.T, provider string) *pluginhost.Host {
 }
 
 func TestRegisterModelsForAuth_PluginStaticModelsFollowExclusions(t *testing.T) {
-	const provider = "kimi"
+	const provider = "xai"
 	cfg := &config.Config{OAuthExcludedModels: map[string][]string{provider: {pluginStaticGlobalModel}}}
 	service := &Service{cfg: cfg, pluginHost: newPluginStaticModelHost(t, provider)}
 	reg := GlobalModelRegistry()
@@ -94,7 +94,7 @@ func TestRegisterModelsForAuth_PluginStaticModelsFollowExclusions(t *testing.T) 
 }
 
 func TestPluginStaticModelAvailabilityFollowsCredentials(t *testing.T) {
-	const provider = "kimi"
+	const provider = "xai"
 	cfg := &config.Config{OAuthExcludedModels: map[string][]string{provider: {pluginStaticGlobalModel}}}
 	host := newPluginStaticModelHost(t, provider)
 	service := &Service{cfg: cfg, pluginHost: host}
@@ -155,11 +155,11 @@ func TestPluginStaticModelAvailabilityFollowsCredentials(t *testing.T) {
 }
 
 func TestRegisterModelsForAuth_PluginStaticExclusionsDoNotMatchNativeAliases(t *testing.T) {
-	const provider = "kimi"
+	const provider = "xai"
 	const nativeAlias = "native-alias"
-	catalog := registry.GetKimiModels()
+	catalog := registry.GetXAIModels()
 	if len(catalog) == 0 {
-		t.Fatal("kimi catalog is empty")
+		t.Fatal("xai catalog is empty")
 	}
 	cfg := &config.Config{
 		OAuthExcludedModels: map[string][]string{provider: {pluginStaticGlobalModel, nativeAlias}},

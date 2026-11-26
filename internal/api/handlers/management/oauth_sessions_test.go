@@ -193,10 +193,10 @@ func TestOAuthSessionStoreCancelIgnoresCompletedAndUnknown(t *testing.T) {
 
 func TestOAuthSessionStoreCancelIgnoresErrorSession(t *testing.T) {
 	store := newOAuthSessionStore(time.Minute)
-	store.Register("error-state", "kimi")
+	store.Register("error-state", "meta")
 	store.SetError("error-state", "Authentication failed")
 
-	if store.IsPending("error-state", "kimi") {
+	if store.IsPending("error-state", "meta") {
 		t.Fatal("error session should not be pending")
 	}
 	if store.Cancel("error-state") {
@@ -229,7 +229,7 @@ func TestGuardOAuthSessionPendingForSave(t *testing.T) {
 	store := newOAuthSessionStore(time.Minute)
 	replaceOAuthSessionStoreForTest(t, store)
 
-	providers := []string{"anthropic", "codex", "antigravity", "xai", "kimi", "kimi-ai", "kimi.ai", "meta"}
+	providers := []string{"anthropic", "codex", "antigravity", "xai", "meta"}
 	for _, provider := range providers {
 		state := provider + "-save-guard"
 		store.Register(state, provider)

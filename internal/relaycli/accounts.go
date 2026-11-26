@@ -16,7 +16,7 @@ import (
 )
 
 // oauthProviders are the browser sign-ins Relay offers.
-var oauthProviders = []string{"claude", "codex", "kimi", "xai", "devin", "meta"}
+var oauthProviders = []string{"claude", "codex", "xai", "devin", "meta"}
 
 func runAccounts(args []string) int {
 	asJSON := hasFlag(&args, "json")

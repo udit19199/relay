@@ -149,15 +149,15 @@ func TestRegisterExecutorForAuth_OpenAICompatUsesNamespacedProviderKey(t *testin
 		{
 			name: "native first",
 			auths: []*coreauth.Auth{
-				{ID: "native-kimi", Provider: "kimi"},
-				openAICompatKimiAuth(),
+				{ID: "native-xai", Provider: "xai"},
+				openAICompatXAIAuth(),
 			},
 		},
 		{
 			name: "compat first",
 			auths: []*coreauth.Auth{
-				openAICompatKimiAuth(),
-				{ID: "native-kimi", Provider: "kimi"},
+				openAICompatXAIAuth(),
+				{ID: "native-xai", Provider: "xai"},
 			},
 		},
 	}
@@ -171,15 +171,15 @@ func TestRegisterExecutorForAuth_OpenAICompatUsesNamespacedProviderKey(t *testin
 
 			service.registerExecutorsForAuths(tt.auths, true)
 
-			nativeExecutor, okNative := service.coreManager.Executor("kimi")
+			nativeExecutor, okNative := service.coreManager.Executor("xai")
 			if !okNative {
-				t.Fatal("expected native kimi executor")
+				t.Fatal("expected native xai executor")
 			}
-			if _, okKimi := nativeExecutor.(*runtimeexecutor.KimiExecutor); !okKimi {
-				t.Fatalf("native executor type = %T, want *executor.KimiExecutor", nativeExecutor)
+			if _, okKimi := nativeExecutor.(*runtimeexecutor.XAIExecutor); !okKimi {
+				t.Fatalf("native executor type = %T, want *executor.XAIExecutor", nativeExecutor)
 			}
 
-			compatExecutor, okCompat := service.coreManager.Executor("openai-compatible-kimi")
+			compatExecutor, okCompat := service.coreManager.Executor("openai-compatible-xai")
 			if !okCompat {
 				t.Fatal("expected namespaced OpenAI-compatible executor")
 			}
@@ -190,14 +190,14 @@ func TestRegisterExecutorForAuth_OpenAICompatUsesNamespacedProviderKey(t *testin
 	}
 }
 
-func openAICompatKimiAuth() *coreauth.Auth {
+func openAICompatXAIAuth() *coreauth.Auth {
 	return &coreauth.Auth{
-		ID:       "compat-kimi",
+		ID:       "compat-xai",
 		Provider: "openai-compatibility",
-		Label:    "kimi",
+		Label:    "xai",
 		Attributes: map[string]string{
-			"compat_name":  "kimi",
-			"provider_key": "kimi",
+			"compat_name":  "xai",
+			"provider_key": "xai",
 		},
 	}
 }

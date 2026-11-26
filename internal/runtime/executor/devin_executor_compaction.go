@@ -14,7 +14,7 @@ import (
 // executeDevinResponsesCompaction handles Codex remote compaction v2 for the
 // native Devin route. Devin has no native compaction endpoint, so the summary
 // is generated with the same model through the normal Execute path and sealed
-// into a CPA compaction capsule, mirroring the Kimi/Meta/OpenAI-compat routes.
+// into a CPA compaction capsule, mirroring the Meta/OpenAI-compat routes.
 func (e *DevinExecutor) executeDevinResponsesCompaction(ctx context.Context, auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
 	var resp cliproxyexecutor.Response
 	baseModel := thinking.ParseSuffix(req.Model).ModelName

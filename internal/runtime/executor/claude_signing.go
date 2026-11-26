@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"net/url"
 	"sort"
 	"strings"
 
@@ -192,44 +191,6 @@ func prependClaudeBillingSystemBlockDoc(doc *ojson.Doc, billingText string) erro
 		return fmt.Errorf("prepend Claude CCH billing block: %w", errSet)
 	}
 	return nil
-}
-
-func isKimiAPIEndpoint(endpoint string) bool {
-	parsed, err := url.Parse(strings.TrimSpace(endpoint))
-	if err != nil {
-		return false
-	}
-	host := parsed.Hostname()
-	return strings.EqualFold(host, "api.kimi.com") || strings.EqualFold(host, "api.kimi.ai")
-}
-
-func isKimiMessagesUpstream(auth *cliproxyauth.Auth, endpoint string) bool {
-	if auth != nil {
-		provider := strings.ToLower(strings.TrimSpace(auth.Provider))
-		if provider == "kimi" || provider == "kimi-ai" || provider == "kimi.ai" || provider == "kimi.com" {
-			return true
-		}
-	}
-	return isKimiAPIEndpoint(endpoint)
-}
-
-// stripDefaultKimiClaudeCodeAttribution removes the Claude Code billing/CCH
-// attribution block from a Kimi Messages body when the caller did not opt into
-// the full CLI profile. Kimi treats the block as prompt text, so forwarding it
-// unchanged would leak CPA's attribution into the model's context. Other system
-// content is preserved.
-func stripDefaultKimiClaudeCodeAttribution(auth *cliproxyauth.Auth, endpoint string, cliFingerprint bool, body []byte) []byte {
-	if cliFingerprint || !isKimiMessagesUpstream(auth, endpoint) {
-		return body
-	}
-	return util.StripClaudeCodeAttributionSystem(body)
-}
-
-func stripDefaultKimiClaudeCodeAttributionDoc(auth *cliproxyauth.Auth, endpoint string, cliFingerprint bool, doc *ojson.Doc) bool {
-	if cliFingerprint || !isKimiMessagesUpstream(auth, endpoint) {
-		return false
-	}
-	return stripClaudeCodeAttributionSystemDoc(doc)
 }
 
 func stripClaudeCodeAttributionSystemDoc(doc *ojson.Doc) bool {

@@ -79,12 +79,6 @@ func stripThinkingFieldsDoc(doc *ojson.Doc, format string, keepTopLevelEffort ..
 		} else {
 			paths = []string{"reasoning_effort", "reasoning"}
 		}
-	case "kimi", "kimi-ai", "kimi.ai", "kimi.com":
-		if keepEffort {
-			paths = []string{"thinking"}
-		} else {
-			paths = []string{"reasoning_effort", "thinking"}
-		}
 	case "codex", "xai":
 		if !keepEffort {
 			paths = []string{"reasoning"}

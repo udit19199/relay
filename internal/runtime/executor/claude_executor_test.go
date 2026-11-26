@@ -1958,7 +1958,7 @@ func TestShouldSanitizeClaudeMessagesForUpstream_OnlyClaudeFamily(t *testing.T) 
 	}{
 		{model: "claude-sonnet-4-5", want: true},
 		{model: "claude-3-5-sonnet-20241022", want: true},
-		{model: "kimi-k2.5", want: false},
+		{model: "example-nonclaude-model", want: false},
 		{model: "mimo-v2", want: false},
 		{model: "gemini-3.5-flash", want: false},
 	}
@@ -1973,9 +1973,9 @@ func TestShouldSanitizeClaudeMessagesForUpstream_OnlyClaudeFamily(t *testing.T) 
 }
 
 func TestSanitizeClaudeMessagesForClaudeUpstream_RestoresCommentaryMarkerForNonClaudeModel(t *testing.T) {
-	body := []byte(`{"model":"kimi-k2.5","messages":[{"role":"assistant","content":[{"type":"thinking","thinking":"COMMENTARY_SENTINEL","signature":"cpa:commentary:v1"},{"type":"thinking","thinking":"reason","signature":"skip_thought_signature_validator"},{"type":"text","text":"FINAL_SENTINEL"}]}]}`)
+	body := []byte(`{"model":"example-nonclaude-model","messages":[{"role":"assistant","content":[{"type":"thinking","thinking":"COMMENTARY_SENTINEL","signature":"cpa:commentary:v1"},{"type":"thinking","thinking":"reason","signature":"skip_thought_signature_validator"},{"type":"text","text":"FINAL_SENTINEL"}]}]}`)
 
-	out := sanitizeClaudeMessagesForClaudeUpstreamWithDebug(context.Background(), body, "kimi-k2.5")
+	out := sanitizeClaudeMessagesForClaudeUpstreamWithDebug(context.Background(), body, "example-nonclaude-model")
 	content := ojson.GetBytes(out, "messages.0.content")
 	if len(content.Array()) != 3 {
 		t.Fatalf("expected 3 content blocks after marker restore: %s", out)
@@ -1995,7 +1995,7 @@ func TestSanitizeClaudeMessagesForClaudeUpstream_RestoresCommentaryMarkerForNonC
 func TestSanitizeClaudeMessagesForClaudeUpstream_BypassesUnknownModelSignatureMatrix(t *testing.T) {
 	rawSignature := "skip_thought_signature_validator"
 	body := []byte(`{
-		"model": "kimi-k2.5",
+		"model": "example-nonclaude-model",
 		"messages": [
 			{
 				"role": "assistant",
@@ -2008,7 +2008,7 @@ func TestSanitizeClaudeMessagesForClaudeUpstream_BypassesUnknownModelSignatureMa
 		]
 	}`)
 
-	output := sanitizeClaudeMessagesForClaudeUpstreamWithDebug(context.Background(), body, "kimi-k2.5")
+	output := sanitizeClaudeMessagesForClaudeUpstreamWithDebug(context.Background(), body, "example-nonclaude-model")
 	parts := ojson.GetBytes(output, "messages.0.content").Array()
 	if len(parts) != 3 {
 		t.Fatalf("content length = %d, want 3 when sanitizer is bypassed: %s", len(parts), output)
@@ -9258,7 +9258,7 @@ func TestApplyClaudeHeaders_StreamTransportNegotiation(t *testing.T) {
 		t.Fatalf("streaming Accept-Encoding = %q, want %q to match the real client", got, want)
 	}
 
-	gatewayReq := httptest.NewRequest(http.MethodPost, "https://api.kimi.com/coding/v1/messages", nil)
+	gatewayReq := httptest.NewRequest(http.MethodPost, "https://gateway.example/coding/v1/messages", nil)
 	gatewayReq = gatewayReq.WithContext(directReq.Context())
 	if errApply := applyClaudeHeaders(gatewayReq, auth, "key-stream-accept", true, nil, body, nil, http.Header{}, false); errApply != nil {
 		t.Fatalf("applyClaudeHeaders() error = %v", errApply)
@@ -9286,7 +9286,7 @@ func TestApplyClaudeHeaders_DefaultPreservesCallerBetas(t *testing.T) {
 	}
 
 	// Other Anthropic-compatible upstreams keep caller betas functional.
-	gatewayReq := httptest.NewRequest(http.MethodPost, "https://api.kimi.com/coding/v1/messages", nil)
+	gatewayReq := httptest.NewRequest(http.MethodPost, "https://gateway.example/coding/v1/messages", nil)
 	gatewayReq = gatewayReq.WithContext(directReq.Context())
 	if errApply := applyClaudeHeaders(gatewayReq, auth, "key-caller-betas", false, nil, body, nil, incoming, false); errApply != nil {
 		t.Fatalf("applyClaudeHeaders() error = %v", errApply)

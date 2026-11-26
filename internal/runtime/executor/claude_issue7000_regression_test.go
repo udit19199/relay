@@ -130,15 +130,6 @@ func TestClaudeExecutor_Issue7000ModelAndChoiceBoundaries(t *testing.T) {
 		})
 	}
 }
-
-func TestKimiExecutor_Issue7000DoesNotRewriteDelegatedToolChoice(t *testing.T) {
-	const choice = `{"type":"tool","name":"lookup_weather","disable_parallel_tool_use":true}`
-	body, _ := captureClaudeIssue7000(t, NewKimiExecutor(&config.Config{}), &cliproxyauth.Auth{Provider: "kimi", Attributes: map[string]string{"api_key": "kimi-issue7000"}}, cliproxyexecutor.Request{Model: "claude-opus-5-5", Payload: claudeIssue7000Payload("claude-opus-5-5", choice)}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude}, "Execute")
-	if got := ojson.GetBytes(body, "tool_choice").Value(); !reflect.DeepEqual(got, ojson.Parse(choice).Value()) {
-		t.Fatalf("delegated provider tool_choice changed: %s", body)
-	}
-}
-
 func TestClaudeExecutor_Issue7000OpenAITranslation(t *testing.T) {
 	const schema = `{"type":"object","properties":{"issue7000_title":{"type":"string"}},"required":["issue7000_title"],"additionalProperties":false}`
 	for _, source := range []struct {

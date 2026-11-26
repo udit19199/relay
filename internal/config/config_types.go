@@ -770,12 +770,12 @@ type ClaudeKey struct {
 	// credential on Anthropic Messages. Empty/default keeps the caller request
 	// fingerprint and headers, including first-party api.anthropic.com API keys.
 	// "claude-code-cli" opts official Anthropic API keys, custom gateways, and
-	// delegated providers such as Kimi into the Claude Code OAuth CLI Messages
+	// delegated providers into the Claude Code OAuth CLI Messages
 	// shape (OAuth betas, CCH signing, stable CLI identity) without treating the
 	// credential as a real OAuth token for refresh/profile/runtime semantics.
 	// CCH is a per-request hash and follows the native gate: it is emitted only on
 	// api.anthropic.com and Vertex, so an opt-in on any other gateway sends the
-	// billing block unsigned and cannot bust that gateway's prompt cache. Kimi
+	// billing block unsigned and cannot bust that gateway's prompt cache. The gateway
 	// strips the attribution entirely by default and keeps it, unsigned, after an
 	// explicit opt-in. count_tokens keeps the native model/messages/tools shape.
 	// Recognized values are defined by NormalizeClaudeFingerprintProfile.
@@ -1060,7 +1060,7 @@ type OpenAICompatibility struct {
 	// Disabled prevents this provider from being used for routing.
 	Disabled bool `yaml:"disabled,omitempty" json:"disabled,omitempty"`
 
-	// Prefix optionally namespaces model aliases for this provider (e.g., "teamA/kimi-k2").
+	// Prefix optionally namespaces model aliases for this provider (e.g., "teamA/model-x").
 	Prefix string `yaml:"prefix,omitempty" json:"prefix,omitempty"`
 
 	// BaseURL is the base URL for the external OpenAI-compatible API endpoint.

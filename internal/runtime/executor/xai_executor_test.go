@@ -7642,10 +7642,6 @@ func testApplyPatchResponsesExecutor(t *testing.T, provider string, exec interfa
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				body, _ := io.ReadAll(r.Body)
 				bodies <- body
-				if provider == "kimi" && !stream {
-					_, _ = w.Write([]byte(completed))
-					return
-				}
 				w.Header().Set("Content-Type", "text/event-stream")
 				_, _ = fmt.Fprintf(w, "data: %s\n\ndata: %s\n\n", `{"type":"response.output_item.done","output_index":0,"item":`+item+`}`, completed)
 			}))
@@ -7997,14 +7993,10 @@ func TestXAIApplyPatchDispatcherEvidenceLifecycle(t *testing.T) {
 }
 
 func TestApplyPatchResponsesExecutorLocalFailures(t *testing.T) {
-	for _, provider := range []string{"xai", "meta", "kimi"} {
+	for _, provider := range []string{"xai", "meta"} {
 		for _, stream := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/stream=%v", provider, stream), func(t *testing.T) {
 				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					if provider == "kimi" && !stream {
-						_, _ = fmt.Fprint(w, `{"output":[{"type":"function_call","name":"apply_patch","arguments":"{}"}]}`)
-						return
-					}
 					w.Header().Set("Content-Type", "text/event-stream")
 					if stream {
 						_, _ = fmt.Fprint(w, "data: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"function_call\",\"id\":\"a\",\"name\":\"apply_patch\",\"arguments\":\"\"}}\n\n")
@@ -8024,9 +8016,6 @@ func TestApplyPatchResponsesExecutorLocalFailures(t *testing.T) {
 				case "meta":
 					exec = NewMetaExecutor(&config.Config{})
 					model = "muse-spark-1.3"
-				case "kimi":
-					exec = NewKimiExecutor(&config.Config{})
-					model = "kimi-k2.5"
 				}
 				auth := &cliproxyauth.Auth{ID: "task6-owned", Provider: provider, Attributes: map[string]string{"api_key": "test", "base_url": server.URL}}
 				checkUsage := task6CaptureFailureUsage(t, auth.ID)

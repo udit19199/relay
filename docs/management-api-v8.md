@@ -163,7 +163,7 @@ retain the corresponding business operation's fields.
 ## OAuth
 
 The login URL is shared by all providers. Set the required `provider` query
-parameter to `claude`, `codex`, `antigravity`, `kimi`, `kimi-ai`, `xai`, `devin`,
+parameter to `claude`, `codex`, `antigravity`, `xai`, `devin`,
 `meta`, or a registered plugin provider ID. For example:
 
 ```http

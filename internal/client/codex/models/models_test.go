@@ -1827,7 +1827,7 @@ func TestCodexClientModelsResponse_DoesNotLeakResponsesLiteOrCodeModeToNonCodexR
 	}
 	providers := map[string][]string{
 		"gpt-6.1-sol":     {"codex"},
-		"kimi-k3":         {"kimi"},
+		"kimi-k3":         {"devin"},
 		"muse-wonder-1.0": {"meta"},
 	}
 

@@ -72,7 +72,7 @@ type UsageReporter struct {
 
 	upstreamModelMu sync.RWMutex
 	// upstreamModel holds the canonical upstream model expected to be served when
-	// it differs from the requested model (e.g. local Kimi model mappings).
+	// it differs from the requested model (e.g. local model mappings).
 	upstreamModel string
 }
 

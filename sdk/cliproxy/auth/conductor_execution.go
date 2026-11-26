@@ -477,8 +477,6 @@ func requestToFormat(provider string, executor ProviderExecutor, req cliproxyexe
 		return sdktranslator.FormatClaude
 	case "gemini", "vertex", "aistudio":
 		return sdktranslator.FormatGemini
-	case "kimi", "kimi-ai", "kimi.ai", "kimi.com":
-		return sdktranslator.FormatOpenAI
 	case "meta":
 		return sdktranslator.FormatCodex
 	case "antigravity":
@@ -1934,15 +1932,7 @@ func executorKeyFromAuth(auth *Auth) string {
 		}
 		return util.OpenAICompatibleProviderKey(providerKey)
 	}
-	provider := strings.ToLower(strings.TrimSpace(auth.Provider))
-	switch provider {
-	case "kimi.com":
-		return "kimi"
-	case "kimi.ai":
-		return "kimi-ai"
-	default:
-		return provider
-	}
+	return strings.ToLower(strings.TrimSpace(auth.Provider))
 }
 
 // logEntryWithRequestID returns a logrus entry with request_id field if available in context.
