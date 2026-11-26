@@ -97,7 +97,6 @@ func TestV8MigrationUpdatesScopeAfterSaving(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			cfg.Home.Enabled = true
 			cfg.CodexResponseSteering = true
 			before := cfg.CloneForRuntime()
 			if err = SaveConfigPreserveComments(path, cfg, migrate); err != nil {

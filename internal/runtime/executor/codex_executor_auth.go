@@ -13,7 +13,6 @@ import (
 
 	codexauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/codex"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
 	sdkauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/auth"
 	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
@@ -157,11 +156,7 @@ func (e *CodexExecutor) Refresh(ctx context.Context, auth *cliproxyauth.Auth) (*
 	if e != nil {
 		cfg = e.cfg
 	}
-	homeEnabled := cfg != nil && cfg.Home.Enabled
 	if auth == nil {
-		if refreshed, handled, err := helps.RefreshAuthViaHome(ctx, cfg, auth); handled {
-			return refreshed, err
-		}
 		return nil, statusErr{code: 500, msg: "codex executor: auth is nil"}
 	}
 
@@ -173,15 +168,15 @@ func (e *CodexExecutor) Refresh(ctx context.Context, auth *cliproxyauth.Auth) (*
 		var outAuth *cliproxyauth.Auth
 		errLock := codexauth.WithFileLock(diskPath, func() error {
 			var errInner error
-			outAuth, errInner = e.refreshLocked(ctx, auth, diskPath, homeEnabled)
+			outAuth, errInner = e.refreshLocked(ctx, auth, diskPath)
 			return errInner
 		})
 		return outAuth, errLock
 	}
-	return e.refreshLocked(ctx, auth, "", homeEnabled)
+	return e.refreshLocked(ctx, auth, "")
 }
 
-func (e *CodexExecutor) refreshLocked(ctx context.Context, auth *cliproxyauth.Auth, diskPath string, homeEnabled bool) (*cliproxyauth.Auth, error) {
+func (e *CodexExecutor) refreshLocked(ctx context.Context, auth *cliproxyauth.Auth, diskPath string) (*cliproxyauth.Auth, error) {
 	var cfg *config.Config
 	if e != nil {
 		cfg = e.cfg
@@ -271,14 +266,9 @@ func (e *CodexExecutor) refreshLocked(ctx context.Context, auth *cliproxyauth.Au
 	}
 
 	_, hasOuter, needOuter := cliproxyauth.CodexOuterNeedsRefresh(auth, now)
-	if outerRefreshToken == "" && !homeEnabled {
+	if outerRefreshToken == "" {
 		hasOuter = false
 		needOuter = false
-	} else if homeEnabled && !hasOuter {
-		hasOuter = true
-		if outerExp, okExp := auth.OuterExpirationTime(); okExp && !outerExp.IsZero() && !outerExp.After(now.Add(cliproxyauth.CodexOuterRefreshLead)) {
-			needOuter = true
-		}
 	}
 	_, hasSIWC, needSIWC := cliproxyauth.CodexSIWCNeedsRefresh(auth, now)
 	if siwcRefreshToken == "" || siwcClientID == "" {
@@ -355,87 +345,46 @@ func (e *CodexExecutor) refreshLocked(ctx context.Context, auth *cliproxyauth.Au
 
 	// Execute refreshes sequentially so outer and SIWC never race on the same credential state.
 	if needOuter {
-		if homeEnabled {
-			if refreshed, handled, errHome := helps.RefreshAuthViaHome(ctx, cfg, auth); handled {
-				if errHome != nil {
-					outerErr = errHome
-				} else if refreshed != nil {
-					outerRefreshed = true
-					if refreshed.ID != "" {
-						auth.ID = refreshed.ID
-					}
-					if refreshed.Provider != "" {
-						auth.Provider = refreshed.Provider
-					}
-					auth.Index = refreshed.Index
-					if refreshed.Metadata != nil {
-						for k, val := range refreshed.Metadata {
-							if k == "siwc" || k == "use_siwc" {
-								continue
-							}
-							auth.Metadata[k] = val
-						}
-						if homeSIWC, okSIWC := refreshed.Metadata["siwc"].(map[string]any); okSIWC && len(homeSIWC) > 0 {
-							if codexSIWCAccessToken(refreshed) != "" && codexSIWCAccessToken(refreshed) != codexSIWCAccessToken(beforeRefresh) {
-								existingSIWC = cloneSIWCMap(homeSIWC)
-								siwcRefreshed = true
-								needSIWC = false
-							}
-						}
-					}
-					if len(refreshed.Attributes) > 0 {
-						clonedAttributes := make(map[string]string, len(auth.Attributes)+len(refreshed.Attributes))
-						for k, v := range auth.Attributes {
-							clonedAttributes[k] = v
-						}
-						for k, v := range refreshed.Attributes {
-							clonedAttributes[k] = v
-						}
-						auth.Attributes = clonedAttributes
-					}
+
+		td, errOuter := svc.RefreshTokensWithRetry(ctx, outerRefreshToken, 3)
+		if errOuter != nil {
+			outerErr = errOuter
+		} else if td != nil {
+			outerRefreshed = true
+			auth.Metadata["id_token"] = td.IDToken
+			auth.Metadata["access_token"] = td.AccessToken
+			if td.RefreshToken != "" {
+				auth.Metadata["refresh_token"] = td.RefreshToken
+			}
+			if td.AccountID != "" {
+				auth.Metadata["account_id"] = td.AccountID
+			}
+			auth.Metadata["email"] = td.Email
+			auth.Metadata["expired"] = td.Expire
+			auth.Metadata["type"] = "codex"
+			auth.Metadata["last_refresh"] = time.Now().Format(time.RFC3339)
+
+			planType := strings.TrimSpace(td.PlanType)
+			if planType == "" && td.IDToken != "" {
+				if claims, errParse := codexauth.ParseJWTToken(td.IDToken); errParse == nil && claims != nil {
+					planType = claims.GetPlanType()
 				}
 			}
-		} else {
-			td, errOuter := svc.RefreshTokensWithRetry(ctx, outerRefreshToken, 3)
-			if errOuter != nil {
-				outerErr = errOuter
-			} else if td != nil {
-				outerRefreshed = true
-				auth.Metadata["id_token"] = td.IDToken
-				auth.Metadata["access_token"] = td.AccessToken
-				if td.RefreshToken != "" {
-					auth.Metadata["refresh_token"] = td.RefreshToken
-				}
-				if td.AccountID != "" {
-					auth.Metadata["account_id"] = td.AccountID
-				}
-				auth.Metadata["email"] = td.Email
-				auth.Metadata["expired"] = td.Expire
-				auth.Metadata["type"] = "codex"
-				auth.Metadata["last_refresh"] = time.Now().Format(time.RFC3339)
-
-				planType := strings.TrimSpace(td.PlanType)
-				if planType == "" && td.IDToken != "" {
-					if claims, errParse := codexauth.ParseJWTToken(td.IDToken); errParse == nil && claims != nil {
-						planType = claims.GetPlanType()
-					}
-				}
-				if planType == "" {
-					planType = codexauth.DefaultPlanType
-				}
-				auth.Metadata["plan_type"] = planType
-				clonedAttributes := make(map[string]string, len(auth.Attributes)+1)
-				for k, v := range auth.Attributes {
-					clonedAttributes[k] = v
-				}
-				clonedAttributes["plan_type"] = planType
-				auth.Attributes = clonedAttributes
-				if storage, ok := auth.Storage.(*codexauth.CodexTokenStorage); ok && storage != nil {
-					clonedStorage := *storage
-					svc.UpdateTokenStorage(&clonedStorage, td)
-					clonedStorage.PlanType = planType
-					auth.Storage = &clonedStorage
-				}
+			if planType == "" {
+				planType = codexauth.DefaultPlanType
+			}
+			auth.Metadata["plan_type"] = planType
+			clonedAttributes := make(map[string]string, len(auth.Attributes)+1)
+			for k, v := range auth.Attributes {
+				clonedAttributes[k] = v
+			}
+			clonedAttributes["plan_type"] = planType
+			auth.Attributes = clonedAttributes
+			if storage, ok := auth.Storage.(*codexauth.CodexTokenStorage); ok && storage != nil {
+				clonedStorage := *storage
+				svc.UpdateTokenStorage(&clonedStorage, td)
+				clonedStorage.PlanType = planType
+				auth.Storage = &clonedStorage
 			}
 		}
 	}

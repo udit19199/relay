@@ -272,15 +272,3 @@ func TestManagerExecuteStreamOpenAIImage401RejectsOuterTokenNotSIWC(t *testing.T
 		t.Fatalf("RejectedSIWCAccessToken = %q, want empty (SIWC token must not be marked rejected on image stream 401)", updated.RejectedSIWCAccessToken)
 	}
 }
-
-func TestHomeDispatchHeadersSynthesizesCodexUserAgentForImageRequests(t *testing.T) {
-	ctx := WithCodexClientRequest(context.Background(), true)
-	in := http.Header{"User-Agent": []string{"Python-urllib/3.14"}}
-	out := homeDispatchHeaders(ctx, in)
-	if got := out.Get("User-Agent"); got != "codex_cli_rs" {
-		t.Fatalf("homeDispatchHeaders User-Agent = %q, want codex_cli_rs", got)
-	}
-	if got := in.Get("User-Agent"); got != "Python-urllib/3.14" {
-		t.Fatalf("original headers mutated: User-Agent = %q", got)
-	}
-}

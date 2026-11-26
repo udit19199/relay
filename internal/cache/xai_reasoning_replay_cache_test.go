@@ -9,7 +9,7 @@ import (
 
 	"github.com/MoeForge/moego/base64"
 	"github.com/MoeForge/moego/ojson"
-	homekv "github.com/router-for-me/CLIProxyAPI/v8/internal/home"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/kvstore"
 )
 
 type fakeXAIReasoningReplayKVClient struct {
@@ -26,6 +26,23 @@ type fakeXAIReasoningReplayKVClient struct {
 	lastExpireTTL time.Duration
 }
 
+func (c *fakeXAIReasoningReplayKVClient) KVSet(_ context.Context, key string, value []byte, opts kvstore.KVSetOptions) (bool, error) {
+	if c.setErr != nil {
+		return false, c.setErr
+	}
+	_, exists := c.values[key]
+	if opts.NX && exists {
+		return false, nil
+	}
+	if opts.XX && !exists {
+		return false, nil
+	}
+	c.setCount++
+	c.lastSetTTL = opts.EX
+	c.values[key] = append([]byte(nil), value...)
+	return true, nil
+}
+
 func newFakeXAIReasoningReplayKVClient() *fakeXAIReasoningReplayKVClient {
 	return &fakeXAIReasoningReplayKVClient{values: make(map[string][]byte)}
 }
@@ -40,16 +57,6 @@ func (c *fakeXAIReasoningReplayKVClient) KVGet(_ context.Context, key string) ([
 		return nil, false, nil
 	}
 	return append([]byte(nil), value...), true, nil
-}
-
-func (c *fakeXAIReasoningReplayKVClient) KVSet(_ context.Context, key string, value []byte, opts homekv.KVSetOptions) (bool, error) {
-	c.setCount++
-	c.lastSetTTL = opts.EX
-	if c.setErr != nil {
-		return false, c.setErr
-	}
-	c.values[key] = append([]byte(nil), value...)
-	return true, nil
 }
 
 func (c *fakeXAIReasoningReplayKVClient) KVDel(_ context.Context, keys ...string) (int64, error) {
@@ -76,11 +83,11 @@ func (c *fakeXAIReasoningReplayKVClient) KVExpire(_ context.Context, _ string, t
 	return true, nil
 }
 
-func useFakeXAIReasoningReplayKVClient(t *testing.T, client *fakeXAIReasoningReplayKVClient, homeMode bool, errClient error) {
+func useFakeXAIReasoningReplayKVClient(t *testing.T, client *fakeXAIReasoningReplayKVClient, kvMode bool, errClient error) {
 	t.Helper()
 	previous := currentXAIReasoningReplayKVClient
 	currentXAIReasoningReplayKVClient = func() (xaiReasoningReplayKVClient, bool, error) {
-		return client, homeMode, errClient
+		return client, kvMode, errClient
 	}
 	t.Cleanup(func() {
 		currentXAIReasoningReplayKVClient = previous
@@ -221,7 +228,7 @@ func TestXAIReasoningReplayCacheStoresToolCallWithoutReasoning(t *testing.T) {
 	}
 }
 
-func TestXAIReasoningReplayRequiredHomeExpireFailureReturnsItems(t *testing.T) {
+func TestXAIReasoningReplayRequiredKVExpireFailureReturnsItems(t *testing.T) {
 	ClearXAIReasoningReplayCache()
 	t.Cleanup(ClearXAIReasoningReplayCache)
 	client := newFakeXAIReasoningReplayKVClient()

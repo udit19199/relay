@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
 	"sort"
 	"strings"
 	"sync"
@@ -14,7 +13,6 @@ import (
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gin-gonic/gin"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/home"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
 	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
@@ -142,12 +140,12 @@ func TranslateRequestEnvelopeWithCodexMultiAgentV2(ctx context.Context, headers 
 
 // PrepareCodexMultiAgentV2Tools prepares collaboration tool definitions at the
 // Responses API boundary without changing the collaboration namespace.
-func PrepareCodexMultiAgentV2Tools(ctx context.Context, headers http.Header, payload []byte, enabled, homeEnabled bool) ([]byte, bool) {
+func PrepareCodexMultiAgentV2Tools(ctx context.Context, headers http.Header, payload []byte, enabled bool) ([]byte, bool) {
 	if len(payload) == 0 {
 		return payload, codexMultiAgentV2ClientEnabled(ctx, headers, enabled)
 	}
 	doc := ojson.NewDoc(payload)
-	changed, prepared := prepareCodexMultiAgentV2ToolsDoc(doc, ctx, headers, enabled, homeEnabled)
+	changed, prepared := prepareCodexMultiAgentV2ToolsDoc(doc, ctx, headers, enabled)
 	if !changed {
 		return payload, prepared
 	}
@@ -156,11 +154,11 @@ func PrepareCodexMultiAgentV2Tools(ctx context.Context, headers http.Header, pay
 
 // PrepareCodexMultiAgentV2ToolsDoc prepares collaboration tool definitions in doc at the
 // Responses API boundary without changing the collaboration namespace.
-func PrepareCodexMultiAgentV2ToolsDoc(doc *ojson.Doc, ctx context.Context, headers http.Header, enabled, homeEnabled bool) (bool, bool) {
-	return prepareCodexMultiAgentV2ToolsDoc(doc, ctx, headers, enabled, homeEnabled)
+func PrepareCodexMultiAgentV2ToolsDoc(doc *ojson.Doc, ctx context.Context, headers http.Header, enabled bool) (bool, bool) {
+	return prepareCodexMultiAgentV2ToolsDoc(doc, ctx, headers, enabled)
 }
 
-func prepareCodexMultiAgentV2ToolsDoc(doc *ojson.Doc, ctx context.Context, headers http.Header, enabled, homeEnabled bool) (bool, bool) {
+func prepareCodexMultiAgentV2ToolsDoc(doc *ojson.Doc, ctx context.Context, headers http.Header, enabled bool) (bool, bool) {
 	if !codexMultiAgentV2ClientEnabled(ctx, headers, enabled) {
 		return false, false
 	}
@@ -180,7 +178,7 @@ func prepareCodexMultiAgentV2ToolsDoc(doc *ojson.Doc, ctx context.Context, heade
 	var models []codexSpawnAgentModel
 	var formattedMarkdown string
 	if len(toolPaths) > 0 {
-		models, formattedMarkdown = codexSpawnAgentModelsAndMarkdownForRequest(ctx, headers, homeEnabled)
+		models, formattedMarkdown = codexSpawnAgentModelsAndMarkdownForRequest(ctx, headers)
 	}
 
 	return rewriteCodexCollaborationToolsDoc(doc, messageToolPaths, toolPaths, models, formattedMarkdown), true
@@ -217,7 +215,7 @@ func optimizeCodexMultiAgentV2RequestDoc(doc *ojson.Doc, ctx context.Context, he
 			changed = true
 		}
 	} else {
-		if toolsChanged, _ := prepareCodexMultiAgentV2ToolsDoc(doc, ctx, headers, cfg.Client.Codex.OptimizeMultiAgentV2, cfg.Home.Enabled); toolsChanged {
+		if toolsChanged, _ := prepareCodexMultiAgentV2ToolsDoc(doc, ctx, headers, cfg.Client.Codex.OptimizeMultiAgentV2); toolsChanged {
 			changed = true
 		}
 	}
@@ -360,20 +358,7 @@ func loadCodexCatalogTemplates() (map[string]map[string]any, map[string]any, uin
 	return templates, defaultTemplate, revision, nil
 }
 
-func codexSpawnAgentModelsAndMarkdownForRequest(ctx context.Context, headers http.Header, homeEnabled bool) ([]codexSpawnAgentModel, string) {
-	if homeEnabled {
-		availableModels := codexHomeAvailableModels(ctx, headers)
-		templates, defaultTemplate, _, errLoad := loadCodexCatalogTemplates()
-		if errLoad != nil || defaultTemplate == nil {
-			return nil, ""
-		}
-		models := codexSpawnAgentModelsFromTemplates(availableModels, templates, defaultTemplate, func(modelID string) *registry.ModelInfo {
-			return registry.LookupModelInfo(modelID)
-		})
-		formatted := formatCodexSpawnAgentModels(models)
-		return models, formatted
-	}
-
+func codexSpawnAgentModelsAndMarkdownForRequest(ctx context.Context, headers http.Header) ([]codexSpawnAgentModel, string) {
 	currentRevision := registry.GetCodexClientModelsRevision()
 	currentGeneration := registry.GetGlobalRegistry().GetGeneration()
 
@@ -410,75 +395,14 @@ func codexSpawnAgentModelsAndMarkdownForRequest(ctx context.Context, headers htt
 	return models, formatted
 }
 
-func codexSpawnAgentModelsForRequest(ctx context.Context, headers http.Header, homeEnabled bool) []codexSpawnAgentModel {
-	models, _ := codexSpawnAgentModelsAndMarkdownForRequest(ctx, headers, homeEnabled)
+func codexSpawnAgentModelsForRequest(ctx context.Context, headers http.Header) []codexSpawnAgentModel {
+	models, _ := codexSpawnAgentModelsAndMarkdownForRequest(ctx, headers)
 	return models
 }
 
-func formatCodexSpawnAgentModelsForRequest(ctx context.Context, headers http.Header, homeEnabled bool) string {
-	_, formatted := codexSpawnAgentModelsAndMarkdownForRequest(ctx, headers, homeEnabled)
+func formatCodexSpawnAgentModelsForRequest(ctx context.Context, headers http.Header) string {
+	_, formatted := codexSpawnAgentModelsAndMarkdownForRequest(ctx, headers)
 	return formatted
-}
-
-func codexHomeAvailableModels(ctx context.Context, headers http.Header) []map[string]any {
-	client := home.Current()
-	if client == nil {
-		return nil
-	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	requestHeaders := headers
-	if ginCtx, ok := ctx.Value("gin").(*gin.Context); ok && ginCtx != nil && ginCtx.Request != nil {
-		requestHeaders = ginCtx.Request.Header
-	}
-	query := make(url.Values)
-	query.Set("client_version", "")
-	raw, errGet := client.GetModels(ctx, requestHeaders, query)
-	if errGet != nil {
-		return nil
-	}
-	return decodeCodexHomeAvailableModels(raw)
-}
-
-func decodeCodexHomeAvailableModels(raw []byte) []map[string]any {
-	var sections map[string][]map[string]any
-	if err := json.Unmarshal(raw, &sections); err != nil || len(sections) == 0 {
-		return nil
-	}
-
-	seen := make(map[string]struct{})
-	models := make([]map[string]any, 0, 256)
-	for _, sectionModels := range sections {
-		for _, model := range sectionModels {
-			modelID := mapString(model, "id")
-			if modelID == "" {
-				modelID = strings.TrimPrefix(mapString(model, "name"), "models/")
-			}
-			if modelID == "" {
-				continue
-			}
-			if _, exists := seen[modelID]; exists {
-				continue
-			}
-			seen[modelID] = struct{}{}
-
-			displayName := mapString(model, "display_name")
-			if displayName == "" {
-				displayName = mapString(model, "displayName")
-			}
-			entry := map[string]any{"id": modelID}
-			if displayName != "" {
-				entry["display_name"] = displayName
-				entry["description"] = displayName
-			}
-			models = append(models, entry)
-		}
-	}
-	sort.Slice(models, func(i, j int) bool {
-		return mapString(models[i], "id") < mapString(models[j], "id")
-	})
-	return models
 }
 
 func codexSpawnAgentModelsFromSources(availableModels []map[string]any, catalogJSON []byte, lookupModel func(string) *registry.ModelInfo) []codexSpawnAgentModel {

@@ -13,12 +13,10 @@ import (
 // RefreshModelDefinitions triggers an immediate on-demand refresh of the model catalogs.
 func (h *Handler) RefreshModelDefinitions(c *gin.Context) {
 	var sources registry.CatalogSources
-	home := false
 	if h != nil {
 		h.mu.Lock()
 		if h.cfg != nil {
 			sources = h.cfg.Models
-			home = h.cfg.Home.Enabled
 		}
 		h.mu.Unlock()
 	}
@@ -31,7 +29,7 @@ func (h *Handler) RefreshModelDefinitions(c *gin.Context) {
 		return
 	}
 
-	result, errRefresh := registry.RefreshModelCatalogsWithPolicy(c.Request.Context(), sources, home)
+	result, errRefresh := registry.RefreshModelCatalogsWithPolicy(c.Request.Context(), sources)
 	if errRefresh != nil {
 		c.JSON(http.StatusBadGateway, gin.H{
 			"ok":                false,

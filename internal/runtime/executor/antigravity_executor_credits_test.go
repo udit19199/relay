@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	homekv "github.com/router-for-me/CLIProxyAPI/v8/internal/home"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/kvstore"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
 	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
@@ -63,6 +63,24 @@ type fakeAntigravityKVClient struct {
 	lastSetKey   string
 }
 
+func (c *fakeAntigravityKVClient) KVSet(_ context.Context, key string, value []byte, opts kvstore.KVSetOptions) (bool, error) {
+	if c.setErr != nil {
+		return false, c.setErr
+	}
+	_, exists := c.values[key]
+	if opts.NX && exists {
+		return false, nil
+	}
+	if opts.XX && !exists {
+		return false, nil
+	}
+	c.setCount++
+	c.lastSetKey = key
+	c.lastSetTTL = opts.EX
+	c.values[key] = append([]byte(nil), value...)
+	return true, nil
+}
+
 func newFakeAntigravityKVClient() *fakeAntigravityKVClient {
 	return &fakeAntigravityKVClient{
 		values:      make(map[string][]byte),
@@ -80,17 +98,6 @@ func (c *fakeAntigravityKVClient) KVGet(_ context.Context, key string) ([]byte, 
 		return nil, false, nil
 	}
 	return append([]byte(nil), value...), true, nil
-}
-
-func (c *fakeAntigravityKVClient) KVSet(_ context.Context, key string, value []byte, opts homekv.KVSetOptions) (bool, error) {
-	c.setCount++
-	c.lastSetKey = key
-	c.lastSetTTL = opts.EX
-	if c.setErr != nil {
-		return false, c.setErr
-	}
-	c.values[key] = append([]byte(nil), value...)
-	return true, nil
 }
 
 func (c *fakeAntigravityKVClient) KVSetNX(_ context.Context, key string, value []byte, ttl time.Duration) (bool, error) {
@@ -125,11 +132,11 @@ func (c *fakeAntigravityKVClient) KVDel(_ context.Context, keys ...string) (int6
 	return deleted, nil
 }
 
-func useFakeAntigravityKVClient(t *testing.T, client *fakeAntigravityKVClient, homeMode bool, errClient error) {
+func useFakeAntigravityKVClient(t *testing.T, client *fakeAntigravityKVClient, kvMode bool, errClient error) {
 	t.Helper()
 	previous := currentAntigravityKVClient
 	currentAntigravityKVClient = func() (antigravityKVClient, bool, error) {
-		return client, homeMode, errClient
+		return client, kvMode, errClient
 	}
 	t.Cleanup(func() {
 		currentAntigravityKVClient = previous
@@ -479,7 +486,7 @@ func TestAntigravityAuthHasCredits(t *testing.T) {
 	})
 }
 
-func TestAntigravityAuthHasCreditsRequiredHomeBalanceUsesKV(t *testing.T) {
+func TestAntigravityAuthHasCreditsRequiredKVBalanceUsesKV(t *testing.T) {
 	resetAntigravityCreditsRetryState()
 	t.Cleanup(resetAntigravityCreditsRetryState)
 	const authID = "home-balance-auth"
@@ -501,17 +508,17 @@ func TestAntigravityAuthHasCreditsRequiredHomeBalanceUsesKV(t *testing.T) {
 		t.Fatalf("antigravityAuthHasCreditsRequired() error = %v", errCredits)
 	}
 	if ok {
-		t.Fatalf("antigravityAuthHasCreditsRequired() = true, want Home KV balance to win over local cache")
+		t.Fatalf("antigravityAuthHasCreditsRequired() = true, want KV balance to win over local cache")
 	}
 	if client.getCount != 1 {
 		t.Fatalf("KVGet count = %d, want 1", client.getCount)
 	}
 }
 
-func TestStoreAntigravityCreditsBalanceBestEffortHomeKV(t *testing.T) {
+func TestStoreAntigravityCreditsBalanceBestEffortKV(t *testing.T) {
 	resetAntigravityCreditsRetryState()
 	t.Cleanup(resetAntigravityCreditsRetryState)
-	const authID = "home-balance-write-auth"
+	const authID = "kv-balance-write-auth"
 	client := newFakeAntigravityKVClient()
 	useFakeAntigravityKVClient(t, client, true, nil)
 
@@ -525,16 +532,16 @@ func TestStoreAntigravityCreditsBalanceBestEffortHomeKV(t *testing.T) {
 		t.Fatalf("KVSet count/key/ttl = %d/%s/%v, want 1/%s/30m", client.setCount, client.lastSetKey, client.lastSetTTL, antigravityCreditsBalanceKey(authID))
 	}
 	if _, ok := antigravityCreditsBalanceByAuth.Load(authID); ok {
-		t.Fatalf("local balance cache was populated in Home mode")
+		t.Fatalf("local balance cache was populated in KV mode")
 	}
 }
 
-func TestAntigravityShortCooldownRequiredHomeKV(t *testing.T) {
+func TestAntigravityShortCooldownRequiredKV(t *testing.T) {
 	resetAntigravityCreditsRetryState()
 	t.Cleanup(resetAntigravityCreditsRetryState)
 	client := newFakeAntigravityKVClient()
 	useFakeAntigravityKVClient(t, client, true, nil)
-	auth := &cliproxyauth.Auth{ID: "home-cooldown-auth"}
+	auth := &cliproxyauth.Auth{ID: "kv-cooldown-auth"}
 	now := time.Now()
 	duration := 30 * time.Second
 
@@ -554,7 +561,7 @@ func TestAntigravityShortCooldownRequiredHomeKV(t *testing.T) {
 	}
 }
 
-func TestAntigravityShortCooldownRequiredHomeKVFailures(t *testing.T) {
+func TestAntigravityShortCooldownRequiredKVFailures(t *testing.T) {
 	auth := &cliproxyauth.Auth{ID: "home-cooldown-failure-auth"}
 	for _, tc := range []struct {
 		name   string

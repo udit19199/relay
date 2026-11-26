@@ -15,7 +15,7 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	homekv "github.com/router-for-me/CLIProxyAPI/v8/internal/home"
+	kvstore "github.com/router-for-me/CLIProxyAPI/v8/internal/kvstore"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
 	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
@@ -65,13 +65,13 @@ var (
 
 type antigravityKVClient interface {
 	KVGet(ctx context.Context, key string) ([]byte, bool, error)
-	KVSet(ctx context.Context, key string, value []byte, opts homekv.KVSetOptions) (bool, error)
+	KVSet(ctx context.Context, key string, value []byte, opts kvstore.KVSetOptions) (bool, error)
 	KVSetNX(ctx context.Context, key string, value []byte, ttl time.Duration) (bool, error)
 	KVDel(ctx context.Context, keys ...string) (int64, error)
 }
 
 var currentAntigravityKVClient = func() (antigravityKVClient, bool, error) {
-	return homekv.CurrentKVClient()
+	return kvstore.CurrentKVClient()
 }
 
 type antigravityCreditsBalance struct {
@@ -123,8 +123,8 @@ func antigravityAuthHasCreditsRequired(ctx context.Context, auth *cliproxyauth.A
 		return hint.Available, nil
 	}
 
-	client, homeMode, errClient := currentAntigravityKVClient()
-	if homeMode {
+	client, kvMode, errClient := currentAntigravityKVClient()
+	if kvMode {
 		if errClient != nil {
 			return false, errClient
 		}
@@ -386,7 +386,7 @@ func (e *AntigravityExecutor) maybeRefreshAntigravityCreditsHint(ctx context.Con
 		return
 	}
 
-	if client, homeMode, errClient := currentAntigravityKVClient(); homeMode {
+	if client, kvMode, errClient := currentAntigravityKVClient(); kvMode {
 		if errClient != nil {
 			log.Errorf("antigravity executor: home kv best-effort refresh lock failed prefix=cpa:antigravity:*: %v", errClient)
 			return
@@ -664,7 +664,7 @@ func antigravityShortCooldownKVKey(auth *cliproxyauth.Auth, modelName string) st
 	if authID == "" || modelName == "" {
 		return ""
 	}
-	return "cpa:antigravity:short-cooldown:" + authID + ":" + homekv.HashKeyPart(modelName)
+	return "cpa:antigravity:short-cooldown:" + authID + ":" + kvstore.HashKeyPart(modelName)
 }
 
 func antigravityCoolingDisabled(auth *cliproxyauth.Auth, cfg *config.Config) bool {
@@ -685,8 +685,8 @@ func antigravityIsInShortCooldownRequired(ctx context.Context, auth *cliproxyaut
 		return false, 0, nil
 	}
 	kvKey := antigravityShortCooldownKVKey(auth, modelName)
-	client, homeMode, errClient := currentAntigravityKVClient()
-	if homeMode {
+	client, kvMode, errClient := currentAntigravityKVClient()
+	if kvMode {
 		if errClient != nil {
 			return false, 0, errClient
 		}
@@ -743,8 +743,8 @@ func markAntigravityShortCooldownRequired(ctx context.Context, auth *cliproxyaut
 		return nil
 	}
 	kvKey := antigravityShortCooldownKVKey(auth, modelName)
-	client, homeMode, errClient := currentAntigravityKVClient()
-	if homeMode {
+	client, kvMode, errClient := currentAntigravityKVClient()
+	if kvMode {
 		if errClient != nil {
 			return errClient
 		}
@@ -752,7 +752,7 @@ func markAntigravityShortCooldownRequired(ctx context.Context, auth *cliproxyaut
 			return nil
 		}
 		until := now.Add(duration)
-		written, errSet := client.KVSet(ctx, kvKey, []byte(strconv.FormatInt(until.UnixNano(), 10)), homekv.KVSetOptions{EX: duration + 5*time.Second})
+		written, errSet := client.KVSet(ctx, kvKey, []byte(strconv.FormatInt(until.UnixNano(), 10)), kvstore.KVSetOptions{EX: duration + 5*time.Second})
 		if errSet != nil {
 			return errSet
 		}
@@ -775,7 +775,7 @@ func storeAntigravityCreditsBalanceBestEffort(authID string, bal antigravityCred
 	if authID == "" {
 		return
 	}
-	if client, homeMode, errClient := currentAntigravityKVClient(); homeMode {
+	if client, kvMode, errClient := currentAntigravityKVClient(); kvMode {
 		if errClient != nil {
 			log.Errorf("antigravity executor: home kv best-effort credits balance set failed prefix=cpa:antigravity:*: %v", errClient)
 			return
@@ -785,7 +785,7 @@ func storeAntigravityCreditsBalanceBestEffort(authID string, bal antigravityCred
 			log.Errorf("antigravity executor: home kv best-effort credits balance set failed prefix=cpa:antigravity:*: %v", errMarshal)
 			return
 		}
-		if _, errSet := client.KVSet(context.Background(), antigravityCreditsBalanceKey(authID), raw, homekv.KVSetOptions{EX: 30 * time.Minute}); errSet != nil {
+		if _, errSet := client.KVSet(context.Background(), antigravityCreditsBalanceKey(authID), raw, kvstore.KVSetOptions{EX: 30 * time.Minute}); errSet != nil {
 			log.Errorf("antigravity executor: home kv best-effort credits balance set failed prefix=cpa:antigravity:*: %v", errSet)
 		}
 		return
@@ -793,7 +793,7 @@ func storeAntigravityCreditsBalanceBestEffort(authID string, bal antigravityCred
 	antigravityCreditsBalanceByAuth.Store(authID, bal)
 }
 
-func homeKVUnavailableStatusErr(cause error) statusErr {
+func kvUnavailableStatusErr(cause error) statusErr {
 	if cause == nil {
 		return statusErr{code: http.StatusServiceUnavailable, msg: "home kv store unavailable"}
 	}

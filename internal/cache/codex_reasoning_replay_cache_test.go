@@ -11,7 +11,7 @@ import (
 
 	"github.com/MoeForge/moego/base64"
 	"github.com/MoeForge/moego/ojson"
-	homekv "github.com/router-for-me/CLIProxyAPI/v8/internal/home"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/kvstore"
 )
 
 type fakeCodexReasoningReplayKVClient struct {
@@ -27,6 +27,25 @@ type fakeCodexReasoningReplayKVClient struct {
 	expireCount   int
 	lastSetTTL    time.Duration
 	lastExpireTTL time.Duration
+}
+
+func (c *fakeCodexReasoningReplayKVClient) KVSet(_ context.Context, key string, value []byte, opts kvstore.KVSetOptions) (bool, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.setErr != nil {
+		return false, c.setErr
+	}
+	_, exists := c.values[key]
+	if opts.NX && exists {
+		return false, nil
+	}
+	if opts.XX && !exists {
+		return false, nil
+	}
+	c.setCount++
+	c.lastSetTTL = opts.EX
+	c.values[key] = append([]byte(nil), value...)
+	return true, nil
 }
 
 func newFakeCodexReasoningReplayKVClient() *fakeCodexReasoningReplayKVClient {
@@ -45,18 +64,6 @@ func (c *fakeCodexReasoningReplayKVClient) KVGet(_ context.Context, key string) 
 		return nil, false, nil
 	}
 	return append([]byte(nil), value...), true, nil
-}
-
-func (c *fakeCodexReasoningReplayKVClient) KVSet(_ context.Context, key string, value []byte, opts homekv.KVSetOptions) (bool, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.setCount++
-	c.lastSetTTL = opts.EX
-	if c.setErr != nil {
-		return false, c.setErr
-	}
-	c.values[key] = append([]byte(nil), value...)
-	return true, nil
 }
 
 func (c *fakeCodexReasoningReplayKVClient) KVCompareAndSwap(_ context.Context, key string, expected []byte, expectedExists bool, value []byte, ttl time.Duration) (bool, error) {
@@ -103,11 +110,11 @@ func (c *fakeCodexReasoningReplayKVClient) KVExpire(_ context.Context, _ string,
 	return true, nil
 }
 
-func useFakeCodexReasoningReplayKVClient(t *testing.T, client *fakeCodexReasoningReplayKVClient, homeMode bool, errClient error) {
+func useFakeCodexReasoningReplayKVClient(t *testing.T, client *fakeCodexReasoningReplayKVClient, kvMode bool, errClient error) {
 	t.Helper()
 	previous := currentCodexReasoningReplayKVClient
 	currentCodexReasoningReplayKVClient = func() (codexReasoningReplayKVClient, bool, error) {
-		return client, homeMode, errClient
+		return client, kvMode, errClient
 	}
 	t.Cleanup(func() {
 		currentCodexReasoningReplayKVClient = previous
@@ -148,7 +155,7 @@ func TestCodexReasoningReplayCacheRejectsInvalidItems(t *testing.T) {
 	}
 }
 
-func TestCodexReasoningReplayRequiredHomeReadAndSlidingExpire(t *testing.T) {
+func TestCodexReasoningReplayRequiredKVReadAndSlidingExpire(t *testing.T) {
 	ClearCodexReasoningReplayCache()
 	t.Cleanup(ClearCodexReasoningReplayCache)
 	client := newFakeCodexReasoningReplayKVClient()
@@ -169,7 +176,7 @@ func TestCodexReasoningReplayRequiredHomeReadAndSlidingExpire(t *testing.T) {
 	}
 }
 
-func TestCodexReasoningReplayRequiredHomeFailures(t *testing.T) {
+func TestCodexReasoningReplayRequiredKVFailures(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		client *fakeCodexReasoningReplayKVClient
@@ -196,7 +203,7 @@ func TestCodexReasoningReplayRequiredHomeFailures(t *testing.T) {
 	}
 }
 
-func TestCodexReasoningReplayBestEffortHomeWriteFailureDoesNotUseLocalCache(t *testing.T) {
+func TestCodexReasoningReplayBestEffortKVWriteFailureDoesNotUseLocalCache(t *testing.T) {
 	ClearCodexReasoningReplayCache()
 	t.Cleanup(ClearCodexReasoningReplayCache)
 	client := newFakeCodexReasoningReplayKVClient()

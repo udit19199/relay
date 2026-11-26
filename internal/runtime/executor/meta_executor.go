@@ -108,9 +108,6 @@ func (e *MetaExecutor) HttpRequest(ctx context.Context, auth *cliproxyauth.Auth,
 // Refresh mints an API key from a DCA token if needed.
 func (e *MetaExecutor) Refresh(ctx context.Context, auth *cliproxyauth.Auth) (*cliproxyauth.Auth, error) {
 	log.Debugf("meta executor: refresh called")
-	if refreshed, handled, err := helps.RefreshAuthViaHome(ctx, e.cfg, auth); handled {
-		return refreshed, err
-	}
 	if auth == nil {
 		return nil, statusErr{code: http.StatusInternalServerError, msg: "meta executor: auth is nil"}
 	}

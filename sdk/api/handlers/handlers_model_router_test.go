@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	internalconfig "github.com/router-for-me/CLIProxyAPI/v8/internal/config"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	coreexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
 	sdkconfig "github.com/router-for-me/CLIProxyAPI/v8/sdk/config"
@@ -245,39 +244,6 @@ func TestHandlerModelRouterDirectExecutorRunsAfterAuthInterceptor(t *testing.T) 
 	}
 	if string(host.lastOptions.OriginalRequest) != `{"after":true}` {
 		t.Fatalf("original request = %q, want after-auth body", host.lastOptions.OriginalRequest)
-	}
-}
-
-func TestHandlerModelRouterPluginExecutorFailsClosedWhenHomeEnabled(t *testing.T) {
-	originalModel := "home-plugin-route"
-	targetPluginID := "plugin-executor"
-	host := &handlerDirectExecutorRouteHost{}
-	host.hasRouters = true
-	host.route = func(context.Context, pluginapi.ModelRouteRequest) (pluginapi.ModelRouteResponse, bool) {
-		return pluginapi.ModelRouteResponse{Handled: true, TargetKind: pluginapi.ModelRouteTargetExecutor, Target: targetPluginID}, true
-	}
-	manager := coreauth.NewManager(nil, nil, nil)
-	manager.SetConfig(&internalconfig.Config{Home: internalconfig.HomeConfig{Enabled: true}})
-	handler := NewBaseAPIHandlers(&sdkconfig.SDKConfig{}, manager)
-	handler.SetModelRouterHost(host)
-
-	body, _, errMsg := handler.ExecuteWithAuthManager(context.Background(), "openai", originalModel, []byte(`{"model":"home-plugin-route"}`), "")
-	if body != nil || errMsg == nil || errMsg.StatusCode != http.StatusServiceUnavailable {
-		t.Fatalf("ExecuteWithAuthManager() = %q, %#v; want 503", body, errMsg)
-	}
-	body, _, errMsg = handler.ExecuteCountWithAuthManager(context.Background(), "openai", originalModel, []byte(`{"model":"home-plugin-route"}`), "")
-	if body != nil || errMsg == nil || errMsg.StatusCode != http.StatusServiceUnavailable {
-		t.Fatalf("ExecuteCountWithAuthManager() = %q, %#v; want 503", body, errMsg)
-	}
-	data, _, errors := handler.ExecuteStreamWithAuthManager(context.Background(), "openai", originalModel, []byte(`{"model":"home-plugin-route","stream":true}`), "")
-	if data != nil {
-		t.Fatalf("ExecuteStreamWithAuthManager() data = %v, want nil", data)
-	}
-	if errMsg = <-errors; errMsg == nil || errMsg.StatusCode != http.StatusServiceUnavailable {
-		t.Fatalf("ExecuteStreamWithAuthManager() error = %#v, want 503", errMsg)
-	}
-	if host.lastPluginID != "" {
-		t.Fatalf("plugin executor was invoked with %q while Home was enabled", host.lastPluginID)
 	}
 }
 

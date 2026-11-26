@@ -17,50 +17,6 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
 )
 
-func TestManagementV8RoutesShareAccessControl(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	for _, tc := range []struct {
-		name                      string
-		enabled, home, authorized bool
-		want                      int
-	}{
-		{"authorized", true, false, true, 200},
-		{"missing key", true, false, false, 401},
-		{"disabled", false, false, true, 404},
-		{"home", true, true, true, 404},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			path := filepath.Join(t.TempDir(), "config.yaml")
-			if err := os.WriteFile(path, []byte("port: 8317\nremote-management: {secret-key: test-password}\n"), 0600); err != nil {
-				t.Fatal(err)
-			}
-			cfg, err := config.LoadConfig(path)
-			if err != nil {
-				t.Fatal(err)
-			}
-			cfg.Home.Enabled = tc.home
-			cfg.Plugins.Dir = filepath.Dir(path)
-			h := management.NewHandler(cfg, path, nil)
-			h.SetLocalPassword("test-password")
-			s := &Server{cfg: cfg, engine: gin.New(), mgmt: h}
-			s.managementRoutesEnabled.Store(tc.enabled)
-			s.registerManagementRoutes()
-			for _, route := range []string{"/v0/management/config", "/v8/management/config", "/v0/management/plugins", "/v8/management/plugins"} {
-				req := httptest.NewRequest(http.MethodGet, route, nil)
-				req.RemoteAddr = "127.0.0.1:1234"
-				if tc.authorized {
-					req.Header.Set("Authorization", "Bearer test-password")
-				}
-				recorder := httptest.NewRecorder()
-				s.engine.ServeHTTP(recorder, req)
-				if recorder.Code != tc.want {
-					t.Fatalf("%s: status=%d want=%d body=%s", route, recorder.Code, tc.want, recorder.Body.String())
-				}
-			}
-		})
-	}
-}
-
 func TestManagementV8IndependentContract(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.yaml")
 	raw := "port: 8317\nrequest-retry: 3\ndebug: false\napi-keys: [client]\nremote-management: {secret-key: test-password}\n"

@@ -13,6 +13,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// CloseAllExecutionSessionsID asks an executor to release all active execution sessions.
+// Executors that do not support this marker may ignore it.
+const CloseAllExecutionSessionsID = "__all_execution_sessions__"
+
 // SetRetryConfig updates additional credential retry rounds, the per-round credential limit, and the cooldown wait interval.
 func (m *Manager) SetRetryConfig(retry int, maxRetryInterval time.Duration, maxRetryCredentials int) {
 	if m == nil {
@@ -679,15 +683,6 @@ func (m *Manager) RemoveIf(ctx context.Context, id string, predicate func(*Auth)
 	m.notifyAuthChangeLocked(id)
 	if m.modelPoolOffsets != nil {
 		delete(m.modelPoolOffsets, id)
-	}
-	for sessionID, sessionAuths := range m.homeRuntimeAuths {
-		if sessionAuths == nil {
-			continue
-		}
-		delete(sessionAuths, id)
-		if len(sessionAuths) == 0 {
-			delete(m.homeRuntimeAuths, sessionID)
-		}
 	}
 	if m.authEpochs == nil {
 		m.authEpochs = make(map[string]uint64)

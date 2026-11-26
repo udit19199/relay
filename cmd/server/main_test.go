@@ -6,31 +6,6 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
 )
 
-func TestArgvEnablesBoolFlag(t *testing.T) {
-	tests := []struct {
-		name string
-		args []string
-		flag string
-		want bool
-	}{
-		{name: "bare long flag", args: []string{"--discover-json"}, flag: "discover-json", want: true},
-		{name: "assigned true", args: []string{"--discover-json=true"}, flag: "discover-json", want: true},
-		{name: "assigned false", args: []string{"--discover-json=false"}, flag: "discover-json", want: false},
-		{name: "does not match timeout", args: []string{"--discover-timeout", "3"}, flag: "discover", want: false},
-		{name: "bare discover", args: []string{"--discover"}, flag: "discover", want: true},
-		{name: "stops at terminator", args: []string{"--", "--discover-json"}, flag: "discover-json", want: false},
-		{name: "stops at non-flag", args: []string{"foo", "--discover-json"}, flag: "discover-json", want: false},
-		{name: "skips config value", args: []string{"--config", "config.yaml", "--discover-json"}, flag: "discover-json", want: true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := argvEnablesBoolFlag(tt.args, tt.flag); got != tt.want {
-				t.Fatalf("argvEnablesBoolFlag(%v, %q) = %t, want %t", tt.args, tt.flag, got, tt.want)
-			}
-		})
-	}
-}
-
 func TestShouldEnableExampleAPIKeySafeMode(t *testing.T) {
 	cfgWithExampleKey := &config.Config{
 		SDKConfig: config.SDKConfig{
@@ -48,7 +23,6 @@ func TestShouldEnableExampleAPIKeySafeMode(t *testing.T) {
 		cfg                *config.Config
 		commandMode        bool
 		cloudConfigMissing bool
-		homeMode           bool
 		want               bool
 	}{
 		{
@@ -61,12 +35,6 @@ func TestShouldEnableExampleAPIKeySafeMode(t *testing.T) {
 			cfg:         cfgWithExampleKey,
 			commandMode: true,
 			want:        false,
-		},
-		{
-			name:     "home mode is not blocked",
-			cfg:      cfgWithExampleKey,
-			homeMode: true,
-			want:     false,
 		},
 		{
 			name:               "cloud standby without config is not blocked",
@@ -88,54 +56,9 @@ func TestShouldEnableExampleAPIKeySafeMode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := shouldEnableExampleAPIKeySafeMode(tt.cfg, tt.commandMode, tt.cloudConfigMissing, tt.homeMode)
+			got := shouldEnableExampleAPIKeySafeMode(tt.cfg, tt.commandMode, tt.cloudConfigMissing)
 			if got != tt.want {
 				t.Fatalf("shouldEnableExampleAPIKeySafeMode() = %t, want %t", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestHomeConfigPayloadPortApplication(t *testing.T) {
-	tests := []struct {
-		name     string
-		yamlBody string
-		wantPort int
-	}{
-		{
-			name:     "custom port honored",
-			yamlBody: "port: 9090\n",
-			wantPort: 9090,
-		},
-		{
-			name:     "custom port 8327 honored",
-			yamlBody: "port: 8327\n",
-			wantPort: 8327,
-		},
-		{
-			name:     "missing port defaults to 8317",
-			yamlBody: "debug: true\n",
-			wantPort: 8317,
-		},
-		{
-			name:     "standard port 8317 preserved",
-			yamlBody: "port: 8317\n",
-			wantPort: 8317,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			parsed, errParse := config.ParseConfigBytes([]byte(tt.yamlBody))
-			if errParse != nil {
-				t.Fatalf("ParseConfigBytes() error = %v", errParse)
-			}
-			if parsed == nil {
-				parsed = &config.Config{}
-			}
-			parsed.Port = config.NormalizeHomePort(parsed.Port)
-			if parsed.Port != tt.wantPort {
-				t.Fatalf("parsed.Port = %d, want %d", parsed.Port, tt.wantPort)
 			}
 		})
 	}

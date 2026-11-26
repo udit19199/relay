@@ -46,7 +46,7 @@ func (e *AntigravityExecutor) Execute(ctx context.Context, auth *cliproxyauth.Au
 	baseModel := thinking.ParseSuffix(req.Model).ModelName
 	if !antigravityCoolingDisabled(auth, e.cfg) {
 		if inCooldown, remaining, errCooldown := antigravityIsInShortCooldownRequired(ctx, auth, baseModel, time.Now()); errCooldown != nil {
-			return resp, homeKVUnavailableStatusErr(errCooldown)
+			return resp, kvUnavailableStatusErr(errCooldown)
 		} else if inCooldown && !antigravityShouldBypassShortCooldown(ctx, e.cfg) {
 			log.Debugf("antigravity executor: auth %s in short cooldown for model %s (%s remaining), returning 429 to switch auth", auth.ID, baseModel, remaining)
 			d := remaining
@@ -166,7 +166,7 @@ func (e *AntigravityExecutor) Execute(ctx context.Context, auth *cliproxyauth.Au
 			closeAntigravityAuthIdleTransports(auth)
 			if decision.retryAfter != nil && *decision.retryAfter > 0 && !antigravityCoolingDisabled(auth, e.cfg) {
 				if errMarkCooldown := markAntigravityShortCooldownRequired(ctx, auth, baseModel, time.Now(), *decision.retryAfter); errMarkCooldown != nil {
-					err = homeKVUnavailableStatusErr(errMarkCooldown)
+					err = kvUnavailableStatusErr(errMarkCooldown)
 					return resp, err
 				}
 				log.Debugf("antigravity executor: short quota cooldown (%s) for model %s, recorded cooldown", *decision.retryAfter, baseModel)
@@ -272,7 +272,7 @@ func (e *AntigravityExecutor) executeClaudeNonStream(ctx context.Context, auth *
 	baseModel := thinking.ParseSuffix(req.Model).ModelName
 	if !antigravityCoolingDisabled(auth, e.cfg) {
 		if inCooldown, remaining, errCooldown := antigravityIsInShortCooldownRequired(ctx, auth, baseModel, time.Now()); errCooldown != nil {
-			return resp, homeKVUnavailableStatusErr(errCooldown)
+			return resp, kvUnavailableStatusErr(errCooldown)
 		} else if inCooldown && !antigravityShouldBypassShortCooldown(ctx, e.cfg) {
 			log.Debugf("antigravity executor: auth %s in short cooldown for model %s (%s remaining), returning 429 to switch auth", auth.ID, baseModel, remaining)
 			d := remaining
@@ -395,7 +395,7 @@ func (e *AntigravityExecutor) executeClaudeNonStream(ctx context.Context, auth *
 				closeAntigravityAuthIdleTransports(auth)
 				if decision.retryAfter != nil && *decision.retryAfter > 0 && !antigravityCoolingDisabled(auth, e.cfg) {
 					if errMarkCooldown := markAntigravityShortCooldownRequired(ctx, auth, baseModel, time.Now(), *decision.retryAfter); errMarkCooldown != nil {
-						err = homeKVUnavailableStatusErr(errMarkCooldown)
+						err = kvUnavailableStatusErr(errMarkCooldown)
 						return resp, err
 					}
 					log.Debugf("antigravity executor: short quota cooldown (%s) for model %s, recorded cooldown", *decision.retryAfter, baseModel)

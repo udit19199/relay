@@ -220,51 +220,18 @@ func (h *Handler) Handle(c *gin.Context) {
 		OriginalRequest: body,
 	}
 	ctx = handlers.EnrichContextWithSessionHierarchy(ctx, selectionOpts.Headers, body, nil)
-	selection, selected, errSelect := h.selectOAuth(ctx, model, selectionOpts)
+	selected, errSelect := h.selectOAuth(ctx, model, selectionOpts)
 	if errSelect != nil {
 		writeSelectionError(c, errSelect)
 		return
 	}
 	if selected == nil {
-		if selection != nil {
-			selection.End("missing_auth")
-		}
 		writeLiveError(c, http.StatusServiceUnavailable, "Codex auth unavailable")
 		return
 	}
-	if selection != nil && selection.CanonicalSessionID != "" {
-		meta := logging.GetClientRequestMetadata(ctx)
-		meta.SessionID = selection.CanonicalSessionID
-		if selection.ParentSessionID != "" {
-			meta.ParentSessionID = selection.ParentSessionID
-		} else {
-			meta.ParentSessionID = ""
-		}
-		if meta.SessionID == meta.ParentSessionID {
-			meta.ParentSessionID = ""
-		}
-		ctx = logging.WithClientRequestMetadata(ctx, meta)
-	}
 
-	if selection != nil {
-		attemptCtx, releaseAttempt, errAttempt := selection.AttemptContext(ctx)
-		if errAttempt != nil {
-			selection.End("attempt_bind_failed")
-			writeLiveError(c, http.StatusServiceUnavailable, errAttempt.Error())
-			return
-		}
-		ctx = attemptCtx
-		defer releaseAttempt()
-	}
 	selectedIndex := selected.EnsureIndex()
 	logging.SetGinCPATraceID(c, selectedIndex)
-	if selection != nil {
-		defer func() {
-			if selection.Active() && !selection.Retained() {
-				selection.End("request_closed")
-			}
-		}()
-	}
 
 	if mediaRelay != nil {
 		clientOffer, errSDP := callRequestSDP(upstreamBody, upstreamContentType)
@@ -321,17 +288,11 @@ func (h *Handler) Handle(c *gin.Context) {
 	}
 
 	if errContext := ctx.Err(); errContext != nil {
-		if selection != nil {
-			selection.End("attempt_canceled")
-		}
 		writeLiveError(c, clienterror.HTTPStatusFromErrorOr(errContext, http.StatusRequestTimeout), errContext.Error())
 		return
 	}
 	resp, errRequest := performRequest(selected)
 	if errRequest != nil {
-		if selection != nil {
-			selection.End("request_failed")
-		}
 		helps.RecordAPIResponseError(ctx, runtimeConfig, errRequest)
 		writeLiveError(c, clienterror.HTTPStatusFromErrorOr(errRequest, http.StatusBadGateway), errRequest.Error())
 		return
@@ -348,25 +309,12 @@ func (h *Handler) Handle(c *gin.Context) {
 		return closeResponseErr
 	}
 	defer func() { _ = closeResponseBody() }()
-	if selection != nil {
-		if errBind := selection.Bind(closeResponseBody); errBind != nil {
-			if resp.StatusCode == http.StatusUnauthorized {
-				h.authManager.ReportHomeUnauthorized(ctx, selected, "codex", model)
-			}
-			selection.End("response_bind_failed")
-			writeLiveError(c, http.StatusServiceUnavailable, errBind.Error())
-			return
-		}
-	}
 
 	responseHeaders := callResponseHeaders(resp.Header)
 	helps.RecordAPIResponseMetadata(ctx, runtimeConfig, resp.StatusCode, responseHeaders)
 	responseBody, errResponse := readLimitedBody(resp.Body)
 	if errResponse != nil {
 		helps.AppendAPIResponseChunk(ctx, runtimeConfig, responseBody)
-		if selection != nil && resp.StatusCode == http.StatusUnauthorized {
-			h.authManager.ReportHomeUnauthorized(ctx, selected, "codex", model, responseBody)
-		}
 		helps.RecordAPIResponseError(ctx, runtimeConfig, errResponse)
 		message := "Failed to read Codex live response"
 		status := clienterror.HTTPStatusFromErrorOr(errResponse, http.StatusBadGateway)
@@ -378,10 +326,6 @@ func (h *Handler) Handle(c *gin.Context) {
 		return
 	}
 	helps.AppendAPIResponseChunk(ctx, runtimeConfig, responseBody)
-	if selection != nil && resp.StatusCode == http.StatusUnauthorized {
-		h.authManager.ReportHomeUnauthorized(ctx, selected, "codex", model, responseBody)
-		log.WithField("status", resp.StatusCode).Warnf("codex live upstream request failed: %s", logging.SafeDiagnosticForLog(string(responseBody)))
-	}
 	responseBodyToWrite := responseBody
 	success := resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices
 	callID := ""
@@ -428,28 +372,6 @@ func (h *Handler) Handle(c *gin.Context) {
 			if principal, ok := c.Get(ClientSecretPrincipalContextKey); ok {
 				session.clientSecretPrincipal, _ = principal.(string)
 			}
-			if selection != nil {
-				if mediaSession != nil {
-					if errBind := selection.Bind(func() error {
-						return mediaSession.CloseWithReason("home_selection_closed")
-					}); errBind != nil {
-						selection.End("media_bind_failed")
-						writeLiveError(c, http.StatusServiceUnavailable, errBind.Error())
-						return
-					}
-				}
-				if errBind := selection.Bind(func() error {
-					// End outside the resource closer to avoid waiting on the closer itself.
-					go selection.End("session_drained")
-					return nil
-				}); errBind != nil {
-					selection.End("session_drain_bind_failed")
-					writeLiveError(c, http.StatusServiceUnavailable, errBind.Error())
-					return
-				}
-				selection.Retain()
-				session.homeSelection = selection
-			}
 			storedSession = h.sessions.put(callID, session)
 			sessionStored = storedSession.callID != ""
 			if mediaSession != nil {
@@ -486,22 +408,8 @@ func mediaCredentialName(selected *auth.Auth, authIndex string) string {
 	return strings.TrimSpace(authIndex)
 }
 
-func (h *Handler) selectOAuth(ctx context.Context, model string, opts coreexecutor.Options) (*auth.HomeDispatchSelection, *auth.Auth, error) {
-	var selection *auth.HomeDispatchSelection
-	var selected *auth.Auth
-	var errSelect error
-	if h.authManager.HomeEnabled() {
-		selection, errSelect = h.authManager.SelectHomeAuthByKind(ctx, "codex", model, auth.AuthKindOAuth, opts)
-		if selection != nil {
-			selected = selection.CloneAuth()
-		}
-	} else {
-		selected, errSelect = h.authManager.SelectAuthByKind(ctx, "codex", "", auth.AuthKindOAuth, opts)
-	}
-	if errSelect != nil && selection != nil {
-		selection.End("selection_failed")
-	}
-	return selection, selected, errSelect
+func (h *Handler) selectOAuth(ctx context.Context, model string, opts coreexecutor.Options) (*auth.Auth, error) {
+	return h.authManager.SelectAuthByKind(ctx, "codex", "", auth.AuthKindOAuth, opts)
 }
 
 var errBodyTooLarge = errors.New("Codex live request body too large")

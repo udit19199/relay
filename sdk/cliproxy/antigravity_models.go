@@ -241,7 +241,7 @@ func (s *Service) fetchAntigravityModelCapabilityHintsForAuth(ctx context.Contex
 // Return the key captured with the HTTP User-Agent so publication cannot label a
 // result with a version resolved before or after the actual probe snapshot.
 func (s *Service) fetchAntigravityModelCapabilityHints(ctx context.Context, auth *coreauth.Auth) (string, antigravityModelCapabilityHints) {
-	if auth == nil || auth.Metadata == nil || s.antigravityHomeEnabled() {
+	if auth == nil || auth.Metadata == nil {
 		return "", antigravityModelCapabilityHints{}
 	}
 	if ctx == nil {
@@ -476,19 +476,10 @@ func (s *Service) reconcileRegisteredModelStates(ctx context.Context, auth *core
 	if auth == nil || s.coreManager == nil {
 		return
 	}
-	if strings.EqualFold(auth.Provider, "antigravity") && !s.antigravityHomeEnabled() {
+	if strings.EqualFold(auth.Provider, "antigravity") {
 		return
 	}
 	s.coreManager.ReconcileRegistryModelStates(ctx, auth.ID)
-}
-
-func (s *Service) antigravityHomeEnabled() bool {
-	if s == nil {
-		return false
-	}
-	s.cfgMu.RLock()
-	defer s.cfgMu.RUnlock()
-	return s.cfg != nil && s.cfg.Home.Enabled
 }
 
 func filterAntigravityModels(models []*ModelInfo, hints antigravityModelCapabilityHints) []*ModelInfo {
@@ -547,7 +538,7 @@ func antigravityAuthModelSettingsEqual(a, b *coreauth.Auth) bool {
 }
 
 func (s *Service) applyAntigravityModelHints(ctx context.Context, auth *coreauth.Auth, providerKey string, hints antigravityModelCapabilityHints, expectedKey string, expectedEpoch, expectedRegEpoch uint64) {
-	if ctx.Err() != nil || s.antigravityHomeEnabled() || s.antigravityCapabilityKey(auth) != expectedKey {
+	if ctx.Err() != nil || s.antigravityCapabilityKey(auth) != expectedKey {
 		return
 	}
 	if hints.ModelIDs == nil && len(hints.WebSearchModelIDs) == 0 {
@@ -603,7 +594,7 @@ func (s *Service) applyAntigravityModelHints(ctx context.Context, auth *coreauth
 // One unfinished request must not block other accounts' retry or expiry deadlines.
 // Network concurrency remains bounded by antigravityProbeSlots.
 func (s *Service) refreshAntigravityModels(ctx context.Context) {
-	if s == nil || s.coreManager == nil || s.antigravityHomeEnabled() {
+	if s == nil || s.coreManager == nil {
 		return
 	}
 	if ctx == nil {
@@ -647,7 +638,7 @@ func (s *Service) scheduleAntigravityModelRefresh(ctx context.Context, auth *cor
 func (s *Service) nextAntigravityModelRefreshDelay() time.Duration {
 	now := antigravityNowFunc()
 	next := now.Add(antigravityRefreshScanInterval)
-	if s == nil || s.coreManager == nil || s.antigravityHomeEnabled() {
+	if s == nil || s.coreManager == nil {
 		return antigravityRefreshScanInterval
 	}
 	for _, auth := range s.coreManager.List() {

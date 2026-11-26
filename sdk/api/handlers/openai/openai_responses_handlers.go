@@ -876,13 +876,11 @@ func (h *OpenAIResponsesAPIHandler) prepareCodexMultiAgentV2ToolsDoc(c *gin.Cont
 	if c != nil && c.Request != nil {
 		requestHeaders = c.Request.Header
 	}
-	homeEnabled := h.AuthManager != nil && h.AuthManager.HomeEnabled()
 	changed, prepared := multiagentv2.PrepareCodexMultiAgentV2ToolsDoc(
 		doc,
 		requestCtx,
 		requestHeaders,
 		cfg.Client.Codex.OptimizeMultiAgentV2,
-		homeEnabled,
 	)
 	if prepared && c != nil {
 		c.Set(multiagentv2.CodexMultiAgentV2ToolsPreparedContextKey, true)

@@ -169,7 +169,7 @@ func (s *Service) commitConfigUpdate(newCfg *config.Config) configCommit {
 	s.cfgMu.Unlock()
 	s.cancelStaleAntigravityProbes("")
 	s.configSequence++
-	registry.UpdateModelCatalogSources(newCfg.Models, newCfg.Home.Enabled)
+	registry.UpdateModelCatalogSources(newCfg.Models)
 	return configCommit{cfg: newCfg, sequence: s.configSequence}
 }
 
@@ -209,7 +209,6 @@ func (s *Service) applyConfigRuntime(ctx context.Context, commit configCommit, s
 	if !s.applyPprofConfigContext(ctx, cfg) {
 		return false
 	}
-	s.applyDiscoveryConfigContext(ctx, cfg)
 	if s.kvStoreManaged.Load() {
 		s.applyKVStoreConfig(cfg)
 	}
@@ -233,7 +232,7 @@ func (s *Service) applyConfigRuntime(ctx context.Context, commit configCommit, s
 		auths = s.coreManager.List()
 	}
 	s.registerAvailableExecutors(registrationCtx, executorRegistrationOptions{
-		includeBaseline:   cfg.Home.Enabled,
+		includeBaseline:   false,
 		forceReplaceAuths: true,
 		auths:             auths,
 	})
@@ -246,7 +245,7 @@ func (s *Service) applyConfigRuntime(ctx context.Context, commit configCommit, s
 	if errContext := ctx.Err(); errContext != nil {
 		return false
 	}
-	if s.coreManager != nil && !cfg.Home.Enabled && cfg.SaveCooldownStatus {
+	if s.coreManager != nil && cfg.SaveCooldownStatus {
 		if errRestoreCooldown := s.coreManager.RestoreCooldownStates(registrationCtx); errRestoreCooldown != nil && ctx.Err() == nil {
 			log.Warnf("failed to restore cooldown state after config update: %v", errRestoreCooldown)
 		}

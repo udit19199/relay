@@ -254,49 +254,6 @@ func TestRedisProtocol_ManagementDisabled_RejectsConnection(t *testing.T) {
 	}
 }
 
-func TestRedisProtocol_HomeEnabled_DisablesConnection(t *testing.T) {
-	t.Setenv("MANAGEMENT_PASSWORD", "test-management-password")
-	redisqueue.SetEnabled(false)
-	t.Cleanup(func() { redisqueue.SetEnabled(false) })
-
-	server := newTestServer(t)
-	if !server.managementRoutesEnabled.Load() {
-		t.Fatalf("expected managementRoutesEnabled to be true")
-	}
-	if server.cfg == nil {
-		t.Fatalf("expected server cfg to be non-nil")
-	}
-	server.cfg.Home.Enabled = true
-	redisqueue.SetEnabled(true)
-
-	addr, stop := startRedisMuxListener(t, server)
-	t.Cleanup(stop)
-
-	conn, errDial := net.DialTimeout("tcp", addr, time.Second)
-	if errDial != nil {
-		t.Fatalf("failed to dial redis listener: %v", errDial)
-	}
-	t.Cleanup(func() { _ = conn.Close() })
-
-	_ = conn.SetDeadline(time.Now().Add(2 * time.Second))
-	_ = writeTestRESPCommand(conn, "PING")
-
-	if msg, err := readTestRESPError(bufio.NewReader(conn)); err != nil {
-		t.Fatalf("failed to read home-mode RESP error: %v", err)
-	} else if msg != "ERR redis usage output disabled in home mode" {
-		t.Fatalf("unexpected disabled RESP error: %q", msg)
-	}
-
-	buf := make([]byte, 1)
-	_, errRead := conn.Read(buf)
-	if errRead == nil {
-		t.Fatalf("expected connection to be closed after home-mode RESP error")
-	}
-	if ne, ok := errRead.(net.Error); ok && ne.Timeout() {
-		t.Fatalf("expected connection to be closed after home-mode RESP error, got timeout: %v", errRead)
-	}
-}
-
 func TestRedisProtocol_SUBSCRIBE_UsageSendsSupportRefresh(t *testing.T) {
 	const managementPassword = "test-management-password"
 

@@ -128,7 +128,6 @@ func (h *Handler) ListAuthFiles(c *gin.Context) {
 	}
 	auths := h.authManager.List()
 	observedAt := time.Now().UTC()
-	cooldownsKnown := !h.authManager.HomeEnabled()
 	if pagination.enabled {
 		matching := make([]*coreauth.Auth, 0, len(auths))
 		for _, auth := range auths {
@@ -145,10 +144,7 @@ func (h *Handler) ListAuthFiles(c *gin.Context) {
 		files := make([]gin.H, 0, end-start)
 		for _, auth := range matching[start:end] {
 			if entry := h.buildAuthFileEntry(auth, quota); entry != nil {
-				entry["cooldowns"] = nil
-				if cooldownsKnown {
-					entry["cooldowns"] = coreauth.CooldownSnapshotForAuth(auth, observedAt)
-				}
+				entry["cooldowns"] = coreauth.CooldownSnapshotForAuth(auth, observedAt)
 				files = append(files, entry)
 			}
 		}
@@ -161,10 +157,7 @@ func (h *Handler) ListAuthFiles(c *gin.Context) {
 			continue
 		}
 		if entry := h.buildAuthFileEntry(auth, quota); entry != nil {
-			entry["cooldowns"] = nil
-			if cooldownsKnown {
-				entry["cooldowns"] = coreauth.CooldownSnapshotForAuth(auth, observedAt)
-			}
+			entry["cooldowns"] = coreauth.CooldownSnapshotForAuth(auth, observedAt)
 			files = append(files, entry)
 		}
 	}

@@ -68,7 +68,6 @@ func TestServiceCatalogStartupAndConfigReload(t *testing.T) {
 		restoreCtx, restoreCancel := context.WithCancel(context.Background())
 		defer restoreCancel()
 		restoreCfg := *cfg
-		restoreCfg.Home.Enabled = false
 		restoreCfg.Models = config.ModelCatalogs{
 			Catalog:      fixture("models.json"),
 			CodexCatalog: fixture("codex_client_models.json"),

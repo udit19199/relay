@@ -214,10 +214,6 @@ func (s *Server) managementAvailable(c *gin.Context) bool {
 		c.AbortWithStatus(http.StatusNotFound)
 		return false
 	}
-	if cfg.Home.Enabled {
-		c.AbortWithStatus(http.StatusNotFound)
-		return false
-	}
 	if !s.managementRoutesEnabled.Load() {
 		c.AbortWithStatus(http.StatusNotFound)
 		return false
@@ -296,7 +292,7 @@ func (s *Server) pluginResourceNoRoute(c *gin.Context) {
 		return
 	}
 	cfg := s.getConfig()
-	if cfg == nil || cfg.Home.Enabled || s.pluginHost == nil {
+	if cfg == nil || s.pluginHost == nil {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}
@@ -309,7 +305,7 @@ func (s *Server) pluginResourceNoRoute(c *gin.Context) {
 
 func (s *Server) serveManagementControlPanel(c *gin.Context) {
 	cfg := s.getConfig()
-	if cfg == nil || cfg.Home.Enabled || cfg.RemoteManagement.DisableControlPanel {
+	if cfg == nil || cfg.RemoteManagement.DisableControlPanel {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}

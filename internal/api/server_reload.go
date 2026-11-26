@@ -78,12 +78,6 @@ func (s *Server) UpdateClientsContext(ctx context.Context, cfg *config.Config) b
 		}
 	}
 
-	if oldCfg == nil || oldCfg.Home.Enabled != cfg.Home.Enabled {
-		if setter, ok := s.requestLogger.(interface{ SetHomeEnabled(bool) }); ok {
-			setter.SetHomeEnabled(cfg.Home.Enabled)
-		}
-	}
-
 	if oldCfg == nil || oldCfg.LoggingToFile != cfg.LoggingToFile || oldCfg.LogsMaxTotalSizeMB != cfg.LogsMaxTotalSizeMB {
 		if err := logging.ConfigureLogOutput(cfg); err != nil {
 			log.Errorf("failed to reconfigure log output: %v", err)
@@ -168,7 +162,7 @@ func (s *Server) UpdateClientsContext(ctx context.Context, cfg *config.Config) b
 			s.managementRoutesEnabled.Store(!newSecretEmpty)
 		}
 	}
-	redisqueue.SetEnabled(s.managementRoutesEnabled.Load() || (cfg != nil && cfg.Home.Enabled))
+	redisqueue.SetEnabled(s.managementRoutesEnabled.Load())
 
 	exampleAPIKeySafeModeRequired := s.exampleAPIKeySafeModeRequired(cfg)
 	if exampleAPIKeySafeModeRequired {
@@ -218,7 +212,7 @@ func (s *Server) UpdateClientsContext(ctx context.Context, cfg *config.Config) b
 
 	// Count client sources from configuration and auth store.
 	authEntries := 0
-	if cfg != nil && !cfg.Home.Enabled {
+	if cfg != nil {
 		tokenStore := sdkAuth.GetTokenStore()
 		if dirSetter, ok := tokenStore.(interface{ SetBaseDir(string) }); ok {
 			dirSetter.SetBaseDir(cfg.AuthDir)

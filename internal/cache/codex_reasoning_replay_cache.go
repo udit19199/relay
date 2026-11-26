@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/MoeForge/moego/ojson"
-	homekv "github.com/router-for-me/CLIProxyAPI/v8/internal/home"
+	kvstore "github.com/router-for-me/CLIProxyAPI/v8/internal/kvstore"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/signature"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
 	log "github.com/sirupsen/logrus"
@@ -49,14 +49,14 @@ var (
 
 type codexReasoningReplayKVClient interface {
 	KVGet(ctx context.Context, key string) ([]byte, bool, error)
-	KVSet(ctx context.Context, key string, value []byte, opts homekv.KVSetOptions) (bool, error)
+	KVSet(ctx context.Context, key string, value []byte, opts kvstore.KVSetOptions) (bool, error)
 	KVCompareAndSwap(ctx context.Context, key string, expected []byte, expectedExists bool, value []byte, ttl time.Duration) (bool, error)
 	KVDel(ctx context.Context, keys ...string) (int64, error)
 	KVExpire(ctx context.Context, key string, ttl time.Duration) (bool, error)
 }
 
 var currentCodexReasoningReplayKVClient = func() (codexReasoningReplayKVClient, bool, error) {
-	return homekv.CurrentKVClient()
+	return kvstore.CurrentKVClient()
 }
 
 // CacheCodexReasoningReplayItem stores a final GPT/Codex reasoning item for
@@ -82,7 +82,7 @@ func CacheCodexReasoningReplayItemsBestEffort(ctx context.Context, modelName, se
 	if !ok {
 		return false
 	}
-	if client, homeMode, errClient := currentCodexReasoningReplayKVClient(); homeMode {
+	if client, kvMode, errClient := currentCodexReasoningReplayKVClient(); kvMode {
 		if errClient != nil {
 			log.Errorf("home kv best-effort codex reasoning replay set failed prefix=cpa:codex:*: %v", errClient)
 			return false
@@ -92,7 +92,7 @@ func CacheCodexReasoningReplayItemsBestEffort(ctx context.Context, modelName, se
 			log.Errorf("home kv best-effort codex reasoning replay set failed prefix=cpa:codex:*: %v", errMarshal)
 			return false
 		}
-		written, errSet := client.KVSet(ctx, codexReasoningReplayKVKey(modelName, sessionKey), raw, homekv.KVSetOptions{EX: CodexReasoningReplayCacheTTL})
+		written, errSet := client.KVSet(ctx, codexReasoningReplayKVKey(modelName, sessionKey), raw, kvstore.KVSetOptions{EX: CodexReasoningReplayCacheTTL})
 		if errSet != nil {
 			log.Errorf("home kv best-effort codex reasoning replay set failed prefix=cpa:codex:*: %v", errSet)
 			return false
@@ -127,7 +127,7 @@ func AppendCodexReasoningReplayItemsBestEffort(ctx context.Context, modelName, s
 	if !ok {
 		return false
 	}
-	if client, homeMode, errClient := currentCodexReasoningReplayKVClient(); homeMode {
+	if client, kvMode, errClient := currentCodexReasoningReplayKVClient(); kvMode {
 		if errClient != nil {
 			log.Errorf("home kv best-effort codex reasoning replay append failed prefix=cpa:codex:*: %v", errClient)
 			return false
@@ -259,8 +259,8 @@ func GetCodexReasoningReplayItemsRequired(ctx context.Context, modelName, sessio
 	if key == "" {
 		return nil, false, nil
 	}
-	client, homeMode, errClient := currentCodexReasoningReplayKVClient()
-	if homeMode {
+	client, kvMode, errClient := currentCodexReasoningReplayKVClient()
+	if kvMode {
 		if errClient != nil {
 			return nil, false, errClient
 		}
@@ -310,8 +310,8 @@ func DeleteCodexReasoningReplayItemRequired(ctx context.Context, modelName, sess
 	if key == "" {
 		return nil
 	}
-	client, homeMode, errClient := currentCodexReasoningReplayKVClient()
-	if homeMode {
+	client, kvMode, errClient := currentCodexReasoningReplayKVClient()
+	if kvMode {
 		if errClient != nil {
 			return errClient
 		}
@@ -343,7 +343,7 @@ func codexReasoningReplayCacheKey(modelName, sessionKey string) string {
 }
 
 func codexReasoningReplayKVKey(modelName, sessionKey string) string {
-	return "cpa:codex:reasoning-replay:" + homekv.HashKeyPart(strings.TrimSpace(modelName)) + ":" + homekv.HashKeyPart(strings.TrimSpace(sessionKey))
+	return "cpa:codex:reasoning-replay:" + kvstore.HashKeyPart(strings.TrimSpace(modelName)) + ":" + kvstore.HashKeyPart(strings.TrimSpace(sessionKey))
 }
 
 func normalizeCodexReasoningReplayItems(items [][]byte) ([][]byte, bool) {

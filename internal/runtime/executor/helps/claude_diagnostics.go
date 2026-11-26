@@ -14,7 +14,7 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/google/uuid"
-	homekv "github.com/router-for-me/CLIProxyAPI/v8/internal/home"
+	kvstore "github.com/router-for-me/CLIProxyAPI/v8/internal/kvstore"
 )
 
 const (
@@ -32,7 +32,7 @@ type claudeSessionDatePinKVClient interface {
 }
 
 var currentClaudeSessionDatePinKVClient = func() (claudeSessionDatePinKVClient, bool, error) {
-	return homekv.CurrentKVClient()
+	return kvstore.CurrentKVClient()
 }
 
 var (

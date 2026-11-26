@@ -118,7 +118,7 @@ func TestCachedUserID_RenewsTTLOnHit(t *testing.T) {
 	}
 }
 
-func TestCachedUserIDRequiredHomeReusesKVAcrossLocalCacheReset(t *testing.T) {
+func TestCachedUserIDRequiredKVReusesKVAcrossLocalCacheReset(t *testing.T) {
 	resetUserIDCache()
 	client := newFakeClaudeIDKVClient()
 	useFakeClaudeIDKVClient(t, client, true, nil)
@@ -149,7 +149,7 @@ func TestCachedUserIDRequiredHomeReusesKVAcrossLocalCacheReset(t *testing.T) {
 	}
 }
 
-func TestCachedUserIDRequiredEmptyAPIKeyDoesNotUseHomeKV(t *testing.T) {
+func TestCachedUserIDRequiredEmptyAPIKeyDoesNotUseKV(t *testing.T) {
 	client := newFakeClaudeIDKVClient()
 	useFakeClaudeIDKVClient(t, client, true, nil)
 
@@ -165,7 +165,7 @@ func TestCachedUserIDRequiredEmptyAPIKeyDoesNotUseHomeKV(t *testing.T) {
 	}
 }
 
-func TestCachedUserIDRequiredHomeKVFailures(t *testing.T) {
+func TestCachedUserIDRequiredKVKVFailures(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		client *fakeClaudeIDKVClient
@@ -185,7 +185,7 @@ func TestCachedUserIDRequiredHomeKVFailures(t *testing.T) {
 	}
 }
 
-func TestCachedUserIDRequiredHomeRequiresReadAfterSet(t *testing.T) {
+func TestCachedUserIDRequiredKVRequiresReadAfterSet(t *testing.T) {
 	client := newFakeClaudeIDKVClient()
 	client.setNoPersist = true
 	useFakeClaudeIDKVClient(t, client, true, nil)

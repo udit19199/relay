@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	homekv "github.com/router-for-me/CLIProxyAPI/v8/internal/home"
+	kvstore "github.com/router-for-me/CLIProxyAPI/v8/internal/kvstore"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -35,12 +35,12 @@ var (
 
 type claudeWebSearchResultKVClient interface {
 	KVGet(ctx context.Context, key string) ([]byte, bool, error)
-	KVSet(ctx context.Context, key string, value []byte, opts homekv.KVSetOptions) (bool, error)
+	KVSet(ctx context.Context, key string, value []byte, opts kvstore.KVSetOptions) (bool, error)
 	KVExpire(ctx context.Context, key string, ttl time.Duration) (bool, error)
 }
 
 var currentClaudeWebSearchResultKVClient = func() (claudeWebSearchResultKVClient, bool, error) {
-	return homekv.CurrentKVClient()
+	return kvstore.CurrentKVClient()
 }
 
 func claudeWebSearchResultKey(sessionKey, toolUseID string) (string, bool) {
@@ -81,12 +81,12 @@ func CacheClaudeWebSearchResultBestEffort(ctx context.Context, sessionKey, toolU
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if client, homeMode, errClient := currentClaudeWebSearchResultKVClient(); homeMode {
+	if client, kvMode, errClient := currentClaudeWebSearchResultKVClient(); kvMode {
 		if errClient != nil {
 			log.Errorf("home kv best-effort claude web search result set failed prefix=cpa:claude:*: %v", errClient)
 			return false
 		}
-		written, errSet := client.KVSet(ctx, "cpa:claude:web-search-result:"+key, bytes.Clone(content), homekv.KVSetOptions{EX: ttl})
+		written, errSet := client.KVSet(ctx, "cpa:claude:web-search-result:"+key, bytes.Clone(content), kvstore.KVSetOptions{EX: ttl})
 		if errSet != nil {
 			log.Errorf("home kv best-effort claude web search result set failed prefix=cpa:claude:*: %v", errSet)
 			return false
@@ -145,7 +145,7 @@ func GetClaudeWebSearchResultRequired(ctx context.Context, sessionKey, toolUseID
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if client, homeMode, errClient := currentClaudeWebSearchResultKVClient(); homeMode {
+	if client, kvMode, errClient := currentClaudeWebSearchResultKVClient(); kvMode {
 		if errClient != nil {
 			return nil, false, errClient
 		}

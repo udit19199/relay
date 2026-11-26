@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	homekv "github.com/router-for-me/CLIProxyAPI/v8/internal/home"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/kvstore"
 	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 )
 
@@ -29,6 +29,23 @@ type fakeClaudeDeviceProfileKVClient struct {
 	lastExpireTTL time.Duration
 }
 
+func (c *fakeClaudeDeviceProfileKVClient) KVSet(_ context.Context, key string, value []byte, opts kvstore.KVSetOptions) (bool, error) {
+	if c.setErr != nil {
+		return false, c.setErr
+	}
+	_, exists := c.values[key]
+	if opts.NX && exists {
+		return false, nil
+	}
+	if opts.XX && !exists {
+		return false, nil
+	}
+	c.setCount++
+	c.lastSetTTL = opts.EX
+	c.values[key] = append([]byte(nil), value...)
+	return true, nil
+}
+
 func newFakeClaudeDeviceProfileKVClient() *fakeClaudeDeviceProfileKVClient {
 	return &fakeClaudeDeviceProfileKVClient{
 		values:      make(map[string][]byte),
@@ -46,16 +63,6 @@ func (c *fakeClaudeDeviceProfileKVClient) KVGet(_ context.Context, key string) (
 		return nil, false, nil
 	}
 	return append([]byte(nil), value...), true, nil
-}
-
-func (c *fakeClaudeDeviceProfileKVClient) KVSet(_ context.Context, key string, value []byte, opts homekv.KVSetOptions) (bool, error) {
-	c.setCount++
-	c.lastSetTTL = opts.EX
-	if c.setErr != nil {
-		return false, c.setErr
-	}
-	c.values[key] = append([]byte(nil), value...)
-	return true, nil
 }
 
 func (c *fakeClaudeDeviceProfileKVClient) KVSetNX(_ context.Context, key string, value []byte, ttl time.Duration) (bool, error) {
@@ -83,11 +90,11 @@ func (c *fakeClaudeDeviceProfileKVClient) KVExpire(_ context.Context, _ string, 
 	return true, nil
 }
 
-func useFakeClaudeDeviceProfileKVClient(t *testing.T, client *fakeClaudeDeviceProfileKVClient, homeMode bool, errClient error) {
+func useFakeClaudeDeviceProfileKVClient(t *testing.T, client *fakeClaudeDeviceProfileKVClient, kvMode bool, errClient error) {
 	t.Helper()
 	previous := currentClaudeDeviceProfileKVClient
 	currentClaudeDeviceProfileKVClient = func() (claudeDeviceProfileKVClient, bool, error) {
-		return client, homeMode, errClient
+		return client, kvMode, errClient
 	}
 	t.Cleanup(func() {
 		currentClaudeDeviceProfileKVClient = previous
@@ -220,7 +227,7 @@ func TestApplyClaudeLegacyDeviceHeadersKeepNewerVersionsUsesConfiguredBaseline(t
 	}
 }
 
-func TestResolveClaudeDeviceProfileRequiredHomeReadWithoutCandidate(t *testing.T) {
+func TestResolveClaudeDeviceProfileRequiredKVReadWithoutCandidate(t *testing.T) {
 	client := newFakeClaudeDeviceProfileKVClient()
 	auth := &cliproxyauth.Auth{ID: "auth-1"}
 	key := claudeDeviceProfileKVKey(auth, "api-key", ClaudeDeviceProfile{})
@@ -248,7 +255,7 @@ func TestResolveClaudeDeviceProfileRequiredHomeReadWithoutCandidate(t *testing.T
 	}
 }
 
-func TestResolveClaudeDeviceProfileRequiredHomeCandidateLocksRereadsAndWrites(t *testing.T) {
+func TestResolveClaudeDeviceProfileRequiredKVCandidateLocksRereadsAndWrites(t *testing.T) {
 	client := newFakeClaudeDeviceProfileKVClient()
 	auth := &cliproxyauth.Auth{ID: "auth-1"}
 	useFakeClaudeDeviceProfileKVClient(t, client, true, nil)
@@ -271,7 +278,7 @@ func TestResolveClaudeDeviceProfileRequiredHomeCandidateLocksRereadsAndWrites(t 
 	}
 }
 
-func TestResolveClaudeDeviceProfileRequiredHomeSeparatesVSCodeAgentSDKFromCLI(t *testing.T) {
+func TestResolveClaudeDeviceProfileRequiredKVSeparatesVSCodeAgentSDKFromCLI(t *testing.T) {
 	client := newFakeClaudeDeviceProfileKVClient()
 	auth := &cliproxyauth.Auth{ID: "auth-home-subclient-isolation"}
 	useFakeClaudeDeviceProfileKVClient(t, client, true, nil)
@@ -308,7 +315,7 @@ func TestResolveClaudeDeviceProfileRequiredHomeSeparatesVSCodeAgentSDKFromCLI(t 
 	}
 }
 
-func TestResolveClaudeDeviceProfileRequiredHomeNormalizesUnmeasuredCachedProfile(t *testing.T) {
+func TestResolveClaudeDeviceProfileRequiredKVNormalizesUnmeasuredCachedProfile(t *testing.T) {
 	client := newFakeClaudeDeviceProfileKVClient()
 	auth := &cliproxyauth.Auth{ID: "auth-1"}
 	key := claudeDeviceProfileKVKey(auth, "api-key", ClaudeDeviceProfile{})
@@ -336,7 +343,7 @@ func TestResolveClaudeDeviceProfileRequiredHomeNormalizesUnmeasuredCachedProfile
 	}
 }
 
-func TestResolveClaudeDeviceProfileRequiredHomeFailures(t *testing.T) {
+func TestResolveClaudeDeviceProfileRequiredKVFailures(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		headers http.Header

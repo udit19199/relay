@@ -54,10 +54,6 @@ func quotaCooldownDisabledForAuth(auth *Auth) bool {
 }
 
 func quotaCooldownDisabledForAuthWithConfig(auth *Auth, cfg *internalconfig.Config) bool {
-	// Home owns cooldown state, so downstream instances must not schedule local cooldowns.
-	if cfg != nil && cfg.Home.Enabled {
-		return true
-	}
 	if auth != nil {
 		if override, ok := auth.DisableCoolingOverride(); ok {
 			return override
@@ -168,10 +164,6 @@ func (m *Manager) setConfigSnapshotLocked(cfg *internalconfig.Config) bool {
 	m.mu.RLock()
 	oldCooldownStore := m.cooldownStore
 	m.mu.RUnlock()
-	previousCfg, _ := m.runtimeConfig.Load().(*internalconfig.Config)
-	if homeSessionAliasTTL(previousCfg) != homeSessionAliasTTL(cfg) {
-		m.homeSessionAliases.clear()
-	}
 	m.runtimeConfig.Store(cfg)
 	clearedCooldowns := m.clearDisabledCooldownStates(cfg)
 	if clearedCooldowns && oldCooldownStore != nil {
@@ -180,9 +172,6 @@ func (m *Manager) setConfigSnapshotLocked(cfg *internalconfig.Config) bool {
 			m.pendingCooldownStateStore = oldCooldownStore
 		}
 		m.mu.Unlock()
-	}
-	if !cfg.Home.Enabled {
-		m.clearHomeRuntimeAuths()
 	}
 	m.rebuildAPIKeyModelAliasFromRuntimeConfig()
 	return clearedCooldowns
@@ -1470,25 +1459,7 @@ func (m *Manager) recordExecutionResult(ctx context.Context, result Result, auth
 			result.AccessToken = authAccessTokenForRequest(ctx, auth, result.Options.Headers)
 		}
 	}
-	if !ephemeral {
-		m.MarkResult(ctx, result)
-		return
-	}
-	m.reportHomeResult(ctx, result, auth)
-}
-
-// reportHomeResult only observes a Home dispatch result and never updates local auth state.
-func (m *Manager) reportHomeResult(ctx context.Context, result Result, auth *Auth) {
-	if m == nil || result.AuthID == "" {
-		return
-	}
-	var snapshot *Auth
-	if auth != nil {
-		snapshot = auth.Clone()
-	}
-	m.hook.OnResult(ctx, result)
-	m.publishErrorEvent(result, snapshot)
-	m.updateSessionAffinity(result)
+	m.MarkResult(ctx, result)
 }
 
 func (m *Manager) recordAvailabilityNeutralResult(ctx context.Context, result Result) {
@@ -2559,16 +2530,6 @@ func refreshErrorFromError(err error) *Error {
 func retryAfterFromError(err error) *time.Duration {
 	if err == nil {
 		return nil
-	}
-	// An exhausted Home round owns the aggregated multi-credential deadline
-	// for scheduling just as it does for response headers.
-	var exhausted *homeRetryRoundExhaustedError
-	if errors.As(err, &exhausted) && exhausted != nil {
-		// The aggregate owns this error even when RetryAfter() is nil: nil
-		// encodes an explicit zero (immediate) or absent aggregate and must
-		// not be replaced by the last attempt's positive hint. Callers that
-		// need the immediate signal consult retryNow / the aggregate first.
-		return exhausted.RetryAfter()
 	}
 	// A locally trusted deadline outranks any hint on the wrapped error so a
 	// re-recorded terminal error cannot reintroduce a stale upstream value.

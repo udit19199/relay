@@ -238,9 +238,6 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 	}
 	s.localPassword = optionState.localPassword
 
-	// Home heartbeat gate: when home is enabled, block all endpoints with 503 until the
-	// subscribe-config heartbeat connection is healthy.
-	engine.Use(s.homeHeartbeatMiddleware())
 	engine.Use(s.exampleAPIKeySafeModeMiddleware())
 
 	// Setup routes
@@ -255,7 +252,7 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 	// or when a local management password is provided (e.g. TUI mode).
 	hasManagementSecret := cfg.RemoteManagement.SecretKey != "" || envManagementSecret || s.localPassword != ""
 	s.managementRoutesEnabled.Store(hasManagementSecret)
-	redisqueue.SetEnabled(hasManagementSecret || (cfg != nil && cfg.Home.Enabled))
+	redisqueue.SetEnabled(hasManagementSecret)
 	if hasManagementSecret {
 		s.registerManagementRoutes()
 	}

@@ -70,63 +70,21 @@ func (h *Handler) HandleHangup(c *gin.Context) {
 		meta.ParentSessionID = session.parentSessionID
 		ctx = logging.WithClientRequestMetadata(ctx, meta)
 	}
-	var activeSelection *auth.HomeDispatchSelection
-	var temporarySelection bool
 	var selected *auth.Auth
-	if session.homeSelection != nil && session.homeSelection.Active() {
-		activeSelection = session.homeSelection
-		selected = activeSelection.CloneAuth()
-	} else {
-		selectionOpts := coreexecutor.Options{
-			Headers: liveSelectionHeaders(c),
-			Metadata: map[string]any{
-				coreexecutor.PinnedAuthMetadataKey:       session.authID,
-				coreexecutor.ExecutionSessionMetadataKey: callID,
-			},
-		}
-		selection, selectedAuth, errSelect := h.selectOAuth(ctx, session.model, selectionOpts)
-		if errSelect != nil {
-			writeSelectionError(c, errSelect)
-			return
-		}
-		if selection != nil && selection.CanonicalSessionID != "" {
-			meta := logging.GetClientRequestMetadata(ctx)
-			meta.SessionID = selection.CanonicalSessionID
-			if selection.ParentSessionID != "" {
-				meta.ParentSessionID = selection.ParentSessionID
-			} else {
-				meta.ParentSessionID = ""
-			}
-			if meta.SessionID == meta.ParentSessionID {
-				meta.ParentSessionID = ""
-			}
-			ctx = logging.WithClientRequestMetadata(ctx, meta)
-		}
-		activeSelection = selection
-		selected = selectedAuth
-		temporarySelection = selection != nil
+
+	selectionOpts := coreexecutor.Options{
+		Headers: liveSelectionHeaders(c),
+		Metadata: map[string]any{
+			coreexecutor.PinnedAuthMetadataKey:       session.authID,
+			coreexecutor.ExecutionSessionMetadataKey: callID,
+		},
 	}
-	var selectionRelease func()
-	if activeSelection != nil {
-		attemptCtx, releaseAttempt, errAttempt := activeSelection.AttemptContext(ctx)
-		if errAttempt != nil {
-			if temporarySelection {
-				activeSelection.End("attempt_bind_failed")
-			}
-			writeRealtimeError(c, http.StatusServiceUnavailable, errAttempt.Error(), "server_error", "realtime_upstream_unavailable")
-			return
-		}
-		ctx = attemptCtx
-		selectionRelease = releaseAttempt
+	selectedAuth, errSelect := h.selectOAuth(ctx, session.model, selectionOpts)
+	if errSelect != nil {
+		writeSelectionError(c, errSelect)
+		return
 	}
-	defer func() {
-		if selectionRelease != nil {
-			selectionRelease()
-		}
-		if temporarySelection && activeSelection != nil {
-			activeSelection.End("request_closed")
-		}
-	}()
+	selected = selectedAuth
 	if selected == nil {
 		writeRealtimeError(c, http.StatusServiceUnavailable, "Codex auth unavailable", "server_error", "codex_auth_unavailable")
 		return
@@ -180,23 +138,12 @@ func (h *Handler) HandleHangup(c *gin.Context) {
 	responseBody, errResponse := readLimitedBody(response.Body)
 	if errResponse != nil {
 		helps.AppendAPIResponseChunk(ctx, runtimeConfig, responseBody)
-		if activeSelection != nil && response.StatusCode == http.StatusUnauthorized {
-			h.authManager.ReportHomeUnauthorized(ctx, selected, "codex", session.model, responseBody)
-		}
 		helps.RecordAPIResponseError(ctx, runtimeConfig, errResponse)
 		writeRealtimeError(c, http.StatusBadGateway, "Failed to read Realtime hangup response", "api_error", "realtime_upstream_unavailable")
 		return
 	}
 	helps.AppendAPIResponseChunk(ctx, runtimeConfig, responseBody)
-	if activeSelection != nil && response.StatusCode == http.StatusUnauthorized {
-		h.authManager.ReportHomeUnauthorized(ctx, selected, "codex", session.model, responseBody)
-		log.WithField("status", response.StatusCode).Warnf("codex realtime hangup upstream request failed: %s", logging.SafeDiagnosticForLog(string(responseBody)))
-	}
 	if response.StatusCode >= http.StatusOK && response.StatusCode < http.StatusMultipleChoices {
-		if selectionRelease != nil {
-			selectionRelease()
-			selectionRelease = nil
-		}
 		h.sessions.complete(session, "client_hangup")
 	}
 	if contentType := response.Header.Get("Content-Type"); contentType != "" {

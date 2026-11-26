@@ -392,7 +392,7 @@ func TestManager_ShouldRetryAfterError_429EnforcesCooldownWaitEvenWithLargeMaxWa
 
 	// With maxWait = 30s (which allows waiting up to 30s):
 	// Because auth was attempted and failed with 429, it must return wait >= 10s (NOT wait = 0).
-	wait, shouldRetry := manager.shouldRetryAfterErrorWithAttempted(context.Background(), opts, err429, 0, []string{"google"}, model, 30*time.Second, -1, 5, attempted)
+	wait, shouldRetry := manager.shouldRetryAfterErrorWithAttempted(context.Background(), opts, err429, 0, []string{"google"}, model, 30*time.Second, 5, attempted)
 	if !shouldRetry {
 		t.Fatal("expected shouldRetry = true when maxWait (30s) >= cooldown floor (10s)")
 	}

@@ -35,18 +35,9 @@ type Config struct {
 	// TLS config controls HTTPS server settings.
 	TLS TLSConfig `yaml:"tls" json:"tls"`
 
-	// Home config is runtime-only and is populated from -home-jwt.
-	Home HomeConfig `yaml:"-" json:"-"`
-
 	// SourceHash is runtime-only: the SHA-256 of the config file bytes this config was
 	// parsed from, or empty when the config was not loaded from a file.
 	SourceHash string `yaml:"-" json:"-"`
-
-	// CredentialConcurrency contains Home-authoritative credential lifecycle settings.
-	CredentialConcurrency CredentialConcurrencyConfig `yaml:"credential-concurrency" json:"credential-concurrency"`
-
-	// CredentialInFlight configures credential observation snapshots.
-	CredentialInFlight CredentialInFlightConfig `yaml:"credential-in-flight" json:"credential-in-flight"`
 
 	// RemoteManagement nests management-related options under 'remote-management'.
 	RemoteManagement RemoteManagement `yaml:"remote-management" json:"-"`
@@ -62,9 +53,6 @@ type Config struct {
 
 	// Pprof config controls the optional pprof HTTP debug server.
 	Pprof PprofConfig `yaml:"pprof" json:"pprof"`
-
-	// Discovery configures local network mDNS / DNS-SD service advertising.
-	Discovery DiscoveryConfig `yaml:"discovery" json:"discovery"`
 
 	// KVStore configures the local bbolt key-value store.
 	KVStore KVStoreConfig `yaml:"kv-store" json:"kv-store"`

@@ -64,9 +64,6 @@ func TestCloneForRuntimeDeepCopiesConfig(t *testing.T) {
 
 	mutateOriginalConfig(cfg)
 
-	if clone.Home.Host != "home.local" {
-		t.Fatalf("clone.Home.Host = %q, want home.local", clone.Home.Host)
-	}
 	if clone.APIKeys[0] != "client-key" {
 		t.Fatalf("clone.APIKeys[0] = %q, want client-key", clone.APIKeys[0])
 	}
@@ -135,19 +132,6 @@ func sampleCloneRuntimeConfig() *Config {
 				KeepAliveSeconds:      3,
 				BootstrapRetries:      2,
 				SendKeepAliveBeforeFT: true,
-			},
-		},
-		Home: HomeConfig{
-			Enabled: true,
-			Host:    "home.local",
-			Port:    8081,
-			TLS: HomeTLSConfig{
-				Enable:              true,
-				ServerName:          "home.local",
-				CACert:              "ca",
-				ClientCert:          "cert",
-				ClientKey:           "key",
-				UseTargetServerName: true,
 			},
 		},
 		Plugins: PluginsConfig{
@@ -230,7 +214,6 @@ func sampleCloneRuntimeConfig() *Config {
 }
 
 func mutateOriginalConfig(cfg *Config) {
-	cfg.Home.Host = "mutated-home.local"
 	cfg.APIKeys[0] = "mutated-client-key"
 	cfg.OAuthExcludedModels["codex"][0] = "mutated-hidden-model"
 	cfg.OAuthModelAlias["codex"][0].Alias = "mutated-client-model"

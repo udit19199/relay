@@ -138,7 +138,7 @@ func TestRefreshModelCatalogsOnDemand(t *testing.T) {
 	oldCodexPublish := codexCatalogUpdater.publish
 	oldDevinPublish := devinCatalogUpdater.publish
 	catalogRuntime.Lock()
-	oldCtx, oldLocal, oldSources, oldHome := catalogRuntime.ctx, catalogRuntime.local, catalogRuntime.sources, catalogRuntime.home
+	oldCtx, oldLocal, oldSources := catalogRuntime.ctx, catalogRuntime.local, catalogRuntime.sources
 	catalogRuntime.Unlock()
 	refreshCallbackMu.Lock()
 	previousCallback, previousPending := refreshCallback, pendingRefreshChanges
@@ -192,7 +192,6 @@ func TestRefreshModelCatalogsOnDemand(t *testing.T) {
 		catalogRuntime.Lock()
 		catalogRuntime.ctx = oldCtx
 		catalogRuntime.sources = oldSources
-		catalogRuntime.home = oldHome
 		catalogRuntime.Unlock()
 		refreshCallbackMu.Lock()
 		refreshCallback, pendingRefreshChanges = previousCallback, previousPending
@@ -270,7 +269,7 @@ func TestRefreshModelCatalogsOnDemand(t *testing.T) {
 		CodexCatalog: codexSrv.URL,
 		DevinCatalog: devinSrv.URL,
 	}
-	StartModelCatalogUpdaters(ctx, sources, false)
+	StartModelCatalogUpdaters(ctx, sources)
 	for _, ch := range []<-chan struct{}{generalPublished, codexPublished, devinPublished} {
 		select {
 		case <-ch:
@@ -337,21 +336,21 @@ func TestRefreshModelCatalogsOnDemand(t *testing.T) {
 		t.Fatal("expected ModelRefreshCallback to be invoked")
 	}
 
-	// Verify --local-model (embeddedCatalogSource) and Home (disabled) policy boundaries skip remote fetches.
+	// Verify --local-model uses embedded catalog sources and skips remote fetches.
 	SetLocalModelCatalogs(true)
-	UpdateModelCatalogSources(CatalogSources{}, true)
+	UpdateModelCatalogSources(CatalogSources{})
 	generalBefore := generalHits.Load()
 	codexBefore := codexHits.Load()
 	devinBefore := devinHits.Load()
 	policyRes, errPolicy := RefreshModelCatalogs(ctx)
 	if errPolicy != nil {
-		t.Fatalf("RefreshModelCatalogs under local+Home policy failed: %v", errPolicy)
+		t.Fatalf("RefreshModelCatalogs under local policy failed: %v", errPolicy)
 	}
-	if policyRes.Catalog != "disabled" || policyRes.CodexCatalog != embeddedCatalogSource || policyRes.DevinCatalog != "disabled" {
+	if policyRes.Catalog != embeddedCatalogSource || policyRes.CodexCatalog != embeddedCatalogSource || policyRes.DevinCatalog != embeddedCatalogSource {
 		t.Fatalf("unexpected policy sources: %+v", policyRes)
 	}
 	if generalHits.Load() != generalBefore || codexHits.Load() != codexBefore || devinHits.Load() != devinBefore {
-		t.Fatal("RefreshModelCatalogs performed remote fetch for disabled or embedded catalogs")
+		t.Fatal("RefreshModelCatalogs performed remote fetch for embedded catalogs")
 	}
 
 	// Verify generation fencing on refreshOnDemand when source switches concurrently.
@@ -463,7 +462,7 @@ func TestRefreshModelCatalogsOnDemand(t *testing.T) {
 		Catalog:      generalSrv.URL,
 		CodexCatalog: codexBlockSrv.URL,
 		DevinCatalog: devinSrv.URL,
-	}, false)
+	})
 	for _, ch := range []<-chan struct{}{generalPublished, codexPublished, devinPublished} {
 		select {
 		case <-ch:
@@ -517,7 +516,7 @@ func TestRefreshModelCatalogsOnDemand(t *testing.T) {
 		Catalog:      "",
 		CodexCatalog: codexSrv.URL,
 		DevinCatalog: devinSrv.URL,
-	}, false)
+	})
 	for _, ch := range []<-chan struct{}{generalPublished, codexPublished} {
 		select {
 		case <-ch:

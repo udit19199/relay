@@ -26,4 +26,4 @@ All processes sharing credentials must use the same authoritative journal and th
 
 Direct SDK users can attach a `codex.RefreshJournal` using `WithRefreshJournal` or `SetRefreshJournal`. Without a configured auth directory or explicit journal, protection is process-local only; a caller persisting credentials across restarts must also provide a durable journal.
 
-CLIProxyAPIHome owns its separate outer-token refresh implementation. These changes cover refreshes performed in this repository (including local SIWC refreshes in Home mode); the Home service requires its own corresponding update.
+These changes cover refreshes performed in this repository, including local SIWC refreshes.

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	homekv "github.com/router-for-me/CLIProxyAPI/v8/internal/home"
+	kvstore "github.com/router-for-me/CLIProxyAPI/v8/internal/kvstore"
 )
 
 type sessionIDCacheEntry struct {
@@ -31,7 +31,7 @@ type claudeIDKVClient interface {
 }
 
 var currentClaudeIDKVClient = func() (claudeIDKVClient, bool, error) {
-	return homekv.CurrentKVClient()
+	return kvstore.CurrentKVClient()
 }
 
 const (
@@ -79,8 +79,8 @@ func CachedSessionIDRequired(ctx context.Context, apiKey string) (string, error)
 	if apiKey == "" {
 		return uuid.New().String(), nil
 	}
-	client, homeMode, errClient := currentClaudeIDKVClient()
-	if homeMode {
+	client, kvMode, errClient := currentClaudeIDKVClient()
+	if kvMode {
 		if errClient != nil {
 			return "", errClient
 		}
@@ -144,5 +144,5 @@ func CachedSessionIDRequired(ctx context.Context, apiKey string) (string, error)
 }
 
 func claudeSessionIDKVKey(apiKey string) string {
-	return "cpa:claude:session-id:" + homekv.HashKeyPart(apiKey)
+	return "cpa:claude:session-id:" + kvstore.HashKeyPart(apiKey)
 }

@@ -125,7 +125,6 @@ func TestConfigV8CommentsUnknownLegacySectionsOnWrite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg.Home = config.HomeConfig{Enabled: true, Host: "runtime.example"}
 	h := &Handler{cfg: cfg, configFilePath: path}
 	router := gin.New()
 	router.GET("/v8/management/config", h.ConfigV8)
@@ -168,8 +167,8 @@ func TestConfigV8CommentsUnknownLegacySectionsOnWrite(t *testing.T) {
 	if url := configV8Node(doc.Content[0], []string{"requests", "proxy-url"}); url == nil || url.Value != "direct" {
 		t.Fatal("path update did not persist the proxy URL")
 	}
-	if h.cfg.Home.Host != "runtime.example" || !h.cfg.Home.Enabled || h.cfg.ProxyURL != "direct" {
-		t.Fatal("path update changed runtime Home settings or missed the proxy URL")
+	if h.cfg.ProxyURL != "direct" {
+		t.Fatal("path update missed the proxy URL")
 	}
 	request(http.MethodPut, "/v8/management/config/requests/proxy-url", `"none"`, http.StatusOK)
 	request(http.MethodDelete, "/v8/management/config/server", "", http.StatusOK)
@@ -651,7 +650,6 @@ plugins:
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg.Home = config.HomeConfig{Enabled: true, Host: "runtime.example"}
 	h := &Handler{cfg: cfg, configFilePath: file}
 	reloads := make(chan *config.Config, 8)
 	h.SetConfigReloadHook(func(_ context.Context, cfg *config.Config) { reloads <- cfg })
@@ -684,7 +682,6 @@ plugins:
 		if errLoad != nil {
 			t.Fatal(errLoad)
 		}
-		loaded.Home = cfg.Home
 		// SourceHash is runtime-only metadata of a file load, not persisted config.
 		loaded.SourceHash = ""
 		select {

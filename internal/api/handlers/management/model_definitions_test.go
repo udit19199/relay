@@ -221,7 +221,7 @@ func TestRefreshModelDefinitions_UpdatesCatalogAndReportsChangedProviders(t *tes
 	h := NewHandlerWithoutConfigFilePath(cfg, nil)
 	t.Cleanup(func() {
 		generalPayload.Store(baseModels)
-		if _, errRestore := registry.RefreshModelCatalogsWithPolicy(context.Background(), cfg.Models, false); errRestore != nil {
+		if _, errRestore := registry.RefreshModelCatalogsWithPolicy(context.Background(), cfg.Models); errRestore != nil {
 			t.Errorf("restore model catalogs failed: %v", errRestore)
 		}
 	})

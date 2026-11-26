@@ -127,7 +127,7 @@ func (f modelRegistrationFence) publishIfCurrent(s *Service, authID string, publ
 			// Match the watcher's normalization so no-op and unrelated reloads do not
 			// discard work. A real change always schedules a replacement: the watcher
 			// redispatches affected auths, and applyConfigRuntime re-registers every
-			// auth (which also covers Home mode, where no watcher runs).
+			// auth.
 			for _, provider := range [2]string{f.exclusionProvider, f.fallbackExclusionProvider} {
 				if provider == "" {
 					continue

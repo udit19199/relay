@@ -2,7 +2,6 @@ package kvstore
 
 import (
 	"context"
-	"errors"
 	"path/filepath"
 	"testing"
 	"time"
@@ -10,11 +9,13 @@ import (
 
 func resetControllerForTest(t *testing.T) {
 	t.Helper()
-	_ = ShutdownLocal()
-	RegisterHomeProvider(nil)
+	if errShutdown := ShutdownLocal(); errShutdown != nil {
+		t.Fatalf("ShutdownLocal() error = %v", errShutdown)
+	}
 	t.Cleanup(func() {
-		_ = ShutdownLocal()
-		RegisterHomeProvider(nil)
+		if errShutdown := ShutdownLocal(); errShutdown != nil {
+			t.Errorf("ShutdownLocal() cleanup error = %v", errShutdown)
+		}
 	})
 }
 
@@ -117,58 +118,6 @@ func TestControllerConfigureLocalInvalidPathReportsUnavailableError(t *testing.T
 	}
 	if errClient == nil {
 		t.Fatalf("CurrentKVClient() error = nil, want unavailable error")
-	}
-}
-
-func TestControllerPrioritizesHomeProviderOverLocalBoltStore(t *testing.T) {
-	resetControllerForTest(t)
-
-	localPath := filepath.Join(t.TempDir(), "local.db")
-	if errCfg := ConfigureLocal(true, localPath); errCfg != nil {
-		t.Fatalf("ConfigureLocal(true, localPath) error = %v", errCfg)
-	}
-
-	homeStorePath := filepath.Join(t.TempDir(), "home-mock.db")
-	homeStore, errOpen := OpenBoltStore(homeStorePath, WithSweepInterval(0))
-	if errOpen != nil {
-		t.Fatalf("OpenBoltStore(homeStorePath) error = %v", errOpen)
-	}
-	t.Cleanup(func() {
-		_ = homeStore.Close()
-	})
-
-	RegisterHomeProvider(func() (KVClient, bool, error) {
-		return homeStore, true, nil
-	})
-
-	client, kvMode, errClient := CurrentKVClient()
-	if errClient != nil || !kvMode {
-		t.Fatalf("CurrentKVClient() with active Home provider = (%v, %v, %v), want (homeStore, true, nil)", client, kvMode, errClient)
-	}
-	if client != homeStore {
-		t.Fatalf("CurrentKVClient() returned %p, want Home provider client %p", client, homeStore)
-	}
-
-	// When Home provider reports homeMode=true with an error, CurrentKVClient must return that error instead of falling back to local BoltStore.
-	expectedErr := errors.New("home kv store unavailable: not connected")
-	RegisterHomeProvider(func() (KVClient, bool, error) {
-		return nil, true, expectedErr
-	})
-	clientErr, kvModeErr, errHome := CurrentKVClient()
-	if !kvModeErr || clientErr != nil || !errors.Is(errHome, expectedErr) {
-		t.Fatalf("CurrentKVClient() with unavailable Home = (%v, %v, %v), want (nil, true, %v)", clientErr, kvModeErr, errHome, expectedErr)
-	}
-
-	// When Home provider reports homeMode=false, CurrentKVClient falls back to the enabled local BoltStore.
-	RegisterHomeProvider(func() (KVClient, bool, error) {
-		return nil, false, nil
-	})
-	clientLocal, kvModeLocal, errLocal := CurrentKVClient()
-	if errLocal != nil || !kvModeLocal || clientLocal == nil {
-		t.Fatalf("CurrentKVClient() with inactive Home = (%v, %v, %v), want local BoltStore", clientLocal, kvModeLocal, errLocal)
-	}
-	if clientLocal == homeStore {
-		t.Fatalf("CurrentKVClient() unexpectedly returned homeStore when homeMode=false")
 	}
 }
 

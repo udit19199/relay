@@ -298,7 +298,7 @@ proxy-url: old
 		t.Fatalf("migrated file is invalid: %v", err)
 	}
 	cfg, err := ParseConfigBytes(migrated)
-	if err != nil || cfg.ProxyURL != "old" || cfg.Home.Enabled {
+	if err != nil || cfg.ProxyURL != "old" {
 		t.Fatalf("migration changed effective settings: cfg=%+v error=%v", cfg, err)
 	}
 	remigrated, _, err := NormalizeConfigLayout(migrated, true)
@@ -519,9 +519,7 @@ proxy-url: old
 func TestV8MigrationPreservesEmptyLegacyContainers(t *testing.T) {
 	for _, section := range []configPath{
 		{"tls", "server.tls"}, {"remote-management", "management"},
-		{"pprof", "observability.pprof"}, {"discovery", "server.discovery"},
-		{"discovery.interfaces", "server.discovery.interfaces"},
-		{"credential-concurrency", "credentials.concurrency"}, {"credential-in-flight", "credentials.in-flight"},
+		{"pprof", "observability.pprof"},
 		{"streaming", "requests.streaming"}, {"payload", "requests.payload"},
 		{"codex", "oauth.providers.codex"}, {"codex.live-media-relay", "oauth.providers.codex.live-media-relay"},
 		{"codex-header-defaults", "oauth.providers.codex.header-defaults"},

@@ -8,8 +8,6 @@ import (
 	"time"
 
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/api"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/home"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/redisqueue"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
@@ -42,31 +40,22 @@ func (s *Service) Run(ctx context.Context) error {
 	s.cfgMu.Lock()
 	s.antigravityContext = ctx
 	s.cfgMu.Unlock()
-	s.homeMu.Lock()
+	s.runCancelMu.Lock()
 	s.runCancel = runCancel
-	s.homeMu.Unlock()
+	s.runCancelMu.Unlock()
 	defer func() {
 		runCancel()
-		s.homeMu.Lock()
+		s.runCancelMu.Lock()
 		if s.runCancel != nil {
 			s.runCancel = nil
 		}
-		s.homeMu.Unlock()
+		s.runCancelMu.Unlock()
 	}()
 
 	s.startModelCatalogUpdaters(ctx)
 
 	usage.StartDefault(ctx)
 	cfg := s.currentConfig()
-	homeEnabled := cfg != nil && cfg.Home.Enabled
-	if homeEnabled {
-		s.cfgMu.Lock()
-		forceHomeRuntimeConfig(s.cfg)
-		cfg = s.cfg
-		s.cfgMu.Unlock()
-		s.applyKVStoreConfig(cfg)
-		redisqueue.SetUsageStatisticsEnabled(true)
-	}
 
 	defer func() {
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -76,18 +65,16 @@ func (s *Service) Run(ctx context.Context) error {
 		}
 	}()
 
-	if !homeEnabled {
-		if errEnsureAuthDir := s.ensureAuthDir(); errEnsureAuthDir != nil {
-			return errEnsureAuthDir
-		}
-		s.applyKVStoreConfig(cfg)
+	if errEnsureAuthDir := s.ensureAuthDir(); errEnsureAuthDir != nil {
+		return errEnsureAuthDir
 	}
+	s.applyKVStoreConfig(cfg)
 
 	s.applyRetryConfig(cfg)
 	s.configureCooldownStateStore(cfg)
 
 	s.registerPluginAuthParser()
-	if s.coreManager != nil && !homeEnabled {
+	if s.coreManager != nil {
 		if errLoad := s.coreManager.Load(ctx); errLoad != nil {
 			log.Warnf("failed to load auth store: %v", errLoad)
 		}
@@ -106,50 +93,32 @@ func (s *Service) Run(ctx context.Context) error {
 		log.Infof("core auth auto-refresh started (interval=%s)", interval)
 	}
 
-	if !homeEnabled {
-		tokenResult, err := s.tokenProvider.Load(ctx, cfg)
-		if err != nil && !errors.Is(err, context.Canceled) {
-			return err
-		}
-		if tokenResult == nil {
-			tokenResult = &TokenClientResult{}
-		}
+	tokenResult, err := s.tokenProvider.Load(ctx, cfg)
+	if err != nil && !errors.Is(err, context.Canceled) {
+		return err
+	}
+	if tokenResult == nil {
+		tokenResult = &TokenClientResult{}
+	}
 
-		apiKeyResult, err := s.apiKeyProvider.Load(ctx, cfg)
-		if err != nil && !errors.Is(err, context.Canceled) {
-			return err
-		}
-		if apiKeyResult == nil {
-			apiKeyResult = &APIKeyClientResult{}
-		}
+	apiKeyResult, err := s.apiKeyProvider.Load(ctx, cfg)
+	if err != nil && !errors.Is(err, context.Canceled) {
+		return err
+	}
+	if apiKeyResult == nil {
+		apiKeyResult = &APIKeyClientResult{}
 	}
 
 	// legacy clients removed; no caches to refresh
 
 	s.ensureWebsocketGateway()
-	if homeEnabled {
-		s.registerAvailableExecutors(ctx, executorRegistrationOptions{
-			includeBaseline: true,
-		})
-		// Home mode does not expose in-process Redis RESP usage output; usage is forwarded to home instead.
-		redisqueue.SetEnabled(true)
-	}
 
 	// handlers no longer depend on legacy clients; pass nil slice initially
 	s.server = api.NewServer(cfg, s.coreManager, s.accessManager, s.configPath, s.serverOptions...)
 	s.syncPluginRuntimeConfig(ctx)
-	if homeEnabled {
-		s.configRuntimeMu.Lock()
-		s.syncPluginModelRuntime(ctx)
-		s.configRuntimeMu.Unlock()
-	}
 
 	if s.authManager == nil {
 		s.authManager = newDefaultAuthManager()
-	}
-
-	if homeEnabled {
-		s.startHomeSubscriber(ctx)
 	}
 
 	if s.server != nil && s.wsGateway != nil {
@@ -193,45 +162,42 @@ func (s *Service) Run(ctx context.Context) error {
 	s.configRuntimeMu.Lock()
 	currentCfg := s.currentConfig()
 	s.applyPprofConfig(currentCfg)
-	s.applyDiscoveryConfig(currentCfg)
 	s.configRuntimeMu.Unlock()
 
 	if s.hooks.OnAfterStart != nil {
 		s.hooks.OnAfterStart(s)
 	}
 
-	if !homeEnabled {
-		var watcherWrapper *WatcherWrapper
-		reloadCallback := func(newCfg *config.Config) { s.applyWatcherConfigUpdate(newCfg) }
+	var watcherWrapper *WatcherWrapper
+	reloadCallback := func(newCfg *config.Config) { s.applyWatcherConfigUpdate(newCfg) }
 
-		authDir := ""
-		if currentCfg := s.currentConfig(); currentCfg != nil {
-			authDir = currentCfg.AuthDir
-		}
-		watcherWrapper, errCreate := s.watcherFactory(s.configPath, authDir, reloadCallback)
-		if errCreate != nil {
-			return fmt.Errorf("cliproxy: failed to create watcher: %w", errCreate)
-		}
-		s.setWatcher(watcherWrapper)
-		s.ensureAuthUpdateQueue(ctx)
-		if s.authUpdates != nil {
-			watcherWrapper.SetAuthUpdateQueue(s.authUpdates)
-		}
-		watcherWrapper.SetConfig(s.currentConfig())
-		s.registerPluginAuthParser()
-
-		watcherCtx, watcherCancel := context.WithCancel(context.Background())
-		s.cfgMu.Lock()
-		s.watcherCancel = watcherCancel
-		s.cfgMu.Unlock()
-		if errStart := watcherWrapper.Start(watcherCtx); errStart != nil {
-			return fmt.Errorf("cliproxy: failed to start watcher: %w", errStart)
-		}
-		log.Info("file watcher started for config and auth directory changes")
-		s.configRuntimeMu.Lock()
-		s.syncPluginModelRuntime(ctx)
-		s.configRuntimeMu.Unlock()
+	authDir := ""
+	if currentCfg := s.currentConfig(); currentCfg != nil {
+		authDir = currentCfg.AuthDir
 	}
+	watcherWrapper, errCreate := s.watcherFactory(s.configPath, authDir, reloadCallback)
+	if errCreate != nil {
+		return fmt.Errorf("cliproxy: failed to create watcher: %w", errCreate)
+	}
+	s.setWatcher(watcherWrapper)
+	s.ensureAuthUpdateQueue(ctx)
+	if s.authUpdates != nil {
+		watcherWrapper.SetAuthUpdateQueue(s.authUpdates)
+	}
+	watcherWrapper.SetConfig(s.currentConfig())
+	s.registerPluginAuthParser()
+
+	watcherCtx, watcherCancel := context.WithCancel(context.Background())
+	s.cfgMu.Lock()
+	s.watcherCancel = watcherCancel
+	s.cfgMu.Unlock()
+	if errStart := watcherWrapper.Start(watcherCtx); errStart != nil {
+		return fmt.Errorf("cliproxy: failed to start watcher: %w", errStart)
+	}
+	log.Info("file watcher started for config and auth directory changes")
+	s.configRuntimeMu.Lock()
+	s.syncPluginModelRuntime(ctx)
+	s.configRuntimeMu.Unlock()
 
 	s.registerModelRefreshCallback()
 
@@ -263,58 +229,12 @@ func (s *Service) Shutdown(ctx context.Context) error {
 			ctx = context.Background()
 		}
 
-		s.homeMu.Lock()
+		s.runCancelMu.Lock()
 		runCancel := s.runCancel
-		s.homeMu.Unlock()
+		s.runCancelMu.Unlock()
 		if runCancel != nil {
 			runCancel()
 		}
-
-		s.homeLifecycleMu.Lock()
-		if supervisor := s.homeSupervisor; supervisor != nil {
-			s.homeConfigCommitMu.Lock()
-			supervisor.cancel()
-			s.homeConfigCommitMu.Unlock()
-			<-supervisor.done
-		}
-		s.homeMu.Lock()
-		homeCancel := s.homeCancel
-		homeClient := s.homeClient
-		homeRegistry := s.homeRegistry
-		homeDispatchBundle := s.homeDispatchBundle
-		homeForwarder := s.homeLogForwarder
-		homeForwarderClient := s.homeLogForwarderClient
-		s.homeGeneration++
-		s.homeCancel = nil
-		s.homeClient = nil
-		s.homeRegistry = nil
-		s.homeDispatchBundle = nil
-		s.homeDrainBound = 0
-		s.homeLogForwarder = nil
-		s.homeLogForwarderClient = nil
-		s.homeMu.Unlock()
-		if s.coreManager != nil {
-			s.coreManager.ClearHomeDispatchBundle(homeDispatchBundle)
-		}
-		home.ClearCurrentIf(homeClient)
-		if homeCancel != nil {
-			homeCancel()
-		}
-		if homeRegistry != nil {
-			if errClose := homeRegistry.Close(); errClose != nil {
-				log.WithError(errClose).Warn("failed to close Home execution registry during shutdown")
-			}
-		}
-		if homeClient != nil {
-			homeClient.Close()
-		}
-		if homeForwarder != nil {
-			if homeForwarderClient == homeClient {
-				homeForwarder.Deactivate(homeClient)
-			}
-			homeForwarder.Stop()
-		}
-		s.homeLifecycleMu.Unlock()
 
 		// legacy refresh loop removed; only stopping core auth manager below
 
@@ -350,13 +270,6 @@ func (s *Service) Shutdown(ctx context.Context) error {
 			log.Errorf("failed to stop pprof server: %v", errShutdownPprof)
 			if shutdownErr == nil {
 				shutdownErr = errShutdownPprof
-			}
-		}
-
-		if errShutdownDiscovery := s.shutdownDiscovery(); errShutdownDiscovery != nil {
-			log.Errorf("failed to stop discovery advertiser: %v", errShutdownDiscovery)
-			if shutdownErr == nil {
-				shutdownErr = errShutdownDiscovery
 			}
 		}
 
@@ -432,7 +345,7 @@ func (s *Service) startModelCatalogUpdaters(ctx context.Context) {
 	s.cfgMu.RUnlock()
 	proxyURL := ""
 	if cfg != nil {
-		registry.StartModelCatalogUpdaters(ctx, cfg.Models, cfg.Home.Enabled)
+		registry.StartModelCatalogUpdaters(ctx, cfg.Models)
 		proxyURL = cfg.ProxyURL
 	}
 	executor.StartXAIVersionUpdater(ctx, proxyURL)

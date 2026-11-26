@@ -132,16 +132,16 @@ func TestDetectClaudeCodeRequestUserAgentFieldsKeepNativeGuards(t *testing.T) {
 }
 
 func TestClaudeDeviceProfileUserAgentFieldsStayRequestScoped(t *testing.T) {
-	for _, homeMode := range []bool{false, true} {
+	for _, kvMode := range []bool{false, true} {
 		name := "local"
-		if homeMode {
+		if kvMode {
 			name = "home"
 		}
 		t.Run(name, func(t *testing.T) {
 			ResetClaudeDeviceProfileCache()
 			t.Cleanup(ResetClaudeDeviceProfileCache)
 			client := newFakeClaudeDeviceProfileKVClient()
-			useFakeClaudeDeviceProfileKVClient(t, client, homeMode, nil)
+			useFakeClaudeDeviceProfileKVClient(t, client, kvMode, nil)
 			auth := &cliproxyauth.Auth{ID: "request-fields-" + name}
 			baseUA := "claude-cli/2.1.321 (external, cli, agent-sdk/0.2.133)"
 			cronUA := "claude-cli/2.1.321 (external, cli, workload/cron, agent-sdk/0.2.133, future-feature/value)"
@@ -165,7 +165,7 @@ func TestClaudeDeviceProfileUserAgentFieldsStayRequestScoped(t *testing.T) {
 					t.Fatalf("request UA = %q, want only current fields in %q", got, testCase.want)
 				}
 			}
-			if homeMode && client.setCount != 1 {
+			if kvMode && client.setCount != 1 {
 				t.Fatalf("stored %d profiles, want one shared stable identity", client.setCount)
 			}
 		})

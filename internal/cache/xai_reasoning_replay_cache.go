@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/MoeForge/moego/ojson"
-	homekv "github.com/router-for-me/CLIProxyAPI/v8/internal/home"
+	kvstore "github.com/router-for-me/CLIProxyAPI/v8/internal/kvstore"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/signature"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
 	log "github.com/sirupsen/logrus"
@@ -40,13 +40,13 @@ var (
 
 type xaiReasoningReplayKVClient interface {
 	KVGet(ctx context.Context, key string) ([]byte, bool, error)
-	KVSet(ctx context.Context, key string, value []byte, opts homekv.KVSetOptions) (bool, error)
+	KVSet(ctx context.Context, key string, value []byte, opts kvstore.KVSetOptions) (bool, error)
 	KVDel(ctx context.Context, keys ...string) (int64, error)
 	KVExpire(ctx context.Context, key string, ttl time.Duration) (bool, error)
 }
 
 var currentXAIReasoningReplayKVClient = func() (xaiReasoningReplayKVClient, bool, error) {
-	return homekv.CurrentKVClient()
+	return kvstore.CurrentKVClient()
 }
 
 // CacheXAIReasoningReplayItem stores a final Grok reasoning item for stateless
@@ -95,7 +95,7 @@ func StoreXAIReasoningReplayItems(ctx context.Context, modelName, sessionKey str
 	if !ok {
 		return XAIReasoningReplayNoReplayableState
 	}
-	if client, homeMode, errClient := currentXAIReasoningReplayKVClient(); homeMode {
+	if client, kvMode, errClient := currentXAIReasoningReplayKVClient(); kvMode {
 		if errClient != nil {
 			log.Errorf("home kv best-effort xai reasoning replay set failed prefix=cpa:xai:*: %v", errClient)
 			return XAIReasoningReplayStoreBackendError
@@ -105,7 +105,7 @@ func StoreXAIReasoningReplayItems(ctx context.Context, modelName, sessionKey str
 			log.Errorf("home kv best-effort xai reasoning replay set failed prefix=cpa:xai:*: %v", errMarshal)
 			return XAIReasoningReplayStoreBackendError
 		}
-		written, errSet := client.KVSet(ctx, xaiReasoningReplayKVKey(modelName, sessionKey), raw, homekv.KVSetOptions{EX: XAIReasoningReplayCacheTTL})
+		written, errSet := client.KVSet(ctx, xaiReasoningReplayKVKey(modelName, sessionKey), raw, kvstore.KVSetOptions{EX: XAIReasoningReplayCacheTTL})
 		if errSet != nil {
 			log.Errorf("home kv best-effort xai reasoning replay set failed prefix=cpa:xai:*: %v", errSet)
 			return XAIReasoningReplayStoreBackendError
@@ -154,8 +154,8 @@ func GetXAIReasoningReplayItemsRequired(ctx context.Context, modelName, sessionK
 	if key == "" {
 		return nil, false, nil
 	}
-	client, homeMode, errClient := currentXAIReasoningReplayKVClient()
-	if homeMode {
+	client, kvMode, errClient := currentXAIReasoningReplayKVClient()
+	if kvMode {
 		if errClient != nil {
 			return nil, false, errClient
 		}
@@ -205,8 +205,8 @@ func DeleteXAIReasoningReplayItemRequired(ctx context.Context, modelName, sessio
 	if key == "" {
 		return nil
 	}
-	client, homeMode, errClient := currentXAIReasoningReplayKVClient()
-	if homeMode {
+	client, kvMode, errClient := currentXAIReasoningReplayKVClient()
+	if kvMode {
 		if errClient != nil {
 			return errClient
 		}
@@ -238,7 +238,7 @@ func xaiReasoningReplayCacheKey(modelName, sessionKey string) string {
 }
 
 func xaiReasoningReplayKVKey(modelName, sessionKey string) string {
-	return "cpa:xai:reasoning-replay:" + homekv.HashKeyPart(strings.TrimSpace(modelName)) + ":" + homekv.HashKeyPart(strings.TrimSpace(sessionKey))
+	return "cpa:xai:reasoning-replay:" + kvstore.HashKeyPart(strings.TrimSpace(modelName)) + ":" + kvstore.HashKeyPart(strings.TrimSpace(sessionKey))
 }
 
 func normalizeXAIReasoningReplayItems(items [][]byte) ([][]byte, bool) {

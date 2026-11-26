@@ -52,7 +52,6 @@ func TestV0SaveUpgradesHistoricalV8Layout(t *testing.T) {
 				t.Fatal(err)
 			}
 			cfg.Port = 8318
-			cfg.Home.Enabled = true
 			if err = SaveConfigPreserveComments(file, cfg, false); err != nil {
 				t.Fatal(err)
 			}
@@ -71,7 +70,7 @@ func TestV0SaveUpgradesHistoricalV8Layout(t *testing.T) {
 			if yamlPath(root, "upstream.codex.response-steering") == nil || yamlPath(root, "upstream.xai.inject-x-search") == nil || yamlPath(root, "server.port").Value != "8318" {
 				t.Fatal("v0 save did not restore canonical provider fields and updated port")
 			}
-			if !cfg.ForAPIKey().Codex.ResponseSteering || !cfg.ForAPIKey().XAI.InjectXSearch || cfg.ForAPIKey().CodexHeaderDefaults.UserAgent != "" || !cfg.Home.Enabled {
+			if !cfg.ForAPIKey().Codex.ResponseSteering || !cfg.ForAPIKey().XAI.InjectXSearch || cfg.ForAPIKey().CodexHeaderDefaults.UserAgent != "" {
 				t.Fatal("v0 save changed shared/OAuth scope or runtime-only state")
 			}
 			if !strings.Contains(string(data), "# Preserve provider settings") {

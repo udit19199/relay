@@ -3,7 +3,6 @@ package helps
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -11,29 +10,19 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	claudeauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/claude"
-	homekv "github.com/router-for-me/CLIProxyAPI/v8/internal/home"
+	kvstore "github.com/router-for-me/CLIProxyAPI/v8/internal/kvstore"
 	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
 )
 
 type fakeClaudeCredentialDevicePoolKV struct {
 	values  map[string][]byte
-	setOpts []homekv.KVSetOptions
+	setOpts []kvstore.KVSetOptions
 }
 
 func (fake *fakeClaudeCredentialDevicePoolKV) KVGet(_ context.Context, key string) ([]byte, bool, error) {
 	value, found := fake.values[key]
 	return bytes.Clone(value), found, nil
-}
-
-func (fake *fakeClaudeCredentialDevicePoolKV) KVSet(_ context.Context, key string, value []byte, opts homekv.KVSetOptions) (bool, error) {
-	_, found := fake.values[key]
-	if (opts.NX && found) || (opts.XX && !found) {
-		return false, nil
-	}
-	fake.values[key] = bytes.Clone(value)
-	fake.setOpts = append(fake.setOpts, opts)
-	return true, nil
 }
 
 func TestClaudeAgentSessionUUIDPreservesNativeSession(t *testing.T) {
@@ -84,50 +73,6 @@ func TestClaudeAgentSessionUUIDUsesExecutionAndDerivedIdentity(t *testing.T) {
 				t.Fatalf("session UUIDs = %q and %q, want equal non-empty values", first, second)
 			}
 		})
-	}
-}
-
-func TestEnsureClaudeCredentialDevicePoolRequiredMigratesHomeKVToOne(t *testing.T) {
-	auth := &cliproxyauth.Auth{ID: "legacy-five-device-credential", Metadata: map[string]any{}}
-	key := "cpa:claude:credential-device-pool:" + homekv.HashKeyPart(auth.EnsureIndex())
-	legacy := []string{
-		"0000000000000000000000000000000000000000000000000000000000000000",
-		"1111111111111111111111111111111111111111111111111111111111111111",
-		"2222222222222222222222222222222222222222222222222222222222222222",
-		"3333333333333333333333333333333333333333333333333333333333333333",
-		"4444444444444444444444444444444444444444444444444444444444444444",
-	}
-	rawLegacy, errMarshal := json.Marshal(legacy)
-	if errMarshal != nil {
-		t.Fatalf("marshal legacy device pool: %v", errMarshal)
-	}
-	fake := &fakeClaudeCredentialDevicePoolKV{values: map[string][]byte{key: rawLegacy}}
-	previousClient := currentClaudeCredentialDevicePoolKVClient
-	currentClaudeCredentialDevicePoolKVClient = func() (claudeCredentialDevicePoolKVClient, bool, error) {
-		return fake, true, nil
-	}
-	t.Cleanup(func() { currentClaudeCredentialDevicePoolKVClient = previousClient })
-
-	deviceIDs, errEnsure := EnsureClaudeCredentialDevicePoolRequired(context.Background(), auth)
-	if errEnsure != nil {
-		t.Fatalf("EnsureClaudeCredentialDevicePoolRequired() error = %v", errEnsure)
-	}
-	want := []string{legacy[0]}
-	if len(deviceIDs) != 1 || deviceIDs[0] != want[0] {
-		t.Fatalf("device IDs = %#v, want %#v", deviceIDs, want)
-	}
-	if len(fake.setOpts) != 1 || !fake.setOpts[0].XX || fake.setOpts[0].NX || fake.setOpts[0].EX != 0 || fake.setOpts[0].PX != 0 {
-		t.Fatalf("Home KV set options = %#v, want one persistent XX rewrite", fake.setOpts)
-	}
-	var stored []string
-	if errUnmarshal := json.Unmarshal(fake.values[key], &stored); errUnmarshal != nil {
-		t.Fatalf("decode canonical Home KV pool: %v", errUnmarshal)
-	}
-	if len(stored) != 1 || stored[0] != want[0] {
-		t.Fatalf("Home KV device IDs = %#v, want %#v", stored, want)
-	}
-	if !claudeauth.HasCanonicalDeviceIDPool(auth.Metadata[claudeauth.ClaudeDeviceIDsMetadataKey]) {
-		t.Fatalf("auth metadata device pool = %#v, want canonical single device", auth.Metadata[claudeauth.ClaudeDeviceIDsMetadataKey])
 	}
 }
 

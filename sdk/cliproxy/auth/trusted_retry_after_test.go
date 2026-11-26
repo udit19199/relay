@@ -81,14 +81,3 @@ func TestTrustedRetryAfterNonPositiveIsNoop(t *testing.T) {
 		t.Fatalf("nil hint must not wrap, got %T", err)
 	}
 }
-
-func TestHomeAggregatedDeadlineOutranksTrustedAnnotation(t *testing.T) {
-	cause := &Error{Message: "upstream body", HTTPStatus: http.StatusTooManyRequests}
-	perAttempt := 5 * time.Second
-	annotated := withTrustedRetryAfter(cause, &perAttempt)
-	aggregated := 1500 * time.Millisecond
-	terminal := markHomeRetryRoundExhausted(annotated, &aggregated, false)
-	if got := SafeResponseHeaders(terminal).Get("Retry-After"); got != "2" {
-		t.Fatalf("aggregated deadline must win, got %q want 2", got)
-	}
-}

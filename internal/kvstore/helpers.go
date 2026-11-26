@@ -54,7 +54,7 @@ func KVSetBytesRequired(ctx context.Context, key string, value []byte, ttl time.
 		return true, errSet
 	}
 	if !written {
-		return true, fmt.Errorf("home kv store unavailable")
+		return true, fmt.Errorf("kv store unavailable")
 	}
 	return true, nil
 }
@@ -93,7 +93,7 @@ func KVExpireRequired(ctx context.Context, key string, ttl time.Duration) (bool,
 func KVGetJSONBestEffort(ctx context.Context, key string, out any) (bool, bool) {
 	kvMode, found, errGet := KVGetJSONRequired(ctx, key, out)
 	if errGet != nil {
-		log.Errorf("home kv best-effort get failed prefix=%s: %v", kvLogPrefix(key), errGet)
+		log.Errorf("kv best-effort get failed prefix=%s: %v", kvLogPrefix(key), errGet)
 		return kvMode, false
 	}
 	return kvMode, found
@@ -103,7 +103,7 @@ func KVGetJSONBestEffort(ctx context.Context, key string, out any) (bool, bool) 
 func KVSetJSONBestEffort(ctx context.Context, key string, value any, ttl time.Duration) bool {
 	raw, errMarshal := json.Marshal(value)
 	if errMarshal != nil {
-		log.Errorf("home kv best-effort set failed prefix=%s: %v", kvLogPrefix(key), errMarshal)
+		log.Errorf("kv best-effort set failed prefix=%s: %v", kvLogPrefix(key), errMarshal)
 		return false
 	}
 	return KVSetBytesBestEffort(ctx, key, raw, ttl)
@@ -116,7 +116,7 @@ func KVSetBytesBestEffort(ctx context.Context, key string, value []byte, ttl tim
 		return false
 	}
 	if errSet != nil {
-		log.Errorf("home kv best-effort set failed prefix=%s: %v", kvLogPrefix(key), errSet)
+		log.Errorf("kv best-effort set failed prefix=%s: %v", kvLogPrefix(key), errSet)
 		return false
 	}
 	return true
@@ -129,7 +129,7 @@ func KVSetNXBestEffort(ctx context.Context, key string, value []byte, ttl time.D
 		return false
 	}
 	if errSet != nil {
-		log.Errorf("home kv best-effort setnx failed prefix=%s: %v", kvLogPrefix(key), errSet)
+		log.Errorf("kv best-effort setnx failed prefix=%s: %v", kvLogPrefix(key), errSet)
 		return false
 	}
 	return written
@@ -142,7 +142,7 @@ func KVDelBestEffort(ctx context.Context, keys ...string) bool {
 		return false
 	}
 	if errDel != nil {
-		log.Errorf("home kv best-effort del failed prefix=%s: %v", kvLogPrefix(firstKVKey(keys)), errDel)
+		log.Errorf("kv best-effort del failed prefix=%s: %v", kvLogPrefix(firstKVKey(keys)), errDel)
 		return false
 	}
 	return true
@@ -155,7 +155,7 @@ func KVExpireBestEffort(ctx context.Context, key string, ttl time.Duration) bool
 		return false
 	}
 	if errExpire != nil {
-		log.Errorf("home kv best-effort expire failed prefix=%s: %v", kvLogPrefix(key), errExpire)
+		log.Errorf("kv best-effort expire failed prefix=%s: %v", kvLogPrefix(key), errExpire)
 		return false
 	}
 	return true

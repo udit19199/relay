@@ -16,7 +16,7 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	internalcache "github.com/router-for-me/CLIProxyAPI/v8/internal/cache"
-	homekv "github.com/router-for-me/CLIProxyAPI/v8/internal/home"
+	kvstore "github.com/router-for-me/CLIProxyAPI/v8/internal/kvstore"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
 	internalsignature "github.com/router-for-me/CLIProxyAPI/v8/internal/signature"
@@ -368,7 +368,7 @@ func logAntigravityReasoningReplayDegraded(scope antigravityReasoningReplayScope
 	if err == nil {
 		return
 	}
-	if errors.Is(err, homekv.ErrCompareAndSwapUnsupported) {
+	if errors.Is(err, kvstore.ErrCompareAndSwapUnsupported) {
 		log.Debugf("antigravity executor: reasoning replay %s unavailable on this Home (session=%s): %v",
 			stage, antigravityReplayLogKey(scope.sessionKey), err)
 		return

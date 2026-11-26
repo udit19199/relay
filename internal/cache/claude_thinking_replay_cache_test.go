@@ -3,16 +3,29 @@ package cache
 import (
 	"bytes"
 	"context"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/kvstore"
 	"sync"
 	"testing"
 	"time"
-
-	homekv "github.com/router-for-me/CLIProxyAPI/v8/internal/home"
 )
 
 type fakeClaudeThinkingReplayKVClient struct {
 	mu     sync.Mutex
 	values map[string][]byte
+}
+
+func (c *fakeClaudeThinkingReplayKVClient) KVSet(_ context.Context, key string, value []byte, opts kvstore.KVSetOptions) (bool, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	_, exists := c.values[key]
+	if opts.NX && exists {
+		return false, nil
+	}
+	if opts.XX && !exists {
+		return false, nil
+	}
+	c.values[key] = append([]byte(nil), value...)
+	return true, nil
 }
 
 func newFakeClaudeThinkingReplayKVClient() *fakeClaudeThinkingReplayKVClient {
@@ -24,13 +37,6 @@ func (c *fakeClaudeThinkingReplayKVClient) KVGet(_ context.Context, key string) 
 	defer c.mu.Unlock()
 	value, found := c.values[key]
 	return append([]byte(nil), value...), found, nil
-}
-
-func (c *fakeClaudeThinkingReplayKVClient) KVSet(_ context.Context, key string, value []byte, _ homekv.KVSetOptions) (bool, error) {
-	c.mu.Lock()
-	c.values[key] = append([]byte(nil), value...)
-	c.mu.Unlock()
-	return true, nil
 }
 
 func (c *fakeClaudeThinkingReplayKVClient) KVDel(_ context.Context, keys ...string) (int64, error) {

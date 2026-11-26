@@ -10,7 +10,7 @@ import (
 
 	"github.com/MoeForge/moego/base64"
 	"github.com/MoeForge/moego/ojson"
-	homekv "github.com/router-for-me/CLIProxyAPI/v8/internal/home"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/kvstore"
 )
 
 type fakeAntigravityReasoningReplayKVClient struct {
@@ -18,6 +18,20 @@ type fakeAntigravityReasoningReplayKVClient struct {
 	values      map[string][]byte
 	expireCount int
 	casErr      error
+}
+
+func (c *fakeAntigravityReasoningReplayKVClient) KVSet(_ context.Context, key string, value []byte, opts kvstore.KVSetOptions) (bool, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	_, exists := c.values[key]
+	if opts.NX && exists {
+		return false, nil
+	}
+	if opts.XX && !exists {
+		return false, nil
+	}
+	c.values[key] = append([]byte(nil), value...)
+	return true, nil
 }
 
 func newFakeAntigravityReasoningReplayKVClient() *fakeAntigravityReasoningReplayKVClient {
@@ -29,13 +43,6 @@ func (c *fakeAntigravityReasoningReplayKVClient) KVGet(_ context.Context, key st
 	defer c.mu.Unlock()
 	value, ok := c.values[key]
 	return append([]byte(nil), value...), ok, nil
-}
-
-func (c *fakeAntigravityReasoningReplayKVClient) KVSet(_ context.Context, key string, value []byte, _ homekv.KVSetOptions) (bool, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.values[key] = append([]byte(nil), value...)
-	return true, nil
 }
 
 func (c *fakeAntigravityReasoningReplayKVClient) KVCompareAndSwap(_ context.Context, key string, expected []byte, expectedExists bool, value []byte, _ time.Duration) (bool, error) {
@@ -72,11 +79,11 @@ func (c *fakeAntigravityReasoningReplayKVClient) KVExpire(_ context.Context, _ s
 	return true, nil
 }
 
-func useFakeAntigravityReasoningReplayKVClient(t *testing.T, client *fakeAntigravityReasoningReplayKVClient, homeMode bool) {
+func useFakeAntigravityReasoningReplayKVClient(t *testing.T, client *fakeAntigravityReasoningReplayKVClient, kvMode bool) {
 	t.Helper()
 	previous := currentAntigravityReasoningReplayKVClient
 	currentAntigravityReasoningReplayKVClient = func() (antigravityReasoningReplayKVClient, bool, error) {
-		return client, homeMode, nil
+		return client, kvMode, nil
 	}
 	t.Cleanup(func() {
 		currentAntigravityReasoningReplayKVClient = previous
@@ -494,7 +501,7 @@ func TestAntigravityReasoningReplayLocalAbsenceReservationsStayWithinEntryBound(
 	}
 }
 
-func TestAntigravityReasoningReplayHomeWritesUnwrappedJSONArrayAndReadsLegacyBase64(t *testing.T) {
+func TestAntigravityReasoningReplayKVWritesUnwrappedJSONArrayAndReadsLegacyBase64(t *testing.T) {
 	client := newFakeAntigravityReasoningReplayKVClient()
 	useFakeAntigravityReasoningReplayKVClient(t, client, true)
 	const model, session = "gemini-3.6-flash-high", "home-unwrapped-json-array"
@@ -520,7 +527,7 @@ func TestAntigravityReasoningReplayHomeWritesUnwrappedJSONArrayAndReadsLegacyBas
 	}
 }
 
-func TestAntigravityReasoningReplayHomeReadNormalizesAndRejectsMixedInvalidChain(t *testing.T) {
+func TestAntigravityReasoningReplayKVReadNormalizesAndRejectsMixedInvalidChain(t *testing.T) {
 	client := newFakeAntigravityReasoningReplayKVClient()
 	useFakeAntigravityReasoningReplayKVClient(t, client, true)
 	const model, session = "gemini-3.6-flash-high", "home-validation"

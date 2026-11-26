@@ -196,9 +196,6 @@ func (h *BaseAPIHandler) executeCountWithAuthManager(ctx context.Context, handle
 }
 
 func (h *BaseAPIHandler) executeWithPluginExecutor(ctx context.Context, entryProtocol, responseProtocol, modelName, originalRequestedModel string, rawJSON []byte, alt, executorPluginID string, execOptions modelExecutionOptions) ([]byte, http.Header, *interfaces.ErrorMessage) {
-	if h.AuthManager != nil && h.AuthManager.HomeEnabled() {
-		return nil, nil, &interfaces.ErrorMessage{StatusCode: http.StatusServiceUnavailable, Error: fmt.Errorf("plugin executor routing is unavailable while Home is enabled")}
-	}
 	host := h.pluginExecutorHost()
 	if host == nil {
 		return nil, nil, &interfaces.ErrorMessage{StatusCode: http.StatusBadGateway, Error: fmt.Errorf("plugin executor host is unavailable")}
@@ -248,9 +245,6 @@ func (h *BaseAPIHandler) executeWithPluginExecutor(ctx context.Context, entryPro
 }
 
 func (h *BaseAPIHandler) countWithPluginExecutor(ctx context.Context, handlerType, modelName, originalRequestedModel string, rawJSON []byte, alt, executorPluginID string, execOptions modelExecutionOptions) ([]byte, http.Header, *interfaces.ErrorMessage) {
-	if h.AuthManager != nil && h.AuthManager.HomeEnabled() {
-		return nil, nil, &interfaces.ErrorMessage{StatusCode: http.StatusServiceUnavailable, Error: fmt.Errorf("plugin executor routing is unavailable while Home is enabled")}
-	}
 	host := h.pluginExecutorHost()
 	if host == nil {
 		return nil, nil, &interfaces.ErrorMessage{StatusCode: http.StatusBadGateway, Error: fmt.Errorf("plugin executor host is unavailable")}

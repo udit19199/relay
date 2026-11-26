@@ -35,11 +35,7 @@ func ParseConfigBytes(data []byte) (*Config, error) {
 	cfg.WebsocketAuth = true
 	cfg.Pprof.Enable = false
 	cfg.Pprof.Addr = DefaultPprofAddr
-	cfg.Discovery.Enabled = false
-	cfg.Discovery.ServiceType = DefaultDiscoveryServiceType
-	cfg.Discovery.Subtypes = []string{"_chat-completions", "_responses", "_messages", "_generate-content", "_interactions"}
 	cfg.RemoteManagement.PanelGitHubRepository = DefaultPanelGitHubRepository
-	cfg.CredentialInFlight = DefaultCredentialInFlightConfig()
 
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("parse config payload: %w", err)
@@ -48,21 +44,11 @@ func ParseConfigBytes(data []byte) (*Config, error) {
 		return nil, errValidate
 	}
 
-	cfg.CredentialConcurrency = cfg.CredentialConcurrency.WithDefaults()
-	if errValidate := cfg.CredentialInFlight.Validate(); errValidate != nil {
-		return nil, errValidate
-	}
 	if errValidate := cfg.ValidateCredentialWeights(); errValidate != nil {
 		return nil, errValidate
 	}
 	if errValidate := cfg.Codex.LiveMediaRelay.Validate(); errValidate != nil {
 		return nil, errValidate
-	}
-	if cfg.Discovery.ServiceType == "" {
-		cfg.Discovery.ServiceType = DefaultDiscoveryServiceType
-	}
-	if len(cfg.Discovery.Subtypes) == 0 {
-		cfg.Discovery.Subtypes = []string{"_chat-completions", "_responses", "_messages", "_generate-content", "_interactions"}
 	}
 
 	// Hash remote management key if plaintext is detected (nested), but do NOT persist.

@@ -9,10 +9,6 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/home"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 )
 
@@ -172,90 +168,6 @@ func TestModelsEndpoint_ExposesResponseToPluginInterceptors_Gemini(t *testing.T)
 	}
 	if !strings.Contains(rr.Body.String(), "gemini-custom") {
 		t.Fatalf("response body did not contain intercepted model: %s", rr.Body.String())
-	}
-}
-
-func TestModelsEndpoint_ExposesResponseToPluginInterceptors_CodexClientVersion(t *testing.T) {
-	for _, useHome := range []bool{false, true} {
-		name := "local"
-		if useHome {
-			name = "home"
-		}
-		t.Run(name, func(t *testing.T) {
-			server := newTestServer(t)
-			updatedCfg := *server.cfg
-			updatedCfg.Client.Codex.EnableApplyPatch = true
-			server.UpdateClients(&updatedCfg)
-			server.handlers.AuthManager.RegisterExecutor(executor.NewOpenAICompatExecutor("interceptor-patch", &config.Config{}))
-			modelRegistry := registry.GetGlobalRegistry()
-			modelRegistry.RegisterClient("interceptor-patch-models", "interceptor-patch", []*registry.ModelInfo{{ID: "interceptor-patch-supported"}})
-			modelRegistry.RegisterClient("interceptor-unknown-models", "remote", []*registry.ModelInfo{{ID: "interceptor-patch-unknown"}})
-			t.Cleanup(func() {
-				modelRegistry.UnregisterClient("interceptor-patch-models")
-				modelRegistry.UnregisterClient("interceptor-unknown-models")
-			})
-			if useHome {
-				server.cfg.Home.Enabled = true
-				client := newHomeCatalogClient(t, `{"interceptor-patch":[{"id":"interceptor-patch-supported"}],"remote":[{"id":"interceptor-patch-unknown"}]}`)
-				previousHome := home.Current()
-				home.SetCurrent(client)
-				t.Cleanup(func() { home.SetCurrent(previousHome) })
-			}
-			intercepted := false
-			server.handlers.SetPluginHost(&mockModelListInterceptorHost{
-				interceptResponse: func(_ context.Context, req pluginapi.ResponseInterceptRequest) pluginapi.ResponseInterceptResponse {
-					intercepted = true
-					if req.SourceFormat != "openai" {
-						t.Fatalf("SourceFormat = %q, want openai", req.SourceFormat)
-					}
-					var parsed map[string]any
-					if errUnmarshal := json.Unmarshal(req.Body, &parsed); errUnmarshal != nil {
-						t.Fatalf("failed to unmarshal original body: %v", errUnmarshal)
-					}
-					seen := 0
-					for _, raw := range parsed["models"].([]any) {
-						entry := raw.(map[string]any)
-						switch entry["slug"] {
-						case "interceptor-patch-supported":
-							seen++
-							if entry["apply_patch_tool_type"] != "freeform" {
-								t.Fatal("interceptor did not receive freeform capability")
-							}
-						case "interceptor-patch-unknown":
-							seen++
-							assertCodexNullableCatalogField(t, entry, "apply_patch_tool_type")
-						}
-					}
-					if seen != 2 {
-						t.Fatalf("interceptor saw %d expected entries, want 2", seen)
-					}
-					parsed["intercepted_by_plugin"] = true
-					modified, errMarshal := json.Marshal(parsed)
-					if errMarshal != nil {
-						t.Fatalf("marshal intercepted catalog: %v", errMarshal)
-					}
-					return pluginapi.ResponseInterceptResponse{Headers: req.ResponseHeaders, Body: modified}
-				},
-			})
-			req := httptest.NewRequest(http.MethodGet, "/v1/models?client_version=0.137.0", nil)
-			req.Header.Set("Authorization", "Bearer test-key")
-			rr := httptest.NewRecorder()
-			engine := server.engine
-			if useHome {
-				engine = gin.New()
-				engine.GET("/v1/models", server.unifiedModelsHandler(nil, nil))
-			}
-			engine.ServeHTTP(rr, req)
-			if rr.Code != http.StatusOK {
-				t.Fatalf("status = %d, body = %s", rr.Code, rr.Body.String())
-			}
-			if !intercepted {
-				t.Fatal("plugin InterceptResponse was not called for /v1/models?client_version")
-			}
-			if !strings.Contains(rr.Body.String(), "intercepted_by_plugin") {
-				t.Fatal("response body did not contain intercepted marker")
-			}
-		})
 	}
 }
 

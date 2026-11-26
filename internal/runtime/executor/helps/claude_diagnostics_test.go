@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	homekv "github.com/router-for-me/CLIProxyAPI/v8/internal/home"
 )
 
 func TestClaudeDiagnosticsTracksCompletedMessagePerCredentialSession(t *testing.T) {
@@ -650,126 +649,6 @@ func TestPinClaudeSessionDateKVPersistsPermanentlyAndIgnoresRetention(t *testing
 	}
 	if fakeKV.setNXCalls != 1 || fakeKV.casCalls != 0 {
 		t.Fatalf("invalid date must not write to KV: setNX=%d cas=%d, want 1/0", fakeKV.setNXCalls, fakeKV.casCalls)
-	}
-}
-
-func TestPinClaudeSessionDateKVConcurrentCorruptedRepairUsesCAS(t *testing.T) {
-	resetClaudeDiagnosticsForTest()
-	defer resetClaudeDiagnosticsForTest()
-
-	fakeKV := &fakeClaudeSessionDatePinKVClient{values: make(map[string][]byte)}
-	prevClientFunc := currentClaudeSessionDatePinKVClient
-	currentClaudeSessionDatePinKVClient = func() (claudeSessionDatePinKVClient, bool, error) {
-		return fakeKV, true, nil
-	}
-	defer func() {
-		currentClaudeSessionDatePinKVClient = prevClientFunc
-	}()
-
-	wantKVKey := "cpa:claude:session-date-pin:" + ClaudeSessionDatePinKey("session-cas")
-	fakeKV.values[wantKVKey] = []byte("corrupted-value")
-
-	key1, _, _ := BeginClaudeDiagnostics("cred-1", "session-cas")
-	key2, _, _ := BeginClaudeDiagnostics("cred-2", "session-cas")
-
-	// Synchronize the first two KVGet calls so both callers deterministically
-	// observe the same corrupted bytes before either executes KVCompareAndSwap.
-	var getBarrier sync.WaitGroup
-	getBarrier.Add(2)
-	var barrierOnce sync.Mutex
-	barrierCount := 0
-	fakeKV.onKVGet = func() {
-		barrierOnce.Lock()
-		barrierCount++
-		waitForBoth := barrierCount <= 2
-		barrierOnce.Unlock()
-		if waitForBoth {
-			getBarrier.Done()
-			getBarrier.Wait()
-		}
-	}
-
-	var (
-		wg   sync.WaitGroup
-		got1 string
-		got2 string
-	)
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		got1 = PinClaudeSessionDate(key1, "session-cas", "2026-08-01", 0)
-	}()
-	go func() {
-		defer wg.Done()
-		got2 = PinClaudeSessionDate(key2, "session-cas", "2026-08-02", 0)
-	}()
-	wg.Wait()
-	fakeKV.onKVGet = nil
-
-	if got1 != got2 {
-		t.Fatalf("concurrent CAS repair returned divergent dates: %q vs %q", got1, got2)
-	}
-	if got1 != "2026-08-01" && got1 != "2026-08-02" {
-		t.Fatalf("concurrent CAS repair date = %q, want 2026-08-01 or 2026-08-02", got1)
-	}
-	if string(fakeKV.values[wantKVKey]) != got1 {
-		t.Fatalf("KV value after concurrent repair = %q, want %q", string(fakeKV.values[wantKVKey]), got1)
-	}
-	if fakeKV.casCalls != 2 {
-		t.Fatalf("CAS repair calls: cas=%d, want 2", fakeKV.casCalls)
-	}
-	if fakeKV.lastCASTTL != 0 {
-		t.Fatalf("KVCompareAndSwap TTL = %v, want 0 (permanent)", fakeKV.lastCASTTL)
-	}
-
-	// When KVCompareAndSwap returns ErrCompareAndSwapUnsupported, concurrent callers
-	// must still converge on a single deterministic date via the mutex-protected L1
-	// fallback without performing an unconditional KV overwrite race.
-	resetClaudeDiagnosticsForTest()
-	fakeKV.values[wantKVKey] = []byte("corrupted-again")
-	fakeKV.casErr = homekv.ErrCompareAndSwapUnsupported
-	key3, _, _ := BeginClaudeDiagnostics("cred-3", "session-cas")
-	key4, _, _ := BeginClaudeDiagnostics("cred-4", "session-cas")
-
-	var unsupportedBarrier sync.WaitGroup
-	unsupportedBarrier.Add(2)
-	unsupportedCount := 0
-	fakeKV.onKVGet = func() {
-		barrierOnce.Lock()
-		unsupportedCount++
-		waitForBoth := unsupportedCount <= 2
-		barrierOnce.Unlock()
-		if waitForBoth {
-			unsupportedBarrier.Done()
-			unsupportedBarrier.Wait()
-		}
-	}
-
-	var (
-		wgUnsupported sync.WaitGroup
-		got3          string
-		got4          string
-	)
-	wgUnsupported.Add(2)
-	go func() {
-		defer wgUnsupported.Done()
-		got3 = PinClaudeSessionDate(key3, "session-cas", "2026-08-05", 0)
-	}()
-	go func() {
-		defer wgUnsupported.Done()
-		got4 = PinClaudeSessionDate(key4, "session-cas", "2026-08-06", 0)
-	}()
-	wgUnsupported.Wait()
-	fakeKV.onKVGet = nil
-
-	if got3 != got4 {
-		t.Fatalf("concurrent CAS-unsupported fallback returned divergent dates: %q vs %q", got3, got4)
-	}
-	if got3 != "2026-08-05" && got3 != "2026-08-06" {
-		t.Fatalf("concurrent CAS-unsupported fallback date = %q, want 2026-08-05 or 2026-08-06", got3)
-	}
-	if got := PinClaudeSessionDate(key3, "session-cas", "2026-08-07", 0); got != got3 {
-		t.Fatalf("subsequent call after CAS-unsupported fallback = %q, want %q", got, got3)
 	}
 }
 

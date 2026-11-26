@@ -166,22 +166,14 @@ func (h *BaseAPIHandler) getRequestDetailsWithOptions(modelName string, allowIma
 	resolvedModelName := modelName
 	initialSuffix := thinking.ParseSuffix(modelName)
 	if initialSuffix.ModelName == "auto" {
-		if h != nil && h.AuthManager != nil && h.AuthManager.HomeEnabled() {
-			resolvedModelName = modelName
+		resolvedBase := util.ResolveAutoModel(initialSuffix.ModelName)
+		if initialSuffix.HasSuffix {
+			resolvedModelName = fmt.Sprintf("%s(%s)", resolvedBase, initialSuffix.RawSuffix)
 		} else {
-			resolvedBase := util.ResolveAutoModel(initialSuffix.ModelName)
-			if initialSuffix.HasSuffix {
-				resolvedModelName = fmt.Sprintf("%s(%s)", resolvedBase, initialSuffix.RawSuffix)
-			} else {
-				resolvedModelName = resolvedBase
-			}
+			resolvedModelName = resolvedBase
 		}
 	} else {
-		if h != nil && h.AuthManager != nil && h.AuthManager.HomeEnabled() {
-			resolvedModelName = modelName
-		} else {
-			resolvedModelName = util.ResolveAutoModel(modelName)
-		}
+		resolvedModelName = util.ResolveAutoModel(modelName)
 	}
 
 	parsed := thinking.ParseSuffix(resolvedModelName)
@@ -192,10 +184,6 @@ func (h *BaseAPIHandler) getRequestDetailsWithOptions(modelName string, allowIma
 	}
 	if errMsg := h.validateSpeechOnlyModel(baseModel, allowSpeechModel); errMsg != nil {
 		return nil, "", errMsg
-	}
-
-	if h != nil && h.AuthManager != nil && h.AuthManager.HomeEnabled() {
-		return []string{"home"}, resolvedModelName, nil
 	}
 
 	providers = util.GetProviderName(baseModel)

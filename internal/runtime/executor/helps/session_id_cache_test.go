@@ -68,18 +68,18 @@ func (c *fakeClaudeIDKVClient) KVExpire(_ context.Context, _ string, ttl time.Du
 	return true, nil
 }
 
-func useFakeClaudeIDKVClient(t *testing.T, client *fakeClaudeIDKVClient, homeMode bool, errClient error) {
+func useFakeClaudeIDKVClient(t *testing.T, client *fakeClaudeIDKVClient, kvMode bool, errClient error) {
 	t.Helper()
 	previous := currentClaudeIDKVClient
 	currentClaudeIDKVClient = func() (claudeIDKVClient, bool, error) {
-		return client, homeMode, errClient
+		return client, kvMode, errClient
 	}
 	t.Cleanup(func() {
 		currentClaudeIDKVClient = previous
 	})
 }
 
-func TestCachedSessionIDRequiredHomeReusesKVAcrossLocalCacheReset(t *testing.T) {
+func TestCachedSessionIDRequiredKVReusesKVAcrossLocalCacheReset(t *testing.T) {
 	resetSessionIDCache()
 	client := newFakeClaudeIDKVClient()
 	useFakeClaudeIDKVClient(t, client, true, nil)
@@ -110,7 +110,7 @@ func TestCachedSessionIDRequiredHomeReusesKVAcrossLocalCacheReset(t *testing.T) 
 	}
 }
 
-func TestCachedSessionIDRequiredEmptyAPIKeyDoesNotUseHomeKV(t *testing.T) {
+func TestCachedSessionIDRequiredEmptyAPIKeyDoesNotUseKV(t *testing.T) {
 	client := newFakeClaudeIDKVClient()
 	useFakeClaudeIDKVClient(t, client, true, nil)
 
@@ -126,7 +126,7 @@ func TestCachedSessionIDRequiredEmptyAPIKeyDoesNotUseHomeKV(t *testing.T) {
 	}
 }
 
-func TestCachedSessionIDRequiredHomeKVFailures(t *testing.T) {
+func TestCachedSessionIDRequiredKVKVFailures(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		client *fakeClaudeIDKVClient
@@ -146,7 +146,7 @@ func TestCachedSessionIDRequiredHomeKVFailures(t *testing.T) {
 	}
 }
 
-func TestCachedSessionIDRequiredHomeRequiresReadAfterSet(t *testing.T) {
+func TestCachedSessionIDRequiredKVRequiresReadAfterSet(t *testing.T) {
 	client := newFakeClaudeIDKVClient()
 	client.setNoPersist = true
 	useFakeClaudeIDKVClient(t, client, true, nil)

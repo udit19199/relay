@@ -51,7 +51,6 @@ type liveSession struct {
 	ownerPrincipal        string
 	ownerProvider         string
 	clientSecretPrincipal string
-	homeSelection         *auth.HomeDispatchSelection
 	media                 mediaRelaySession
 	resources             *liveSessionResources
 	token                 uint64
@@ -123,9 +122,6 @@ func (s *sessionStore) put(callID string, session liveSession) liveSession {
 			if errClose := previous.session.media.CloseWithReason("session_replaced"); errClose != nil {
 				log.WithError(errClose).Debug("codex live media: close replaced session")
 			}
-		}
-		if previous.session.homeSelection != session.homeSelection {
-			endHomeSelection(previous.session, "session_replaced")
 		}
 	}
 	return session
@@ -248,13 +244,6 @@ func endLiveSession(session liveSession, reason string) {
 			log.WithError(errClose).Debug("codex live media: close stored session")
 		}
 	}
-	endHomeSelection(session, reason)
-}
-
-func endHomeSelection(session liveSession, reason string) {
-	if session.homeSelection != nil {
-		session.homeSelection.End(reason)
-	}
 }
 
 func (r *liveSessionResources) add(closers ...func() error) {
@@ -366,59 +355,26 @@ func (h *Handler) HandleSideband(c *gin.Context) {
 		meta.ParentSessionID = session.parentSessionID
 		ctx = logging.WithClientRequestMetadata(ctx, meta)
 	}
-	var selection *auth.HomeDispatchSelection
 	var selected *auth.Auth
 	var errSelect error
-	if session.homeSelection != nil {
-		if !session.homeSelection.Active() {
-			consumeSession = true
-			writeLiveError(c, http.StatusServiceUnavailable, "Codex live Home selection unavailable")
-			return
-		}
-		selection = session.homeSelection
-		selected = selection.CloneAuth()
-	} else {
-		selectionOpts := coreexecutor.Options{
-			Headers: liveSelectionHeaders(c),
-			Metadata: map[string]any{
-				coreexecutor.PinnedAuthMetadataKey:       session.authID,
-				coreexecutor.ExecutionSessionMetadataKey: callID,
-			},
-		}
-		selection, selected, errSelect = h.selectOAuth(ctx, session.model, selectionOpts)
+
+	selectionOpts := coreexecutor.Options{
+		Headers: liveSelectionHeaders(c),
+		Metadata: map[string]any{
+			coreexecutor.PinnedAuthMetadataKey:       session.authID,
+			coreexecutor.ExecutionSessionMetadataKey: callID,
+		},
 	}
+	selected, errSelect = h.selectOAuth(ctx, session.model, selectionOpts)
 	if errSelect != nil {
 		writeSelectionError(c, errSelect)
 		return
-	}
-	if selection != nil && selection.CanonicalSessionID != "" {
-		meta := logging.GetClientRequestMetadata(ctx)
-		meta.SessionID = selection.CanonicalSessionID
-		if selection.ParentSessionID != "" {
-			meta.ParentSessionID = selection.ParentSessionID
-		} else {
-			meta.ParentSessionID = ""
-		}
-		if meta.SessionID == meta.ParentSessionID {
-			meta.ParentSessionID = ""
-		}
-		ctx = logging.WithClientRequestMetadata(ctx, meta)
 	}
 	if selected == nil {
 		writeLiveError(c, http.StatusServiceUnavailable, "Codex auth unavailable")
 		return
 	}
 
-	if selection != nil {
-		attemptCtx, releaseAttempt, errAttempt := selection.AttemptContext(ctx)
-		if errAttempt != nil {
-			consumeSession = true
-			writeLiveError(c, http.StatusServiceUnavailable, errAttempt.Error())
-			return
-		}
-		ctx = attemptCtx
-		defer releaseAttempt()
-	}
 	logging.SetGinCPATraceID(c, selected.EnsureIndex())
 
 	upstreamURL := buildSidebandURL(h.sidebandAPIBaseURL, style, callID)
@@ -451,19 +407,7 @@ func (h *Handler) HandleSideband(c *gin.Context) {
 
 	upstream, handshakeResponse, errDial := dialUpstream(selected)
 	if errDial != nil {
-		handshakeStatus := clienterror.HTTPStatusFromErrorOr(errDial, http.StatusBadGateway)
-		if handshakeResponse != nil && handshakeResponse.StatusCode > 0 {
-			handshakeStatus = handshakeResponse.StatusCode
-		}
-		responseBody := handleSidebandDialError(c, ctx, runtimeConfig, handshakeResponse, errDial)
-		if selection != nil && handshakeStatus == http.StatusUnauthorized {
-			diagnosticBody := responseBody
-			if len(diagnosticBody) == 0 {
-				diagnosticBody = []byte(errDial.Error())
-			}
-			h.authManager.ReportHomeUnauthorized(ctx, selected, "codex", session.model, diagnosticBody)
-			log.WithField("status", handshakeStatus).Warnf("codex live sideband upstream handshake failed: %s", logging.SafeDiagnosticForLog(string(diagnosticBody)))
-		}
+		handleSidebandDialError(c, ctx, runtimeConfig, handshakeResponse, errDial)
 		return
 	}
 	if handshakeResponse != nil {
@@ -476,15 +420,6 @@ func (h *Handler) HandleSideband(c *gin.Context) {
 	}
 
 	closeUpstream := websocketCloseFunc("upstream", upstream)
-	if selection != nil {
-		if errBind := selection.Bind(closeUpstream); errBind != nil {
-			consumeSession = true
-			writeLiveError(c, http.StatusServiceUnavailable, errBind.Error())
-			return
-		}
-	} else {
-		defer func() { _ = closeUpstream() }()
-	}
 
 	upgradeHeaders := make(http.Header)
 	if subprotocol := upstream.Subprotocol(); subprotocol != "" {
@@ -496,14 +431,6 @@ func (h *Handler) HandleSideband(c *gin.Context) {
 		return
 	}
 	closeDownstream := websocketCloseFunc("downstream", downstream)
-	if selection != nil {
-		if errBind := selection.Bind(closeDownstream); errBind != nil {
-			consumeSession = true
-			return
-		}
-	} else {
-		defer func() { _ = closeDownstream() }()
-	}
 	if session.resources != nil {
 		session.resources.add(closeUpstream, closeDownstream)
 	}

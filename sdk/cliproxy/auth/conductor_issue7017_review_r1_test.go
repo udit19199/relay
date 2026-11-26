@@ -113,18 +113,6 @@ func TestIssue7017ExecuteStreamBootstrapMarkedAttemptKeepsTrustedRetryAfter(t *t
 	}
 }
 
-func TestIssue7017RetryAfterFromErrorPrefersHomeAggregate(t *testing.T) {
-	cause := &Error{Message: "upstream body", HTTPStatus: http.StatusTooManyRequests}
-	perAttempt := 5 * time.Second
-	annotated := withTrustedRetryAfter(cause, &perAttempt)
-	aggregated := 1500 * time.Millisecond
-	terminal := markHomeRetryRoundExhausted(annotated, &aggregated, false)
-	got := retryAfterFromError(terminal)
-	if got == nil || *got != aggregated {
-		t.Fatalf("retryAfterFromError = %v, want Home aggregate %v", got, aggregated)
-	}
-}
-
 func TestIssue7017MarkResultExplicitZeroHintSkipsCooldown(t *testing.T) {
 	withQuotaCooldownEnabled(t)
 	zero := time.Duration(0)

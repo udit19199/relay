@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	homekv "github.com/router-for-me/CLIProxyAPI/v8/internal/home"
+	kvstore "github.com/router-for-me/CLIProxyAPI/v8/internal/kvstore"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -42,13 +42,13 @@ var cacheCleanupOnce sync.Once
 
 type signatureKVClient interface {
 	KVGet(ctx context.Context, key string) ([]byte, bool, error)
-	KVSet(ctx context.Context, key string, value []byte, opts homekv.KVSetOptions) (bool, error)
+	KVSet(ctx context.Context, key string, value []byte, opts kvstore.KVSetOptions) (bool, error)
 	KVDel(ctx context.Context, keys ...string) (int64, error)
 	KVExpire(ctx context.Context, key string, ttl time.Duration) (bool, error)
 }
 
 var currentSignatureKVClient = func() (signatureKVClient, bool, error) {
-	return homekv.CurrentKVClient()
+	return kvstore.CurrentKVClient()
 }
 
 // groupCache is the inner map type
@@ -130,12 +130,12 @@ func CacheSignatureBestEffort(ctx context.Context, modelName, text, signature st
 		return false
 	}
 
-	if client, homeMode, errClient := currentSignatureKVClient(); homeMode {
+	if client, kvMode, errClient := currentSignatureKVClient(); kvMode {
 		if errClient != nil {
 			log.Errorf("home kv best-effort signature set failed prefix=cpa:signature:*: %v", errClient)
 			return false
 		}
-		written, errSet := client.KVSet(ctx, signatureKVKey(modelName, text), []byte(signature), homekv.KVSetOptions{EX: SignatureCacheTTL})
+		written, errSet := client.KVSet(ctx, signatureKVKey(modelName, text), []byte(signature), kvstore.KVSetOptions{EX: SignatureCacheTTL})
 		if errSet != nil {
 			log.Errorf("home kv best-effort signature set failed prefix=cpa:signature:*: %v", errSet)
 			return false
@@ -177,7 +177,7 @@ func GetCachedSignatureRequired(ctx context.Context, modelName, text string) (st
 		return "", nil
 	}
 
-	if client, homeMode, errClient := currentSignatureKVClient(); homeMode {
+	if client, kvMode, errClient := currentSignatureKVClient(); kvMode {
 		if errClient != nil {
 			return "", errClient
 		}
@@ -255,7 +255,7 @@ func DeleteCachedSignatureRequired(ctx context.Context, modelName, text string) 
 	if text == "" {
 		return nil
 	}
-	if client, homeMode, errClient := currentSignatureKVClient(); homeMode {
+	if client, kvMode, errClient := currentSignatureKVClient(); kvMode {
 		if errClient != nil {
 			return errClient
 		}
@@ -296,7 +296,7 @@ func GetModelGroup(modelName string) string {
 }
 
 func signatureKVKey(modelName, text string) string {
-	return fmt.Sprintf("cpa:signature:%s:%s", GetModelGroup(modelName), homekv.HashKeyPart(text))
+	return fmt.Sprintf("cpa:signature:%s:%s", GetModelGroup(modelName), kvstore.HashKeyPart(text))
 }
 
 var signatureCacheEnabled atomic.Bool

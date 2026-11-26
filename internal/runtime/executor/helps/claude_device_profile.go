@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	homekv "github.com/router-for-me/CLIProxyAPI/v8/internal/home"
+	kvstore "github.com/router-for-me/CLIProxyAPI/v8/internal/kvstore"
 	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 )
 
@@ -44,13 +44,13 @@ var (
 
 type claudeDeviceProfileKVClient interface {
 	KVGet(ctx context.Context, key string) ([]byte, bool, error)
-	KVSet(ctx context.Context, key string, value []byte, opts homekv.KVSetOptions) (bool, error)
+	KVSet(ctx context.Context, key string, value []byte, opts kvstore.KVSetOptions) (bool, error)
 	KVSetNX(ctx context.Context, key string, value []byte, ttl time.Duration) (bool, error)
 	KVExpire(ctx context.Context, key string, ttl time.Duration) (bool, error)
 }
 
 var currentClaudeDeviceProfileKVClient = func() (claudeDeviceProfileKVClient, bool, error) {
-	return homekv.CurrentKVClient()
+	return kvstore.CurrentKVClient()
 }
 
 type claudeCLIVersion struct {
@@ -383,11 +383,11 @@ func claudeDeviceProfileCacheKey(auth *cliproxyauth.Auth, apiKey string, profile
 }
 
 func claudeDeviceProfileKVKey(auth *cliproxyauth.Auth, apiKey string, profile ClaudeDeviceProfile, configs ...*config.Config) string {
-	return "cpa:claude:device-profile:" + homekv.HashKeyPart(claudeDeviceProfileScopedKey(auth, apiKey, profile, configs...))
+	return "cpa:claude:device-profile:" + kvstore.HashKeyPart(claudeDeviceProfileScopedKey(auth, apiKey, profile, configs...))
 }
 
 func claudeDeviceProfileLockKVKey(auth *cliproxyauth.Auth, apiKey string, profile ClaudeDeviceProfile, configs ...*config.Config) string {
-	return "cpa:claude:device-profile-lock:" + homekv.HashKeyPart(claudeDeviceProfileScopedKey(auth, apiKey, profile, configs...))
+	return "cpa:claude:device-profile-lock:" + kvstore.HashKeyPart(claudeDeviceProfileScopedKey(auth, apiKey, profile, configs...))
 }
 
 func startClaudeDeviceProfileCacheCleanup() {
@@ -421,8 +421,8 @@ func ResolveClaudeDeviceProfile(auth *cliproxyauth.Auth, apiKey string, headers 
 
 // ResolveClaudeDeviceProfileRequired resolves a stable Claude Code device profile for request-time paths.
 func ResolveClaudeDeviceProfileRequired(ctx context.Context, auth *cliproxyauth.Auth, apiKey string, headers http.Header, cfg *config.Config) (ClaudeDeviceProfile, error) {
-	client, homeMode, errClient := currentClaudeDeviceProfileKVClient()
-	if homeMode {
+	client, kvMode, errClient := currentClaudeDeviceProfileKVClient()
+	if kvMode {
 		if errClient != nil {
 			return ClaudeDeviceProfile{}, errClient
 		}
@@ -582,7 +582,7 @@ func writeClaudeDeviceProfileToHome(ctx context.Context, client claudeDeviceProf
 	if errMarshal != nil {
 		return errMarshal
 	}
-	written, errSet := client.KVSet(ctx, key, raw, homekv.KVSetOptions{EX: claudeDeviceProfileTTL})
+	written, errSet := client.KVSet(ctx, key, raw, kvstore.KVSetOptions{EX: claudeDeviceProfileTTL})
 	if errSet != nil {
 		return errSet
 	}

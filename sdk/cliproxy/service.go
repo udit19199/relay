@@ -7,20 +7,15 @@ import (
 	"context"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/api"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/home"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/homeplugins"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/pluginhost"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/watcher"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/wsrelay"
 	sdkaccess "github.com/router-for-me/CLIProxyAPI/v8/sdk/access"
 	sdkAuth "github.com/router-for-me/CLIProxyAPI/v8/sdk/auth"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executionregistry"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/config"
-	sdkpluginstore "github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginstore"
 )
 
 // Service wraps the proxy server lifecycle so external programs can embed the CLI proxy.
@@ -33,7 +28,7 @@ type Service struct {
 	// cfgMu protects concurrent access to the configuration.
 	cfgMu sync.RWMutex
 
-	// configUpdateMu serializes config updates across watcher + home.
+	// configUpdateMu serializes config updates across watcher callbacks.
 	configUpdateMu sync.Mutex
 
 	// configRuntimeMu orders side-effecting runtime application after config commits.
@@ -74,9 +69,6 @@ type Service struct {
 	// pprofServer manages the optional pprof HTTP debug server.
 	pprofServer *pprofServer
 
-	// discoveryManager manages local network mDNS / DNS-SD service advertising.
-	discoveryManager *discoveryAdvertiserManager
-
 	// kvStoreManaged tracks whether this service instance owns local KVStore lifecycle.
 	kvStoreManaged atomic.Bool
 
@@ -116,29 +108,10 @@ type Service struct {
 	// wsGateway manages websocket Gemini providers.
 	wsGateway *wsrelay.Manager
 
-	homeLifecycleMu              sync.Mutex
-	homeOwnershipMu              sync.Mutex
-	homeConfigCommitMu           sync.Mutex
-	homeConfigStageHook          func()
-	homeConfigCommitHook         func()
-	homeConfigRuntimeHook        func()
+	runCancelMu                  sync.Mutex
+	runCancel                    context.CancelFunc
 	applyPprofConfigContextFn    func(context.Context, *config.Config) bool
 	updateServerClientsContextFn func(context.Context, *config.Config) bool
-	homeSupervisor               *homeSubscriberSupervisor
-	homeMu                       sync.Mutex
-	homeGeneration               uint64
-	homeClient                   *home.Client
-	homeRegistry                 *executionregistry.Registry
-	homeDispatchBundle           *coreauth.HomeDispatchBundle
-	homeDrainBound               time.Duration
-	homeCancel                   context.CancelFunc
-	runCancel                    context.CancelFunc
-	homeLogForwarder             homeLogForwarder
-	homeLogForwarderClient       *home.Client
-	homePluginSyncMu             sync.Mutex
-	homePluginSyncKey            string
-	homePluginSyncFetch          func(context.Context, sdkpluginstore.PluginSyncRequest) (sdkpluginstore.PluginSyncResponse, error)
-	homePluginDeleteTask         func(context.Context, *config.Config, home.PluginTask) homeplugins.SyncReport
 	antigravityProbeWg           sync.WaitGroup
 	// antigravityContext is protected by cfgMu and owns background model probes.
 	antigravityContext       context.Context

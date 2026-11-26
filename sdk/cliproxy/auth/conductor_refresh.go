@@ -116,9 +116,9 @@ func (m *Manager) queueRefreshUnschedule(authID string) {
 }
 
 // codexAutoRefreshUnavailable mirrors the executor's local renewal requirements.
-// Runtime evaluators and Home retain control over their own refresh mechanisms.
+// Runtime evaluators retain control over their own refresh mechanisms.
 func (m *Manager) codexAutoRefreshUnavailable(a *Auth, now time.Time) bool {
-	if !authProviderIs(a, "codex") || m.HomeEnabled() {
+	if !authProviderIs(a, "codex") {
 		return false
 	}
 	if evaluator, ok := a.Runtime.(RefreshEvaluator); ok && evaluator != nil {
@@ -1112,26 +1112,6 @@ func clearUnauthorizedModelStates(auth *Auth, now time.Time) []string {
 		updateAggregatedAvailability(auth, now)
 	}
 	return resumed
-}
-
-// RefreshHomeSelectionAfterUnauthorized only reuses a newer snapshot already
-// installed by Home. It never refreshes or mutates Home-owned credentials.
-func (m *Manager) RefreshHomeSelectionAfterUnauthorized(ctx context.Context, selection *HomeDispatchSelection, failedAuth *Auth) (*Auth, bool, error) {
-	if m == nil || selection == nil {
-		return nil, false, nil
-	}
-	current := selection.CloneAuth()
-	if failedAuth == nil {
-		failedAuth = current
-	}
-	if current != nil && failedAuth != nil && current.ID == failedAuth.ID {
-		currentToken := authAccessTokenForRequest(ctx, current)
-		failedToken := authAccessTokenForRequest(ctx, failedAuth)
-		if currentToken != "" && failedToken != "" && currentToken != failedToken {
-			return current, true, nil
-		}
-	}
-	return current, false, nil
 }
 
 // tryRefreshAfterUnauthorized refreshes local OAuth credentials once after a

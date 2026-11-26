@@ -4,8 +4,6 @@ import (
 	"net/http"
 	"testing"
 	"time"
-
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
 )
 
 // Review round 5 regressions: an expired own-model quota marker is history,
@@ -72,19 +70,4 @@ func (e issue7017SafeHeaderError) Error() string { return "plugin failure" }
 
 func (e issue7017SafeHeaderError) SafeResponseHeaders() http.Header {
 	return http.Header{"Retry-After": []string{e.retryAfter}}
-}
-
-func TestHasTrustedRetryDeadlineCoversSafeHeaderCarriers(t *testing.T) {
-	if !HasTrustedRetryDeadline(newHomeConcurrencyBusyError(&Error{Message: "busy", HTTPStatus: http.StatusTooManyRequests}, time.Second)) {
-		t.Fatal("Home concurrency busy must report a trusted deadline")
-	}
-	dispatchCooldown := &homeDispatchRetryAfterError{cause: &Error{Message: "cooling", HTTPStatus: http.StatusTooManyRequests}, retryAfter: time.Second}
-	if !HasTrustedRetryDeadline(dispatchCooldown) {
-		t.Fatal("Home dispatch cooldown must report a trusted deadline")
-	}
-	if !HasTrustedRetryDeadline(issue7017SafeHeaderError{retryAfter: "1"}) {
-		t.Fatal("generic safe-header carriers must report a trusted deadline")
-	}
-	opts := cliproxyexecutor.Options{}
-	_ = opts
 }

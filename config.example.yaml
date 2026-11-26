@@ -14,7 +14,6 @@ config-version: 8
 # embedded catalogs, and normal mode uses the official remote sources.
 # Failed refreshes retain the last valid catalog; custom sources never fall back
 # to official URLs. Files and URLs are refreshed every 3 hours and on source changes.
-# Home mode never loads the general catalog, even when explicitly configured.
 models:
   catalog: ""
   codex-catalog: ""
@@ -66,31 +65,7 @@ server:
   # When true, disable high-overhead request logging and HTTP middleware features to reduce per-request memory usage under high concurrency.
   commercial-mode: false
 
-  # Enable local network mDNS / DNS-SD service discovery (RFC 6762 / RFC 6763).
-  # When enabled, broadcasts _ai-gateway._tcp with API protocol subtypes on the local network.
-  # TXT records follow draft-su-ai-gateway-discovery-00:
-  #   txtvers, path, tls, auth, protocols, auth_type, product, id, role
-  # The TXT protocols list mirrors the advertised subtypes. Management endpoints are never advertised.
-  # NOTE for Docker users: Link-local multicast (224.0.0.251) cannot cross default NAT bridge networks.
-  # To broadcast across the physical LAN, run the container with host networking (--net=host / network_mode: host).
-  discovery:
-    enabled: false
-    # service-name: ""                  # Optional name prefix. Advertised as CPA-<ShortID> or <name>-<ShortID> (e.g. office-8F3B)
-    # service-type: "_ai-gateway._tcp"  # Service type (RFC 6335 compliant)
-    # subtypes:                         # DNS-SD API protocol subtypes to advertise
-    #   - "_chat-completions"
-    #   - "_responses"
-    #   - "_messages"
-    #   - "_generate-content"
-    #   - "_interactions"
-    #   # Optional extended subtypes: _completions, _responses-ws, _realtime, _images,
-    #   # _videos, _audio, _count-tokens, _search
-    # interfaces:
-    #   include: []                     # White-listed interfaces (empty: auto-detect physical interfaces)
-    #   exclude: []                     # Additional interface patterns to exclude
-    # auth-required: true               # Advertise auth=1 (credentials required)
-
-  # Local persistent KV store settings (bbolt). Ignored when Home mode is enabled.
+  # Local persistent KV store settings (bbolt).
   kv-store:
     # Disable local bbolt KV persistence and fall back to in-memory maps (default: false).
     disabled: false
@@ -126,41 +101,6 @@ access:
     - "your-api-key-2"
     - "your-api-key-3"
 
-# Optional credential concurrency and observation contracts.
-
-# credentials:
-#
-#   # Credential concurrency is configured by Home in Home mode. The synthesized Home config is
-#   # authoritative and local values, including the values below, are ignored. Do not use local
-#   # configuration to override a Home concurrency policy.
-#
-#   concurrency:
-#     # Revisions are system-owned metadata, not ordinary editable settings.
-#     lifecycle-config-revision: 1
-#     observation-barrier-revision: 0
-#     cpa-heartbeat-timeout: "3s"
-#     cpa-cancel-bound: "5s"
-#     reclaim-grace: "5s"
-#     cleanup-interval: "5s"
-#     release-flush-interval: 250ms
-#     release-max-backoff: 2s
-#     busy-retry-min: 250ms
-#     busy-retry-max: 1s
-#     max-limit: 1000000
-#
-#   # Credential in-flight observation snapshot contract.
-#
-#   in-flight:
-#     snapshot-interval: 2s
-#     stale-after: 10s
-#     max-part-bytes: 262144
-#     max-part-count: 64
-#     max-revision-bytes: 16777216
-#     max-aggregate-groups: 100000
-#     max-details: 10000
-#     max-string-bytes: 256
-#     staging-retention: 1m
-
 # Routing strategy for selecting credentials when multiple match.
 routing:
   strategy: "round-robin" # round-robin (default), weighted-round-robin, fill-first
@@ -177,8 +117,6 @@ routing:
   # Sticky requests keep their bindings but stop adding compensation when the full
   # credit delta cannot fit the cap; new sessions keep earning credit to avoid starvation.
   # Credits are process-local and reset on restart or selector replacement.
-  # In Home mode, compatible Home versions charge retained WS turns from usage after completion;
-  # CPA preserves the retained credential and concurrency slot instead of redispatching each turn.
   # For OAuth/file credentials, add a top-level numeric "weight" field to the auth JSON.
   # Enable universal session-sticky routing for all clients.
   # Explicit Claude Code, Codex, OpenCode, and pi session headers are preferred,

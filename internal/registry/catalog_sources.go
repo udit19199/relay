@@ -376,7 +376,6 @@ var catalogRuntime struct {
 	ctx     context.Context
 	local   bool
 	sources CatalogSources
-	home    bool
 }
 
 // SetLocalModelCatalogs sets the process default before the service starts.
@@ -388,24 +387,22 @@ func SetLocalModelCatalogs(local bool) {
 }
 
 // StartModelCatalogUpdaters binds process-wide readers to the service lifetime.
-func StartModelCatalogUpdaters(ctx context.Context, sources CatalogSources, home bool) {
+func StartModelCatalogUpdaters(ctx context.Context, sources CatalogSources) {
 	catalogRuntime.Lock()
 	defer catalogRuntime.Unlock()
 	catalogRuntime.ctx = ctx
 	catalogRuntime.sources = sources
-	catalogRuntime.home = home
-	configureCatalogs(ctx, sources, catalogRuntime.local, home)
+	configureCatalogs(ctx, sources, catalogRuntime.local)
 }
 
 // UpdateModelCatalogSources updates an already-started process policy on reload.
 // Updates before service startup or after shutdown do not start readers.
-func UpdateModelCatalogSources(sources CatalogSources, home bool) {
+func UpdateModelCatalogSources(sources CatalogSources) {
 	catalogRuntime.Lock()
 	defer catalogRuntime.Unlock()
 	catalogRuntime.sources = sources
-	catalogRuntime.home = home
 	if catalogRuntime.ctx != nil && catalogRuntime.ctx.Err() == nil {
-		configureCatalogs(catalogRuntime.ctx, sources, catalogRuntime.local, home)
+		configureCatalogs(catalogRuntime.ctx, sources, catalogRuntime.local)
 	}
 }
 
@@ -413,14 +410,13 @@ func UpdateModelCatalogSources(sources CatalogSources, home bool) {
 func RefreshModelCatalogs(ctx context.Context) (CatalogRefreshResult, error) {
 	catalogRuntime.Lock()
 	sources := catalogRuntime.sources
-	home := catalogRuntime.home
 	catalogRuntime.Unlock()
-	return RefreshModelCatalogsWithPolicy(ctx, sources, home)
+	return RefreshModelCatalogsWithPolicy(ctx, sources)
 }
 
 // RefreshModelCatalogsWithPolicy triggers an immediate on-demand refresh using fallbackSources
-// and fallbackHome when process-wide catalog updaters have not been started.
-func RefreshModelCatalogsWithPolicy(ctx context.Context, fallbackSources CatalogSources, fallbackHome bool) (CatalogRefreshResult, error) {
+// when process-wide catalog updaters have not been started.
+func RefreshModelCatalogsWithPolicy(ctx context.Context, fallbackSources CatalogSources) (CatalogRefreshResult, error) {
 	if errValidate := fallbackSources.Validate(); errValidate != nil {
 		return CatalogRefreshResult{
 			Catalogs:         map[string]CatalogSourceStatus{},
@@ -431,11 +427,10 @@ func RefreshModelCatalogsWithPolicy(ctx context.Context, fallbackSources Catalog
 	local := catalogRuntime.local
 	if catalogRuntime.ctx != nil && catalogRuntime.ctx.Err() == nil {
 		fallbackSources = catalogRuntime.sources
-		fallbackHome = catalogRuntime.home
 	}
 	catalogRuntime.Unlock()
 
-	effectiveFallback := effectiveCatalogSources(fallbackSources, local, fallbackHome)
+	effectiveFallback := effectiveCatalogSources(fallbackSources, local)
 	var (
 		generalStatus CatalogSourceStatus
 		codexStatus   CatalogSourceStatus
@@ -487,18 +482,18 @@ func RefreshModelCatalogsWithPolicy(ctx context.Context, fallbackSources Catalog
 	return result, errors.Join(errGeneral, errCodex, errDevin)
 }
 
-func configureCatalogs(ctx context.Context, sources CatalogSources, local, home bool) {
+func configureCatalogs(ctx context.Context, sources CatalogSources, local bool) {
 	if errValidate := sources.Validate(); errValidate != nil {
 		log.WithError(errValidate).Warn("invalid catalog sources")
 		return
 	}
-	sources = effectiveCatalogSources(sources, local, home)
+	sources = effectiveCatalogSources(sources, local)
 	generalCatalogUpdater.configure(ctx, sources.Catalog)
 	codexCatalogUpdater.configure(ctx, sources.CodexCatalog)
 	devinCatalogUpdater.configure(ctx, sources.DevinCatalog)
 }
 
-func effectiveCatalogSources(sources CatalogSources, local, home bool) CatalogSources {
+func effectiveCatalogSources(sources CatalogSources, local bool) CatalogSources {
 	selectSource := func(source string) string {
 		if source == "" && local {
 			return embeddedCatalogSource
@@ -507,10 +502,6 @@ func effectiveCatalogSources(sources CatalogSources, local, home bool) CatalogSo
 	}
 	general := selectSource(sources.Catalog)
 	devin := selectSource(sources.DevinCatalog)
-	if home {
-		general = "disabled"
-		devin = "disabled"
-	}
 	return CatalogSources{Catalog: general, CodexCatalog: selectSource(sources.CodexCatalog), DevinCatalog: devin}
 }
 

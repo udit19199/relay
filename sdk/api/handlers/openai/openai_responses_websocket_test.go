@@ -22,14 +22,12 @@ import (
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	internalconfig "github.com/router-for-me/CLIProxyAPI/v8/internal/config"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/interfaces"
 	requestlogging "github.com/router-for-me/CLIProxyAPI/v8/internal/logging"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
 	sdkaccess "github.com/router-for-me/CLIProxyAPI/v8/sdk/access"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/api/handlers"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executionregistry"
 	coreexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
 	sdkconfig "github.com/router-for-me/CLIProxyAPI/v8/sdk/config"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
@@ -105,78 +103,6 @@ func (*homeResponsesWebsocketExecutor) CountTokens(context.Context, *coreauth.Au
 
 func (*homeResponsesWebsocketExecutor) HttpRequest(context.Context, *coreauth.Auth, *http.Request) (*http.Response, error) {
 	return nil, errors.New("not implemented")
-}
-
-func TestResponsesWebsocketHomeSelectedAuthCallbackPinsAndReusesFirstSelection(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	dispatcher := &homeResponsesWebsocketDispatcher{}
-	executor := &homeResponsesWebsocketExecutor{}
-	manager := coreauth.NewManager(nil, nil, nil)
-	manager.SetConfig(&internalconfig.Config{Home: internalconfig.HomeConfig{Enabled: true}})
-	manager.PublishHomeDispatch(dispatcher, executionregistry.New(), 1)
-	manager.RegisterExecutor(executor)
-	registry.GetGlobalRegistry().RegisterClient("home-responses-websocket-auth", "codex", []*registry.ModelInfo{{ID: "gpt-5.4"}})
-
-	base := handlers.NewBaseAPIHandlers(&sdkconfig.SDKConfig{}, manager)
-	h := NewOpenAIResponsesAPIHandler(base)
-	router := gin.New()
-	router.GET("/v1/responses/ws", h.ResponsesWebsocket)
-	server := httptest.NewServer(router)
-	defer server.Close()
-
-	wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/v1/responses/ws"
-	conn, _, errDial := websocket.DefaultDialer.Dial(wsURL, nil)
-	if errDial != nil {
-		t.Fatalf("dial websocket: %v", errDial)
-	}
-	defer func() {
-		if errClose := conn.Close(); errClose != nil {
-			t.Errorf("close websocket: %v", errClose)
-		}
-	}()
-
-	requests := []string{
-		`{"type":"response.create","model":"gpt-5.4","input":[]}`,
-		`{"type":"response.create","model":"gpt-5.4","input":[]}`,
-	}
-	for index, request := range requests {
-		if errWrite := conn.WriteMessage(websocket.TextMessage, []byte(request)); errWrite != nil {
-			t.Fatalf("write websocket request %d: %v", index+1, errWrite)
-		}
-		_, payload, errRead := conn.ReadMessage()
-		if errRead != nil {
-			t.Fatalf("read websocket response %d: %v", index+1, errRead)
-		}
-		if got := ojson.GetBytesNoCopy(payload, "type").String(); got != wsEventTypeCompleted {
-			t.Fatalf("response %d type = %q, want %q: %s", index+1, got, wsEventTypeCompleted, payload)
-		}
-		if index == 0 {
-			executor.mu.Lock()
-			firstMetadata := maps.Clone(executor.metadata[0])
-			executor.mu.Unlock()
-			sessionID, _ := firstMetadata[coreexecutor.ExecutionSessionMetadataKey].(string)
-			if _, ok := manager.GetExecutionSessionAuthByID(sessionID, "home-responses-websocket-auth"); !ok {
-				t.Fatal("first selected-auth callback did not stage the session runtime auth")
-			}
-		}
-	}
-
-	executor.mu.Lock()
-	metadata := append([]map[string]any(nil), executor.metadata...)
-	executor.mu.Unlock()
-	if len(metadata) != 2 {
-		t.Fatalf("executor metadata calls = %d, want 2", len(metadata))
-	}
-	if got := metadata[1][coreexecutor.PinnedAuthMetadataKey]; got != "home-responses-websocket-auth" {
-		t.Fatalf("second turn pinned auth metadata = %#v, want home selected auth (first metadata: %#v, second metadata: %#v)", got, metadata[0], metadata[1])
-	}
-	if got := dispatcher.calls.Load(); got != 1 {
-		t.Fatalf("Home RPOP calls = %d, want 1 after selected-auth callback pin", got)
-	}
-	if got := executor.calls.Load(); got != 2 {
-		t.Fatalf("executor calls = %d, want 2", got)
-	}
 }
 
 func TestWebsocketReplayCloseRequiresTypedSignal(t *testing.T) {
@@ -5720,83 +5646,6 @@ func (d *homeHTTPResponsesWebsocketDispatcher) RPopAuth(context.Context, string,
 }
 
 func (*homeHTTPResponsesWebsocketDispatcher) AbortAmbiguousDispatch() {}
-
-func TestResponsesWebsocketUsesObservedCompactionResponseForHomeRuntimeAuth(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	const model = "gpt-5.4"
-	dispatcher := &homeHTTPResponsesWebsocketDispatcher{}
-	executor := &homeResponsesWebsocketExecutor{
-		provider: "openai",
-		responses: [][]byte{
-			[]byte(`{"type":"response.completed","response":{"id":"resp-1","output":[{"type":"message","role":"assistant","id":"old-home-assistant"}]}}`),
-			[]byte(`{"type":"response.completed","response":{"id":"resp-2","output":[{"type":"compaction","id":"cmp-home-1","encrypted_content":"opaque"}]}}`),
-			[]byte(`{"type":"response.completed","response":{"id":"resp-3","output":[{"type":"message","role":"assistant","id":"new-home-assistant"}]}}`),
-		},
-	}
-	manager := coreauth.NewManager(nil, nil, nil)
-	manager.SetConfig(&internalconfig.Config{Home: internalconfig.HomeConfig{Enabled: true}})
-	manager.PublishHomeDispatch(dispatcher, executionregistry.New(), 1)
-	manager.RegisterExecutor(executor)
-	// Home runtime credentials are not registered in the local client registry.
-	// The test verifies that observed compaction replay succeeds based solely on Home execution session auth.
-
-	base := handlers.NewBaseAPIHandlers(&sdkconfig.SDKConfig{}, manager)
-	h := NewOpenAIResponsesAPIHandler(base)
-	router := gin.New()
-	router.GET("/v1/responses/ws", h.ResponsesWebsocket)
-	server := httptest.NewServer(router)
-	defer server.Close()
-
-	conn, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(server.URL, "http")+"/v1/responses/ws", nil)
-	if err != nil {
-		t.Fatalf("dial websocket: %v", err)
-	}
-	defer conn.Close()
-
-	requests := []string{
-		`{"type":"response.create","model":"` + model + `","input":[{"type":"message","role":"user","id":"old-home-user"}]}`,
-		`{"type":"response.create","input":[{"type":"compaction_trigger"}]}`,
-		`{"type":"response.create","input":[{"type":"compaction","id":"cmp-home-1","encrypted_content":"opaque"},{"type":"message","role":"user","id":"new-home-user"}]}`,
-	}
-	for index, request := range requests {
-		if errWrite := conn.WriteMessage(websocket.TextMessage, []byte(request)); errWrite != nil {
-			t.Fatalf("write websocket message %d: %v", index+1, errWrite)
-		}
-		if _, _, errRead := conn.ReadMessage(); errRead != nil {
-			t.Fatalf("read websocket message %d: %v", index+1, errRead)
-		}
-	}
-
-	executor.mu.Lock()
-	defer executor.mu.Unlock()
-	if len(executor.payloads) < 3 {
-		t.Fatalf("expected at least 3 payloads on home executor, got %d", len(executor.payloads))
-	}
-	thirdPayload := executor.payloads[2]
-	input := ojson.GetBytesNoCopy(thirdPayload, "input").Array()
-	wantIDs := []string{"cmp-home-1", "new-home-user"}
-	if len(input) != len(wantIDs) {
-		t.Fatalf("home runtime post-compaction input len = %d, want %d: %s", len(input), len(wantIDs), thirdPayload)
-	}
-	for index, wantID := range wantIDs {
-		if gotID := input[index].Get("id").String(); gotID != wantID {
-			t.Fatalf("home runtime input[%d] id = %q, want %q: %s", index, gotID, wantID, thirdPayload)
-		}
-	}
-	if gotType := input[0].Get("type").String(); gotType != "compaction" {
-		t.Fatalf("home runtime input[0] type = %q, want compaction", gotType)
-	}
-	if gotEnc := input[0].Get("encrypted_content").String(); gotEnc != "opaque" {
-		t.Fatalf("home runtime input[0] encrypted_content = %q, want opaque", gotEnc)
-	}
-	if gotType := input[1].Get("type").String(); gotType != "message" {
-		t.Fatalf("home runtime input[1] type = %q, want message", gotType)
-	}
-	if gotRole := input[1].Get("role").String(); gotRole != "user" {
-		t.Fatalf("home runtime input[1] role = %q, want user", gotRole)
-	}
-}
 
 func TestResponsesWebsocketProviderRouteSwitchDoesNotInheritCompaction(t *testing.T) {
 	gin.SetMode(gin.TestMode)

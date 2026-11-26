@@ -423,16 +423,10 @@ type PprofConfig struct {
 	Addr string `yaml:"addr" json:"addr"`
 }
 
-// DiscoveryInterfacesConfig specifies interface inclusion and exclusion rules.
-type DiscoveryInterfacesConfig struct {
-	Include []string `yaml:"include" json:"include"`
-	Exclude []string `yaml:"exclude" json:"exclude"`
-}
-
 // KVStoreConfig holds configuration for the local persistent bbolt KV store.
 type KVStoreConfig struct {
 	// Disabled turns off the local bbolt KV store when true (fallback to in-memory).
-	// Defaults to false (bbolt enabled by default in non-Home mode).
+	// Defaults to false (bbolt enabled by default).
 	Disabled bool `yaml:"disabled" json:"disabled"`
 
 	// Path is the file system path to the bbolt database file.
@@ -468,31 +462,6 @@ func (cfg *Config) EffectiveKVStorePath() string {
 		return filepath.Join(DefaultAuthDir, DefaultKVStorePath)
 	}
 	return cfg.KVStore.EffectivePathForAuthDir(cfg.AuthDir)
-}
-
-// DiscoveryConfig controls local network mDNS / DNS-SD service advertising.
-type DiscoveryConfig struct {
-	// Enabled toggles mDNS service advertising on the local network (default: false).
-	Enabled bool `yaml:"enabled" json:"enabled"`
-
-	// ServiceName is the optional custom instance name. When empty, defaults to CPA-<ShortID>.
-	ServiceName string `yaml:"service-name" json:"service-name"`
-
-	// ServiceType is the DNS-SD service type (default: _ai-gateway._tcp).
-	ServiceType string `yaml:"service-type" json:"service-type"`
-
-	// Subtypes specifies DNS-SD API protocol subtypes to advertise (e.g. _responses, _messages, _generate-content).
-	Subtypes []string `yaml:"subtypes" json:"subtypes"`
-
-	// Interfaces specifies network interface filtering rules.
-	Interfaces DiscoveryInterfacesConfig `yaml:"interfaces" json:"interfaces"`
-
-	// AuthRequired indicates whether authentication is required for client calls (default: true).
-	AuthRequired *bool `yaml:"auth-required" json:"auth-required"`
-
-	// AdvertiseManagement is deprecated and ignored. Management endpoints are never
-	// advertised over DNS-SD; the field remains so existing config files still load.
-	AdvertiseManagement bool `yaml:"advertise-management" json:"advertise-management"`
 }
 
 // RemoteManagement holds management API configuration under 'remote-management'.

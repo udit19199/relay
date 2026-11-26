@@ -148,11 +148,8 @@ func (s *Service) syncPluginModelRuntime(ctx context.Context) {
 	if ctx.Err() != nil {
 		return
 	}
-	s.cfgMu.RLock()
-	homeEnabled := s.cfg != nil && s.cfg.Home.Enabled
-	s.cfgMu.RUnlock()
 	s.registerAvailableExecutors(ctx, executorRegistrationOptions{
-		includeBaseline:   homeEnabled,
+		includeBaseline:   false,
 		includePlugins:    true,
 		forceReplaceAuths: false,
 		auths:             s.coreManager.List(),

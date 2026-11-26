@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	homekv "github.com/router-for-me/CLIProxyAPI/v8/internal/home"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/kvstore"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -28,6 +28,23 @@ type fakeSignatureKVClient struct {
 	lastExpireTTL time.Duration
 }
 
+func (c *fakeSignatureKVClient) KVSet(_ context.Context, key string, value []byte, opts kvstore.KVSetOptions) (bool, error) {
+	if c.setErr != nil {
+		return false, c.setErr
+	}
+	_, exists := c.values[key]
+	if opts.NX && exists {
+		return false, nil
+	}
+	if opts.XX && !exists {
+		return false, nil
+	}
+	c.setCount++
+	c.lastSetTTL = opts.EX
+	c.values[key] = append([]byte(nil), value...)
+	return true, nil
+}
+
 func newFakeSignatureKVClient() *fakeSignatureKVClient {
 	return &fakeSignatureKVClient{values: make(map[string][]byte)}
 }
@@ -42,16 +59,6 @@ func (c *fakeSignatureKVClient) KVGet(_ context.Context, key string) ([]byte, bo
 		return nil, false, nil
 	}
 	return append([]byte(nil), value...), true, nil
-}
-
-func (c *fakeSignatureKVClient) KVSet(_ context.Context, key string, value []byte, opts homekv.KVSetOptions) (bool, error) {
-	c.setCount++
-	c.lastSetTTL = opts.EX
-	if c.setErr != nil {
-		return false, c.setErr
-	}
-	c.values[key] = append([]byte(nil), value...)
-	return true, nil
 }
 
 func (c *fakeSignatureKVClient) KVDel(_ context.Context, keys ...string) (int64, error) {
@@ -78,11 +85,11 @@ func (c *fakeSignatureKVClient) KVExpire(_ context.Context, _ string, ttl time.D
 	return true, nil
 }
 
-func useFakeSignatureKVClient(t *testing.T, client *fakeSignatureKVClient, homeMode bool, errClient error) {
+func useFakeSignatureKVClient(t *testing.T, client *fakeSignatureKVClient, kvMode bool, errClient error) {
 	t.Helper()
 	previous := currentSignatureKVClient
 	currentSignatureKVClient = func() (signatureKVClient, bool, error) {
-		return client, homeMode, errClient
+		return client, kvMode, errClient
 	}
 	t.Cleanup(func() {
 		currentSignatureKVClient = previous
@@ -105,7 +112,7 @@ func TestCacheSignature_BasicStorageAndRetrieval(t *testing.T) {
 	}
 }
 
-func TestGetCachedSignatureRequiredHomeReadAndSlidingExpire(t *testing.T) {
+func TestGetCachedSignatureRequiredKVReadAndSlidingExpire(t *testing.T) {
 	ClearSignatureCache("")
 	text := "thinking text"
 	signature := "abc123validSignature1234567890123456789012345678901234567890"
@@ -125,7 +132,7 @@ func TestGetCachedSignatureRequiredHomeReadAndSlidingExpire(t *testing.T) {
 	}
 }
 
-func TestGetCachedSignatureRequiredHomeFailures(t *testing.T) {
+func TestGetCachedSignatureRequiredKVFailures(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		client *fakeSignatureKVClient
@@ -144,7 +151,7 @@ func TestGetCachedSignatureRequiredHomeFailures(t *testing.T) {
 	}
 }
 
-func TestGetCachedSignatureRequiredHomeMissDoesNotFallbackToLocalCache(t *testing.T) {
+func TestGetCachedSignatureRequiredKVMissDoesNotFallbackToLocalCache(t *testing.T) {
 	ClearSignatureCache("")
 	text := "thinking text"
 	signature := "abc123validSignature1234567890123456789012345678901234567890"
@@ -162,7 +169,7 @@ func TestGetCachedSignatureRequiredHomeMissDoesNotFallbackToLocalCache(t *testin
 	}
 }
 
-func TestCacheSignatureBestEffortHomeWriteFailureDoesNotUseLocalCache(t *testing.T) {
+func TestCacheSignatureBestEffortKVWriteFailureDoesNotUseLocalCache(t *testing.T) {
 	ClearSignatureCache("")
 	text := "thinking text"
 	signature := "abc123validSignature1234567890123456789012345678901234567890"
@@ -179,7 +186,7 @@ func TestCacheSignatureBestEffortHomeWriteFailureDoesNotUseLocalCache(t *testing
 	}
 }
 
-func TestDeleteCachedSignatureRequiredHomeExactKey(t *testing.T) {
+func TestDeleteCachedSignatureRequiredKVExactKey(t *testing.T) {
 	ClearSignatureCache("")
 	text := "thinking text"
 	signature := "abc123validSignature1234567890123456789012345678901234567890"

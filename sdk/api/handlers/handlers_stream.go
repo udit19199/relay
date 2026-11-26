@@ -79,12 +79,6 @@ func (h *BaseAPIHandler) ExecuteImageStreamWithAuthManager(ctx context.Context, 
 }
 
 func (h *BaseAPIHandler) streamWithPluginExecutor(ctx context.Context, entryProtocol, responseProtocol, modelName, originalRequestedModel string, rawJSON []byte, alt, executorPluginID string, execOptions modelExecutionOptions) (<-chan []byte, http.Header, <-chan *interfaces.ErrorMessage) {
-	if h.AuthManager != nil && h.AuthManager.HomeEnabled() {
-		errChan := make(chan *interfaces.ErrorMessage, 1)
-		errChan <- &interfaces.ErrorMessage{StatusCode: http.StatusServiceUnavailable, Error: fmt.Errorf("plugin executor routing is unavailable while Home is enabled")}
-		close(errChan)
-		return nil, nil, errChan
-	}
 	host := h.pluginExecutorHost()
 	if host == nil {
 		errChan := make(chan *interfaces.ErrorMessage, 1)
@@ -591,9 +585,6 @@ func (h *BaseAPIHandler) executeStreamWithAuthManagerFormats(ctx context.Context
 	}
 
 	maxBootstrapRetries := StreamingBootstrapRetries(h.CurrentConfig())
-	if h.AuthManager.HomeEnabled() {
-		maxBootstrapRetries = 0
-	}
 	for bootstrapRetries := 0; !streamCanceledBeforeRead; {
 		readInitialStreamChunks()
 		if streamCanceledBeforeRead || bootstrapErr != nil || bootstrapStreamErr == nil {

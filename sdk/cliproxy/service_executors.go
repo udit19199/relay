@@ -194,7 +194,7 @@ func (s *Service) registerAvailableExecutors(ctx context.Context, opts executorR
 	if ctx.Err() != nil {
 		return
 	}
-	// Keep all Service-owned executor registration paths here so native, Home,
+	// Keep all Service-owned executor registration paths here so native,
 	// auth-derived, and plugin executors stay in the same binding order.
 	if opts.includeBaseline {
 		s.registerExecutorsForAuths(baselineExecutorAuths(), opts.forceReplaceAuths)
@@ -575,7 +575,7 @@ func (s *Service) tryRegisterPluginModelsForAuthWithConfigFenced(ctx context.Con
 	if result.Err != nil {
 		return true, true
 	}
-	if s.coreManager != nil && strings.EqualFold(a.Provider, "antigravity") && !s.antigravityHomeEnabled() {
+	if s.coreManager != nil && strings.EqualFold(a.Provider, "antigravity") {
 		defer s.coreManager.ReconcileRegistryModelStates(ctx, a.ID)
 	}
 	activeAuth := a

@@ -22,9 +22,6 @@ const antigravityCredentialAcquisitionTimeout = 30 * time.Second
 
 // Refresh refreshes the authentication credentials using the refresh token.
 func (e *AntigravityExecutor) Refresh(ctx context.Context, auth *cliproxyauth.Auth) (*cliproxyauth.Auth, error) {
-	if refreshed, handled, err := helps.RefreshAuthViaHome(ctx, e.cfg, auth); handled {
-		return refreshed, err
-	}
 	if auth == nil {
 		return auth, nil
 	}
@@ -85,17 +82,6 @@ func (e *AntigravityExecutor) ensureAccessToken(ctx context.Context, auth *clipr
 		if rt, ok := ctx.Value("cliproxy.roundtripper").(http.RoundTripper); ok && rt != nil {
 			refreshCtx = context.WithValue(refreshCtx, "cliproxy.roundtripper", rt)
 		}
-	}
-	if refreshed, handled, err := helps.RefreshAuthViaHome(refreshCtx, e.cfg, auth); handled {
-		if err != nil {
-			return "", nil, err
-		}
-		token := misc.MetadataString(refreshed.Metadata, "access_token")
-		if strings.TrimSpace(token) == "" {
-			return "", nil, statusErr{code: http.StatusUnauthorized, msg: "missing access token"}
-		}
-		e.maybeRefreshAntigravityCreditsHint(ctx, refreshed, token)
-		return token, refreshed, nil
 	}
 
 	updated, errRefresh := e.refreshToken(refreshCtx, auth.Clone())

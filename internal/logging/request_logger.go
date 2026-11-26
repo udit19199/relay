@@ -145,8 +145,6 @@ type FileRequestLogger struct {
 
 	// errorLogsMaxFiles limits the number of error log files retained.
 	errorLogsMaxFiles int
-
-	homeEnabled bool
 }
 
 // NewFileRequestLogger creates a new file-based request logger.
@@ -172,7 +170,6 @@ func NewFileRequestLogger(enabled bool, logsDir string, configDir string, errorL
 		enabled:           enabled,
 		logsDir:           logsDir,
 		errorLogsMaxFiles: errorLogsMaxFiles,
-		homeEnabled:       false,
 	}
 }
 

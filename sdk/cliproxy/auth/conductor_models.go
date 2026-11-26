@@ -166,11 +166,6 @@ func preserveRequestedModelSuffix(requestedModel, resolved string) string {
 }
 
 func (m *Manager) executionModelCandidates(auth *Auth, routeModel string) []string {
-	if auth != nil && auth.Attributes != nil {
-		if homeModel := strings.TrimSpace(auth.Attributes[homeUpstreamModelAttributeKey]); homeModel != "" {
-			return []string{homeModel}
-		}
-	}
 	requestedModel := rewriteModelForAuth(routeModel, auth)
 	requestedModel = m.applyOAuthModelAlias(auth, requestedModel)
 	if pool := m.resolveOpenAICompatUpstreamModelPool(auth, requestedModel); len(pool) > 0 {
@@ -189,7 +184,6 @@ func (m *Manager) executionModelCandidates(auth *Auth, routeModel string) []stri
 
 // ResolveExecutionModel returns the credential-aware upstream model used by
 // normal execution. It strips auth prefixes, applies configured aliases, and
-// prefers Home-dispatched upstream models when present.
 func (m *Manager) ResolveExecutionModel(auth *Auth, routeModel string) string {
 	routeModel = strings.TrimSpace(routeModel)
 	if m == nil {
@@ -283,14 +277,6 @@ func (m *Manager) clientModelProjectionForAuth(auth *Auth, routeModel string, no
 }
 
 func (m *Manager) stateModelForExecution(auth *Auth, routeModel, upstreamModel string, pooled bool) string {
-	if auth != nil && auth.Attributes != nil {
-		if homeModel := strings.TrimSpace(auth.Attributes[homeUpstreamModelAttributeKey]); homeModel != "" {
-			if resolved := strings.TrimSpace(upstreamModel); resolved != "" {
-				return resolved
-			}
-			return homeModel
-		}
-	}
 	stateModel := executionResultModel(routeModel, upstreamModel, pooled)
 	selectionModel := m.selectionModelForAuth(auth, routeModel)
 	if sameCanonicalModelKey(selectionModel, upstreamModel) && strings.TrimSpace(selectionModel) != "" {
@@ -351,17 +337,9 @@ func (m *Manager) executionModelCandidatesWithAlias(auth *Auth, routeModel strin
 	routing := m.loadAPIKeyModelRouting()
 	requestedModel := rewriteModelForAuth(routeModel, auth)
 	aliasResult := m.resolveExecutionAliasResultForRequestedWithRouting(routing, auth, requestedModel)
-	if aliasResult.ForceMapping && auth != nil && auth.Attributes != nil && strings.EqualFold(strings.TrimSpace(auth.Attributes[homeForceMappingAttributeKey]), "true") {
-		aliasResult.OriginalAlias = strings.TrimSpace(routeModel)
-	}
 	upstreamModel := executionAliasPoolModel(auth, requestedModel, aliasResult)
 
 	var candidates []string
-	if auth != nil && auth.Attributes != nil {
-		if homeModel := strings.TrimSpace(auth.Attributes[homeUpstreamModelAttributeKey]); homeModel != "" {
-			candidates = []string{homeModel}
-		}
-	}
 	if len(candidates) == 0 {
 		if pool := resolveOpenAICompatUpstreamModelPool(routing.config, auth, upstreamModel); len(pool) > 0 {
 			if len(pool) == 1 {
@@ -392,34 +370,10 @@ func (m *Manager) resolveExecutionAliasResultForRequested(auth *Auth, requestedM
 }
 
 func (m *Manager) resolveExecutionAliasResultForRequestedWithRouting(routing *apiKeyModelRoutingSnapshot, auth *Auth, requestedModel string) OAuthModelAliasResult {
-	if result := homeForceMappingAliasResult(auth, requestedModel); result.ForceMapping {
-		return result
-	}
 	if isConfiguredModelRoutingAuth(auth) {
 		return resolveAPIKeyModelAliasWithResult(routing.config, auth, requestedModel)
 	}
 	return m.applyOAuthModelAliasWithResult(auth, requestedModel)
-}
-
-func homeForceMappingAliasResult(auth *Auth, requestedModel string) OAuthModelAliasResult {
-	if auth == nil || auth.Attributes == nil || !strings.EqualFold(strings.TrimSpace(auth.Attributes[homeForceMappingAttributeKey]), "true") {
-		return OAuthModelAliasResult{}
-	}
-	originalAlias := strings.TrimSpace(auth.Attributes[homeOriginalAliasAttributeKey])
-	canonicalOriginalAlias := canonicalHomeConcurrencyModelKey(auth.Attributes[homeOriginalAliasAttributeKey])
-	canonicalRequestedModel := canonicalHomeConcurrencyModelKey(requestedModel)
-	if canonicalOriginalAlias == "" || canonicalOriginalAlias != canonicalRequestedModel {
-		return OAuthModelAliasResult{}
-	}
-	upstreamModel := strings.TrimSpace(auth.Attributes[homeUpstreamModelAttributeKey])
-	if upstreamModel == "" {
-		upstreamModel = strings.TrimSpace(requestedModel)
-	}
-	return OAuthModelAliasResult{
-		UpstreamModel: upstreamModel,
-		ForceMapping:  true,
-		OriginalAlias: originalAlias,
-	}
 }
 
 func executionAliasPoolModel(auth *Auth, requestedModel string, aliasResult OAuthModelAliasResult) string {

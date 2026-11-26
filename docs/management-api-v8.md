@@ -10,7 +10,7 @@ available in the [management API guide](https://help.router-for.me/management/ap
 The v8 endpoints use the same management key and remote-access policy as v0.
 Send `Authorization: Bearer <management-key>` or `X-Management-Key: <management-key>`.
 OAuth callbacks validate a pending login state and do not require a management-key
-header. Home mode disables local management endpoints for both versions.
+header.
 
 ## Configuration endpoints
 
@@ -92,7 +92,7 @@ traffic does not starve smaller-weight peers.
 
 Credits are local to the CPA process and reset on restart, selector replacement,
 or bounded pool-cache eviction. Concurrent selections see pending credit; local
-selection/binding success confirms it, while failure releases it. In Home mode,
+selection/binding success confirms it, while failure releases it.
 scheduling and credit accounting remain owned by Home. With matching CPA and Home
 versions, retained WebSocket responses (including Codex duplex successors) report
 `home_selection.reused` through usage so Home can charge later turns without
@@ -196,7 +196,7 @@ query parameter is required; Vertex is currently the supported import provider.
 
 SIWC is a second credential partition of an existing Codex credential, not a new
 provider. This flow is available only in standalone CPA with local file-backed
-Codex OAuth credentials. Home mode and non-file storage backends are not supported.
+Codex OAuth credentials.
 
 Start a binding with management authentication:
 

@@ -68,12 +68,6 @@ func (s *Server) handleRedisConnection(conn net.Conn, reader *bufio.Reader) {
 		return true
 	}
 
-	if cfg := s.getConfig(); cfg != nil && cfg.Home.Enabled {
-		_ = writeRedisError(writer, "ERR redis usage output disabled in home mode")
-		_ = writer.Flush()
-		return
-	}
-
 	for {
 		if !s.managementRoutesEnabled.Load() {
 			return

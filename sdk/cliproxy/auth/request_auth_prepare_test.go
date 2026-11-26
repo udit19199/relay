@@ -2,19 +2,14 @@ package auth
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"net/http"
 	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
 
-	internalconfig "github.com/router-for-me/CLIProxyAPI/v8/internal/config"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executionregistry"
 	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
 )
 
@@ -140,263 +135,13 @@ type homeRequestPrepareDispatcher struct {
 
 func (*homeRequestPrepareDispatcher) HeartbeatOK() bool { return true }
 
-func (d *homeRequestPrepareDispatcher) RPopAuth(context.Context, string, string, http.Header, int) ([]byte, error) {
-	if d.calls.Add(1) > 1 {
-		return json.Marshal(homeErrorEnvelope{Error: &homeErrorDetail{Code: homeRequestRetryExceededErrorCode, Message: "no more Home auths"}})
-	}
-	return json.Marshal(homeAuthDispatchResponse{Auth: Auth{
-		ID:       "same-id",
-		Provider: "antigravity",
-		Status:   StatusActive,
-		Metadata: map[string]any{"access_token": "home-token", "source": "home"},
-	}})
-}
-
 func (*homeRequestPrepareDispatcher) AbortAmbiguousDispatch() {}
 
 type homeErrorPriorityDispatcher struct{}
 
 func (*homeErrorPriorityDispatcher) HeartbeatOK() bool { return true }
 
-func (*homeErrorPriorityDispatcher) RPopAuth(_ context.Context, _ string, _ string, _ http.Header, count int) ([]byte, error) {
-	switch count {
-	case 1:
-		return json.Marshal(homeAuthDispatchResponse{Auth: Auth{
-			ID:       "model-error-auth",
-			Provider: "antigravity",
-			Status:   StatusActive,
-			Metadata: map[string]any{"access_token": "model-token", "project_id": "prepared-project"},
-		}})
-	case 2:
-		return json.Marshal(homeAuthDispatchResponse{Auth: Auth{
-			ID:       "refresh-error-auth",
-			Provider: "antigravity",
-			Status:   StatusActive,
-			Metadata: map[string]any{"access_token": "refresh-token"},
-		}})
-	default:
-		return json.Marshal(homeErrorEnvelope{Error: &homeErrorDetail{Code: homeRequestRetryExceededErrorCode, Message: "no more Home auths"}})
-	}
-}
-
 func (*homeErrorPriorityDispatcher) AbortAmbiguousDispatch() {}
-
-func TestHomeModelErrorOutranksLaterRefreshPreparationError(t *testing.T) {
-	paths := []struct {
-		name string
-		run  func(*Manager) error
-	}{
-		{
-			name: "Execute",
-			run: func(manager *Manager) error {
-				_, errExecute := manager.Execute(context.Background(), []string{"antigravity"}, cliproxyexecutor.Request{Model: "test-model"}, cliproxyexecutor.Options{})
-				return errExecute
-			},
-		},
-		{
-			name: "Count",
-			run: func(manager *Manager) error {
-				_, errCount := manager.ExecuteCount(context.Background(), []string{"antigravity"}, cliproxyexecutor.Request{Model: "test-model"}, cliproxyexecutor.Options{})
-				return errCount
-			},
-		},
-		{
-			name: "Stream",
-			run: func(manager *Manager) error {
-				_, errStream := manager.ExecuteStream(context.Background(), []string{"antigravity"}, cliproxyexecutor.Request{Model: "test-model"}, cliproxyexecutor.Options{Stream: true})
-				return errStream
-			},
-		},
-	}
-
-	for _, path := range paths {
-		t.Run(path.name, func(t *testing.T) {
-			modelErr := &Error{HTTPStatus: http.StatusServiceUnavailable, Message: "MODEL_CAPACITY_EXHAUSTED"}
-			refreshErr := &Error{Code: "refresh_temporarily_unavailable", HTTPStatus: http.StatusServiceUnavailable, Message: "credential refresh temporarily unavailable"}
-			executor := &requestPrepareExecutor{prepareErr: refreshErr, executeErr: modelErr}
-			manager := NewManager(nil, nil, nil)
-			manager.SetConfig(&internalconfig.Config{Home: internalconfig.HomeConfig{Enabled: true}})
-			manager.PublishHomeDispatch(&homeErrorPriorityDispatcher{}, executionregistry.New(), 1)
-			manager.RegisterExecutor(executor)
-
-			errRun := path.run(manager)
-			if errRun == nil || errRun.Error() != modelErr.Message || statusCodeFromError(errRun) != http.StatusServiceUnavailable {
-				t.Fatalf("%s error = %v, want upstream model error %q", path.name, errRun, modelErr.Message)
-			}
-			if strings.Contains(errRun.Error(), refreshErr.Message) {
-				t.Fatalf("%s error was overwritten by refresh failure: %v", path.name, errRun)
-			}
-			if executor.executeCalls.Load() != 1 || executor.prepareCalls.Load() != 1 {
-				t.Fatalf("%s calls = execute %d prepare %d, want 1/1", path.name, executor.executeCalls.Load(), executor.prepareCalls.Load())
-			}
-		})
-	}
-}
-
-func TestHomePrepareUsesEphemeralDispatchAuthAcrossExecutionPaths(t *testing.T) {
-	for _, path := range []struct {
-		name string
-		run  func(*Manager, context.Context) error
-	}{
-		{
-			name: "Execute",
-			run: func(manager *Manager, ctx context.Context) error {
-				_, errExecute := manager.Execute(ctx, []string{"antigravity"}, cliproxyexecutor.Request{Model: "test-model"}, cliproxyexecutor.Options{})
-				return errExecute
-			},
-		},
-		{
-			name: "Count",
-			run: func(manager *Manager, ctx context.Context) error {
-				_, errCount := manager.ExecuteCount(ctx, []string{"antigravity"}, cliproxyexecutor.Request{Model: "test-model"}, cliproxyexecutor.Options{})
-				return errCount
-			},
-		},
-		{
-			name: "Stream",
-			run: func(manager *Manager, ctx context.Context) error {
-				result, errStream := manager.ExecuteStream(ctx, []string{"antigravity"}, cliproxyexecutor.Request{Model: "test-model"}, cliproxyexecutor.Options{Stream: true})
-				if errStream != nil {
-					return errStream
-				}
-				for range result.Chunks {
-				}
-				return nil
-			},
-		},
-	} {
-		t.Run(path.name, func(t *testing.T) {
-			store := &requestPrepareStore{}
-			executor := &requestPrepareExecutor{}
-			manager := NewManager(store, nil, nil)
-			manager.SetConfig(&internalconfig.Config{Home: internalconfig.HomeConfig{Enabled: true}})
-			manager.PublishHomeDispatch(&homeRequestPrepareDispatcher{}, executionregistry.New(), 1)
-			manager.RegisterExecutor(executor)
-			localAuth := &Auth{ID: "same-id", Provider: "antigravity", Status: StatusActive, Metadata: map[string]any{"access_token": "local-token", "source": "local"}}
-			if _, errRegister := manager.Register(WithSkipPersist(context.Background()), localAuth); errRegister != nil {
-				t.Fatalf("register local auth: %v", errRegister)
-			}
-			if errRun := path.run(manager, context.Background()); errRun != nil {
-				t.Fatalf("%s error: %v", path.name, errRun)
-			}
-			observed := executor.lastObservedAuth()
-			if observed == nil {
-				t.Fatal("executor did not receive prepared auth")
-			}
-			if got := testStringValue(observed.Metadata["access_token"]); got != "home-token" {
-				t.Fatalf("executor access token = %q, want Home token", got)
-			}
-			if got := testStringValue(observed.Metadata["source"]); got != "home" {
-				t.Fatalf("executor source = %q, want Home metadata", got)
-			}
-			current, ok := manager.GetByID("same-id")
-			if !ok {
-				t.Fatal("local auth disappeared")
-			}
-			if got := testStringValue(current.Metadata["access_token"]); got != "local-token" {
-				t.Fatalf("local access token = %q, want unchanged local token", got)
-			}
-			if got := testStringValue(current.Metadata["source"]); got != "local" {
-				t.Fatalf("local source = %q, want unchanged local metadata", got)
-			}
-		})
-	}
-}
-
-func TestHomeExecutionResultsDoNotMutateSameIDLocalAuth(t *testing.T) {
-	paths := []struct {
-		name string
-		run  func(*Manager, context.Context) error
-	}{
-		{
-			name: "Execute",
-			run: func(manager *Manager, ctx context.Context) error {
-				_, errExecute := manager.Execute(ctx, []string{"antigravity"}, cliproxyexecutor.Request{Model: "test-model"}, cliproxyexecutor.Options{})
-				return errExecute
-			},
-		},
-		{
-			name: "Count",
-			run: func(manager *Manager, ctx context.Context) error {
-				_, errCount := manager.ExecuteCount(ctx, []string{"antigravity"}, cliproxyexecutor.Request{Model: "test-model"}, cliproxyexecutor.Options{})
-				return errCount
-			},
-		},
-		{
-			name: "Stream",
-			run: func(manager *Manager, ctx context.Context) error {
-				result, errStream := manager.ExecuteStream(ctx, []string{"antigravity"}, cliproxyexecutor.Request{Model: "test-model"}, cliproxyexecutor.Options{Stream: true})
-				if errStream != nil {
-					return errStream
-				}
-				for range result.Chunks {
-				}
-				return nil
-			},
-		},
-	}
-	outcomes := []struct {
-		name       string
-		prepareErr error
-		executeErr error
-	}{
-		{name: "success"},
-		{name: "execution failure", executeErr: errors.New("upstream failed")},
-		{name: "prepare failure", prepareErr: errors.New("prepare failed")},
-	}
-
-	for _, path := range paths {
-		for _, outcome := range outcomes {
-			t.Run(path.name+"/"+outcome.name, func(t *testing.T) {
-				store := &requestPrepareStore{}
-				hook := &resultCaptureHook{}
-				executor := &requestPrepareExecutor{prepareErr: outcome.prepareErr, executeErr: outcome.executeErr}
-				manager := NewManager(store, nil, hook)
-				manager.SetConfig(&internalconfig.Config{Home: internalconfig.HomeConfig{Enabled: true}})
-				manager.PublishHomeDispatch(&homeRequestPrepareDispatcher{}, executionregistry.New(), 1)
-				manager.RegisterExecutor(executor)
-				localAuth := &Auth{
-					ID:        "same-id",
-					Provider:  "antigravity",
-					Status:    StatusActive,
-					Success:   7,
-					Failed:    4,
-					UpdatedAt: time.Unix(123, 0),
-					Metadata:  map[string]any{"access_token": "local-token", "source": "local"},
-					ModelStates: map[string]*ModelState{
-						"test-model": {Status: StatusError, Unavailable: true, StatusMessage: "local failure", UpdatedAt: time.Unix(122, 0)},
-					},
-				}
-				if _, errRegister := manager.Register(WithSkipPersist(context.Background()), localAuth); errRegister != nil {
-					t.Fatalf("register local auth: %v", errRegister)
-				}
-				registry.GetGlobalRegistry().RegisterClient(localAuth.ID, localAuth.Provider, []*registry.ModelInfo{{ID: "test-model"}})
-				t.Cleanup(func() { registry.GetGlobalRegistry().UnregisterClient(localAuth.ID) })
-
-				beforeLocal, ok := manager.GetByID(localAuth.ID)
-				if !ok {
-					t.Fatal("local auth is missing before Home execution")
-				}
-				beforeScheduler := homeExecutionSchedulerAuthSnapshot(t, manager, localAuth.ID)
-				beforeModels := registry.GetGlobalRegistry().GetModelsForClient(localAuth.ID)
-				failed := outcome.prepareErr != nil || outcome.executeErr != nil
-				if errRun := path.run(manager, context.Background()); failed != (errRun != nil) {
-					t.Fatalf("%s error = %v, want failure=%t", path.name, errRun, failed)
-				}
-				if outcome.prepareErr == nil {
-					observed := executor.lastObservedAuth()
-					if observed == nil {
-						t.Fatal("executor did not receive prepared auth")
-					}
-					if got := testStringValue(observed.Metadata["access_token"]); got != "home-token" {
-						t.Fatalf("executor access token = %q, want Home token", got)
-					}
-				}
-				assertHomeExecutionResultStateUnchanged(t, manager, store, hook, beforeLocal, beforeScheduler, beforeModels)
-			})
-		}
-	}
-}
 
 func homeExecutionSchedulerAuthSnapshot(t *testing.T, manager *Manager, authID string) *Auth {
 	t.Helper()

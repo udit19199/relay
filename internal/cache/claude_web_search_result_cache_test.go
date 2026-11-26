@@ -4,12 +4,11 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/kvstore"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
-
-	homekv "github.com/router-for-me/CLIProxyAPI/v8/internal/home"
 )
 
 type fakeClaudeWebSearchResultKVClient struct {
@@ -22,6 +21,23 @@ type fakeClaudeWebSearchResultKVClient struct {
 	expireCount   int
 	lastSetTTL    time.Duration
 	lastExpireTTL time.Duration
+}
+
+func (c *fakeClaudeWebSearchResultKVClient) KVSet(_ context.Context, key string, value []byte, opts kvstore.KVSetOptions) (bool, error) {
+	if c.setErr != nil {
+		return false, c.setErr
+	}
+	_, exists := c.values[key]
+	if opts.NX && exists {
+		return false, nil
+	}
+	if opts.XX && !exists {
+		return false, nil
+	}
+	c.setCount++
+	c.lastSetTTL = opts.EX
+	c.values[key] = append([]byte(nil), value...)
+	return true, nil
 }
 
 func newFakeClaudeWebSearchResultKVClient() *fakeClaudeWebSearchResultKVClient {
@@ -40,16 +56,6 @@ func (c *fakeClaudeWebSearchResultKVClient) KVGet(_ context.Context, key string)
 	return bytes.Clone(value), true, nil
 }
 
-func (c *fakeClaudeWebSearchResultKVClient) KVSet(_ context.Context, key string, value []byte, opts homekv.KVSetOptions) (bool, error) {
-	c.setCount++
-	c.lastSetTTL = opts.EX
-	if c.setErr != nil {
-		return false, c.setErr
-	}
-	c.values[key] = bytes.Clone(value)
-	return true, nil
-}
-
 func (c *fakeClaudeWebSearchResultKVClient) KVExpire(_ context.Context, _ string, ttl time.Duration) (bool, error) {
 	c.expireCount++
 	c.lastExpireTTL = ttl
@@ -59,11 +65,11 @@ func (c *fakeClaudeWebSearchResultKVClient) KVExpire(_ context.Context, _ string
 	return true, nil
 }
 
-func useFakeClaudeWebSearchResultKVClient(t *testing.T, client *fakeClaudeWebSearchResultKVClient, homeMode bool, errClient error) {
+func useFakeClaudeWebSearchResultKVClient(t *testing.T, client *fakeClaudeWebSearchResultKVClient, kvMode bool, errClient error) {
 	t.Helper()
 	previous := currentClaudeWebSearchResultKVClient
 	currentClaudeWebSearchResultKVClient = func() (claudeWebSearchResultKVClient, bool, error) {
-		return client, homeMode, errClient
+		return client, kvMode, errClient
 	}
 	t.Cleanup(func() {
 		currentClaudeWebSearchResultKVClient = previous
@@ -187,28 +193,7 @@ func TestClaudeWebSearchResultCachePurgesExpiredBeforeEvictingLiveEntries(t *tes
 	}
 }
 
-func TestClaudeWebSearchResultCacheHomeModeDoesNotUseLocalCache(t *testing.T) {
-	now := time.Unix(1_800_000_000, 0)
-	useClaudeWebSearchResultClock(t, &now)
-
-	CacheClaudeWebSearchResult("session-local", "srvtoolu_local", []byte(`[{"url":"local"}]`), 30*time.Minute, 16)
-
-	homekv.SetCurrent(&homekv.Client{})
-	t.Cleanup(homekv.ClearCurrent)
-
-	if got, ok := GetClaudeWebSearchResult("session-local", "srvtoolu_local", 30*time.Minute); ok {
-		t.Fatalf("GetClaudeWebSearchResult() = %q, true; want Home miss without local fallback", got)
-	}
-
-	CacheClaudeWebSearchResult("session-home", "srvtoolu_home", []byte(`[{"url":"home"}]`), 30*time.Minute, 16)
-	homekv.ClearCurrent()
-
-	if got, ok := GetClaudeWebSearchResult("session-home", "srvtoolu_home", 30*time.Minute); ok {
-		t.Fatalf("local cache = %q, true; want empty after Home write failure", got)
-	}
-}
-
-func TestClaudeWebSearchResultCacheHomeWriteReadAndSlidingExpire(t *testing.T) {
+func TestClaudeWebSearchResultCacheKVWriteReadAndSlidingExpire(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
 	useClaudeWebSearchResultClock(t, &now)
 
@@ -220,7 +205,7 @@ func TestClaudeWebSearchResultCacheHomeWriteReadAndSlidingExpire(t *testing.T) {
 		t.Fatal("CacheClaudeWebSearchResultBestEffort() = false, want true")
 	}
 	if claudeWebSearchResultOrder.Len() != 0 {
-		t.Fatalf("local cache len = %d, want 0 in Home mode", claudeWebSearchResultOrder.Len())
+		t.Fatalf("local cache len = %d, want 0 with KV storage", claudeWebSearchResultOrder.Len())
 	}
 	kvKey := claudeWebSearchResultKVKey("session-home", "srvtoolu_1")
 	if client.setCount != 1 || client.lastSetTTL != 45*time.Minute {

@@ -48,7 +48,7 @@ type errorEventModelStatus struct {
 }
 
 func (m *Manager) publishErrorEvent(result Result, authSnapshot *Auth) {
-	if m == nil || result.Success || authSnapshot == nil || m.HomeEnabled() {
+	if m == nil || result.Success || authSnapshot == nil {
 		return
 	}
 	payload, ok := buildErrorEventPayload(result, authSnapshot)

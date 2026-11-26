@@ -7,9 +7,6 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/gin-gonic/gin"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/home"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 )
 
@@ -87,46 +84,5 @@ func TestIssue5190ModelDetailUsesVisibleCatalog(t *testing.T) {
 	}
 	if calls != 2 {
 		t.Errorf("catalog interceptor calls=%d want=2", calls)
-	}
-}
-
-func TestIssue5190ModelDetailHomeVisibility(t *testing.T) {
-	server := newTestServer(t)
-	modelRegistry := registry.GetGlobalRegistry()
-	modelRegistry.RegisterClient(t.Name(), "openai", []*registry.ModelInfo{{ID: "local/only", Object: "model"}})
-	t.Cleanup(func() { modelRegistry.UnregisterClient(t.Name()) })
-	engine := server.engine
-	get := func(id string, authorized bool) *httptest.ResponseRecorder {
-		req := httptest.NewRequest(http.MethodGet, "/v1/models/"+id, nil)
-		if authorized {
-			req.Header.Set("Authorization", "Bearer test-key")
-		}
-		rr := httptest.NewRecorder()
-		engine.ServeHTTP(rr, req)
-		return rr
-	}
-	if rr := get("local/only", true); rr.Code != 200 {
-		t.Fatalf("local detail: %d %s", rr.Code, rr.Body.String())
-	}
-	if rr := get("local/only", false); rr.Code != 401 {
-		t.Fatalf("unauthorized detail: %d", rr.Code)
-	}
-	server.cfg.Home.Enabled = true
-	// The catalog fixture does not implement Home's readiness handshake.
-	// Reuse the registered route without the unrelated readiness middleware.
-	engine = gin.New()
-	for _, route := range server.engine.Routes() {
-		if route.Method == http.MethodGet && route.Path == "/v1/models/*model" {
-			engine.GET(route.Path, route.HandlerFunc)
-		}
-	}
-	previousHome := home.Current()
-	home.SetCurrent(newHomeCatalogClient(t, `{"openai":[{"id":"home/visible"}]}`))
-	t.Cleanup(func() { home.SetCurrent(previousHome) })
-	if rr := get("home/visible", true); rr.Code != 200 || ojson.GetBytesNoCopy(rr.Body.Bytes(), "id").String() != "home/visible" {
-		t.Fatalf("Home detail: %d %s", rr.Code, rr.Body.String())
-	}
-	if rr := get("local/only", true); rr.Code != 404 {
-		t.Fatalf("local registry leaked into Home: %d %s", rr.Code, rr.Body.String())
 	}
 }

@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	homekv "github.com/router-for-me/CLIProxyAPI/v8/internal/home"
+	kvstore "github.com/router-for-me/CLIProxyAPI/v8/internal/kvstore"
 )
 
 type CodexCache struct {
@@ -61,17 +61,17 @@ func GetCodexCache(key string) (CodexCache, bool) {
 
 // GetCodexCacheRequired retrieves a cached entry for request-time paths.
 func GetCodexCacheRequired(ctx context.Context, key string) (CodexCache, bool, error) {
-	var homeCache CodexCache
-	homeMode, found, errGet := homekv.KVGetJSONRequired(ctx, key, &homeCache)
-	if homeMode {
+	var kvCache CodexCache
+	kvMode, found, errGet := kvstore.KVGetJSONRequired(ctx, key, &kvCache)
+	if kvMode {
 		if errGet != nil || !found {
 			return CodexCache{}, false, errGet
 		}
-		if homeCache.Expire.Before(time.Now()) {
-			_, _, _ = homekv.KVDelRequired(ctx, key)
+		if kvCache.Expire.Before(time.Now()) {
+			_, _, _ = kvstore.KVDelRequired(ctx, key)
 			return CodexCache{}, false, nil
 		}
-		return homeCache, true, nil
+		return kvCache, true, nil
 	}
 
 	codexCacheCleanupOnce.Do(startCodexCacheCleanup)
@@ -95,8 +95,8 @@ func SetCodexCacheRequired(ctx context.Context, key string, cache CodexCache) er
 	if ttl <= 0 {
 		return nil
 	}
-	if _, homeMode, _ := homekv.CurrentKVClient(); homeMode {
-		_, errSet := homekv.KVSetJSONRequired(ctx, key, cache, ttl)
+	if _, kvMode, _ := kvstore.CurrentKVClient(); kvMode {
+		_, errSet := kvstore.KVSetJSONRequired(ctx, key, cache, ttl)
 		return errSet
 	}
 	codexCacheCleanupOnce.Do(startCodexCacheCleanup)
@@ -112,8 +112,8 @@ func SetCodexCacheBestEffort(ctx context.Context, key string, cache CodexCache) 
 	if ttl <= 0 {
 		return false
 	}
-	if _, homeMode, _ := homekv.CurrentKVClient(); homeMode {
-		return homekv.KVSetJSONBestEffort(ctx, key, cache, ttl)
+	if _, kvMode, _ := kvstore.CurrentKVClient(); kvMode {
+		return kvstore.KVSetJSONBestEffort(ctx, key, cache, ttl)
 	}
 	codexCacheCleanupOnce.Do(startCodexCacheCleanup)
 	codexCacheMu.Lock()
@@ -124,5 +124,5 @@ func SetCodexCacheBestEffort(ctx context.Context, key string, cache CodexCache) 
 
 // CodexPromptCacheKey builds the Home KV key for a model/user prompt cache.
 func CodexPromptCacheKey(modelName string, userScope string) string {
-	return "cpa:codex:prompt-cache:" + homekv.HashKeyPart(modelName) + ":" + homekv.HashKeyPart(userScope)
+	return "cpa:codex:prompt-cache:" + kvstore.HashKeyPart(modelName) + ":" + kvstore.HashKeyPart(userScope)
 }

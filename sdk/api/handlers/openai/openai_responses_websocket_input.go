@@ -246,11 +246,7 @@ func (h *OpenAIResponsesAPIHandler) forwardResponsesWebsocketInterrupt(ctx conte
 		return fmt.Errorf("upstream executor does not support response.interrupt")
 	}
 	ctx = cliproxyexecutor.WithWebsocketAuthCheck(ctx, func(authID string) bool {
-		// Home runtime credentials live on the execution session, not in the global map.
 		auth, found := h.AuthManager.GetByID(authID)
-		if !found || auth == nil {
-			auth, found = h.AuthManager.GetExecutionSessionAuthByID(sessionID, authID)
-		}
 		return found && auth != nil && !auth.Disabled && auth.Status != coreauth.StatusDisabled
 	})
 	return sender.InterruptExecutionSession(ctx, sessionID, payload)

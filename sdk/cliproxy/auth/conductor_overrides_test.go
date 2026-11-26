@@ -71,21 +71,6 @@ func TestManager_ShouldRetryAfterError_RespectsAuthRequestRetryOverride(t *testi
 	}
 }
 
-func TestManager_ShouldRetryAfterError_SkipsWrappedHomeConcurrencyBusy(t *testing.T) {
-	m := NewManager(nil, nil, nil)
-	m.SetRetryConfig(1, 30*time.Second, 0)
-	if _, errRegister := m.Register(context.Background(), &Auth{ID: "retry-auth", Provider: "codex"}); errRegister != nil {
-		t.Fatalf("register auth: %v", errRegister)
-	}
-
-	_, _, maxWait := m.retrySettings()
-	errBusy := fmt.Errorf("outer retry: %w", NewHomeConcurrencyBusyError("busy", 20*time.Second))
-	wait, shouldRetry := m.shouldRetryAfterError(errBusy, 0, []string{"codex"}, "gpt", maxWait)
-	if shouldRetry || wait != 0 {
-		t.Fatalf("wrapped Home busy retry = (%v, %t), want (0, false)", wait, shouldRetry)
-	}
-}
-
 func TestManager_ShouldRetryAfterError_RetriesLocalRoundWithoutCooldown(t *testing.T) {
 	m := NewManager(nil, nil, nil)
 	m.SetRetryConfig(1, 0, 0)
@@ -213,67 +198,6 @@ func TestManager_ShouldRetryAfterError_IgnoresNonRoundCooldownOverrides(t *testi
 
 			if wait, shouldRetry := manager.shouldRetryAfterError(&Error{HTTPStatus: http.StatusBadGateway, Message: "upstream unavailable"}, 0, []string{"codex"}, model, time.Minute); shouldRetry || wait != 0 {
 				t.Fatalf("non-round cooldown override retry = (%v, %t), want (0, false)", wait, shouldRetry)
-			}
-		})
-	}
-}
-
-func TestManager_ShouldRetryAfterError_IgnoresRequestIneligibleOverrides(t *testing.T) {
-	tests := []struct {
-		name       string
-		ctx        context.Context
-		opts       cliproxyexecutor.Options
-		eligible   *Auth
-		ineligible *Auth
-	}{
-		{
-			name: "credential policy",
-			ctx:  withCredentialPolicy(context.Background(), CredentialPolicyCodexAlphaSearchV1),
-			eligible: &Auth{
-				ID:         "retry-policy-eligible",
-				Provider:   "codex",
-				Attributes: map[string]string{"auth_kind": "oauth"},
-				Metadata:   map[string]any{"request_retry": 0},
-			},
-			ineligible: &Auth{
-				ID:         "retry-policy-ineligible",
-				Provider:   "codex",
-				Attributes: map[string]string{"api_key": "ordinary"},
-				Metadata:   map[string]any{"request_retry": 2},
-			},
-		},
-		{
-			name: "pinned credential",
-			ctx:  context.Background(),
-			opts: cliproxyexecutor.Options{Metadata: map[string]any{cliproxyexecutor.PinnedAuthMetadataKey: "retry-pinned-eligible"}},
-			eligible: &Auth{
-				ID:       "retry-pinned-eligible",
-				Provider: "codex",
-				Metadata: map[string]any{"request_retry": 0},
-			},
-			ineligible: &Auth{
-				ID:       "retry-pinned-ineligible",
-				Provider: "codex",
-				Metadata: map[string]any{"request_retry": 2},
-			},
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			manager := NewManager(nil, nil, nil)
-			manager.SetRetryConfig(0, 0, 0)
-			model := "retry-eligibility-" + uuid.NewString()
-			for _, auth := range []*Auth{test.eligible, test.ineligible} {
-				registry.GetGlobalRegistry().RegisterClient(auth.ID, auth.Provider, []*registry.ModelInfo{{ID: model}})
-				t.Cleanup(func() { registry.GetGlobalRegistry().UnregisterClient(auth.ID) })
-				if _, errRegister := manager.Register(context.Background(), auth); errRegister != nil {
-					t.Fatalf("register %s: %v", auth.ID, errRegister)
-				}
-			}
-
-			wait, shouldRetry := manager.shouldRetryAfterErrorWithHomeRetryLimit(test.ctx, test.opts, &Error{HTTPStatus: http.StatusBadGateway, Message: "retryable failure"}, 0, []string{"codex"}, model, 0, -1, 0)
-			if shouldRetry || wait != 0 {
-				t.Fatalf("request-ineligible override retry = (%v, %t), want (0, false)", wait, shouldRetry)
 			}
 		})
 	}

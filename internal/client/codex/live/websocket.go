@@ -58,42 +58,14 @@ func (h *Handler) HandleDirectWebsocket(c *gin.Context) {
 	ctx = coreexecutor.WithDownstreamWebsocket(ctx)
 	selectionOpts := coreexecutor.Options{Headers: liveSelectionHeaders(c)}
 	ctx = handlers.EnrichContextWithSessionHierarchy(ctx, selectionOpts.Headers, nil, nil)
-	selection, selected, errSelect := h.selectOAuth(ctx, selectionModel, selectionOpts)
+	selected, errSelect := h.selectOAuth(ctx, selectionModel, selectionOpts)
 	if errSelect != nil {
 		writeSelectionError(c, errSelect)
 		return
 	}
 	if selected == nil {
-		if selection != nil {
-			selection.End("missing_auth")
-		}
 		writeRealtimeError(c, http.StatusServiceUnavailable, "Codex auth unavailable", "server_error", "codex_auth_unavailable")
 		return
-	}
-	if selection != nil && selection.CanonicalSessionID != "" {
-		meta := logging.GetClientRequestMetadata(ctx)
-		meta.SessionID = selection.CanonicalSessionID
-		if selection.ParentSessionID != "" {
-			meta.ParentSessionID = selection.ParentSessionID
-		} else {
-			meta.ParentSessionID = ""
-		}
-		if meta.SessionID == meta.ParentSessionID {
-			meta.ParentSessionID = ""
-		}
-		ctx = logging.WithClientRequestMetadata(ctx, meta)
-	}
-	if selection != nil {
-		attemptCtx, releaseAttempt, errAttempt := selection.AttemptContext(ctx)
-		if errAttempt != nil {
-			selection.End("attempt_bind_failed")
-			writeRealtimeError(c, http.StatusServiceUnavailable, errAttempt.Error(), "server_error", "realtime_upstream_unavailable")
-			return
-		}
-		ctx = attemptCtx
-		defer releaseAttempt()
-		selection.Retain()
-		defer selection.End("session_closed")
 	}
 	logging.SetGinCPATraceID(c, selected.EnsureIndex())
 
@@ -144,14 +116,6 @@ func (h *Handler) HandleDirectWebsocket(c *gin.Context) {
 			}
 		}
 		closeHandshakeBody(handshakeResponse, "direct websocket rejected")
-		if selection != nil && status == http.StatusUnauthorized {
-			diagnosticBody := responseBody
-			if len(diagnosticBody) == 0 {
-				diagnosticBody = []byte(errDial.Error())
-			}
-			h.authManager.ReportHomeUnauthorized(ctx, selected, "codex", selectionModel, diagnosticBody)
-			log.WithField("status", status).Warnf("codex realtime websocket upstream handshake failed: %s", logging.SafeDiagnosticForLog(string(diagnosticBody)))
-		}
 		helps.RecordAPIWebsocketError(ctx, helpConfig, "dial", errDial)
 		if handshakeResponse != nil && handshakeResponse.StatusCode == http.StatusUnauthorized {
 			if contentType := handshakeResponse.Header.Get("Content-Type"); contentType != "" {
@@ -208,13 +172,6 @@ func (h *Handler) HandleDirectWebsocket(c *gin.Context) {
 		}
 	}
 
-	if selection != nil {
-		if errBind := selection.Bind(closeUpstream); errBind != nil {
-			writeRealtimeError(c, http.StatusServiceUnavailable, errBind.Error(), "server_error", "realtime_upstream_unavailable")
-			return
-		}
-	}
-
 	upgradeHeaders := make(http.Header)
 	if subprotocol := upstream.Subprotocol(); subprotocol != "" {
 		upgradeHeaders.Set("Sec-WebSocket-Protocol", subprotocol)
@@ -226,11 +183,6 @@ func (h *Handler) HandleDirectWebsocket(c *gin.Context) {
 	}
 	closeDownstream := websocketCloseFunc("downstream", downstream)
 	defer func() { _ = closeDownstream() }()
-	if selection != nil {
-		if errBind := selection.Bind(closeDownstream); errBind != nil {
-			return
-		}
-	}
 
 	if errRelay := relayWebsockets(downstream, upstream); errRelay != nil && !isNormalWebsocketClose(errRelay) {
 		helps.RecordAPIWebsocketError(ctx, h.currentConfig(), "relay", errRelay)

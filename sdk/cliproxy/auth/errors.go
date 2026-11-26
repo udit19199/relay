@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -486,13 +487,6 @@ func HasTrustedRetryDeadline(err error) bool {
 	if err == nil {
 		return false
 	}
-	// An exhausted Home round owns the aggregate decision even when its
-	// RetryAfter is nil (immediate / no hint), so raw passthrough stays
-	// suppressed for the whole round.
-	var exhausted *homeRetryRoundExhaustedError
-	if errors.As(err, &exhausted) && exhausted != nil {
-		return true
-	}
 	var unavailable *authUnavailableError
 	if errors.As(err, &unavailable) && unavailable != nil && unavailable.retryAfter > 0 {
 		return true
@@ -501,8 +495,7 @@ func HasTrustedRetryDeadline(err error) bool {
 	if errors.As(err, &cooldown) && cooldown != nil && cooldown.resetIn > 0 {
 		return true
 	}
-	// Every remaining safe-header carrier (Home busy, Home dispatch
-	// cooldown, plugin-provided safe headers) outranks a raw passthrough
+	// Every remaining safe-header carrier outranks a raw passthrough
 	// Retry-After as well.
 	if SafeResponseHeaders(err).Get("Retry-After") != "" {
 		return true
@@ -561,4 +554,42 @@ func WithCause(err *Error, cause error) error {
 		base:  err,
 		cause: cause,
 	}
+}
+
+// SafeResponseHeaders returns trusted response headers only for concrete
+// retry/cooldown errors.
+func SafeResponseHeaders(err error) http.Header {
+	var trusted *trustedRetryAfterError
+	if errors.As(err, &trusted) && trusted != nil {
+		return trusted.SafeResponseHeaders()
+	}
+	var modelCooldown *modelCooldownError
+	if errors.As(err, &modelCooldown) && modelCooldown != nil {
+		return modelCooldown.Headers()
+	}
+	var unavailable *authUnavailableError
+	if errors.As(err, &unavailable) && unavailable != nil {
+		return unavailable.Headers()
+	}
+	var safeHeaderProvider interface{ SafeResponseHeaders() http.Header }
+	if errors.As(err, &safeHeaderProvider) && safeHeaderProvider != nil {
+		if value := safeHeaderProvider.SafeResponseHeaders().Get("Retry-After"); value != "" {
+			return http.Header{"Retry-After": []string{value}}
+		}
+	}
+	return nil
+}
+
+func safeRetryAfterHeader(retryAfter time.Duration) http.Header {
+	if retryAfter <= 0 {
+		return nil
+	}
+	seconds := int64(retryAfter / time.Second)
+	if retryAfter%time.Second != 0 {
+		seconds++
+	}
+	if seconds < 1 {
+		seconds = 1
+	}
+	return http.Header{"Retry-After": []string{strconv.FormatInt(seconds, 10)}}
 }

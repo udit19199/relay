@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	homekv "github.com/router-for-me/CLIProxyAPI/v8/internal/home"
+	kvstore "github.com/router-for-me/CLIProxyAPI/v8/internal/kvstore"
 )
 
 type userIDCacheEntry struct {
@@ -75,8 +75,8 @@ func CachedUserIDRequired(ctx context.Context, apiKey string) (string, error) {
 	if apiKey == "" {
 		return newUserID()
 	}
-	client, homeMode, errClient := currentClaudeIDKVClient()
-	if homeMode {
+	client, kvMode, errClient := currentClaudeIDKVClient()
+	if kvMode {
 		if errClient != nil {
 			return "", errClient
 		}
@@ -146,5 +146,5 @@ func CachedUserIDRequired(ctx context.Context, apiKey string) (string, error) {
 }
 
 func claudeUserIDKVKey(apiKey string) string {
-	return "cpa:claude:user-id:" + homekv.HashKeyPart(apiKey)
+	return "cpa:claude:user-id:" + kvstore.HashKeyPart(apiKey)
 }

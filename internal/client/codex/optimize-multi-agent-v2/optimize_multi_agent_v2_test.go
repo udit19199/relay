@@ -131,31 +131,6 @@ func TestCodexSpawnAgentModelsFromSourcesIncludesModelMetadata(t *testing.T) {
 	}
 }
 
-func TestDecodeCodexHomeAvailableModels(t *testing.T) {
-	t.Parallel()
-
-	raw := []byte(`{
-		"codex":[{"id":"model-b","display_name":"Model B"},{"id":"model-a"}],
-		"other":[{"name":"models/model-c","displayName":"Model C"},{"id":"model-a","display_name":"duplicate"}]
-	}`)
-	models := decodeCodexHomeAvailableModels(raw)
-	if len(models) != 3 {
-		t.Fatalf("model count = %d, want 3", len(models))
-	}
-	if got := mapString(models[0], "id"); got != "model-a" {
-		t.Fatalf("first model ID = %q, want model-a", got)
-	}
-	if got := mapString(models[1], "description"); got != "Model B" {
-		t.Fatalf("model-b description = %q, want Model B", got)
-	}
-	if got := mapString(models[2], "id"); got != "model-c" {
-		t.Fatalf("last model ID = %q, want model-c", got)
-	}
-	if got := decodeCodexHomeAvailableModels([]byte(`{"error":{"type":"no_credentials"}}`)); got != nil {
-		t.Fatalf("error envelope decoded as models: %#v", got)
-	}
-}
-
 func TestRewriteCodexSpawnAgentDescriptionNormalizesModelList(t *testing.T) {
 	t.Parallel()
 
@@ -366,7 +341,7 @@ func TestPrepareCodexMultiAgentV2ToolsOnlyPreparesToolDefinitions(t *testing.T) 
 		]
 	}`)
 	headers := http.Header{"User-Agent": []string{"codex_cli_rs/0.144.1"}}
-	got, prepared := PrepareCodexMultiAgentV2Tools(context.Background(), headers, payload, true, false)
+	got, prepared := PrepareCodexMultiAgentV2Tools(context.Background(), headers, payload, true)
 	if !prepared {
 		t.Fatal("Codex CLI request was not marked prepared")
 	}
@@ -1085,7 +1060,7 @@ func TestCodexSpawnAgentModelsCacheInvalidation(t *testing.T) {
 		modelRegistry.UnregisterClient(clientID2)
 	})
 
-	formatted1 := formatCodexSpawnAgentModelsForRequest(context.Background(), nil, false)
+	formatted1 := formatCodexSpawnAgentModelsForRequest(context.Background(), nil)
 	if !strings.Contains(formatted1, "test-spawn-model-alpha") {
 		t.Fatalf("expected initial markdown to contain test-spawn-model-alpha, got: %s", formatted1)
 	}
@@ -1094,7 +1069,7 @@ func TestCodexSpawnAgentModelsCacheInvalidation(t *testing.T) {
 	}
 
 	// 2. Cache hit returns identical content
-	formattedHit := formatCodexSpawnAgentModelsForRequest(context.Background(), nil, false)
+	formattedHit := formatCodexSpawnAgentModelsForRequest(context.Background(), nil)
 	if formattedHit != formatted1 {
 		t.Fatalf("cache hit expected identical output, got %s vs %s", formattedHit, formatted1)
 	}
@@ -1108,7 +1083,7 @@ func TestCodexSpawnAgentModelsCacheInvalidation(t *testing.T) {
 		},
 	})
 
-	formatted2 := formatCodexSpawnAgentModelsForRequest(context.Background(), nil, false)
+	formatted2 := formatCodexSpawnAgentModelsForRequest(context.Background(), nil)
 	if !strings.Contains(formatted2, "test-spawn-model-beta") {
 		t.Fatalf("expected cache invalidation to include test-spawn-model-beta, got: %s", formatted2)
 	}
@@ -1125,14 +1100,14 @@ func TestCodexSpawnAgentModelsCacheInvalidation(t *testing.T) {
 		},
 	})
 
-	formatted3 := formatCodexSpawnAgentModelsForRequest(context.Background(), nil, false)
+	formatted3 := formatCodexSpawnAgentModelsForRequest(context.Background(), nil)
 	if !strings.Contains(formatted3, "low, medium (default), high, max") {
 		t.Fatalf("expected updated thinking levels to reflect in markdown, got: %s", formatted3)
 	}
 
 	// 5. Unregistering client invalidates cache
 	modelRegistry.UnregisterClient(clientID2)
-	formatted4 := formatCodexSpawnAgentModelsForRequest(context.Background(), nil, false)
+	formatted4 := formatCodexSpawnAgentModelsForRequest(context.Background(), nil)
 	if strings.Contains(formatted4, "test-spawn-model-beta") {
 		t.Fatalf("expected test-spawn-model-beta to be removed after unregistering, got: %s", formatted4)
 	}
@@ -1161,7 +1136,7 @@ func BenchmarkCodexSpawnAgentModelsForRequest(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		codexSpawnAgentModelsForRequest(ctx, nil, false)
+		codexSpawnAgentModelsForRequest(ctx, nil)
 	}
 }
 
@@ -1194,7 +1169,7 @@ func BenchmarkPrepareCodexMultiAgentV2Tools(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		PrepareCodexMultiAgentV2Tools(ctx, headers, payload, true, false)
+		PrepareCodexMultiAgentV2Tools(ctx, headers, payload, true)
 	}
 }
 

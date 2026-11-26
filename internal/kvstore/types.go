@@ -22,7 +22,7 @@ type KVSetOptions struct {
 	XX bool
 }
 
-// KVClient defines the key-value storage contract shared by Home KV and local BoltStore.
+// KVClient defines the key-value storage contract shared by the local BoltStore.
 type KVClient interface {
 	KVGet(ctx context.Context, key string) ([]byte, bool, error)
 	KVSet(ctx context.Context, key string, value []byte, opts KVSetOptions) (bool, error)
@@ -40,16 +40,16 @@ type KVClient interface {
 func BuildSetArgs(key string, value []byte, opts KVSetOptions) ([]any, error) {
 	key = strings.TrimSpace(key)
 	if key == "" {
-		return nil, fmt.Errorf("home kv: key is empty")
+		return nil, fmt.Errorf("kv: key is empty")
 	}
 	if opts.EX > 0 && opts.PX > 0 {
-		return nil, fmt.Errorf("home kv: EX and PX are mutually exclusive")
+		return nil, fmt.Errorf("kv: EX and PX are mutually exclusive")
 	}
 	if opts.EX < 0 || opts.PX < 0 {
-		return nil, fmt.Errorf("home kv: ttl must not be negative")
+		return nil, fmt.Errorf("kv: ttl must not be negative")
 	}
 	if opts.NX && opts.XX {
-		return nil, fmt.Errorf("home kv: NX and XX are mutually exclusive")
+		return nil, fmt.Errorf("kv: NX and XX are mutually exclusive")
 	}
 
 	args := []any{key, append([]byte(nil), value...)}

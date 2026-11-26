@@ -1,5 +1,5 @@
 // Package pluginstore exposes plugin registry and artifact installation helpers
-// for embedders such as CLIProxyAPIHome.
+// for embedders.
 package pluginstore
 
 import (

@@ -2287,3 +2287,21 @@ func extractResponsesAPIContent(content ojson.Result) string {
 func extractSessionID(payload []byte) string {
 	return ExtractSessionID(nil, payload, nil)
 }
+
+func isHierarchyParent(primary, fallback string) bool {
+	if fallback == "" || primary == "" || primary == fallback {
+		return false
+	}
+	if strings.Contains(primary, ":agent:") {
+		return true
+	}
+	idx1 := strings.Index(primary, ":")
+	idx2 := strings.Index(fallback, ":")
+	if idx1 > 0 && idx2 > 0 && primary[:idx1] == fallback[:idx2] {
+		return true
+	}
+	if idx1 == -1 && idx2 == -1 {
+		return true
+	}
+	return false
+}

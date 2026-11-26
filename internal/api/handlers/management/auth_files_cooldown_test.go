@@ -166,31 +166,17 @@ func TestListAuthFilesCooldownsCredentialKindsAndFilters(t *testing.T) {
 
 func TestListAuthFilesCooldownsUnknown(t *testing.T) {
 	t.Setenv("MANAGEMENT_PASSWORD", "")
-	for _, mode := range []string{"disk", "home"} {
-		t.Run(mode, func(t *testing.T) {
-			cfg := &config.Config{AuthDir: t.TempDir()}
-			var manager *coreauth.Manager
-			if mode == "disk" {
-				if errWrite := os.WriteFile(filepath.Join(cfg.AuthDir, "a.json"), []byte(`{"type":"codex"}`), 0o600); errWrite != nil {
-					t.Fatal(errWrite)
-				}
-			} else {
-				cfg.Home.Enabled = true
-				manager = coreauth.NewManager(nil, nil, nil)
-				manager.SetConfig(cfg)
-				registerAuthForLookupTest(t, manager, &coreauth.Auth{ID: "a", Provider: "codex", Status: coreauth.StatusActive, Attributes: map[string]string{"runtime_only": "true"}})
-			}
-			h := NewHandlerWithoutConfigFilePath(cfg, manager)
-			payload := requestAuthFilesCooldowns(t, h, "")
-			if len(payload.Files) != 1 || string(payload.Files[0].Cooldowns) != "null" {
-				t.Fatalf("unknown cooldowns = %+v", payload.Files)
-			}
-			if mode == "disk" {
-				if filtered := requestAuthFilesCooldowns(t, h, "?auth_index=missing"); len(filtered.Files) != 0 {
-					t.Fatal("disk fallback matched index")
-				}
-			}
-		})
+	cfg := &config.Config{AuthDir: t.TempDir()}
+	if errWrite := os.WriteFile(filepath.Join(cfg.AuthDir, "a.json"), []byte(`{"type":"codex"}`), 0o600); errWrite != nil {
+		t.Fatal(errWrite)
+	}
+	h := NewHandlerWithoutConfigFilePath(cfg, nil)
+	payload := requestAuthFilesCooldowns(t, h, "")
+	if len(payload.Files) != 1 || string(payload.Files[0].Cooldowns) != "null" {
+		t.Fatalf("unknown cooldowns = %+v", payload.Files)
+	}
+	if filtered := requestAuthFilesCooldowns(t, h, "?auth_index=missing"); len(filtered.Files) != 0 {
+		t.Fatal("disk fallback matched index")
 	}
 }
 

@@ -18,7 +18,7 @@ import (
 	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
 )
 
-// Without a watcher (Home mode), a registration dropped for obsolete global exclusions
+// Without a watcher, a registration dropped for obsolete global exclusions
 // must still be replaced by the re-registration that runs when the config is applied.
 func TestModelRegistrationDroppedForGlobalExclusionsIsReplacedWithoutWatcher(t *testing.T) {
 	models := registry.GetClaudeModels()

@@ -920,9 +920,6 @@ func (e *OpenAICompatExecutor) CountTokens(ctx context.Context, auth *cliproxyau
 // that need plugin/Home refresh must bind a refresh-capable executor instead.
 func (e *OpenAICompatExecutor) Refresh(ctx context.Context, auth *cliproxyauth.Auth) (*cliproxyauth.Auth, error) {
 	log.Debugf("openai compat executor: refresh called")
-	if refreshed, handled, err := helps.RefreshAuthViaHome(ctx, e.cfg, auth); handled {
-		return refreshed, err
-	}
 	if openAICompatAuthHasRefreshToken(auth) {
 		provider := ""
 		if e != nil {
@@ -1148,37 +1145,6 @@ func (e *OpenAICompatExecutor) resolveCredentials(auth *cliproxyauth.Auth) (base
 func (e *OpenAICompatExecutor) resolveCompatConfig(auth *cliproxyauth.Auth, req cliproxyexecutor.Request) *config.OpenAICompatibility {
 	if auth == nil || e.cfg == nil {
 		return nil
-	}
-	if e.cfg.Home.Enabled {
-		// Home excludes provider credentials from the global configuration. These
-		// non-secret options belong to the credential selected for this attempt.
-		var options struct {
-			SupportPromptCacheKey bool                              `json:"support-prompt-cache-key"`
-			Models                []config.OpenAICompatibilityModel `json:"models"`
-		}
-		present := false
-		if rawOptions, exists := auth.Metadata["credential_options"]; exists {
-			if data, errMarshal := json.Marshal(rawOptions); errMarshal == nil {
-				present = json.Unmarshal(data, &options) == nil
-			}
-		}
-		if raw, exists := auth.Attributes["support_prompt_cache_key"]; exists {
-			if value, errParse := strconv.ParseBool(raw); errParse == nil {
-				options.SupportPromptCacheKey = value
-				present = true
-			}
-		}
-		if model, ok := cliproxyauth.ResolvedHomeModelOptions(req); ok {
-			options.Models = []config.OpenAICompatibilityModel{model}
-			present = true
-		}
-		if present {
-			return &config.OpenAICompatibility{
-				Name:                  auth.Attributes["compat_name"],
-				SupportPromptCacheKey: options.SupportPromptCacheKey,
-				Models:                options.Models,
-			}
-		}
 	}
 	if auth.AuthSourceKind() == cliproxyauth.AuthSourceConfig && auth.Attributes != nil {
 		if rawIndex := strings.TrimSpace(auth.Attributes["config_index"]); rawIndex != "" {

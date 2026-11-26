@@ -490,9 +490,6 @@ func (h *OpenAIResponsesAPIHandler) ResponsesWebsocket(c *gin.Context) {
 		if auth, ok := h.AuthManager.GetByID(authID); ok {
 			return auth, false, true
 		}
-		if auth, ok := h.AuthManager.GetExecutionSessionAuthByID(passthroughSessionID, authID); ok {
-			return auth, true, true
-		}
 		return nil, false, false
 	}
 	sessionAuthByID := func(authID string) (*coreauth.Auth, bool) {

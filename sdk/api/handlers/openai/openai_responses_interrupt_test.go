@@ -23,7 +23,6 @@ import (
 	runtimeexecutor "github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/api/handlers"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executionregistry"
 	coreexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
 )
 
@@ -452,86 +451,3 @@ func TestResponsesInterruptStopsHTTPUpstream(t *testing.T) {
 
 // TestResponsesInterruptUsesHomeSessionAuth verifies that a credential staged only
 // on the Home execution session can still authorize response.interrupt.
-func TestResponsesInterruptUsesHomeSessionAuth(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	manager := coreauth.NewManager(nil, nil, nil)
-	manager.SetConfig(&config.Config{Home: config.HomeConfig{Enabled: true}})
-	manager.PublishHomeDispatch(homeInterruptDispatcher{}, executionregistry.New(), 1)
-	executor := &homeInterruptExecutor{}
-	manager.RegisterExecutor(executor)
-	const authID = "home-interrupt-auth"
-	const model = "home-interrupt-model"
-	registry.GetGlobalRegistry().RegisterClient(authID, "codex", []*registry.ModelInfo{{ID: model}})
-	defer registry.GetGlobalRegistry().UnregisterClient(authID)
-
-	handler := NewOpenAIResponsesAPIHandler(handlers.NewBaseAPIHandlers(&config.SDKConfig{}, manager))
-	router := gin.New()
-	router.GET("/v1/responses", handler.ResponsesWebsocket)
-	downstream := httptest.NewServer(router)
-	defer downstream.Close()
-
-	client, _, errDial := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(downstream.URL, "http")+"/v1/responses", nil)
-	if errDial != nil {
-		t.Fatal(errDial)
-	}
-	defer func() { _ = client.Close() }()
-	_ = client.SetReadDeadline(time.Now().Add(8 * time.Second))
-	if errSend := client.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf(`{"type":"response.create","model":%q,"input":[]}`, model))); errSend != nil {
-		t.Fatal(errSend)
-	}
-	_, payload, errRead := client.ReadMessage()
-	if errRead != nil {
-		t.Fatal(errRead)
-	}
-	if got := ojson.GetBytesNoCopy(payload, "type").String(); got != "response.created" {
-		t.Fatalf("expected response.created, got %s", payload)
-	}
-	if _, ok := manager.GetByID(authID); ok {
-		t.Fatal("home credential leaked into the global auth map")
-	}
-	executor.mu.Lock()
-	if len(executor.metadata) != 1 {
-		executor.mu.Unlock()
-		t.Fatalf("executor calls = %d, want 1", len(executor.metadata))
-	}
-	sessionID, _ := executor.metadata[0][coreexecutor.ExecutionSessionMetadataKey].(string)
-	executor.mu.Unlock()
-	if _, ok := manager.GetExecutionSessionAuthByID(sessionID, authID); !ok {
-		t.Fatal("home session auth was not staged")
-	}
-
-	interrupt := []byte(`{"type":"response.interrupt","response_id":"r1","mode":"discard_partial_items","extension":"keep"}`)
-	if errSend := client.WriteMessage(websocket.TextMessage, interrupt); errSend != nil {
-		t.Fatal(errSend)
-	}
-	_, completed, errCompleted := client.ReadMessage()
-	if errCompleted != nil {
-		t.Fatal(errCompleted)
-	}
-	if got := ojson.GetBytesNoCopy(completed, "type").String(); got != "response.completed" {
-		t.Fatalf("expected response.completed after interrupt, got %s", completed)
-	}
-	executor.mu.Lock()
-	gotInterrupt := append([][]byte(nil), executor.interrupted...)
-	executor.mu.Unlock()
-	if len(gotInterrupt) != 1 || !bytes.Equal(gotInterrupt[0], interrupt) {
-		t.Fatalf("interrupt payload = %#v, want %s", gotInterrupt, interrupt)
-	}
-	if errSend := client.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf(`{"type":"response.create","model":%q,"input":[]}`, model))); errSend != nil {
-		t.Fatal(errSend)
-	}
-	_, followCreated, errFollow := client.ReadMessage()
-	if errFollow != nil {
-		t.Fatal(errFollow)
-	}
-	if got := ojson.GetBytesNoCopy(followCreated, "type").String(); got != "response.created" {
-		t.Fatalf("expected follow-up response.created, got %s", followCreated)
-	}
-	_, followDone, errDone := client.ReadMessage()
-	if errDone != nil {
-		t.Fatal(errDone)
-	}
-	if got := ojson.GetBytesNoCopy(followDone, "type").String(); got != "response.completed" {
-		t.Fatalf("expected follow-up response.completed, got %s", followDone)
-	}
-}

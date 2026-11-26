@@ -258,7 +258,7 @@ func (s *BoltStore) KVGet(ctx context.Context, key string) ([]byte, bool, error)
 	}
 	key = strings.TrimSpace(key)
 	if key == "" {
-		return nil, false, fmt.Errorf("home kv: key is empty")
+		return nil, false, fmt.Errorf("kv: key is empty")
 	}
 	var value []byte
 	var found bool
@@ -383,10 +383,10 @@ func (s *BoltStore) KVCompareAndSwap(ctx context.Context, key string, expected [
 	}
 	key = strings.TrimSpace(key)
 	if key == "" {
-		return false, fmt.Errorf("home kv: key is empty")
+		return false, fmt.Errorf("kv: key is empty")
 	}
 	if ttl < 0 {
-		return false, fmt.Errorf("home kv: ttl must not be negative")
+		return false, fmt.Errorf("kv: ttl must not be negative")
 	}
 
 	var roundedTTL time.Duration
@@ -495,7 +495,7 @@ func (s *BoltStore) KVExpire(ctx context.Context, key string, ttl time.Duration)
 	}
 	key = strings.TrimSpace(key)
 	if key == "" {
-		return false, fmt.Errorf("home kv: key is empty")
+		return false, fmt.Errorf("kv: key is empty")
 	}
 	keyBytes := []byte(key)
 	var updated bool
@@ -551,7 +551,7 @@ func (s *BoltStore) KVTTL(ctx context.Context, key string) (time.Duration, bool,
 	}
 	key = strings.TrimSpace(key)
 	if key == "" {
-		return 0, false, fmt.Errorf("home kv: key is empty")
+		return 0, false, fmt.Errorf("kv: key is empty")
 	}
 	var remaining time.Duration
 	var found bool
@@ -594,7 +594,7 @@ func (s *BoltStore) KVIncrBy(ctx context.Context, key string, delta int64) (int6
 	}
 	key = strings.TrimSpace(key)
 	if key == "" {
-		return 0, fmt.Errorf("home kv: key is empty")
+		return 0, fmt.Errorf("kv: key is empty")
 	}
 	keyBytes := []byte(key)
 	var next int64
@@ -701,7 +701,7 @@ func (s *BoltStore) KVMSet(ctx context.Context, pairs map[string][]byte) error {
 	keys := make([]string, 0, len(pairs))
 	for k := range pairs {
 		if strings.TrimSpace(k) == "" {
-			return fmt.Errorf("home kv: key is empty")
+			return fmt.Errorf("kv: key is empty")
 		}
 		keys = append(keys, k)
 	}

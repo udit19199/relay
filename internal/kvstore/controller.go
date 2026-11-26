@@ -9,20 +9,11 @@ import (
 
 var (
 	controllerMu sync.RWMutex
-	homeProvider func() (KVClient, bool, error)
 	localEnabled bool
 	localStore   *BoltStore
 	localPath    string
 	localErr     error
 )
-
-// RegisterHomeProvider registers the callback used by CurrentKVClient to inspect
-// whether Home mode is active and obtain the active Home KV client.
-func RegisterHomeProvider(fn func() (KVClient, bool, error)) {
-	controllerMu.Lock()
-	homeProvider = fn
-	controllerMu.Unlock()
-}
 
 // ConfigureLocal enables, reconfigures, or disables the local bbolt-backed KV store.
 func ConfigureLocal(enabled bool, rawPath string) error {
@@ -95,21 +86,9 @@ func shutdownLocalLocked() error {
 	return errClose
 }
 
-// CurrentKVClient returns the active KVClient using the three-tier routing order:
-//  1. Home KV when Home mode is active (never falling back to local bbolt).
-//  2. Local BoltStore when server.kv-store.disabled is false.
-//  3. (nil, false, nil) for default in-memory storage.
+// CurrentKVClient returns the local BoltStore when enabled, or
+// (nil, false, nil) for default in-memory storage.
 func CurrentKVClient() (KVClient, bool, error) {
-	controllerMu.RLock()
-	provider := homeProvider
-	controllerMu.RUnlock()
-
-	if provider != nil {
-		if client, homeMode, errHome := provider(); homeMode {
-			return client, true, errHome
-		}
-	}
-
 	controllerMu.RLock()
 	defer controllerMu.RUnlock()
 
