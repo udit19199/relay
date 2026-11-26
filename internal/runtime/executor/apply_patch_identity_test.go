@@ -137,7 +137,7 @@ func applyPatchIdentitySource(interactions bool, first, boundary string, snapsho
 }
 
 func TestApplyPatchNamedLateIdentityActualTransports(t *testing.T) {
-	for _, transport := range []string{"xai", "meta", "interactions", "ws-sse", "ws-raw"} {
+	for _, transport := range []string{"xai", "meta", "ws-sse", "ws-raw"} {
 		for _, first := range []string{"item", "call", "neither", "neither-item-first", "neither-call-first"} {
 			for _, boundary := range []string{"delta", "item", "terminal"} {
 				for _, snapshot := range []bool{false, true} {
@@ -206,9 +206,6 @@ func applyPatchIdentityExecutor(t *testing.T, transport string, source [][]byte)
 	}))
 	t.Cleanup(server.Close)
 	exec := task6RepairExecutor(transport)
-	if transport == "interactions" {
-		exec = NewGeminiInteractionsExecutor(&config.Config{})
-	}
 	if ws {
 		wsExec := NewXAIWebsocketsExecutor(&config.Config{})
 		wsExec.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
@@ -219,7 +216,7 @@ func applyPatchIdentityExecutor(t *testing.T, transport string, source [][]byte)
 }
 
 func TestApplyPatchNamedLateIdentityActualFailures(t *testing.T) {
-	for _, transport := range []string{"xai", "meta", "interactions", "ws-sse", "ws-raw"} {
+	for _, transport := range []string{"xai", "meta", "ws-sse", "ws-raw"} {
 		for _, mode := range []string{"item-conflict", "call-conflict", "partial-snapshot", "invalid-snapshot", "eof"} {
 			t.Run(transport+"/"+mode, func(t *testing.T) {
 				interactions := transport == "interactions"
@@ -286,7 +283,7 @@ func TestApplyPatchNamedLateIdentityActualFailures(t *testing.T) {
 }
 
 func TestApplyPatchNamedLateIdentityActualInterleaved(t *testing.T) {
-	for _, transport := range []string{"xai", "meta", "interactions", "ws-sse", "ws-raw"} {
+	for _, transport := range []string{"xai", "meta", "ws-sse", "ws-raw"} {
 		t.Run(transport, func(t *testing.T) {
 			interactions := transport == "interactions"
 			first := applyPatchIdentitySource(interactions, "item", "item", false)

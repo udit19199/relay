@@ -14,7 +14,6 @@ func TestProviderRefreshLeads(t *testing.T) {
 	}{
 		{name: "codex", authenticator: NewCodexAuthenticator(), want: 96 * time.Hour},
 		{name: "claude", authenticator: NewClaudeAuthenticator(), want: 4 * time.Hour},
-		{name: "antigravity", authenticator: NewAntigravityAuthenticator(), want: 30 * time.Minute},
 		{name: "xai", authenticator: NewXAIAuthenticator(), want: 5 * time.Minute},
 		{name: "devin", authenticator: NewDevinAuthenticator(), wantNil: true},
 		{name: "meta", authenticator: NewMetaAuthenticator(), wantNil: true},

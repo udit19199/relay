@@ -69,30 +69,6 @@ func TestClaudeUsageRecordCarriesResponseModel(t *testing.T) {
 	}
 }
 
-func TestGeminiUsageRecordCarriesResponseModel(t *testing.T) {
-	const alias = "gemini-response-model-test"
-	capture := &multiProviderUsageCapture{alias: alias, records: make(chan coreusage.Record, 4)}
-	coreusage.RegisterNamedPlugin(t.Name(), capture)
-	t.Cleanup(func() {
-		coreusage.RegisterNamedPlugin(t.Name(), multiProviderNoopUsagePlugin{})
-	})
-
-	ctx := coreusage.WithRequestedModelAlias(context.Background(), alias)
-	auth := &cliproxyauth.Auth{ID: "gemini-auth-1", Index: "auth-gemini-1", Provider: "gemini"}
-	reporter := helps.NewExecutorUsageReporter(ctx, NewGeminiExecutor(&config.Config{}), "gemini-2.5-pro", auth)
-
-	reporter.ObserveResponseModel([]byte(`data: {"candidates":[{"content":{"parts":[{"text":"hi"}]}}],"modelVersion":"gemini-2.5-flash"}`))
-	reporter.Publish(ctx, coreusage.Detail{InputTokens: 15, OutputTokens: 25})
-
-	record := capture.await(t)
-	if record.Model != "gemini-2.5-pro" {
-		t.Fatalf("record model = %q, want gemini-2.5-pro", record.Model)
-	}
-	if record.ResponseModel != "gemini-2.5-flash" {
-		t.Fatalf("record response model = %q, want gemini-2.5-flash", record.ResponseModel)
-	}
-}
-
 func TestOpenAICompatUsageRecordCarriesResponseModel(t *testing.T) {
 	const alias = "openai-response-model-test"
 	capture := &multiProviderUsageCapture{alias: alias, records: make(chan coreusage.Record, 4)}
@@ -114,35 +90,6 @@ func TestOpenAICompatUsageRecordCarriesResponseModel(t *testing.T) {
 	}
 	if record.ResponseModel != "gpt-4o-2024-08-06" {
 		t.Fatalf("record response model = %q, want gpt-4o-2024-08-06", record.ResponseModel)
-	}
-}
-
-func TestGeminiInteractionsUsageRecordCarriesResponseModel(t *testing.T) {
-	const alias = "gemini-interactions-response-model-test"
-	capture := &multiProviderUsageCapture{alias: alias, records: make(chan coreusage.Record, 4)}
-	coreusage.RegisterNamedPlugin(t.Name(), capture)
-	t.Cleanup(func() {
-		coreusage.RegisterNamedPlugin(t.Name(), multiProviderNoopUsagePlugin{})
-	})
-
-	ctx := coreusage.WithRequestedModelAlias(context.Background(), alias)
-	auth := &cliproxyauth.Auth{ID: "gemini-auth-interactions", Index: "auth-gemini-interactions-1", Provider: "gemini"}
-	reporter := helps.NewExecutorUsageReporter(ctx, NewGeminiExecutor(&config.Config{}), "gemini-2.5-pro", auth)
-
-	sseChunk := []byte("data: {\"event_type\":\"interaction.completed\",\"interaction\":{\"id\":\"i1\",\"status\":\"completed\",\"service_tier\":\"standard\",\"model\":\"gemini-3.1-flash-lite\",\"usage\":{\"total_input_tokens\":2,\"total_output_tokens\":3,\"total_tokens\":5}}}\n\n")
-	reporter.ObserveResponseModel(sseChunk)
-	detail, ok := helps.ParseInteractionsStreamUsage(sseChunk)
-	if !ok {
-		t.Fatalf("ParseInteractionsStreamUsage failed to parse detail")
-	}
-	reporter.Publish(ctx, detail)
-
-	record := capture.await(t)
-	if record.Model != "gemini-2.5-pro" {
-		t.Fatalf("record model = %q, want gemini-2.5-pro", record.Model)
-	}
-	if record.ResponseModel != "gemini-3.1-flash-lite" {
-		t.Fatalf("record response model = %q, want gemini-3.1-flash-lite", record.ResponseModel)
 	}
 }
 

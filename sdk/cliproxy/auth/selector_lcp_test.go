@@ -1679,3 +1679,7 @@ func BenchmarkSessionAffinitySelectorPickLCP(b *testing.B) {
 		_, _ = selector.Pick(context.Background(), "openai", "gpt-4o", opts, auths)
 	}
 }
+
+func boolPointer(b bool) *bool {
+	return &b
+}

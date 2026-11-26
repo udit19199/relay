@@ -389,8 +389,6 @@ func (h *Handler) StartOAuthV8(c *gin.Context) {
 		h.RequestAnthropicToken(c)
 	case "codex":
 		h.RequestCodexToken(c)
-	case "antigravity":
-		h.RequestAntigravityToken(c)
 	case "xai":
 		h.RequestXAIToken(c)
 	case "devin":
@@ -470,18 +468,6 @@ func (h *Handler) oauthTargetProviderMatches(targetProvider, requestedProvider s
 	host := h.pluginHost
 	h.mu.Unlock()
 	return host != nil && host.SameAuthProvider(targetProvider, requestedProvider)
-}
-
-// ImportOAuthV8 dispatches credential import using the provider query parameter.
-func (h *Handler) ImportOAuthV8(c *gin.Context) {
-	switch strings.ToLower(strings.TrimSpace(c.Query("provider"))) {
-	case "":
-		c.JSON(http.StatusBadRequest, gin.H{"error": "provider is required"})
-	case "vertex":
-		h.ImportVertexCredential(c)
-	default:
-		c.JSON(http.StatusNotFound, gin.H{"error": "provider_not_found"})
-	}
 }
 
 // VerifyAuthFileV8 runs an operator-triggered, account-pinned inference verification

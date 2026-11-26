@@ -91,14 +91,6 @@ func task6Executor(provider string) cliproxyauth.ProviderExecutor {
 	switch provider {
 	case "claude", "claude-oauth":
 		return NewClaudeExecutor(cfg)
-	case "gemini":
-		return NewGeminiExecutor(cfg)
-	case "gemini-interactions":
-		return NewGeminiInteractionsExecutor(cfg)
-	case "vertex":
-		return NewGeminiVertexExecutor(cfg)
-	case "antigravity":
-		return NewAntigravityExecutor(cfg)
 	default:
 		return NewOpenAICompatExecutor(provider, cfg)
 	}
@@ -135,7 +127,7 @@ func assertTask6FailedStream(t *testing.T, chunks <-chan cliproxyexecutor.Stream
 }
 
 func TestApplyPatchActualProviderErrorAndEOF(t *testing.T) {
-	for _, provider := range []string{"custom-compat", "claude", "claude-oauth", "gemini", "gemini-interactions", "vertex", "antigravity"} {
+	for _, provider := range []string{"custom-compat", "claude", "claude-oauth"} {
 		for _, mode := range []string{"nonstream", "stream", "eof", "empty", "scanner"} {
 			t.Run(provider+"/"+mode, func(t *testing.T) {
 				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -428,7 +420,7 @@ data: {"type":"response.completed","response":{"output":[{"type":"function_call"
 }
 
 func TestApplyPatchHTTPGatewayErrorMatrix(t *testing.T) {
-	for _, provider := range []string{"custom-compat", "claude", "claude-oauth", "gemini", "gemini-interactions", "vertex", "antigravity", "devin", "xai", "meta"} {
+	for _, provider := range []string{"custom-compat", "claude", "claude-oauth", "devin", "xai", "meta"} {
 		for _, mode := range []string{"nonstream", "stream", "eof"} {
 			t.Run(provider+"/"+mode, func(t *testing.T) {
 				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -520,7 +512,7 @@ func task6DrainUsage(t *testing.T) {
 }
 
 func TestApplyPatchSDKOriginalRequestFallback(t *testing.T) {
-	for _, provider := range []string{"custom-compat", "gemini", "gemini-interactions", "vertex"} {
+	for _, provider := range []string{"custom-compat"} {
 		t.Run(provider, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				_, _ = io.WriteString(w, task6ProviderFixture(provider, "nonstream", "apply_patch"))
@@ -704,40 +696,6 @@ func TestApplyPatchDevinLegacyOtherToolsPreserved(t *testing.T) {
 			if !bytes.Contains(output, []byte(`"type":"response.completed"`)) || bytes.Contains(output, []byte(`"type":"response.failed"`)) {
 				t.Fatalf("legacy stream falsely rejected: %s", output)
 			}
-		})
-	}
-}
-
-func TestApplyPatchInteractionsSourceFailureIsSealed(t *testing.T) {
-	for _, streaming := range []bool{false, true} {
-		t.Run(fmt.Sprintf("stream=%v", streaming), func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if !streaming {
-					_, _ = io.WriteString(w, `{"id":"r","status":"failed","error":{"message":"RAW_SECRET"}}`)
-					return
-				}
-				w.Header().Set("Content-Type", "text/event-stream")
-				_, _ = io.WriteString(w, "data: {\"event_type\":\"interaction.created\",\"interaction\":{\"id\":\"r\"}}\n\ndata: {\"event_type\":\"interaction.failed\",\"interaction\":{\"id\":\"r\"},\"error\":{\"message\":\"RAW_SECRET\"}}\n\ndata: {\"event_type\":\"interaction.completed\",\"interaction\":{\"id\":\"r\",\"usage\":{\"total_input_tokens\":5}}}\n\ndata: [DONE]\n\n")
-			}))
-			defer server.Close()
-			exec := NewGeminiInteractionsExecutor(&config.Config{})
-			auth := &cliproxyauth.Auth{ID: "task6-source-failed", Provider: "gemini-interactions", Attributes: map[string]string{"api_key": "test", "base_url": server.URL}}
-			checkUsage := task6CaptureFailureUsage(t, auth.ID)
-			defer checkUsage()
-			if !streaming {
-				response, errExecute := exec.Execute(t.Context(), auth, cliproxyexecutor.Request{Model: "gemini-3.1-pro-preview", Payload: []byte(task6PatchRequest)}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse})
-				if len(response.Payload) > 0 {
-					t.Errorf("upstream failed response returned success: %s", response.Payload)
-				}
-				assertTask6PatchError(t, errExecute)
-				return
-			}
-			stream, errExecuteStream := exec.ExecuteStream(t.Context(), auth, cliproxyexecutor.Request{Model: "gemini-3.1-pro-preview", Payload: []byte(task6PatchRequest)}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse})
-			if errExecuteStream != nil {
-				t.Fatal(errExecuteStream)
-			}
-			assertTask6FailedStream(t, stream.Chunks)
-
 		})
 	}
 }

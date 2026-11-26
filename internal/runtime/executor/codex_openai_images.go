@@ -485,7 +485,7 @@ func (e *CodexExecutor) executeDirectOpenAIImageStream(ctx context.Context, auth
 		defer close(out)
 		var streamUsage helps.StreamUsageBuffer
 		streamUsage.SetRequestPayload(body, contentType)
-		usageObserver := helps.NewOpenAIStreamUsageObserver(&streamUsage, streamScannerBuffer)
+		usageObserver := helps.NewOpenAIStreamUsageObserver(&streamUsage, helps.StreamScannerBuffer)
 		defer func() {
 			if errClose := httpResp.Body.Close(); errClose != nil {
 				log.Errorf("codex executor: close response body error: %v", errClose)

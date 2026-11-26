@@ -297,7 +297,6 @@ func TestRequestCodexTokenLoginDoesNotRaceConfigV8Save(t *testing.T) {
 	router := gin.New()
 	router.GET("/codex-auth-url", handler.RequestCodexToken)
 	router.GET("/anthropic-auth-url", handler.RequestAnthropicToken)
-	router.GET("/antigravity-auth-url", handler.RequestAntigravityToken)
 	router.PUT("/v8/management/config/*path", handler.ConfigV8)
 
 	saveRetry := func(val string) {
@@ -309,7 +308,7 @@ func TestRequestCodexTokenLoginDoesNotRaceConfigV8Save(t *testing.T) {
 		}
 	}
 
-	for _, endpoint := range []string{"/anthropic-auth-url", "/antigravity-auth-url"} {
+	for _, endpoint := range []string{"/anthropic-auth-url"} {
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, endpoint, nil))
 		if w.Code != http.StatusOK {

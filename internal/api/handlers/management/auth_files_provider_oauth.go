@@ -16,7 +16,6 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gin-gonic/gin"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/antigravity"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/claude"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/codex"
 	metaauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/meta"
@@ -35,13 +34,6 @@ type codexOAuthService interface {
 	GenerateAuthURL(state string, pkceCodes *codex.PKCECodes) (string, error)
 	ExchangeCodeForTokens(ctx context.Context, code string, pkceCodes *codex.PKCECodes) (*codex.CodexAuthBundle, error)
 	CreateTokenStorage(bundle *codex.CodexAuthBundle) *codex.CodexTokenStorage
-}
-
-type antigravityOAuthService interface {
-	BuildAuthURL(state, redirectURI string) string
-	ExchangeCodeForTokens(ctx context.Context, code, redirectURI string) (*antigravity.TokenResponse, error)
-	FetchUserInfo(ctx context.Context, accessToken string) (string, error)
-	FetchProjectID(ctx context.Context, accessToken string) (string, error)
 }
 
 type claudeOAuthService interface {
@@ -702,176 +694,6 @@ func authGrantFingerprint(auth *coreauth.Auth) string {
 		}
 	}
 	return oauthGrantFingerprint(accessToken, refreshToken, email, accountID)
-}
-
-func (h *Handler) RequestAntigravityToken(c *gin.Context) {
-	ctx := context.Background()
-	ctx = PopulateAuthContext(ctx, c)
-
-	fmt.Println("Initializing Antigravity authentication...")
-
-	sessionProxyURL := oauthSessionProxyURLFromContext(c)
-	cfg := h.oauthConfigWithProxy(sessionProxyURL)
-	authSvc := newAntigravityOAuthService(cfg)
-
-	state, errState := misc.GenerateRandomState()
-	if errState != nil {
-		log.Errorf("Failed to generate state parameter: %v", errState)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate state parameter"})
-		return
-	}
-
-	redirectURI := fmt.Sprintf("http://localhost:%d/oauth-callback", antigravity.CallbackPort)
-	authURL := authSvc.BuildAuthURL(state, redirectURI)
-
-	RegisterOAuthSessionWithProxy(state, "antigravity", sessionProxyURL)
-	respPayload := gin.H{"status": "ok", "url": authURL, "state": state}
-	bindOAuthSessionTarget(c, state, respPayload)
-
-	isWebUI := isWebUIRequest(c)
-	var forwarder *callbackForwarder
-	if isWebUI {
-		targetURL, errTarget := h.managementCallbackURL("/antigravity/callback")
-		if errTarget != nil {
-			log.WithError(errTarget).Error("failed to compute antigravity callback target")
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "callback server unavailable"})
-			return
-		}
-		var errStart error
-		if forwarder, errStart = startCallbackForwarder(antigravity.CallbackPort, "antigravity", targetURL); errStart != nil {
-			log.WithError(errStart).Error("failed to start antigravity callback forwarder")
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to start callback server"})
-			return
-		}
-	}
-
-	go func() {
-		if isWebUI {
-			defer stopCallbackForwarderInstance(antigravity.CallbackPort, forwarder)
-		}
-
-		waitFile := filepath.Join(cfg.AuthDir, fmt.Sprintf(".oauth-antigravity-%s.oauth", state))
-		deadline := time.Now().Add(5 * time.Minute)
-		var authCode string
-		for {
-			if !IsOAuthSessionPending(state, "antigravity") {
-				return
-			}
-			if time.Now().After(deadline) {
-				log.Error("oauth flow timed out")
-				SetOAuthSessionError(state, "OAuth flow timed out")
-				return
-			}
-			if data, errReadFile := os.ReadFile(waitFile); errReadFile == nil {
-				var payload map[string]string
-				_ = json.Unmarshal(data, &payload)
-				_ = os.Remove(waitFile)
-				if errStr := strings.TrimSpace(payload["error"]); errStr != "" {
-					log.Errorf("Authentication failed: %s", errStr)
-					SetOAuthSessionError(state, "Authentication failed")
-					return
-				}
-				if payloadState := strings.TrimSpace(payload["state"]); payloadState != "" && payloadState != state {
-					log.Errorf("Authentication failed: state mismatch")
-					SetOAuthSessionError(state, "Authentication failed: state mismatch")
-					return
-				}
-				authCode = strings.TrimSpace(payload["code"])
-				if authCode == "" {
-					log.Error("Authentication failed: code not found")
-					SetOAuthSessionError(state, "Authentication failed: code not found")
-					return
-				}
-				break
-			}
-			time.Sleep(500 * time.Millisecond)
-		}
-
-		tokenResp, errToken := authSvc.ExchangeCodeForTokens(ctx, authCode, redirectURI)
-		if errToken != nil {
-			log.Errorf("Failed to exchange token: %s", redactSessionProxyInString(errToken.Error(), sessionProxyURL))
-			SetOAuthSessionError(state, "Failed to exchange token")
-			return
-		}
-
-		accessToken := strings.TrimSpace(tokenResp.AccessToken)
-		if accessToken == "" {
-			log.Error("antigravity: token exchange returned empty access token")
-			SetOAuthSessionError(state, "Failed to exchange token")
-			return
-		}
-
-		email, errInfo := authSvc.FetchUserInfo(ctx, accessToken)
-		if errInfo != nil {
-			log.Errorf("Failed to fetch user info: %s", redactSessionProxyInString(errInfo.Error(), sessionProxyURL))
-			SetOAuthSessionError(state, "Failed to fetch user info")
-			return
-		}
-		email = strings.TrimSpace(email)
-		if email == "" {
-			log.Error("antigravity: user info returned empty email")
-			SetOAuthSessionError(state, "Failed to fetch user info")
-			return
-		}
-
-		projectID := ""
-		if accessToken != "" {
-			fetchedProjectID, errProject := authSvc.FetchProjectID(ctx, accessToken)
-			if errProject != nil {
-				if sessionProxyURL != "" {
-					log.Errorf("antigravity: failed to fetch project ID: %s", redactSessionProxyInString(errProject.Error(), sessionProxyURL))
-					SetOAuthSessionError(state, "Failed to fetch project ID")
-					return
-				}
-				log.Warnf("antigravity: failed to fetch project ID: %v", errProject)
-			} else {
-				projectID = fetchedProjectID
-				log.Infof("antigravity: obtained project ID %s", util.HideAPIKey(projectID))
-			}
-		}
-
-		now := time.Now()
-		metadata := map[string]any{
-			"type":          "antigravity",
-			"access_token":  tokenResp.AccessToken,
-			"refresh_token": tokenResp.RefreshToken,
-			"expires_in":    tokenResp.ExpiresIn,
-			"timestamp":     now.UnixMilli(),
-			"expired":       now.Add(time.Duration(tokenResp.ExpiresIn) * time.Second).Format(time.RFC3339),
-		}
-		if email != "" {
-			metadata["email"] = email
-		}
-		if projectID != "" {
-			metadata["project_id"] = projectID
-		}
-
-		fileName := antigravity.CredentialFileName(email)
-		label := strings.TrimSpace(email)
-		if label == "" {
-			label = "antigravity"
-		}
-
-		record := &coreauth.Auth{
-			ID:       fileName,
-			Provider: "antigravity",
-			FileName: fileName,
-			Label:    label,
-			Metadata: metadata,
-		}
-		savedPath, okSaved := h.commitAndCompleteBuiltinOAuthSession(ctx, state, "antigravity", sessionProxyURL, record, "Failed to save token to file", false)
-		if !okSaved {
-			return
-		}
-
-		fmt.Printf("Authentication successful! Token saved to %s\n", savedPath)
-		if projectID != "" {
-			fmt.Printf("Using GCP project: %s\n", util.HideAPIKey(projectID))
-		}
-		fmt.Println("You can now use Antigravity services through this CLI")
-	}()
-
-	c.JSON(200, respPayload)
 }
 
 func (h *Handler) RequestXAIToken(c *gin.Context) {

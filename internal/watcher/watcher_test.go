@@ -60,11 +60,6 @@ func TestApplyAuthExcludedModelsMeta_OAuthProvider(t *testing.T) {
 
 func TestBuildAPIKeyClientsCounts(t *testing.T) {
 	cfg := &config.Config{
-		GeminiKey:       []config.GeminiKey{{APIKey: "g1"}, {APIKey: "g2"}},
-		InteractionsKey: []config.GeminiKey{{APIKey: "i1"}},
-		VertexCompatAPIKey: []config.VertexCompatKey{
-			{APIKey: "v1"},
-		},
 		ClaudeKey: []config.ClaudeKey{{APIKey: "c1"}},
 		CodexKey:  []config.CodexKey{{APIKey: "c1"}, {APIKey: "c2"}},
 		XAIKey:    []config.XAIKey{{APIKey: "x1"}},
@@ -74,12 +69,11 @@ func TestBuildAPIKeyClientsCounts(t *testing.T) {
 		},
 	}
 
-	gemini, vertex, claude, codex, xai, meta, compat := BuildAPIKeyClients(cfg)
-	if gemini != 3 || vertex != 1 || claude != 1 || codex != 2 || xai != 1 || meta != 1 || compat != 2 {
-		t.Fatalf("unexpected counts: %d %d %d %d %d %d %d", gemini, vertex, claude, codex, xai, meta, compat)
+	claude, codex, xai, meta, compat := BuildAPIKeyClients(cfg)
+	if claude != 1 || codex != 2 || xai != 1 || meta != 1 || compat != 2 {
+		t.Fatalf("unexpected counts: %d %d %d %d %d", claude, codex, xai, meta, compat)
 	}
 }
-
 func TestNormalizeAuthStripsTemporalFields(t *testing.T) {
 	now := time.Now()
 	auth := &coreauth.Auth{

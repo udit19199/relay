@@ -22,24 +22,7 @@ func TestBuildConfigModelsDisplayName(t *testing.T) {
 				}}})[0]
 			},
 		},
-		{
-			name: "gemini",
-			want: "Gemini Catalog Name",
-			got: func() *ModelInfo {
-				return buildGeminiConfigModels(&config.GeminiKey{Models: []config.GeminiModel{{
-					Name: "gemini-upstream", Alias: "gemini-catalog", DisplayName: "Gemini Catalog Name",
-				}}})[0]
-			},
-		},
-		{
-			name: "vertex",
-			want: "Vertex Catalog Name",
-			got: func() *ModelInfo {
-				return buildVertexCompatConfigModels(&config.VertexCompatKey{Models: []config.VertexCompatModel{{
-					Name: "vertex-upstream", Alias: "vertex-catalog", DisplayName: "Vertex Catalog Name",
-				}}})[0]
-			},
-		},
+
 		{
 			name: "codex",
 			want: "Codex Catalog Name",

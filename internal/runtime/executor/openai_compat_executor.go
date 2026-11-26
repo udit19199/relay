@@ -773,7 +773,7 @@ func (e *OpenAICompatExecutor) executeImagesStream(ctx context.Context, auth *cl
 		defer close(out)
 		var streamUsage helps.StreamUsageBuffer
 		streamUsage.SetRequestPayload(payload, contentType)
-		usageObserver := helps.NewOpenAIStreamUsageObserver(&streamUsage, streamScannerBuffer)
+		usageObserver := helps.NewOpenAIStreamUsageObserver(&streamUsage, helps.StreamScannerBuffer)
 		observer := helps.NewStreamResponseModelObserver(reporter)
 		defer func() {
 			observer.Finish()

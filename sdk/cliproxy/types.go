@@ -53,13 +53,6 @@ type APIKeyClientProvider interface {
 
 // APIKeyClientResult is returned by APIKeyClientProvider.Load()
 type APIKeyClientResult struct {
-	// GeminiKeyCount is the number of Gemini-family API keys loaded.
-	// It includes native Interactions API keys.
-	GeminiKeyCount int
-
-	// VertexCompatKeyCount is the number of Vertex-compatible API keys loaded
-	VertexCompatKeyCount int
-
 	// ClaudeKeyCount is the number of Claude API keys loaded
 	ClaudeKeyCount int
 

@@ -17,12 +17,8 @@ func ParsePluginExecutorResponseUsage(protocol string, payload []byte) usage.Det
 	switch strings.ToLower(strings.TrimSpace(protocol)) {
 	case "claude":
 		return parseClaudePayloadUsage(payload)
-	case "gemini":
-		return ParseGeminiUsage(payload)
 	case "interactions", "interactions-response":
 		return ParseInteractionsUsage(payload)
-	case "antigravity":
-		return ParseAntigravityUsage(payload)
 	case "codex", "openai-response":
 		return parseResponsesPluginExecutorUsage(payload)
 	default:
@@ -61,19 +57,11 @@ func ObservePluginExecutorStreamUsage(protocol string, payload []byte, buffer *S
 		IterateStreamLines(payload, func(line []byte) {
 			buffer.ObserveClaudeStream(line)
 		})
-	case "gemini":
-		IterateStreamLines(payload, func(line []byte) {
-			buffer.ObserveGeminiStream(line)
-		})
 	case "interactions", "interactions-response":
 		IterateStreamLines(payload, func(line []byte) {
 			if detail, ok := ParseInteractionsStreamUsage(line); ok {
 				ObserveMergedStreamUsage(buffer, detail)
 			}
-		})
-	case "antigravity":
-		IterateStreamLines(payload, func(line []byte) {
-			buffer.ObserveAntigravityStream(line)
 		})
 	case "codex", "openai-response":
 		IterateStreamLines(payload, func(line []byte) {
@@ -106,8 +94,8 @@ func ObservePluginExecutorStreamTTFT(protocol string, reporter *UsageReporter, p
 	switch strings.ToLower(strings.TrimSpace(protocol)) {
 	case "claude":
 		ObserveClaudeTokenEvent(reporter, payload)
-	case "gemini", "antigravity", "interactions", "interactions-response":
-		ObserveGeminiTokenEvent(reporter, payload)
+	case "interactions", "interactions-response":
+		ObserveResponsesTokenEvent(reporter, payload)
 	case "codex", "openai-response":
 		ObserveResponsesTokenEvent(reporter, payload)
 	default:

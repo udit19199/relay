@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/antigravity"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/claude"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/devin"
 	metaauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/meta"
@@ -26,36 +25,6 @@ type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return f(req)
-}
-
-type targetedTestAntigravityOAuthService struct {
-	email       string
-	accessToken string
-}
-
-func (s *targetedTestAntigravityOAuthService) BuildAuthURL(state, _ string) string {
-	return "https://accounts.google.com/o/oauth2/v2/auth?state=" + state
-}
-
-func (s *targetedTestAntigravityOAuthService) ExchangeCodeForTokens(_ context.Context, code, _ string) (*antigravity.TokenResponse, error) {
-	tok := s.accessToken
-	if tok == "" {
-		tok = "ag-fresh-access-" + code
-	}
-	return &antigravity.TokenResponse{
-		AccessToken:  tok,
-		RefreshToken: "ag-fresh-refresh-" + code,
-		ExpiresIn:    3600,
-		TokenType:    "Bearer",
-	}, nil
-}
-
-func (s *targetedTestAntigravityOAuthService) FetchUserInfo(_ context.Context, _ string) (string, error) {
-	return s.email, nil
-}
-
-func (s *targetedTestAntigravityOAuthService) FetchProjectID(_ context.Context, _ string) (string, error) {
-	return "ag-project-1", nil
 }
 
 type targetedTestClaudeOAuthService struct {
@@ -227,12 +196,6 @@ func TestStartOAuthV8TargetedSessionRegistrationAcrossBuiltinProviders(t *testin
 	}
 	t.Cleanup(func() { newCodexOAuthService = origCodexFactory })
 
-	origAgFactory := newAntigravityOAuthService
-	newAntigravityOAuthService = func(*config.Config) antigravityOAuthService {
-		return &targetedTestAntigravityOAuthService{email: "a@x.test"}
-	}
-	t.Cleanup(func() { newAntigravityOAuthService = origAgFactory })
-
 	origDevinFactory := newDevinOAuthService
 	newDevinOAuthService = func(*config.Config) devinOAuthService {
 		return &fakeDevinOAuthService{}
@@ -248,7 +211,6 @@ func TestStartOAuthV8TargetedSessionRegistrationAcrossBuiltinProviders(t *testin
 		meta     map[string]any
 	}{
 		{provider: "codex", fileName: "codex-target.json", meta: map[string]any{"type": "codex", "email": "a@x.test", "account_id": "acc-1"}},
-		{provider: "antigravity", fileName: "antigravity-target.json", meta: map[string]any{"type": "antigravity", "email": "a@x.test"}},
 		{provider: "claude", fileName: "claude-target.json", meta: map[string]any{"type": "claude", "email": "a@x.test", "account_uuid": "uuid-1"}},
 		{provider: "xai", fileName: "xai-target.json", meta: map[string]any{"type": "xai", "email": "a@x.test", "sub": "sub-1"}},
 		{provider: "meta", fileName: "meta-target.json", meta: map[string]any{"type": "meta", "email": "a@x.test"}},
@@ -306,111 +268,6 @@ func TestStartOAuthV8TargetedSessionRegistrationAcrossBuiltinProviders(t *testin
 				t.Fatalf("%s: GetOAuthSessionTarget(%q) = (%+v, %v), want AuthID=%q VerifyAfterLogin=true", tc.provider, state, sessionTarget, okTarget, tc.fileName)
 			}
 		})
-	}
-}
-
-func TestTargetedOAuthReloginAntigravityRejectsMismatchedAccountAndUpdatesMatchingTarget(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	authDir := t.TempDir()
-	targetFile := "antigravity-a@x.test.json"
-	targetPath := filepath.Join(authDir, targetFile)
-	initialContent := `{"type":"antigravity","email":"a@x.test","access_token":"old-access","refresh_token":"old-refresh"}`
-	if errWrite := os.WriteFile(targetPath, []byte(initialContent), 0o600); errWrite != nil {
-		t.Fatalf("write target file: %v", errWrite)
-	}
-
-	manager := coreauth.NewManager(nil, nil, nil)
-	_, _ = manager.Register(context.Background(), &coreauth.Auth{
-		ID:             targetFile,
-		FileName:       targetFile,
-		Provider:       "antigravity",
-		RequiresSignIn: true,
-		Metadata: map[string]any{
-			"type":          "antigravity",
-			"email":         "a@x.test",
-			"access_token":  "old-access",
-			"refresh_token": "old-refresh",
-		},
-		Attributes: map[string]string{
-			coreauth.AttributePath: targetPath,
-			"email":                "a@x.test",
-		},
-	})
-
-	agSvc := &targetedTestAntigravityOAuthService{email: "b@x.test"}
-	origAgFactory := newAntigravityOAuthService
-	newAntigravityOAuthService = func(*config.Config) antigravityOAuthService {
-		return agSvc
-	}
-	t.Cleanup(func() { newAntigravityOAuthService = origAgFactory })
-
-	h := NewHandlerWithoutConfigFilePath(&config.Config{AuthDir: authDir, Port: 8317}, manager)
-	router := gin.New()
-	router.POST("/v8/management/oauth/auth-url", h.StartOAuthV8)
-	router.GET("/v8/management/oauth/status", h.GetAuthStatus)
-
-	// 1. Mismatched account (b@x.test) must be rejected and must NOT write antigravity-b@x.test.json.
-	wMismatch := httptest.NewRecorder()
-	reqMismatch := httptest.NewRequest(http.MethodPost, "/v8/management/oauth/auth-url", strings.NewReader(`{"provider":"antigravity","name":"antigravity-a@x.test.json"}`))
-	reqMismatch.Header.Set("Content-Type", "application/json")
-	router.ServeHTTP(wMismatch, reqMismatch)
-	if wMismatch.Code != http.StatusOK {
-		t.Fatalf("StartOAuthV8 status = %d: %s", wMismatch.Code, wMismatch.Body.String())
-	}
-	var mismatchStart struct {
-		State        string `json:"state"`
-		TargetAuthID string `json:"target_auth_id"`
-	}
-	_ = json.Unmarshal(wMismatch.Body.Bytes(), &mismatchStart)
-	t.Cleanup(func() { CancelOAuthSession(mismatchStart.State) })
-	if mismatchStart.TargetAuthID != targetFile {
-		t.Fatalf("target_auth_id = %q, want %q", mismatchStart.TargetAuthID, targetFile)
-	}
-	if _, errCb := WriteOAuthCallbackFileForPendingSession(authDir, "antigravity", mismatchStart.State, "code-mismatch", ""); errCb != nil {
-		t.Fatalf("write callback: %v", errCb)
-	}
-	mismatchStatus := pollOAuthStatusUntilDone(t, router, mismatchStart.State)
-	if mismatchStatus["status"] != "error" || !strings.Contains(strings.ToLower(mismatchStatus["error"].(string)), "does not match target credential") {
-		t.Fatalf("expected account mismatch error, got %#v", mismatchStatus)
-	}
-	if _, errStat := os.Stat(filepath.Join(authDir, "antigravity-b@x.test.json")); !os.IsNotExist(errStat) {
-		t.Fatalf("mismatched login must not create antigravity-b@x.test.json, stat err = %v", errStat)
-	}
-	afterMismatchBytes, _ := os.ReadFile(targetPath)
-	if string(afterMismatchBytes) != initialContent {
-		t.Fatalf("target file changed after mismatched login: %s", string(afterMismatchBytes))
-	}
-
-	// 2. Matching account (a@x.test) updates target file in place and reports adopted status.
-	agSvc.email = "a@x.test"
-	agSvc.accessToken = "ag-fresh-token-match"
-	wMatch := httptest.NewRecorder()
-	reqMatch := httptest.NewRequest(http.MethodPost, "/v8/management/oauth/auth-url", strings.NewReader(`{"provider":"antigravity","name":"antigravity-a@x.test.json"}`))
-	reqMatch.Header.Set("Content-Type", "application/json")
-	router.ServeHTTP(wMatch, reqMatch)
-	if wMatch.Code != http.StatusOK {
-		t.Fatalf("StartOAuthV8 (match) status = %d: %s", wMatch.Code, wMatch.Body.String())
-	}
-	var matchStart struct {
-		State string `json:"state"`
-	}
-	_ = json.Unmarshal(wMatch.Body.Bytes(), &matchStart)
-	t.Cleanup(func() { CancelOAuthSession(matchStart.State) })
-	if _, errCb := WriteOAuthCallbackFileForPendingSession(authDir, "antigravity", matchStart.State, "code-match", ""); errCb != nil {
-		t.Fatalf("write match callback: %v", errCb)
-	}
-	matchStatus := pollOAuthStatusUntilDone(t, router, matchStart.State)
-	if matchStatus["status"] != "ok" || matchStatus["auth_id"] != targetFile || matchStatus["saved"] != true || matchStatus["adopted"] != true {
-		t.Fatalf("expected saved & adopted ok status for %s, got %#v", targetFile, matchStatus)
-	}
-	repaired, okRepaired := manager.GetByID(targetFile)
-	if !okRepaired || repaired == nil || repaired.RequiresSignIn {
-		t.Fatalf("expected %s repaired in manager, got %+v", targetFile, repaired)
-	}
-	savedRaw, errRead := os.ReadFile(targetPath)
-	if errRead != nil || !strings.Contains(string(savedRaw), "ag-fresh-token-match") {
-		t.Fatalf("expected target file updated with fresh token, got %q (err=%v)", string(savedRaw), errRead)
 	}
 }
 
@@ -743,38 +600,34 @@ func TestTargetedOAuthReloginReviewEdgeCasesAndVerification(t *testing.T) {
 	}
 
 	// 4. Targeted completion with verify=true runs VerifyInference and reports verification fields.
-	agPath := filepath.Join(authDir, "ag-verify.json")
-	agMeta := map[string]any{
-		"type":          "antigravity",
+	xaiVerifyPath := filepath.Join(authDir, "xai-verify.json")
+	xaiVerifyMeta := map[string]any{
+		"type":          "xai",
 		"email":         "verify@x.test",
-		"access_token":  "old-ag",
-		"refresh_token": "old-ag-refresh",
+		"access_token":  "old-xai-verify",
+		"refresh_token": "old-xai-verify-refresh",
 	}
-	rawAG, _ := json.Marshal(agMeta)
-	if errWrite := os.WriteFile(agPath, rawAG, 0o600); errWrite != nil {
-		t.Fatalf("write ag-verify.json: %v", errWrite)
+	rawXAIVerify, _ := json.Marshal(xaiVerifyMeta)
+	if errWrite := os.WriteFile(xaiVerifyPath, rawXAIVerify, 0o600); errWrite != nil {
+		t.Fatalf("write xai-verify.json: %v", errWrite)
 	}
-	agExec := &recordingRefreshVerifyExecutor{}
+	verifyExec := &recordingRefreshVerifyExecutor{}
 	managerWithVerify := coreauth.NewManager(nil, nil, nil)
-	managerWithVerify.RegisterExecutor(agExec)
+	managerWithVerify.RegisterExecutor(verifyExec)
 	if _, errReg := managerWithVerify.Register(context.Background(), &coreauth.Auth{
-		ID:             "ag-verify.json",
-		FileName:       "ag-verify.json",
-		Provider:       "antigravity",
+		ID:             "xai-verify.json",
+		FileName:       "xai-verify.json",
+		Provider:       "xai",
 		RequiresSignIn: true,
-		Metadata:       agMeta,
-		Attributes:     map[string]string{coreauth.AttributePath: agPath},
+		Metadata:       xaiVerifyMeta,
+		Attributes:     map[string]string{coreauth.AttributePath: xaiVerifyPath},
 	}); errReg != nil {
-		t.Fatalf("register ag-verify.json: %v", errReg)
+		t.Fatalf("register xai-verify.json: %v", errReg)
 	}
 
-	agSvc := &targetedTestAntigravityOAuthService{
-		email:       "verify@x.test",
-		accessToken: "ag-verified-access",
-	}
-	origAG := newAntigravityOAuthService
-	newAntigravityOAuthService = func(*config.Config) antigravityOAuthService { return agSvc }
-	t.Cleanup(func() { newAntigravityOAuthService = origAG })
+	xaiSvc.email = "verify@x.test"
+	xaiSvc.subject = ""
+	xaiSvc.accessToken = "xai-verified-access"
 
 	hVerify := NewHandlerWithoutConfigFilePath(&config.Config{AuthDir: authDir, Port: 8317}, managerWithVerify)
 	routerVerify := gin.New()
@@ -782,20 +635,20 @@ func TestTargetedOAuthReloginReviewEdgeCasesAndVerification(t *testing.T) {
 	routerVerify.GET("/v8/management/oauth/status", hVerify.GetAuthStatus)
 
 	wVerifyStart := httptest.NewRecorder()
-	routerVerify.ServeHTTP(wVerifyStart, httptest.NewRequest(http.MethodPost, "/v8/management/oauth/auth-url", strings.NewReader(`{"provider":"antigravity","name":"ag-verify.json","verify":true,"verify_model":"gemini-2.5-flash"}`)))
+	routerVerify.ServeHTTP(wVerifyStart, httptest.NewRequest(http.MethodPost, "/v8/management/oauth/auth-url", strings.NewReader(`{"provider":"xai","name":"xai-verify.json","verify":true,"verify_model":"grok-2"}`)))
 	if wVerifyStart.Code != http.StatusOK {
-		t.Fatalf("antigravity verify StartOAuthV8 status = %d: %s", wVerifyStart.Code, wVerifyStart.Body.String())
+		t.Fatalf("xai verify StartOAuthV8 status = %d: %s", wVerifyStart.Code, wVerifyStart.Body.String())
 	}
 	var verifyStartBody struct{ State string }
 	_ = json.Unmarshal(wVerifyStart.Body.Bytes(), &verifyStartBody)
-	_, _ = WriteOAuthCallbackFileForPendingSession(authDir, "antigravity", verifyStartBody.State, "ag-code-verify", "")
 	verifyStatus := pollOAuthStatusUntilDone(t, routerVerify, verifyStartBody.State)
 	if verifyStatus["status"] != "ok" || verifyStatus["inference_verified"] != true || verifyStatus["recovery_stage"] != "inference_verified" {
-		t.Fatalf("antigravity verify status = %#v, want ok with inference_verified=true", verifyStatus)
+		t.Fatalf("xai verify status = %#v, want ok with inference_verified=true", verifyStatus)
 	}
-	if agExec.calls == 0 || agExec.lastModel != "gemini-2.5-flash" {
-		t.Fatalf("expected executor VerifyInference call with model gemini-2.5-flash, got calls=%d model=%q", agExec.calls, agExec.lastModel)
+	if verifyExec.calls == 0 || verifyExec.lastModel != "grok-2" {
+		t.Fatalf("expected executor VerifyInference call with model grok-2, got calls=%d model=%q", verifyExec.calls, verifyExec.lastModel)
 	}
+
 }
 
 type recordingRefreshVerifyExecutor struct {
@@ -804,7 +657,7 @@ type recordingRefreshVerifyExecutor struct {
 	err       error
 }
 
-func (e *recordingRefreshVerifyExecutor) Identifier() string { return "antigravity" }
+func (e *recordingRefreshVerifyExecutor) Identifier() string { return "xai" }
 func (e *recordingRefreshVerifyExecutor) Execute(_ context.Context, _ *coreauth.Auth, req cliproxyexecutor.Request, _ cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
 	e.calls++
 	e.lastModel = req.Model

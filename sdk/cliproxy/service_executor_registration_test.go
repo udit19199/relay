@@ -67,8 +67,6 @@ func TestRegisterAvailableExecutors(t *testing.T) {
 	}
 	expectedPluginHost = service.pluginHost
 	expectedManager = service.coreManager
-	service.ensureWebsocketGateway()
-
 	service.registerAvailableExecutors(nil, executorRegistrationOptions{
 		includeBaseline: true,
 		includePlugins:  true,

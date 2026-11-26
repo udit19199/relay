@@ -6,10 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/constant"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/modelconfig"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/config"
 )
@@ -43,7 +41,6 @@ func (s *Service) registerModelsForAuthWithConfigAndCache(ctx context.Context, c
 	// resolution: a registration superseded while it is being computed must
 	// not overwrite or remove the newer registration when it finishes last.
 	fence := newModelRegistrationFence(a, cfg)
-	s.cancelStaleAntigravityProbes(a.ID)
 	if a.Disabled {
 		if s != nil && s.coreManager != nil {
 			if current, ok := s.coreManager.GetByID(a.ID); ok && current != nil && !current.Disabled {
@@ -89,58 +86,6 @@ func (s *Service) registerModelsForAuthWithConfigAndCache(ctx context.Context, c
 	published := true
 	var models []*ModelInfo
 	switch provider {
-	case constant.Gemini:
-		models = registry.GetGeminiModels()
-		if entry := resolveConfigGeminiKeyForConfig(cfg, a); entry != nil {
-			if len(entry.Models) > 0 {
-				models = buildGeminiConfigModels(entry)
-			}
-			if authKind == "apikey" {
-				excluded = entry.ExcludedModels
-			}
-		}
-		models = applyExcludedModels(models, excluded)
-	case constant.GeminiInteractions:
-		models = registry.GetGeminiModels()
-		if entry := resolveConfigInteractionsKeyForConfig(cfg, a); entry != nil {
-			if len(entry.Models) > 0 {
-				models = buildGeminiConfigModels(entry)
-			}
-			if authKind == "apikey" {
-				excluded = entry.ExcludedModels
-			}
-		}
-		models = applyExcludedModels(models, excluded)
-	case "vertex":
-		// Vertex AI Gemini supports the same model identifiers as Gemini.
-		models = registry.GetGeminiVertexModels()
-		if entry := resolveConfigVertexCompatKeyForConfig(cfg, a); entry != nil {
-			if len(entry.Models) > 0 {
-				models = buildVertexCompatConfigModels(entry)
-			}
-			if authKind == "apikey" {
-				excluded = entry.ExcludedModels
-			}
-		} else {
-			models = appendVertexServiceAccountModels(cfg, a, models)
-		}
-		models = applyExcludedModels(models, excluded)
-	case "aistudio":
-		models = registry.GetAIStudioModels()
-		models = applyExcludedModels(models, excluded)
-	case "antigravity":
-		expectedRegEpoch := GlobalModelRegistry().ClientRegistrationEpoch(a.ID)
-		expectedKey := s.antigravityCapabilityKey(a)
-		hints := s.cachedAntigravityHints(a)
-		if hints.ModelIDs != nil {
-			// Publish known catalogs through the same fenced, state-preserving
-			// path as refreshes. An expired catalog remains usable while HTTP
-			// is pending, including its quota and suspension projections.
-			s.applyAntigravityModelHints(ctx, a, provider, hints, expectedKey, a.RegistrationEpoch, expectedRegEpoch)
-			s.asyncProbeAntigravityCapabilities(ctx, a, provider)
-			return true
-		}
-		models = applyExcludedModels(models, excluded)
 	case "claude":
 		models = registry.GetClaudeModels()
 		if entry := resolveConfigClaudeKeyForConfig(cfg, a); entry != nil {
@@ -335,17 +280,18 @@ func (s *Service) registerModelsForAuthWithConfigAndCache(ctx context.Context, c
 			resolved = withOpenCodeGoAliases(cfg, provider, authKind, a.Attributes, models, resolved)
 		}
 		published = s.registerResolvedModelsForAuthFenced(a, fence, key, resolved)
-		if strings.EqualFold(strings.TrimSpace(a.Provider), "antigravity") {
-			s.asyncProbeAntigravityCapabilities(ctx, a, key)
-		}
 		return published
 	}
 
 	published = s.unregisterModelsForAuthFenced(a, fence)
-	if provider == "antigravity" {
-		s.asyncProbeAntigravityCapabilities(ctx, a, key)
-	}
 	return published
+}
+
+func (s *Service) reconcileRegisteredModelStates(ctx context.Context, auth *coreauth.Auth) {
+	if auth == nil || s.coreManager == nil {
+		return
+	}
+	s.coreManager.ReconcileRegistryModelStates(ctx, auth.ID)
 }
 
 // refreshModelRegistrationForAuth re-applies the latest model registration for
@@ -353,8 +299,6 @@ func (s *Service) registerModelsForAuthWithConfigAndCache(ctx context.Context, c
 // refresh. Callers are expected to pre-filter provider membership.
 //
 // Re-registration is deliberate: most providers start a fresh registry snapshot.
-// Native Antigravity catalogs instead use fenced replacement to preserve quota
-// and suspension state while account entitlement refreshes are pending.
 func (s *Service) refreshModelRegistrationForAuth(current *coreauth.Auth) bool {
 	return s.refreshModelRegistrationForAuthWithContext(context.Background(), current, nil)
 }
@@ -473,102 +417,6 @@ func resolveConfigClaudeKeyForConfig(cfg *config.Config, auth *coreauth.Auth) *c
 	if attrKey != "" {
 		for i := range cfg.ClaudeKey {
 			entry := &cfg.ClaudeKey[i]
-			if strings.EqualFold(strings.TrimSpace(entry.APIKey), attrKey) {
-				return entry
-			}
-		}
-	}
-	return nil
-}
-
-func (s *Service) resolveConfigGeminiKey(auth *coreauth.Auth) *config.GeminiKey {
-	return resolveConfigGeminiKeyForConfig(s.currentConfig(), auth)
-}
-
-func resolveConfigGeminiKeyForConfig(cfg *config.Config, auth *coreauth.Auth) *config.GeminiKey {
-	if cfg == nil {
-		return nil
-	}
-	return resolveConfigGeminiKeyEntryForConfig(cfg, auth, cfg.GeminiKey)
-}
-
-func (s *Service) resolveConfigInteractionsKey(auth *coreauth.Auth) *config.GeminiKey {
-	return resolveConfigInteractionsKeyForConfig(s.currentConfig(), auth)
-}
-
-func resolveConfigInteractionsKeyForConfig(cfg *config.Config, auth *coreauth.Auth) *config.GeminiKey {
-	if cfg == nil {
-		return nil
-	}
-	return resolveConfigGeminiKeyEntryForConfig(cfg, auth, cfg.InteractionsKey)
-}
-
-func (s *Service) resolveConfigGeminiKeyEntry(auth *coreauth.Auth, entries []config.GeminiKey) *config.GeminiKey {
-	return resolveConfigGeminiKeyEntryForConfig(s.currentConfig(), auth, entries)
-}
-
-func resolveConfigGeminiKeyEntryForConfig(cfg *config.Config, auth *coreauth.Auth, entries []config.GeminiKey) *config.GeminiKey {
-	if auth == nil || cfg == nil {
-		return nil
-	}
-	if entry := configEntryForAuthIndex(auth, entries); entry != nil {
-		return entry
-	}
-	var attrKey, attrBase string
-	if auth.Attributes != nil {
-		attrKey = strings.TrimSpace(auth.Attributes["api_key"])
-		attrBase = strings.TrimSpace(auth.Attributes["base_url"])
-	}
-	for i := range entries {
-		entry := &entries[i]
-		cfgKey := strings.TrimSpace(entry.APIKey)
-		cfgBase := strings.TrimSpace(entry.BaseURL)
-		if attrKey != "" && strings.EqualFold(cfgKey, attrKey) {
-			if cfgBase == "" || strings.EqualFold(cfgBase, attrBase) {
-				return entry
-			}
-			continue
-		}
-		if attrKey == "" && attrBase != "" && strings.EqualFold(cfgBase, attrBase) {
-			return entry
-		}
-	}
-	return nil
-}
-
-func (s *Service) resolveConfigVertexCompatKey(auth *coreauth.Auth) *config.VertexCompatKey {
-	return resolveConfigVertexCompatKeyForConfig(s.currentConfig(), auth)
-}
-
-func resolveConfigVertexCompatKeyForConfig(cfg *config.Config, auth *coreauth.Auth) *config.VertexCompatKey {
-	if auth == nil || cfg == nil {
-		return nil
-	}
-	if entry := configEntryForAuthIndex(auth, cfg.VertexCompatAPIKey); entry != nil {
-		return entry
-	}
-	var attrKey, attrBase string
-	if auth.Attributes != nil {
-		attrKey = strings.TrimSpace(auth.Attributes["api_key"])
-		attrBase = strings.TrimSpace(auth.Attributes["base_url"])
-	}
-	for i := range cfg.VertexCompatAPIKey {
-		entry := &cfg.VertexCompatAPIKey[i]
-		cfgKey := strings.TrimSpace(entry.APIKey)
-		cfgBase := strings.TrimSpace(entry.BaseURL)
-		if attrKey != "" && strings.EqualFold(cfgKey, attrKey) {
-			if cfgBase == "" || strings.EqualFold(cfgBase, attrBase) {
-				return entry
-			}
-			continue
-		}
-		if attrKey == "" && attrBase != "" && strings.EqualFold(cfgBase, attrBase) {
-			return entry
-		}
-	}
-	if attrKey != "" {
-		for i := range cfg.VertexCompatAPIKey {
-			entry := &cfg.VertexCompatAPIKey[i]
 			if strings.EqualFold(strings.TrimSpace(entry.APIKey), attrKey) {
 				return entry
 			}
@@ -945,146 +793,6 @@ func buildConfigModels[T modelEntry](models []T, ownedBy, modelType, metadataCha
 		out = append(out, info)
 	}
 	return out
-}
-
-func buildVertexCompatConfigModels(entry *config.VertexCompatKey) []*ModelInfo {
-	if entry == nil {
-		return nil
-	}
-	models := buildConfigModels(entry.Models, "google", "vertex", "vertex")
-	for _, info := range models {
-		for _, configured := range entry.Models {
-			name := strings.TrimSpace(configured.Name)
-			id := strings.TrimSpace(configured.Alias)
-			if id == "" {
-				id = name
-			}
-			if !strings.EqualFold(info.ID, id) {
-				continue
-			}
-			if publisher, model, ok := strings.Cut(helps.NormalizeVertexOpenAPIModel(name), "/"); ok && strings.TrimSpace(publisher) != "" && strings.TrimSpace(model) != "" && !strings.EqualFold(strings.TrimSpace(publisher), "google") {
-				info.OwnedBy = strings.TrimSpace(publisher)
-			}
-			openAPI := helps.IsVertexOpenAPIModel(name)
-			if configured.OpenAPI != nil {
-				openAPI = *configured.OpenAPI
-			} else if entry.OpenAPI != nil {
-				openAPI = *entry.OpenAPI
-			}
-			if openAPI && info.Thinking == nil {
-				info.Thinking = &registry.ThinkingSupport{Levels: []string{"low", "medium", "high"}}
-			}
-			break
-		}
-	}
-	return models
-}
-
-func appendVertexServiceAccountModels(cfg *config.Config, a *coreauth.Auth, baseModels []*ModelInfo) []*ModelInfo {
-	if a == nil {
-		return baseModels
-	}
-	seen := make(map[string]struct{}, len(baseModels))
-	for _, model := range baseModels {
-		if model == nil {
-			continue
-		}
-		if id := strings.ToLower(strings.TrimSpace(model.ID)); id != "" {
-			seen[id] = struct{}{}
-		}
-	}
-
-	var extraNames []string
-	addName := func(raw string) {
-		trimmed := strings.TrimSpace(raw)
-		if trimmed == "" {
-			return
-		}
-		key := strings.ToLower(trimmed)
-		if _, exists := seen[key]; exists {
-			return
-		}
-		seen[key] = struct{}{}
-		extraNames = append(extraNames, trimmed)
-	}
-
-	if a.Attributes != nil {
-		if raw := strings.TrimSpace(a.Attributes["openapi_models"]); raw != "" {
-			for _, part := range strings.Split(raw, ",") {
-				addName(part)
-			}
-		}
-	}
-	if a.Metadata != nil {
-		for _, key := range []string{"openapi_models", "openapi-models", "models"} {
-			raw, ok := a.Metadata[key]
-			if !ok || raw == nil {
-				continue
-			}
-			switch v := raw.(type) {
-			case string:
-				for _, part := range strings.Split(v, ",") {
-					addName(part)
-				}
-			case []string:
-				for _, item := range v {
-					addName(item)
-				}
-			case []any:
-				for _, item := range v {
-					switch elem := item.(type) {
-					case string:
-						addName(elem)
-					case map[string]any:
-						if name, okName := elem["name"].(string); okName {
-							addName(name)
-						}
-					}
-				}
-			}
-		}
-	}
-
-	for _, aliasEntry := range oauthModelAliasesForAuth(cfg, "vertex", a.Attributes) {
-		addName(aliasEntry.Name)
-	}
-
-	if len(extraNames) == 0 {
-		return baseModels
-	}
-
-	now := time.Now().Unix()
-	out := make([]*ModelInfo, 0, len(baseModels)+len(extraNames))
-	out = append(out, baseModels...)
-	for _, name := range extraNames {
-		ownedBy := "google"
-		if publisher, _, ok := strings.Cut(helps.NormalizeVertexOpenAPIModel(name), "/"); ok && strings.TrimSpace(publisher) != "" {
-			ownedBy = strings.TrimSpace(publisher)
-		}
-		info := &ModelInfo{
-			ID:              name,
-			MetadataModelID: name,
-			Object:          "model",
-			Created:         now,
-			OwnedBy:         ownedBy,
-			Type:            "vertex",
-			DisplayName:     name,
-			UserDefined:     true,
-			Thinking:        &registry.ThinkingSupport{Levels: []string{"low", "medium", "high"}},
-		}
-		if resolved := modelconfig.ResolveModelInfo(name, "vertex", nil); resolved.Thinking != nil {
-			info.Thinking = resolved.Thinking
-		}
-		out = append(out, info)
-	}
-	return out
-}
-
-func buildGeminiConfigModels(entry *config.GeminiKey) []*ModelInfo {
-	if entry == nil {
-		return nil
-	}
-	return buildConfigModels(entry.Models, "google", "gemini", "gemini")
 }
 
 func buildClaudeConfigModels(entry *config.ClaudeKey) []*ModelInfo {

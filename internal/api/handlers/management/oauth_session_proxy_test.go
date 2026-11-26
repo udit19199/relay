@@ -15,12 +15,11 @@ import (
 	"testing"
 	"time"
 
+	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/antigravity"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/codex"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/pluginhost"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/watcher/synthesizer"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
@@ -54,7 +53,7 @@ func (s *proxyTestCodexOAuthService) ExchangeCodeForTokens(ctx context.Context, 
 		return nil, errRead
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, &antigravity.HTTPStatusError{StatusCodeValue: resp.StatusCode, Message: string(body)}
+		return nil, fmt.Errorf("token endpoint status %d: %s", resp.StatusCode, body)
 	}
 	var payload struct {
 		Email string `json:"email"`
@@ -533,73 +532,7 @@ func TestStartOAuthV8ParallelSessionsWithDifferentProxiesOutOfOrderCallbacks(t *
 	}
 }
 
-type proxyTestAntigravityOAuthService struct {
-	client  *http.Client
-	baseURL string
-}
-
-func (s *proxyTestAntigravityOAuthService) BuildAuthURL(state, _ string) string {
-	return s.baseURL + "/auth?state=" + state
-}
-
-func (s *proxyTestAntigravityOAuthService) ExchangeCodeForTokens(ctx context.Context, code, _ string) (*antigravity.TokenResponse, error) {
-	req, errReq := http.NewRequestWithContext(ctx, http.MethodPost, s.baseURL+"/token", strings.NewReader("code="+url.QueryEscape(code)))
-	if errReq != nil {
-		return nil, errReq
-	}
-	resp, errDo := s.client.Do(req)
-	if errDo != nil {
-		return nil, errDo
-	}
-	defer func() { _ = resp.Body.Close() }()
-	var token antigravity.TokenResponse
-	if errDecode := json.NewDecoder(resp.Body).Decode(&token); errDecode != nil {
-		return nil, errDecode
-	}
-	return &token, nil
-}
-
-func (s *proxyTestAntigravityOAuthService) FetchUserInfo(ctx context.Context, accessToken string) (string, error) {
-	req, errReq := http.NewRequestWithContext(ctx, http.MethodGet, s.baseURL+"/userinfo", nil)
-	if errReq != nil {
-		return "", errReq
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	resp, errDo := s.client.Do(req)
-	if errDo != nil {
-		return "", errDo
-	}
-	defer func() { _ = resp.Body.Close() }()
-	var info struct {
-		Email string `json:"email"`
-	}
-	if errDecode := json.NewDecoder(resp.Body).Decode(&info); errDecode != nil {
-		return "", errDecode
-	}
-	return info.Email, nil
-}
-
-func (s *proxyTestAntigravityOAuthService) FetchProjectID(ctx context.Context, accessToken string) (string, error) {
-	req, errReq := http.NewRequestWithContext(ctx, http.MethodPost, s.baseURL+"/project", nil)
-	if errReq != nil {
-		return "", errReq
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	resp, errDo := s.client.Do(req)
-	if errDo != nil {
-		return "", errDo
-	}
-	defer func() { _ = resp.Body.Close() }()
-	var proj struct {
-		ProjectID string `json:"project_id"`
-	}
-	if errDecode := json.NewDecoder(resp.Body).Decode(&proj); errDecode != nil {
-		return "", errDecode
-	}
-	return proj.ProjectID, nil
-}
-
-func TestStartOAuthV8AntigravityAndPluginSessionProxyAndRestartPersistence(t *testing.T) {
+func TestStartOAuthV8PluginSessionProxyAndRestartPersistence(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	var proxyHits, directHits atomic.Int32
@@ -612,34 +545,13 @@ func TestStartOAuthV8AntigravityAndPluginSessionProxyAndRestartPersistence(t *te
 		}
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
-		case "/token":
-			_, _ = w.Write([]byte(`{"access_token":"ag-access","refresh_token":"ag-refresh","expires_in":3600,"token_type":"Bearer"}`))
-		case "/userinfo":
-			_, _ = w.Write([]byte(`{"email":"ag-user@example.test"}`))
-		case "/project":
-			_, _ = w.Write([]byte(`{"project_id":"ag-proj-123"}`))
-		case "/plugin-start", "/plugin-poll", "/runtime-traffic":
+		case "/plugin-start", "/plugin-poll":
 			_, _ = w.Write([]byte(`{"ok":true}`))
 		default:
 			http.NotFound(w, r)
 		}
 	}))
 	defer upstream.Close()
-
-	originalAgFactory := newAntigravityOAuthService
-	newAntigravityOAuthService = func(cfg *config.Config) antigravityOAuthService {
-		var sdkCfg config.SDKConfig
-		if cfg != nil {
-			sdkCfg = cfg.SDKConfig
-		}
-		return &proxyTestAntigravityOAuthService{
-			client:  util.SetProxy(&sdkCfg, &http.Client{}),
-			baseURL: upstream.URL,
-		}
-	}
-	defer func() {
-		newAntigravityOAuthService = originalAgFactory
-	}()
 
 	authDir := t.TempDir()
 	host := pluginhost.New()
@@ -649,7 +561,7 @@ func TestStartOAuthV8AntigravityAndPluginSessionProxyAndRestartPersistence(t *te
 				identifier: "custom-sso",
 				startLogin: func(ctx context.Context, req pluginapi.AuthLoginStartRequest) (pluginapi.AuthLoginStartResponse, error) {
 					if req.Host.ProxyURL != proxyServer.URL {
-						return pluginapi.AuthLoginStartResponse{}, &antigravity.HTTPStatusError{StatusCodeValue: 500, Message: "unexpected host proxy"}
+						return pluginapi.AuthLoginStartResponse{}, fmt.Errorf("unexpected host proxy")
 					}
 					if _, errDo := req.HTTPClient.Do(ctx, pluginapi.HTTPRequest{Method: http.MethodGet, URL: upstream.URL + "/plugin-start"}); errDo != nil {
 						return pluginapi.AuthLoginStartResponse{}, errDo
@@ -691,58 +603,7 @@ func TestStartOAuthV8AntigravityAndPluginSessionProxyAndRestartPersistence(t *te
 	router.GET("/status", h.GetAuthStatus)
 	router.DELETE("/session", h.CancelAuthSession)
 
-	// 1. Antigravity session with proxy_url covers token exchange, userinfo, and project discovery
-	agBody, _ := json.Marshal(map[string]string{"provider": "antigravity", "proxy_url": proxyServer.URL})
-	agRec := httptest.NewRecorder()
-	router.ServeHTTP(agRec, httptest.NewRequest(http.MethodPost, "/v8/management/oauth/auth-url", strings.NewReader(string(agBody))))
-	if agRec.Code != http.StatusOK {
-		t.Fatalf("antigravity start status = %d, body = %s", agRec.Code, agRec.Body.String())
-	}
-	var agStart struct {
-		State string `json:"state"`
-	}
-	_ = json.Unmarshal(agRec.Body.Bytes(), &agStart)
-	t.Cleanup(func() { CancelOAuthSession(agStart.State) })
-
-	if _, errWrite := WriteOAuthCallbackFileForPendingSession(authDir, "antigravity", agStart.State, "ag-code", ""); errWrite != nil {
-		t.Fatalf("write antigravity callback: %v", errWrite)
-	}
-	if agStatus := waitForOAuthStatus(t, router, agStart.State); agStatus.Status != "ok" {
-		t.Fatalf("antigravity status = %#v, want ok", agStatus)
-	}
-	if proxyHits.Load() != 3 || directHits.Load() != 0 {
-		t.Fatalf("antigravity proxyHits=%d directHits=%d, want 3 and 0", proxyHits.Load(), directHits.Load())
-	}
-
-	// Simulate restart by synthesizing the saved Antigravity credential from disk and routing traffic
-	agPath := filepath.Join(authDir, antigravity.CredentialFileName("ag-user@example.test"))
-	agRaw, errReadAg := os.ReadFile(agPath)
-	if errReadAg != nil {
-		t.Fatalf("read saved antigravity credential: %v", errReadAg)
-	}
-	synthAuths, errSynth := synthesizer.SynthesizeAuthFile(&synthesizer.SynthesisContext{
-		Config:      cfg,
-		AuthDir:     authDir,
-		Now:         time.Now(),
-		IDGenerator: synthesizer.NewStableIDGenerator(),
-	}, agPath, agRaw)
-	if errSynth != nil || len(synthAuths) != 1 {
-		t.Fatalf("SynthesizeAuthFile err=%v len=%d", errSynth, len(synthAuths))
-	}
-	if synthAuths[0].ProxyURL != proxyServer.URL {
-		t.Fatalf("synthesized ProxyURL after restart = %q, want %q", synthAuths[0].ProxyURL, proxyServer.URL)
-	}
-	runtimeClient := helps.NewProxyAwareHTTPClient(context.Background(), cfg, synthAuths[0], 0)
-	runtimeResp, errRuntime := runtimeClient.Get(upstream.URL + "/runtime-traffic")
-	if errRuntime != nil {
-		t.Fatalf("runtime request with synthesized auth failed: %v", errRuntime)
-	}
-	_ = runtimeResp.Body.Close()
-	if proxyHits.Load() != 4 || directHits.Load() != 0 {
-		t.Fatalf("after runtime request: proxyHits=%d directHits=%d, want 4 and 0", proxyHits.Load(), directHits.Load())
-	}
-
-	// 2. Plugin OAuth session with proxy_url covers StartLogin, PollLogin, and saved credential
+	// Plugin OAuth session with proxy_url covers StartLogin, PollLogin, and saved credential
 	pluginBody, _ := json.Marshal(map[string]string{"provider": "custom-sso", "proxy_url": proxyServer.URL})
 	pluginRec := httptest.NewRecorder()
 	router.ServeHTTP(pluginRec, httptest.NewRequest(http.MethodPost, "/v8/management/oauth/auth-url", strings.NewReader(string(pluginBody))))
@@ -753,8 +614,8 @@ func TestStartOAuthV8AntigravityAndPluginSessionProxyAndRestartPersistence(t *te
 	if pluginStatus := performOAuthStatusRequest(t, router, "plugin-proxy-state-1"); pluginStatus.Status != "ok" {
 		t.Fatalf("plugin poll status = %#v, want ok", pluginStatus)
 	}
-	if proxyHits.Load() != 6 || directHits.Load() != 0 {
-		t.Fatalf("after plugin login: proxyHits=%d directHits=%d, want 6 and 0", proxyHits.Load(), directHits.Load())
+	if proxyHits.Load() != 2 || directHits.Load() != 0 {
+		t.Fatalf("after plugin login: proxyHits=%d directHits=%d, want 2 and 0", proxyHits.Load(), directHits.Load())
 	}
 	pluginCredRaw, errReadPlugin := os.ReadFile(filepath.Join(authDir, "custom-sso-user.json"))
 	if errReadPlugin != nil {
@@ -792,115 +653,6 @@ func TestStartOAuthV8AntigravityAndPluginSessionProxyAndRestartPersistence(t *te
 	oauthSessions.mu.Unlock()
 	if got := GetOAuthSessionProxyURL("expired-proxy-state"); got != "" {
 		t.Fatalf("GetOAuthSessionProxyURL for expired session = %q, want empty", got)
-	}
-}
-
-func TestStartOAuthV8AntigravityProjectDiscoveryProxyFailureFailsSession(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	var proxyHits, directHits atomic.Int32
-	proxyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		proxyHits.Add(1)
-		if strings.HasSuffix(r.RequestURI, "/project") {
-			if hj, ok := w.(http.Hijacker); ok {
-				conn, _, errHijack := hj.Hijack()
-				if errHijack == nil {
-					_ = conn.Close()
-					return
-				}
-			}
-			http.Error(w, "proxy dropped on project discovery", http.StatusBadGateway)
-			return
-		}
-		outReq, errReq := http.NewRequestWithContext(r.Context(), r.Method, r.RequestURI, r.Body)
-		if errReq != nil {
-			http.Error(w, errReq.Error(), http.StatusBadGateway)
-			return
-		}
-		outReq.Header = r.Header.Clone()
-		outReq.Header.Set("X-Via-Session-Proxy", "1")
-		resp, errDo := (&http.Client{Transport: &http.Transport{Proxy: nil}}).Do(outReq)
-		if errDo != nil {
-			http.Error(w, errDo.Error(), http.StatusBadGateway)
-			return
-		}
-		defer func() { _ = resp.Body.Close() }()
-		for k, vals := range resp.Header {
-			for _, v := range vals {
-				w.Header().Add(k, v)
-			}
-		}
-		w.WriteHeader(resp.StatusCode)
-		_, _ = io.Copy(w, resp.Body)
-	}))
-	defer proxyServer.Close()
-
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("X-Via-Session-Proxy") != "1" {
-			directHits.Add(1)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		switch r.URL.Path {
-		case "/token":
-			_, _ = w.Write([]byte(`{"access_token":"ag-access","refresh_token":"ag-refresh","expires_in":3600,"token_type":"Bearer"}`))
-		case "/userinfo":
-			_, _ = w.Write([]byte(`{"email":"ag-fail@example.test"}`))
-		case "/project":
-			_, _ = w.Write([]byte(`{"project_id":"ag-proj-should-not-reach"}`))
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	defer upstream.Close()
-
-	originalAgFactory := newAntigravityOAuthService
-	newAntigravityOAuthService = func(cfg *config.Config) antigravityOAuthService {
-		var sdkCfg config.SDKConfig
-		if cfg != nil {
-			sdkCfg = cfg.SDKConfig
-		}
-		return &proxyTestAntigravityOAuthService{
-			client:  util.SetProxy(&sdkCfg, &http.Client{}),
-			baseURL: upstream.URL,
-		}
-	}
-	defer func() {
-		newAntigravityOAuthService = originalAgFactory
-	}()
-
-	authDir := t.TempDir()
-	h := NewHandlerWithoutConfigFilePath(&config.Config{AuthDir: authDir}, nil)
-	router := gin.New()
-	router.POST("/v8/management/oauth/auth-url", h.StartOAuthV8)
-	router.GET("/status", h.GetAuthStatus)
-
-	agBody, _ := json.Marshal(map[string]string{"provider": "antigravity", "proxy_url": proxyServer.URL})
-	agRec := httptest.NewRecorder()
-	router.ServeHTTP(agRec, httptest.NewRequest(http.MethodPost, "/v8/management/oauth/auth-url", strings.NewReader(string(agBody))))
-	if agRec.Code != http.StatusOK {
-		t.Fatalf("start status = %d, body = %s", agRec.Code, agRec.Body.String())
-	}
-	var agStart struct {
-		State string `json:"state"`
-	}
-	_ = json.Unmarshal(agRec.Body.Bytes(), &agStart)
-	t.Cleanup(func() { CancelOAuthSession(agStart.State) })
-
-	if _, errWrite := WriteOAuthCallbackFileForPendingSession(authDir, "antigravity", agStart.State, "ag-code", ""); errWrite != nil {
-		t.Fatalf("write callback: %v", errWrite)
-	}
-	agStatus := waitForOAuthStatus(t, router, agStart.State)
-	if agStatus.Status != "error" {
-		t.Fatalf("expected error status when proxy disconnects during project discovery, got %#v", agStatus)
-	}
-	if directHits.Load() != 0 {
-		t.Fatalf("expected 0 direct hits, got %d", directHits.Load())
-	}
-	entries, _ := os.ReadDir(authDir)
-	for _, e := range entries {
-		if strings.HasSuffix(e.Name(), ".json") {
-			t.Fatalf("unexpected credential file saved after project discovery proxy failure: %s", e.Name())
-		}
 	}
 }
 

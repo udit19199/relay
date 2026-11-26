@@ -33,26 +33,7 @@ func TestBuildConfigModelsPropagatesMaxContextLength(t *testing.T) {
 				})[0]
 			},
 		},
-		{
-			name: "gemini",
-			got: func() *ModelInfo {
-				return buildGeminiConfigModels(&config.GeminiKey{
-					Models: []config.GeminiModel{{
-						Name: "gemini-upstream", Alias: "gemini-alias", MaxContextLength: want,
-					}},
-				})[0]
-			},
-		},
-		{
-			name: "interactions",
-			got: func() *ModelInfo {
-				return buildGeminiConfigModels(&config.GeminiKey{
-					Models: []config.GeminiModel{{
-						Name: "interactions-upstream", Alias: "interactions-alias", MaxContextLength: want,
-					}},
-				})[0]
-			},
-		},
+
 		{
 			name: "xai",
 			got: func() *ModelInfo {

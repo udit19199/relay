@@ -14,14 +14,6 @@ import (
 	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
 )
 
-func TestEnsureColonSpacedJSONLeavesInvalidPayloadUnchanged(t *testing.T) {
-	input := []byte(`{"text":"unterminated}`)
-	output := ensureColonSpacedJSON(input)
-	if &output[0] != &input[0] || string(output) != string(input) {
-		t.Fatal("invalid JSON payload changed")
-	}
-}
-
 func TestCodexMultipartImageEditAppendsExistingImages(t *testing.T) {
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
@@ -211,94 +203,6 @@ func TestExecutorPayloadSingleDocPipelinesByteConsistency(t *testing.T) {
 			t.Fatalf("xai doc output mismatch:\ndoc:  %s\nbyte: %s", docOut, byteOut)
 		}
 	})
-
-	t.Run("gemini and aistudio doc pipeline matches byte pipeline", func(t *testing.T) {
-		raw := []byte(`{"generationConfig":{"thinkingConfig":{"thinkingLevel":"medium"},"responseModalities":["TEXT","IMAGE"],"imageConfig":{"aspectRatio":"1:1"}},"contents":[{"role":"user","parts":[{"text":"draw"}]}]}`)
-
-		byteOut := fixGeminiImageAspectRatio("gemini-2.5-flash-image-preview", bytes.Clone(raw))
-		byteOut = normalizeAIStudioThinkingLevel(byteOut)
-
-		doc := ojson.NewDoc(bytes.Clone(raw))
-		fixGeminiImageAspectRatioDoc("gemini-2.5-flash-image-preview", doc)
-		normalizeAIStudioThinkingLevelDoc(doc)
-		docOut := doc.Bytes()
-
-		if !bytes.Equal(docOut, byteOut) {
-			t.Fatalf("gemini/aistudio doc output mismatch:\ndoc:  %s\nbyte: %s", docOut, byteOut)
-		}
-	})
-}
-
-func TestAntigravityReasoningReplayAccumulatorClonesStreamSignatures(t *testing.T) {
-	scope := antigravityReasoningReplayScope{
-		modelName:  "gemini-2.5-pro",
-		sessionKey: "session:test-reusable-buf",
-	}
-	reqPayload := []byte(`{"request":{"contents":[{"role":"user","parts":[{"text":"hello"}]}]}}`)
-	acc := newAntigravityReasoningReplayAccumulator(scope, reqPayload)
-	if acc == nil {
-		t.Fatal("expected non-nil accumulator")
-	}
-
-	line1 := []byte(`data: {"response":{"candidates":[{"content":{"role":"model","parts":[{"thoughtSignature":"sig_detached_reusable_01"}]}}]}}`)
-	acc.ObserveSSELine(line1)
-	for i := range line1 {
-		line1[i] = 'X'
-	}
-
-	line2 := []byte(`data: {"response":{"candidates":[{"content":{"role":"model","parts":[{"functionCall":{"id":"call_1","name":"lookup","args":{"q":"test"}}}]},"finishReason":"STOP"}]}}`)
-	acc.ObserveSSELine(line2)
-	for i := range line2 {
-		line2[i] = 'Y'
-	}
-
-	if !acc.seenSignatures["sig_detached_reusable_01"] {
-		t.Fatalf("seenSignatures missing sig_detached_reusable_01 after buffer overwrite: %+v", acc.seenSignatures)
-	}
-	if len(acc.items) != 1 {
-		t.Fatalf("len(acc.items) = %d, want 1", len(acc.items))
-	}
-	if got := ojson.GetBytesNoCopy(acc.items[0], "thoughtSignature").String(); got != "sig_detached_reusable_01" {
-		t.Fatalf("replayed item thoughtSignature = %q, want sig_detached_reusable_01", got)
-	}
-}
-
-func TestXAIResponseFilterAndNamespaceRestorerCloneStreamItemIDs(t *testing.T) {
-	filter := newXAIInternalXSearchResponseFilter(true, nil)
-	addedBuf := []byte(`{"type":"response.output_item.added","output_index":0,"item":{"id":"ctc_reusable_01","call_id":"xs_call_reusable_01","type":"custom_tool_call","name":"x_keyword_search"}}`)
-	if got := filter.apply(addedBuf); got != nil {
-		t.Fatalf("expected initial internal x_search item to be dropped, got %s", got)
-	}
-	for i := range addedBuf {
-		addedBuf[i] = 'X'
-	}
-
-	deltaByItemID := []byte(`{"type":"response.custom_tool_call_input.delta","item_id":"ctc_reusable_01","delta":"{}"}`)
-	if got := filter.apply(deltaByItemID); got != nil {
-		t.Fatalf("expected delta referencing ctc_reusable_01 to be dropped after buffer overwrite, got %s", got)
-	}
-	doneByCallID := []byte(`{"type":"response.custom_tool_call_input.done","call_id":"xs_call_reusable_01"}`)
-	if got := filter.apply(doneByCallID); got != nil {
-		t.Fatalf("expected done referencing xs_call_reusable_01 to be dropped after buffer overwrite, got %s", got)
-	}
-
-	restorer := newXAINamespaceRestorer(map[string]xaiNamespaceToolRef{
-		"mcp__codex_app": {
-			namespace:    "mcp__codex_app",
-			isDispatcher: true,
-			children:     map[string]struct{}{"lookup": {}},
-		},
-	})
-	dispAddedBuf := []byte(`{"type":"response.output_item.added","item":{"id":"fc_disp_reusable_01","type":"function_call","name":"mcp__codex_app"}}`)
-	_ = restorer.restore(dispAddedBuf)
-	for i := range dispAddedBuf {
-		dispAddedBuf[i] = 'X'
-	}
-	argsDone := []byte(`{"type":"response.function_call_arguments.done","item_id":"fc_disp_reusable_01","arguments":"{\"name\":\"lookup\",\"arguments\":{\"k\":\"v\"}}"}`)
-	restored := restorer.restore(argsDone)
-	if got := ojson.GetBytesNoCopy(restored, "arguments").String(); got != `{"k":"v"}` {
-		t.Fatalf("restored arguments = %q, want {\"k\":\"v\"}", got)
-	}
 }
 
 func TestNormalizeXAIImageRefsDocArbitraryNestedExtensionPath(t *testing.T) {

@@ -11,7 +11,6 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/api"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/pluginhost"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/watcher"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/wsrelay"
 	sdkaccess "github.com/router-for-me/CLIProxyAPI/v8/sdk/access"
 	sdkAuth "github.com/router-for-me/CLIProxyAPI/v8/sdk/auth"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
@@ -105,25 +104,10 @@ type Service struct {
 	// shutdownOnce ensures shutdown is called only once.
 	shutdownOnce sync.Once
 
-	// wsGateway manages websocket Gemini providers.
-	wsGateway *wsrelay.Manager
-
 	runCancelMu                  sync.Mutex
 	runCancel                    context.CancelFunc
 	applyPprofConfigContextFn    func(context.Context, *config.Config) bool
 	updateServerClientsContextFn func(context.Context, *config.Config) bool
-	antigravityProbeWg           sync.WaitGroup
-	// antigravityContext is protected by cfgMu and owns background model probes.
-	antigravityContext       context.Context
-	antigravityProbeMu       sync.Mutex
-	antigravityAccountProbes map[string]map[*antigravityAccountProbe]struct{}
-	antigravityRefreshWake   chan struct{}
-	// antigravityRefreshPending is protected by antigravityProbeMu. Each entry
-	// owns one worker and at most one queued snapshot shared by all probe entry
-	// points. A nil value means the worker is running without a queued successor.
-	antigravityRefreshPending map[string]*antigravityModelRefreshRequest
-	antigravityPersistPending map[string]*antigravityHintPersistRequest
-	antigravityPersistActive  map[string]*antigravityHintPersistRequest
 }
 
 // SetResultPolicy sets an execution result policy on the underlying core auth manager.

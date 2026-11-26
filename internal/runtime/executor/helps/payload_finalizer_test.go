@@ -242,31 +242,6 @@ func TestExecutorHelpersDocCrossMethodPipelines(t *testing.T) {
 			t.Fatalf("expected search_content_types to be stripped: %s", out)
 		}
 	})
-
-	t.Run("gemini and vertex doc pipeline", func(t *testing.T) {
-		raw := []byte(`{"contents":[{"role":"model","parts":[{"functionCall":{"id":"call_1","name":"fn","args":{}}},{"thought":true,"text":"thinking"}]},{"role":"model","parts":[{"thought":true,"text":"trailing thought"}]}]}`)
-		doc := ojson.NewDoc(raw)
-		if !DropGeminiTrailingThoughtOnlyContentDoc(doc, "contents") {
-			t.Fatal("expected DropGeminiTrailingThoughtOnlyContentDoc to mutate doc")
-		}
-		if !StripVertexOpenAIResponsesToolCallIDsDoc(doc, "openai-response") {
-			t.Fatal("expected StripVertexOpenAIResponsesToolCallIDsDoc to mutate doc")
-		}
-		if !EnsureGeminiBoundaryUserContentDoc(doc, "contents") {
-			t.Fatal("expected EnsureGeminiBoundaryUserContentDoc to mutate doc")
-		}
-		out := doc.Bytes()
-		contents := ojson.GetBytesNoCopy(out, "contents").Array()
-		if len(contents) != 3 {
-			t.Fatalf("len(contents) = %d, want 3: %s", len(contents), out)
-		}
-		if contents[0].Get("role").String() != "user" || contents[2].Get("role").String() != "user" {
-			t.Fatalf("expected leading and trailing user turns: %s", out)
-		}
-		if contents[1].Get("parts.0.functionCall.id").Exists() {
-			t.Fatalf("expected functionCall.id to be stripped: %s", out)
-		}
-	})
 }
 
 func TestFinalizeDocCustomWrapperCalledOnceAndPreservesOriginalFromBody(t *testing.T) {

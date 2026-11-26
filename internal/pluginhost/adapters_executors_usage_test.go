@@ -897,16 +897,6 @@ func TestExecutorAdapterExecuteStreamErrorChunkImmediatePublishWithoutClose(t *t
 	}
 }
 
-func TestObservePluginExecutorStreamTTFT_Antigravity(t *testing.T) {
-	reporter := helps.NewUsageReporter(context.Background(), "antigravity", "test-model", nil)
-	reporter.StartResponseTTFT()
-	antigravityChunk := []byte(`data: {"response":{"candidates":[{"content":{"parts":[{"text":"hello"}]}}]}}`)
-	helps.ObservePluginExecutorStreamTTFT("antigravity", reporter, antigravityChunk)
-	if !reporter.IsTTFTSet() {
-		t.Errorf("ObservePluginExecutorStreamTTFT for antigravity should set TTFT on token event")
-	}
-}
-
 type capturingUsagePlugin struct {
 	captured chan pluginapi.UsageRecord
 }
