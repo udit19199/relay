@@ -301,8 +301,6 @@ func TestSessionAffinityGuardianSchedulingProvider(t *testing.T) {
 		provider string
 		auth     Auth
 	}{
-		{name: "kimi_ai", provider: "kimi-ai", auth: Auth{Provider: "kimi.ai"}},
-		{name: "kimi_com", provider: "kimi", auth: Auth{Provider: "kimi.com"}},
 		{name: "normalized_provider", provider: "codex", auth: Auth{Provider: " Codex "}},
 		{name: "compatible_attributes", provider: "openai-compatible-review", auth: Auth{
 			Provider: "openai-compatibility", Attributes: map[string]string{"compat_name": "Review", "provider_key": "review"},

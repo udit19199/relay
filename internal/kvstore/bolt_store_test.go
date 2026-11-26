@@ -136,17 +136,17 @@ func TestBuildSetArgsAndDurationCeil(t *testing.T) {
 		t.Fatalf("BuildSetArgs(PX XX) = %#v, want %#v", args, want)
 	}
 
-	if _, errEmpty := BuildSetArgs("   ", []byte("v"), KVSetOptions{}); errEmpty == nil || errEmpty.Error() != "home kv: key is empty" {
-		t.Fatalf("BuildSetArgs(empty key) error = %v, want 'home kv: key is empty'", errEmpty)
+	if _, errEmpty := BuildSetArgs("   ", []byte("v"), KVSetOptions{}); errEmpty == nil || errEmpty.Error() != "kv: key is empty" {
+		t.Fatalf("BuildSetArgs(empty key) error = %v, want 'kv: key is empty'", errEmpty)
 	}
-	if _, errExPx := BuildSetArgs("k", []byte("v"), KVSetOptions{EX: time.Second, PX: time.Millisecond}); errExPx == nil || errExPx.Error() != "home kv: EX and PX are mutually exclusive" {
-		t.Fatalf("BuildSetArgs(EX PX) error = %v, want 'home kv: EX and PX are mutually exclusive'", errExPx)
+	if _, errExPx := BuildSetArgs("k", []byte("v"), KVSetOptions{EX: time.Second, PX: time.Millisecond}); errExPx == nil || errExPx.Error() != "kv: EX and PX are mutually exclusive" {
+		t.Fatalf("BuildSetArgs(EX PX) error = %v, want 'kv: EX and PX are mutually exclusive'", errExPx)
 	}
-	if _, errNeg := BuildSetArgs("k", []byte("v"), KVSetOptions{EX: -time.Second}); errNeg == nil || errNeg.Error() != "home kv: ttl must not be negative" {
-		t.Fatalf("BuildSetArgs(negative EX) error = %v, want 'home kv: ttl must not be negative'", errNeg)
+	if _, errNeg := BuildSetArgs("k", []byte("v"), KVSetOptions{EX: -time.Second}); errNeg == nil || errNeg.Error() != "kv: ttl must not be negative" {
+		t.Fatalf("BuildSetArgs(negative EX) error = %v, want 'kv: ttl must not be negative'", errNeg)
 	}
-	if _, errNxXx := BuildSetArgs("k", []byte("v"), KVSetOptions{NX: true, XX: true}); errNxXx == nil || errNxXx.Error() != "home kv: NX and XX are mutually exclusive" {
-		t.Fatalf("BuildSetArgs(NX XX) error = %v, want 'home kv: NX and XX are mutually exclusive'", errNxXx)
+	if _, errNxXx := BuildSetArgs("k", []byte("v"), KVSetOptions{NX: true, XX: true}); errNxXx == nil || errNxXx.Error() != "kv: NX and XX are mutually exclusive" {
+		t.Fatalf("BuildSetArgs(NX XX) error = %v, want 'kv: NX and XX are mutually exclusive'", errNxXx)
 	}
 	if ErrCompareAndSwapUnsupported == nil || ErrCompareAndSwapUnsupported.Error() != "kvstore: compare-and-swap command is not supported" {
 		t.Fatalf("ErrCompareAndSwapUnsupported = %v, want 'kvstore: compare-and-swap command is not supported'", ErrCompareAndSwapUnsupported)

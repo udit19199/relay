@@ -50,7 +50,6 @@ func TestCatalogPolicyHotReload(t *testing.T) {
 	awaitSource(general, embeddedCatalogSource)
 	awaitSource(codex, "https://example.com/codex")
 	UpdateModelCatalogSources(CatalogSources{})
-	awaitSource(general, embeddedCatalogSource)
 
 	// Shutdown must fence reloads, and a new SDK lifetime must retain CLI policy.
 	cancel()

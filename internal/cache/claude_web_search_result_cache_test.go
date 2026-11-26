@@ -24,6 +24,7 @@ type fakeClaudeWebSearchResultKVClient struct {
 }
 
 func (c *fakeClaudeWebSearchResultKVClient) KVSet(_ context.Context, key string, value []byte, opts kvstore.KVSetOptions) (bool, error) {
+	c.lastSetTTL = opts.EX
 	if c.setErr != nil {
 		return false, c.setErr
 	}
@@ -35,7 +36,6 @@ func (c *fakeClaudeWebSearchResultKVClient) KVSet(_ context.Context, key string,
 		return false, nil
 	}
 	c.setCount++
-	c.lastSetTTL = opts.EX
 	c.values[key] = append([]byte(nil), value...)
 	return true, nil
 }
