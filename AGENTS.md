@@ -24,7 +24,7 @@ go test ./... # Run all tests
 go test -v -run TestName ./path/to/pkg # Run single test
 go build -o test-output ./cmd/server && rm test-output # Verify compile (REQUIRED after changes)
 ```
-- Common flags: `--config <path>`, `--tui`, `--standalone`, `--local-model`, `--no-browser`, `--oauth-callback-port <port>`
+- Common flags: `--config <path>`, `--local-model`, `--no-browser`, `--oauth-callback-port <port>`
 
 ## Config
 - Default config: `config.yaml` (template: `config.example.yaml`)
@@ -47,7 +47,6 @@ go build -o test-output ./cmd/server && rm test-output # Verify compile (REQUIRE
 - `internal/wsrelay/` — WebSocket relay sessions
 - `internal/usage/` — Usage and token accounting
 - `internal/home/` — CLIProxyAPIHome control plane integration (bootstrap, RESP communication, dispatch coordination)
-- `internal/tui/` — Bubbletea terminal UI (`--tui`, `--standalone`)
 - `sdk/cliproxy/` — Embeddable SDK entry (service/builder/watchers/pipeline)
 - `internal/relaycli/` — Relay's own commands (`setup`, `status`, `doctor`, `accounts`, `fallback`), dispatched from the top of `main()` in `cmd/server/main.go`. They talk to the running proxy only through `/v8/management` (plus `/v0/management/quota/fetch`, which has no v8 route), print one JSON object with `--json`, and are what coding agents use to install and run Relay (README "Agent setup"). `RELAY_HOME` overrides `~/.relay`. Fallback chains are credential `priority` plus per-credential `model_aliases`, with each credential's place recorded under `relay_fallback`; OpenCode Go aliases are published without the `opencode-go/` prefix (`withOpenCodeGoAliases`) so a chain can include it.
 - `test/` — Cross-module integration tests
