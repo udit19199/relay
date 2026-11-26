@@ -93,9 +93,9 @@ func TestClaudeExecutor_CompactionTriggerStreamReturnsSingleCompactionItem(t *te
 }
 
 func TestClaudeExecutor_ReplayedCompactionCapsuleIsExpanded(t *testing.T) {
-	capsule, errSeal := helps.SealAntigravityCompaction(claudeCompactionSummaryText, "claude-haiku-4-5-20251001")
+	capsule, errSeal := helps.SealResponsesCompaction(claudeCompactionSummaryText, "claude-haiku-4-5-20251001")
 	if errSeal != nil {
-		t.Fatalf("SealAntigravityCompaction() error = %v", errSeal)
+		t.Fatalf("SealResponsesCompaction() error = %v", errSeal)
 	}
 
 	var seen []byte
@@ -251,9 +251,9 @@ func TestClaudeExecutor_CompactionSummaryPayloadRuleIsLast(t *testing.T) {
 }
 
 func TestClaudeExecutor_CompactionTriggerIncludesPreviousCapsule(t *testing.T) {
-	capsule, errSeal := helps.SealAntigravityCompaction("Earlier sealed summary.", "claude-haiku-4-5-20251001")
+	capsule, errSeal := helps.SealResponsesCompaction("Earlier sealed summary.", "claude-haiku-4-5-20251001")
 	if errSeal != nil {
-		t.Fatalf("SealAntigravityCompaction() error = %v", errSeal)
+		t.Fatalf("SealResponsesCompaction() error = %v", errSeal)
 	}
 	var seen []byte
 	server := httptest.NewServer(claudeCompactionUpstream(t, &seen))
@@ -435,7 +435,7 @@ func assertSingleCompactionOutput(t *testing.T, payload []byte) {
 	if len(items) != 1 || items[0].Get("type").String() != "compaction" {
 		t.Fatalf("output types = %s, want exactly one compaction; payload=%s", compactionOutputTypes(items), payload)
 	}
-	plain, errUnseal := helps.UnsealAntigravityCompaction(items[0].Get("encrypted_content").String())
+	plain, errUnseal := helps.UnsealResponsesCompaction(items[0].Get("encrypted_content").String())
 	if errUnseal != nil {
 		t.Fatalf("unseal compaction capsule: %v", errUnseal)
 	}

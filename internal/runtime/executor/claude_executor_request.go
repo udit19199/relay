@@ -474,7 +474,7 @@ func isClaudeFable52Model(model string) bool {
 
 // applyClaudeCloakThinkingDisplay fills the latest CLI display only when the
 // translated caller did not choose one. An explicit summarized or omitted value
-// from Responses, Chat, or Gemini stays untouched.
+// from Responses, Chat, or Interactions stays untouched.
 func applyClaudeCloakThinkingDisplay(body []byte, callerOwned bool) []byte {
 	if callerOwned || len(body) == 0 {
 		return body

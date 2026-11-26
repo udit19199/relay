@@ -46,8 +46,8 @@ var CandidateSessionPrefixes = []string{
 	"lcp:v1:", "lcp:",
 	"codex:", "claude:", "header:", "session:",
 	"affinity:", "slot:", "task:", "conv:",
-	"thread:", "clientreq:", "geminicache:",
-	"pck:", "user:", "execution:", "agy:", "derived:",
+	"thread:", "clientreq:",
+	"pck:", "user:", "execution:", "derived:",
 }
 
 // knownSessionPrefixes tracks legacy protocol-specific session prefixes that need to be
@@ -59,8 +59,8 @@ var knownSessionPrefixes = []string{
 	"ctx:v1:", "ctx:",
 	"codex:", "claude:", "header:", "session:",
 	"affinity:", "slot:", "task:", "conv:",
-	"thread:", "clientreq:", "geminicache:",
-	"pck:", "user:", "execution:", "agy:", "derived:",
+	"thread:", "clientreq:",
+	"pck:", "user:", "execution:", "derived:",
 }
 
 // NormalizeToCanonicalUUID deterministically normalizes any session identifier to a
@@ -353,7 +353,6 @@ func hasExplicitSession(headers map[string][]string, payload []byte) bool {
 		"X-Codex-Parent-Thread-Id",
 		"X-Codex-Turn-Metadata",
 		"X-Openai-Subagent",
-		"X-Http-Session-Id",
 		"X-Session-ID",
 		"X-Session-Affinity",
 		"X-Parent-Session-ID",

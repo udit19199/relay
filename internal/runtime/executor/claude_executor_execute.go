@@ -159,7 +159,7 @@ func (e *ClaudeExecutor) Execute(ctx context.Context, auth *cliproxyauth.Auth, r
 	reconcileClaudeCodeContextManagementDoc(doc, contextManagementState)
 	normalizeClaudeSamplingForUpstreamDoc(doc, confirmedClaudeCode)
 
-	// Default cache_control for translated entrypoints (Responses/Chat/Gemini) and other
+	// Default cache_control for translated entrypoints (Responses/Chat/Interactions) and other
 	// non-native callers. Confirmed native Claude Code owns its marker placement and must
 	// not be rewritten. Cloaked requests always run section-independent ensure so cloaking's
 	// first-user marker cannot suppress system/latest-user breakpoints.

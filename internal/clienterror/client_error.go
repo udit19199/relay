@@ -155,7 +155,7 @@ const GeminiFilterBlockMessagePrefix = "This request was blocked by Gemini's fil
 // GeminiFilterBlockPolicyURL is the policy URL embedded in Gemini's mid-stream content filter block frame.
 const GeminiFilterBlockPolicyURL = "https://policies.google.com/terms/generative-ai/use-policy"
 
-// GeminiFilterBlockMessage inspects a raw Gemini / Antigravity JSON payload and returns the filter
+// GeminiFilterBlockMessage inspects a raw Gemini-family JSON payload and returns the filter
 // block message when the payload is an injected mid-stream Gemini content filter frame.
 //
 // Upstream injects this frame inside an HTTP 200 SSE stream with only candidates[0].content.parts[0].text

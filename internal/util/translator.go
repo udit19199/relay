@@ -1665,8 +1665,8 @@ func cleanClaudeToolArgumentsByTranslatedSchema(argsJSON string, translatedSchem
 				}
 				// The "_" placeholder is also marked required by addEmptySchemaPlaceholder;
 				// when branch flattening drops required, its boolean type is the fallback signal
-				// only for nested objects. At the top level, the Antigravity executor wraps tool
-				// schemas before its second sanitization pass, which can also inject "_" after
+				// only for nested objects. At the top level, a provider executor may wrap tool
+				// schemas before a second sanitization pass, which can also inject "_" after
 				// translation; that post-translation injection is handled below by re-running
 				// the same schema cleaning on the translated schema.
 				if !injected && !topLevel {

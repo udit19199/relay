@@ -444,9 +444,9 @@ func TestCodexExecutorReplayedWebSearchCallHistoryEnsuresWebSearchTool_Issue6770
 
 func TestCodexExecutorExpandsRecognizedCPACompactionCapsules_Issue7118(t *testing.T) {
 	summaryText := "Claude compacted summary before switching to GPT."
-	capsule, errSeal := helps.SealAntigravityCompaction(summaryText, "claude-sonnet-4-6")
+	capsule, errSeal := helps.SealResponsesCompaction(summaryText, "claude-sonnet-4-6")
 	if errSeal != nil {
-		t.Fatalf("SealAntigravityCompaction() error = %v", errSeal)
+		t.Fatalf("SealResponsesCompaction() error = %v", errSeal)
 	}
 
 	mixedPayload := `{"model":"gpt-6.1-sol","input":[` +

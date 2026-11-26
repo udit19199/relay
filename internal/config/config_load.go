@@ -277,7 +277,7 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
 		return nil, errResolvePluginsDir
 	}
 
-	// Sanitize Gemini API key configuration and migrate legacy entries.
+	// Sanitize API key configuration and migrate legacy entries.
 
 	// Sanitize Codex keys: drop entries without base-url
 	cfg.SanitizeCodexKeys()

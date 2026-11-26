@@ -114,8 +114,8 @@ func cleanJSONSchema(jsonStr string, options jsonSchemaCleanOptions) string {
 		jsonStr = removeKeywords(jsonStr, []string{"nullable", "title"})
 		jsonStr = removePlaceholderFields(jsonStr)
 	} else if options.removeToolTitle {
-		// Legacy non-VALIDATED Antigravity requests used the Gemini cleaner, which drops title.
-		// Keep that harmless metadata policy without losing Antigravity's native nullable support.
+		// Some Interactions routes use the Gemini-family cleaner, which drops title.
+		// Keep that harmless metadata policy without losing native nullable support.
 		jsonStr = removeKeywords(jsonStr, []string{"title"})
 	}
 	if !preserveConjunctions {
@@ -1352,7 +1352,7 @@ func convertConstToEnum(jsonStr string) string {
 }
 
 // convertEnumValuesToStrings ensures all enum values use the string representation required by
-// Gemini's proto schema. The declared type remains independent: Antigravity uses it to choose the
+// Gemini's proto schema. The declared type remains independent: callers use it to choose the
 // emitted JSON type on both response and function-argument paths.
 func convertEnumValuesToStrings(jsonStr string, forceStringType bool) string {
 	paths := findPaths(jsonStr, "enum")
@@ -1418,7 +1418,7 @@ func addEnumHints(jsonStr string) string {
 	return jsonStr
 }
 
-// Antigravity does not enforce enum on function arguments and ignores boolean response enums.
+// Some upstreams do not enforce enum on function arguments and ignore boolean response enums.
 // Preserve the advisory values in description, but do not leave an unenforced constraint in the
 // schema contract. Response enums for string, number, and integer remain native constraints.
 func dropIgnoredEnumsToHints(jsonStr string, options jsonSchemaCleanOptions) string {
@@ -1924,7 +1924,7 @@ func flattenAnyOfOneOf(jsonStr string, preserveOneOf, flattenMultiBranch bool) s
 		nullable := hasNull || parent.Get("nullable").Bool()
 
 		// Preserve multi-branch unions (2+ standalone non-null branches) so non-first branches are not lost.
-		// On native Gemini/Antigravity Schema carriers (!preserveOneOf), normalize oneOf to anyOf because
+		// On native Gemini-family schema carriers (!preserveOneOf), normalize oneOf to anyOf because
 		// the protobuf Schema message supports anyOf but rejects oneOf.
 		// Routes that reject multi-branch unions upstream (flattenMultiBranch) skip this
 		// preservation and fall through to the single-strongest-branch flattening below.

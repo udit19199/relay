@@ -20,30 +20,30 @@ import (
 )
 
 const (
-	antigravityCompactionCapsulePrefix = "cpa-ag-compact-v1:"
-	antigravityCompactionItemIDPrefix  = "cmp_ag_compact_"
-	fixedCompactionKeySecret           = "CLIProxyAPI"
+	responsesCompactionCapsulePrefix = "cpa-ag-compact-v1:"
+	responsesCompactionItemIDPrefix  = "cmp_ag_compact_"
+	fixedCompactionKeySecret         = "CLIProxyAPI"
 )
 
-type antigravityCompactionCapsuleData struct {
+type responsesCompactionCapsuleData struct {
 	Summary   string `json:"summary"`
 	Model     string `json:"model"`
 	CreatedAt int64  `json:"created_at"`
 }
 
-// RecognizedAntigravityCompactionCapsule reports whether encrypted content uses the CPA capsule prefix.
-func RecognizedAntigravityCompactionCapsule(encryptedContent string) bool {
-	return strings.HasPrefix(strings.TrimSpace(encryptedContent), antigravityCompactionCapsulePrefix)
+// RecognizedResponsesCompactionCapsule reports whether encrypted content uses the CPA capsule prefix.
+func RecognizedResponsesCompactionCapsule(encryptedContent string) bool {
+	return strings.HasPrefix(strings.TrimSpace(encryptedContent), responsesCompactionCapsulePrefix)
 }
 
 func isRecognizedCPACompactionItem(item ojson.Result) bool {
 	if item.Get("type").String() != "compaction" {
 		return false
 	}
-	if RecognizedAntigravityCompactionCapsule(item.Get("encrypted_content").String()) {
+	if RecognizedResponsesCompactionCapsule(item.Get("encrypted_content").String()) {
 		return true
 	}
-	return strings.HasPrefix(strings.TrimSpace(item.Get("id").String()), antigravityCompactionItemIDPrefix)
+	return strings.HasPrefix(strings.TrimSpace(item.Get("id").String()), responsesCompactionItemIDPrefix)
 }
 
 // HasRecognizedResponsesCompactionItem checks whether input contains a CPA-minted compaction item.
@@ -148,7 +148,7 @@ func ExpandResponsesCompactionCapsules(req *cliproxyexecutor.Request, opts *clip
 	if req != nil && len(req.Payload) > 0 {
 		doc := ojson.NewDoc(req.Payload)
 		changed := DropForeignResponsesCompactionItemsDoc(doc, provider)
-		expanded, errExpand := ExpandAntigravityCompactionCapsulesDoc(doc)
+		expanded, errExpand := ExpandCPACompactionCapsulesDoc(doc)
 		if errExpand != nil {
 			return errExpand
 		}
@@ -163,7 +163,7 @@ func ExpandResponsesCompactionCapsules(req *cliproxyexecutor.Request, opts *clip
 		}
 		doc := ojson.NewDoc(opts.OriginalRequest)
 		changed := DropForeignResponsesCompactionItemsDoc(doc, provider)
-		expanded, errExpand := ExpandAntigravityCompactionCapsulesDoc(doc)
+		expanded, errExpand := ExpandCPACompactionCapsulesDoc(doc)
 		if errExpand != nil {
 			return errExpand
 		}
@@ -178,7 +178,7 @@ func ExpandResponsesCompactionCapsules(req *cliproxyexecutor.Request, opts *clip
 func ExpandRecognizedResponsesCompactionCapsules(req *cliproxyexecutor.Request, opts *cliproxyexecutor.Options) error {
 	sameOriginal := req != nil && opts != nil && len(opts.OriginalRequest) > 0 && bytes.Equal(req.Payload, opts.OriginalRequest)
 	if req != nil && HasRecognizedResponsesCompactionItem(req.Payload) {
-		expanded, errExpand := ExpandRecognizedAntigravityCompactionCapsules(req.Payload)
+		expanded, errExpand := ExpandRecognizedCPACompactionCapsules(req.Payload)
 		if errExpand != nil {
 			return errExpand
 		}
@@ -190,7 +190,7 @@ func ExpandRecognizedResponsesCompactionCapsules(req *cliproxyexecutor.Request, 
 			return nil
 		}
 		if HasRecognizedResponsesCompactionItem(opts.OriginalRequest) {
-			expanded, errExpand := ExpandRecognizedAntigravityCompactionCapsules(opts.OriginalRequest)
+			expanded, errExpand := ExpandRecognizedCPACompactionCapsules(opts.OriginalRequest)
 			if errExpand != nil {
 				return errExpand
 			}
@@ -200,18 +200,18 @@ func ExpandRecognizedResponsesCompactionCapsules(req *cliproxyexecutor.Request, 
 	return nil
 }
 
-// PrepareAntigravityCompactionSummaryPayload prepares a payload for non-stream Antigravity summary generation.
-func PrepareAntigravityCompactionSummaryPayload(payload []byte, modelName string) []byte {
+// PrepareResponsesCompactionSummaryPayload prepares a payload for non-stream Responses summary generation.
+func PrepareResponsesCompactionSummaryPayload(payload []byte, modelName string) []byte {
 	if len(payload) == 0 {
 		return payload
 	}
 	doc := ojson.NewDoc(payload)
-	PrepareAntigravityCompactionSummaryPayloadDoc(doc, modelName)
+	PrepareResponsesCompactionSummaryPayloadDoc(doc, modelName)
 	return doc.Bytes()
 }
 
-// PrepareAntigravityCompactionSummaryPayloadDoc prepares doc in place for non-stream Antigravity summary generation.
-func PrepareAntigravityCompactionSummaryPayloadDoc(doc *ojson.Doc, modelName string) {
+// PrepareResponsesCompactionSummaryPayloadDoc prepares doc in place for non-stream Responses summary generation.
+func PrepareResponsesCompactionSummaryPayloadDoc(doc *ojson.Doc, modelName string) {
 	if doc == nil || doc.Len() == 0 {
 		return
 	}
@@ -257,15 +257,15 @@ func PrepareAntigravityCompactionSummaryPayloadDoc(doc *ojson.Doc, modelName str
 	_ = doc.Set("stream", false)
 }
 
-// deriveAntigravityCompactionKey derives an AES-256 key from the fixed CLIProxyAPI secret.
-func deriveAntigravityCompactionKey() []byte {
+// deriveResponsesCompactionKey derives an AES-256 key from the fixed CLIProxyAPI secret.
+func deriveResponsesCompactionKey() []byte {
 	h := sha256.Sum256([]byte(fixedCompactionKeySecret))
 	return h[:]
 }
 
-// SealAntigravityCompaction encrypts summary data into an opaque capsule using AES-GCM.
-func SealAntigravityCompaction(summary, modelName string) (string, error) {
-	data := antigravityCompactionCapsuleData{
+// SealResponsesCompaction encrypts summary data into an opaque capsule using AES-GCM.
+func SealResponsesCompaction(summary, modelName string) (string, error) {
+	data := responsesCompactionCapsuleData{
 		Summary:   summary,
 		Model:     modelName,
 		CreatedAt: time.Now().Unix(),
@@ -275,7 +275,7 @@ func SealAntigravityCompaction(summary, modelName string) (string, error) {
 		return "", fmt.Errorf("marshal compaction capsule: %w", errMarshal)
 	}
 
-	key := deriveAntigravityCompactionKey()
+	key := deriveResponsesCompactionKey()
 	block, errCipher := aes.NewCipher(key)
 	if errCipher != nil {
 		return "", fmt.Errorf("create cipher: %w", errCipher)
@@ -292,23 +292,23 @@ func SealAntigravityCompaction(summary, modelName string) (string, error) {
 	}
 
 	ciphertext := gcm.Seal(nonce, nonce, plaintext, nil)
-	return antigravityCompactionCapsulePrefix + base64.RawURLEncoding.EncodeToString(ciphertext), nil
+	return responsesCompactionCapsulePrefix + base64.RawURLEncoding.EncodeToString(ciphertext), nil
 }
 
-// UnsealAntigravityCompaction decrypts and validates an opaque capsule.
-func UnsealAntigravityCompaction(encryptedContent string) (string, error) {
+// UnsealResponsesCompaction decrypts and validates an opaque capsule.
+func UnsealResponsesCompaction(encryptedContent string) (string, error) {
 	encryptedContent = strings.TrimSpace(encryptedContent)
-	if !strings.HasPrefix(encryptedContent, antigravityCompactionCapsulePrefix) {
+	if !strings.HasPrefix(encryptedContent, responsesCompactionCapsulePrefix) {
 		return "", fmt.Errorf("unrecognized compaction capsule format")
 	}
 
-	raw := strings.TrimPrefix(encryptedContent, antigravityCompactionCapsulePrefix)
+	raw := strings.TrimPrefix(encryptedContent, responsesCompactionCapsulePrefix)
 	ciphertext, errDecode := base64.RawURLEncoding.DecodeString(raw)
 	if errDecode != nil {
 		return "", fmt.Errorf("decode compaction capsule: %w", errDecode)
 	}
 
-	key := deriveAntigravityCompactionKey()
+	key := deriveResponsesCompactionKey()
 	block, errCipher := aes.NewCipher(key)
 	if errCipher != nil {
 		return "", fmt.Errorf("create cipher: %w", errCipher)
@@ -330,20 +330,20 @@ func UnsealAntigravityCompaction(encryptedContent string) (string, error) {
 		return "", fmt.Errorf("invalid or corrupted compaction capsule: %w", errOpen)
 	}
 
-	var data antigravityCompactionCapsuleData
+	var data responsesCompactionCapsuleData
 	if errUnmarshal := json.Unmarshal(plaintext, &data); errUnmarshal != nil {
 		return "", fmt.Errorf("unmarshal compaction capsule: %w", errUnmarshal)
 	}
 	return data.Summary, nil
 }
 
-// ExpandAntigravityCompactionCapsules expands compaction items in input into developer context.
-func ExpandAntigravityCompactionCapsules(payload []byte) ([]byte, error) {
+// ExpandCPACompactionCapsules expands compaction items in input into developer context.
+func ExpandCPACompactionCapsules(payload []byte) ([]byte, error) {
 	if len(payload) == 0 {
 		return payload, nil
 	}
 	doc := ojson.NewDoc(payload)
-	changed, errExpand := ExpandAntigravityCompactionCapsulesDoc(doc)
+	changed, errExpand := ExpandCPACompactionCapsulesDoc(doc)
 	if errExpand != nil {
 		return nil, errExpand
 	}
@@ -353,8 +353,8 @@ func ExpandAntigravityCompactionCapsules(payload []byte) ([]byte, error) {
 	return doc.Bytes(), nil
 }
 
-// ExpandAntigravityCompactionCapsulesDoc expands compaction items in input into developer context in place on doc.
-func ExpandAntigravityCompactionCapsulesDoc(doc *ojson.Doc) (bool, error) {
+// ExpandCPACompactionCapsulesDoc expands compaction items in input into developer context in place on doc.
+func ExpandCPACompactionCapsulesDoc(doc *ojson.Doc) (bool, error) {
 	if doc == nil || doc.Len() == 0 {
 		return false, nil
 	}
@@ -371,7 +371,7 @@ func ExpandAntigravityCompactionCapsulesDoc(doc *ojson.Doc) (bool, error) {
 	for idx, item := range input.Array() {
 		if item.Get("type").String() == "compaction" {
 			encryptedContent := item.Get("encrypted_content").String()
-			summary, errUnseal := UnsealAntigravityCompaction(encryptedContent)
+			summary, errUnseal := UnsealResponsesCompaction(encryptedContent)
 			if errUnseal != nil {
 				return false, fmt.Errorf("invalid compaction capsule: %w", errUnseal)
 			}
@@ -393,13 +393,13 @@ func ExpandAntigravityCompactionCapsulesDoc(doc *ojson.Doc) (bool, error) {
 	return true, nil
 }
 
-// ExpandRecognizedAntigravityCompactionCapsules expands recognized CPA compaction items in input into developer context while leaving non-CPA compaction items untouched.
-func ExpandRecognizedAntigravityCompactionCapsules(payload []byte) ([]byte, error) {
+// ExpandRecognizedCPACompactionCapsules expands recognized CPA compaction items in input into developer context while leaving non-CPA compaction items untouched.
+func ExpandRecognizedCPACompactionCapsules(payload []byte) ([]byte, error) {
 	if len(payload) == 0 {
 		return payload, nil
 	}
 	doc := ojson.NewDoc(payload)
-	changed, errExpand := ExpandRecognizedAntigravityCompactionCapsulesDoc(doc)
+	changed, errExpand := ExpandRecognizedCPACompactionCapsulesDoc(doc)
 	if errExpand != nil {
 		return nil, errExpand
 	}
@@ -409,8 +409,8 @@ func ExpandRecognizedAntigravityCompactionCapsules(payload []byte) ([]byte, erro
 	return doc.Bytes(), nil
 }
 
-// ExpandRecognizedAntigravityCompactionCapsulesDoc expands recognized CPA compaction items in input in place on doc.
-func ExpandRecognizedAntigravityCompactionCapsulesDoc(doc *ojson.Doc) (bool, error) {
+// ExpandRecognizedCPACompactionCapsulesDoc expands recognized CPA compaction items in input in place on doc.
+func ExpandRecognizedCPACompactionCapsulesDoc(doc *ojson.Doc) (bool, error) {
 	if doc == nil || doc.Len() == 0 {
 		return false, nil
 	}
@@ -427,7 +427,7 @@ func ExpandRecognizedAntigravityCompactionCapsulesDoc(doc *ojson.Doc) (bool, err
 	for idx, item := range input.Array() {
 		if isRecognizedCPACompactionItem(item) {
 			encryptedContent := item.Get("encrypted_content").String()
-			summary, errUnseal := UnsealAntigravityCompaction(encryptedContent)
+			summary, errUnseal := UnsealResponsesCompaction(encryptedContent)
 			if errUnseal != nil {
 				return false, fmt.Errorf("invalid compaction capsule: %w", errUnseal)
 			}
@@ -449,8 +449,8 @@ func ExpandRecognizedAntigravityCompactionCapsulesDoc(doc *ojson.Doc) (bool, err
 	return true, nil
 }
 
-// ExtractAntigravitySummaryText extracts summary text from Antigravity or Responses response.
-func ExtractAntigravitySummaryText(respPayload []byte) (string, error) {
+// ExtractResponsesSummaryText extracts summary text from Responses response.
+func ExtractResponsesSummaryText(respPayload []byte) (string, error) {
 	// 1. OpenAI Responses format: iterate through output array and skip reasoning
 	output := ojson.GetBytesNoCopy(respPayload, "output")
 	if output.IsArray() {
@@ -477,7 +477,7 @@ func ExtractAntigravitySummaryText(respPayload []byte) (string, error) {
 		}
 	}
 
-	// 2. Antigravity Gemini format: response.candidates.0.content.parts or candidates.0.content.parts
+	// 2. Gemini-family response format: response.candidates.0.content.parts or candidates.0.content.parts
 	candidates := ojson.GetBytesNoCopy(respPayload, "response.candidates")
 	if !candidates.Exists() {
 		candidates = ojson.GetBytesNoCopy(respPayload, "candidates")
@@ -524,8 +524,8 @@ func ExtractAntigravitySummaryText(respPayload []byte) (string, error) {
 	return "", fmt.Errorf("no summary text found in upstream response")
 }
 
-// BuildAntigravityCompactionStreamChunks creates SSE frames for compaction stream response.
-func BuildAntigravityCompactionStreamChunks(modelName, capsule string, inputTokens, outputTokens, totalTokens int) [][]byte {
+// BuildResponsesCompactionStreamChunks creates SSE frames for compaction stream response.
+func BuildResponsesCompactionStreamChunks(modelName, capsule string, inputTokens, outputTokens, totalTokens int) [][]byte {
 	now := time.Now().Unix()
 	responseID := fmt.Sprintf("resp_ag_compact_%d", time.Now().UnixNano())
 	itemID := fmt.Sprintf("cmp_ag_compact_%d", time.Now().UnixNano())
@@ -593,8 +593,8 @@ func BuildAntigravityCompactionStreamChunks(modelName, capsule string, inputToke
 	return frames
 }
 
-// BuildAntigravityCompactionResponse creates JSON response for non-stream response.compaction.
-func BuildAntigravityCompactionResponse(modelName, capsule string, inputTokens, outputTokens, totalTokens int) []byte {
+// BuildResponsesCompactionResponse creates JSON response for non-stream response.compaction.
+func BuildResponsesCompactionResponse(modelName, capsule string, inputTokens, outputTokens, totalTokens int) []byte {
 	now := time.Now().Unix()
 	responseID := fmt.Sprintf("resp_ag_compact_%d", time.Now().UnixNano())
 	itemID := fmt.Sprintf("cmp_ag_compact_%d", time.Now().UnixNano())
@@ -694,16 +694,16 @@ func BuildResponsesCompactionResponseFromSummary(modelName string, summaryPayloa
 	if errStatus := ValidateResponsesCompactionSummaryStatus(summaryPayload); errStatus != nil {
 		return nil, errStatus
 	}
-	summaryText, errExtract := ExtractAntigravitySummaryText(summaryPayload)
+	summaryText, errExtract := ExtractResponsesSummaryText(summaryPayload)
 	if errExtract != nil {
 		return nil, fmt.Errorf("extract summary: %w", errExtract)
 	}
-	capsule, errSeal := SealAntigravityCompaction(summaryText, modelName)
+	capsule, errSeal := SealResponsesCompaction(summaryText, modelName)
 	if errSeal != nil {
 		return nil, fmt.Errorf("seal compaction capsule: %w", errSeal)
 	}
 	inputTokens, outputTokens, totalTokens, cachedTokens, reasoningTokens := ExtractResponsesCompactionUsage(summaryPayload)
-	respPayload := BuildAntigravityCompactionResponse(modelName, capsule, inputTokens, outputTokens, totalTokens)
+	respPayload := BuildResponsesCompactionResponse(modelName, capsule, inputTokens, outputTokens, totalTokens)
 	respDoc := ojson.NewDoc(respPayload)
 	_ = respDoc.Set("usage.input_tokens_details.cached_tokens", cachedTokens)
 	_ = respDoc.Set("usage.output_tokens_details.reasoning_tokens", reasoningTokens)
@@ -722,7 +722,7 @@ func BuildResponsesCompactionStreamChunksFromResponse(modelName string, compacti
 	totalTokens := int(ojson.GetBytesNoCopy(compactionPayload, "usage.total_tokens").Int())
 	cachedTokens := int(ojson.GetBytesNoCopy(compactionPayload, "usage.input_tokens_details.cached_tokens").Int())
 	reasoningTokens := int(ojson.GetBytesNoCopy(compactionPayload, "usage.output_tokens_details.reasoning_tokens").Int())
-	chunks := BuildAntigravityCompactionStreamChunks(modelName, capsule, inputTokens, outputTokens, totalTokens)
+	chunks := BuildResponsesCompactionStreamChunks(modelName, capsule, inputTokens, outputTokens, totalTokens)
 	for i := range chunks {
 		chunks[i] = PatchResponsesCompactionStreamUsage(chunks[i], inputTokens, outputTokens, totalTokens, cachedTokens, reasoningTokens)
 	}

@@ -920,16 +920,11 @@ type StreamUsageBuffer struct {
 	seenOpenAIToolCallKeys       map[string]struct{}
 	openAIToolCallsRequested     int64
 	openAIExplicitToolCalls      bool
-	geminiCallCounter            geminiFunctionCallCounter
 	openAIStreamImages           int64
 	openAIExplicitImageCount     bool
 	openAIStreamImageDetails     *usage.ImageDetails
 	responsesOutputByIndex       map[int64][]byte
 	responsesOutputFallback      [][]byte
-	geminiToolDetails            *usage.ToolUsageDetails
-	geminiWebSearchRequests      *int64
-	geminiImageCount             int64
-	geminiImageDetails           *usage.ImageDetails
 	requestedImageDetails        *usage.ImageDetails
 }
 
@@ -941,19 +936,6 @@ var (
 	openAIStreamImageDoneMarker   = []byte(`.completed"`)
 	responsesOutputItemDoneMarker = []byte(`"response.output_item.done"`)
 	claudeStreamBlockStartMarker  = []byte(`"content_block_start"`)
-	geminiUsageMetaMarker         = []byte(`"usageMetadata"`)
-	geminiUsageMetaSnakeMarker    = []byte(`"usage_metadata"`)
-	geminiGroundingMetaMarker     = []byte(`"groundingMetadata"`)
-	geminiGroundingSnakeMarker    = []byte(`"grounding_metadata"`)
-	geminiURLContextMetaMarker    = []byte(`"urlContextMetadata"`)
-	geminiURLContextSnakeMarker   = []byte(`"url_context_metadata"`)
-	geminiExecCodeMarker          = []byte(`"executableCode"`)
-	geminiExecCodeSnakeMarker     = []byte(`"executable_code"`)
-	geminiFunctionCallMarker      = []byte(`"functionCall"`)
-	geminiFunctionCallSnakeMarker = []byte(`"function_call"`)
-	geminiInlineDataMarker        = []byte(`"inlineData"`)
-	geminiInlineDataSnakeMarker   = []byte(`"inline_data"`)
-	geminiPredictionsMarker       = []byte(`"predictions"`)
 )
 
 func cloneTrimmedString(s string) string {
@@ -964,21 +946,6 @@ func cloneTrimmedString(s string) string {
 	return strings.Clone(s)
 }
 
-func hasGeminiCandidateArtifactMarker(payload []byte) bool {
-	return bytes.Contains(payload, geminiGroundingMetaMarker) ||
-		bytes.Contains(payload, geminiGroundingSnakeMarker) ||
-		bytes.Contains(payload, geminiURLContextMetaMarker) ||
-		bytes.Contains(payload, geminiURLContextSnakeMarker) ||
-		bytes.Contains(payload, geminiExecCodeMarker) ||
-		bytes.Contains(payload, geminiExecCodeSnakeMarker) ||
-		bytes.Contains(payload, geminiFunctionCallMarker) ||
-		bytes.Contains(payload, geminiFunctionCallSnakeMarker) ||
-		bytes.Contains(payload, geminiInlineDataMarker) ||
-		bytes.Contains(payload, geminiInlineDataSnakeMarker) ||
-		bytes.Contains(payload, geminiPredictionsMarker)
-}
-
-// Observe records detail when ok is true, allowing the final stream usage to win.
 func (b *StreamUsageBuffer) Observe(detail usage.Detail, ok bool) {
 	if b == nil || !ok {
 		return
@@ -1000,70 +967,9 @@ func (b *StreamUsageBuffer) Observe(detail usage.Detail, ok bool) {
 			b.detail.UpstreamServiceTier = detail.UpstreamServiceTier
 		}
 	}
-	b.applyGeminiStreamObservations()
 	b.ok = true
 }
 
-func (b *StreamUsageBuffer) rememberGeminiCandidateArtifacts(detail *usage.Detail) {
-	if b == nil || detail == nil {
-		return
-	}
-	if detail.ToolUsageDetails != nil {
-		// Content parts are incremental executions; grounding metadata is a snapshot.
-		previous := b.geminiToolDetails
-		b.geminiToolDetails = mergeToolUsageDetails(previous, detail.ToolUsageDetails)
-		if previous != nil {
-			addCounter := func(prev, delta *int64) *int64 {
-				if prev == nil || delta == nil {
-					return mergeInt64Ptr(prev, delta)
-				}
-				if sum, ok := safeUsageTokenSum(*prev, *delta); ok {
-					return usage.Int64Ptr(sum)
-				}
-				return nil
-			}
-			b.geminiToolDetails.ToolCallsRequested = addCounter(
-				previous.ToolCallsRequested, detail.ToolUsageDetails.ToolCallsRequested,
-			)
-			b.geminiToolDetails.CodeExecutionCalls = addCounter(
-				previous.CodeExecutionCalls, detail.ToolUsageDetails.CodeExecutionCalls,
-			)
-		}
-	}
-	if detail.WebSearchRequests != nil {
-		b.geminiWebSearchRequests = mergeInt64Ptr(b.geminiWebSearchRequests, detail.WebSearchRequests)
-	}
-	if detail.ImageCount != nil && *detail.ImageCount > 0 {
-		b.geminiImageCount += *detail.ImageCount
-	}
-	if detail.ImageDetails != nil {
-		b.geminiImageDetails = detail.ImageDetails.Clone()
-	}
-}
-
-func (b *StreamUsageBuffer) applyGeminiStreamObservations() {
-	if b == nil {
-		return
-	}
-	if b.geminiToolDetails != nil {
-		b.detail.ToolUsageDetails = mergeToolUsageDetails(b.detail.ToolUsageDetails, b.geminiToolDetails)
-	}
-	if b.geminiWebSearchRequests != nil {
-		b.detail.WebSearchRequests = usage.CloneInt64Ptr(b.geminiWebSearchRequests)
-	}
-	if b.geminiImageCount > 0 {
-		b.detail.ImageCount = usage.Int64Ptr(b.geminiImageCount)
-	}
-	if b.geminiImageDetails != nil && b.detail.ImageDetails == nil {
-		b.detail.ImageDetails = b.geminiImageDetails.Clone()
-	}
-	if b.geminiImageCount > 0 && b.requestedImageDetails != nil && b.detail.RequestedImageDetails == nil {
-		b.detail.RequestedImageDetails = b.requestedImageDetails.Clone()
-	}
-}
-
-// SetRequestPayload records request-side image/media configuration on the stream buffer
-// so it can be attached as RequestedImageDetails if the stream produces images.
 func (b *StreamUsageBuffer) SetRequestPayload(requestPayload []byte, contentType ...string) {
 	if b == nil || len(requestPayload) == 0 {
 		return
@@ -1071,106 +977,7 @@ func (b *StreamUsageBuffer) SetRequestPayload(requestPayload []byte, contentType
 	b.requestedImageDetails = ParseRequestImageDetails(requestPayload, contentType...)
 }
 
-// ObserveGeminiStream records and merges usage and candidate tool/media artifacts from a Gemini SSE line.
-func (b *StreamUsageBuffer) ObserveGeminiStream(line []byte) {
-	b.observeGeminiFamilyStream(line, false)
-}
-
-// ObserveAntigravityStream records and merges usage and candidate tool/media artifacts from an Antigravity SSE line.
-func (b *StreamUsageBuffer) ObserveAntigravityStream(line []byte) {
-	b.observeGeminiFamilyStream(line, true)
-}
-
-func (b *StreamUsageBuffer) observeGeminiFamilyStream(line []byte, allowResponseWrapper bool) {
-	if b == nil {
-		return
-	}
-	payload := jsonPayload(line)
-	if len(payload) == 0 || !ojson.ValidBytes(payload) {
-		return
-	}
-	root := util.ParseGJSONBytesNoCopy(payload)
-	var (
-		node           ojson.Result
-		candidatesNode ojson.Result
-		predsNode      ojson.Result
-	)
-	root.ForEach(func(key, val ojson.Result) bool {
-		switch key.String() {
-		case "usageMetadata", "usage_metadata":
-			if !node.Exists() {
-				node = val
-			}
-		case "candidates":
-			candidatesNode = val
-		case "predictions":
-			predsNode = val
-		case "response":
-			if allowResponseWrapper && val.IsObject() {
-				val.ForEach(func(rk, rv ojson.Result) bool {
-					switch rk.String() {
-					case "usageMetadata", "usage_metadata":
-						if !node.Exists() {
-							node = rv
-						}
-					case "candidates":
-						if !candidatesNode.Exists() {
-							candidatesNode = rv
-						}
-					}
-					return true
-				})
-			}
-		}
-		return true
-	})
-	if candidatesNode.Exists() || predsNode.Exists() {
-		var artifactDetail usage.Detail
-		applyGeminiNodesArtifactsWithCounter(&artifactDetail, candidatesNode, predsNode, &b.geminiCallCounter)
-		b.rememberGeminiCandidateArtifacts(&artifactDetail)
-		if !node.Exists() && (artifactDetail.ToolUsageDetails != nil || artifactDetail.ImageCount != nil) {
-			b.applyGeminiStreamObservations()
-			b.ok = true
-			return
-		}
-	}
-	if !node.Exists() {
-		return
-	}
-	detail := parseGeminiFamilyUsageDetail(node)
-	if !allowResponseWrapper && !hasNonZeroTokenUsage(detail) {
-		return
-	}
-	if b.ok {
-		update := detail
-		mergeStreamStructuredFields(&detail, b.detail, update)
-		// Explicit zero modality counts are authoritative, not absent fields.
-		for _, pair := range []struct {
-			dst **int64
-			src *int64
-		}{
-			{&detail.TextInputTokens, update.TextInputTokens},
-			{&detail.ImageInputTokens, update.ImageInputTokens},
-			{&detail.AudioInputTokens, update.AudioInputTokens},
-			{&detail.VideoInputTokens, update.VideoInputTokens},
-			{&detail.FileInputTokens, update.FileInputTokens},
-			{&detail.CachedTextTokens, update.CachedTextTokens},
-			{&detail.CachedImageTokens, update.CachedImageTokens},
-			{&detail.CachedAudioTokens, update.CachedAudioTokens},
-			{&detail.TextOutputTokens, update.TextOutputTokens},
-			{&detail.ImageOutputTokens, update.ImageOutputTokens},
-			{&detail.AudioOutputTokens, update.AudioOutputTokens},
-		} {
-			if pair.src != nil {
-				*pair.dst = usage.CloneInt64Ptr(pair.src)
-			}
-		}
-	}
-	b.Observe(detail, true)
-}
-
-// ObserveOpenAIStream records response-tier state and the latest usage from an
-// OpenAI-style stream while avoiding JSON parsing for irrelevant chunks.
+// ObserveOpenAIStream records usage, tool, and image artifacts from an OpenAI SSE line.
 func (b *StreamUsageBuffer) ObserveOpenAIStream(line []byte) {
 	if b == nil {
 		return
@@ -3148,7 +2955,7 @@ func parseClaudeCostNode(usageNode ojson.Result) *usage.CostDetails {
 	return out
 }
 
-func parseGeminiFamilyUsageDetail(node ojson.Result) usage.Detail {
+func parseInteractionsTokenCountUsageDetail(node ojson.Result) usage.Detail {
 	if !node.Exists() || !node.IsObject() {
 		return usage.Detail{}
 	}
@@ -3380,234 +3187,6 @@ func parseGeminiFamilyUsageDetail(node ojson.Result) usage.Detail {
 	return detail
 }
 
-func applyGeminiPayloadArtifacts(detail *usage.Detail, root ojson.Result) {
-	if detail == nil || !root.Exists() || !root.IsObject() {
-		return
-	}
-	candidates := root.Get("candidates")
-	if !candidates.Exists() {
-		candidates = root.Get("response.candidates")
-	}
-	var preds ojson.Result
-	if strings.Contains(root.Raw, `"predictions"`) {
-		preds = root.Get("predictions")
-	}
-	applyGeminiNodesArtifacts(detail, candidates, preds)
-}
-
-func applyGeminiNodesArtifacts(detail *usage.Detail, candidates, preds ojson.Result) {
-	var callCounter geminiFunctionCallCounter
-	applyGeminiNodesArtifactsWithCounter(detail, candidates, preds, &callCounter)
-}
-
-func applyGeminiNodesArtifactsWithCounter(detail *usage.Detail, candidates, preds ojson.Result, callCounter *geminiFunctionCallCounter) {
-	if detail == nil {
-		return
-	}
-	if callCounter == nil {
-		callCounter = &geminiFunctionCallCounter{}
-	}
-	if candidates.Exists() && candidates.IsArray() {
-		var (
-			webSearchGrounded bool
-			webSearchQueries  int64
-			webChunks         int64
-			fileChunks        int64
-			mapsChunks        int64
-			urlFetchCount     int64
-			codeExecCount     int64
-			fnCallCount       int64
-			imageOutCount     int64
-			firstImageMime    string
-		)
-		candidates.ForEach(func(candPos, cand ojson.Result) bool {
-			if !cand.IsObject() {
-				return true
-			}
-			candIdx := candPos.Int()
-			if idxNode := cand.Get("index"); idxNode.Type == ojson.Number {
-				candIdx = idxNode.Int()
-			}
-			cand.ForEach(func(ck, cv ojson.Result) bool {
-				switch ck.String() {
-				case "groundingMetadata", "grounding_metadata":
-					if !cv.IsObject() {
-						return true
-					}
-					cv.ForEach(func(gk, gv ojson.Result) bool {
-						switch gk.String() {
-						case "webSearchQueries", "web_search_queries":
-							if gv.IsArray() {
-								gv.ForEach(func(_, qItem ojson.Result) bool {
-									if strings.TrimSpace(qItem.String()) != "" {
-										webSearchQueries++
-										webSearchGrounded = true
-									}
-									return true
-								})
-							}
-						case "searchEntryPoint", "search_entry_point":
-							webSearchGrounded = true
-						case "groundingChunks", "grounding_chunks":
-							if gv.IsArray() {
-								gv.ForEach(func(_, ch ojson.Result) bool {
-									switch {
-									case ch.Get("web").Exists():
-										webChunks++
-										webSearchGrounded = true
-									case ch.Get("retrievedContext").Exists() || ch.Get("retrieved_context").Exists():
-										fileChunks++
-									case ch.Get("maps").Exists():
-										mapsChunks++
-									}
-									return true
-								})
-							}
-						}
-						return true
-					})
-				case "urlContextMetadata", "url_context_metadata":
-					if cv.IsObject() {
-						if urls := firstExistingUsageNode(cv, "urlMetadata", "url_metadata"); urls.IsArray() {
-							urlFetchCount += int64(len(urls.Array()))
-						}
-					}
-				case "content":
-					if parts := cv.Get("parts"); parts.IsArray() {
-						parts.ForEach(func(_, part ojson.Result) bool {
-							if !part.IsObject() {
-								return true
-							}
-							part.ForEach(func(pk, pv ojson.Result) bool {
-								switch pk.String() {
-								case "executableCode", "executable_code":
-									codeExecCount++
-								case "functionCall", "function_call":
-									fnCallCount += callCounter.observePart(candIdx, pv)
-								case "inlineData", "inline_data":
-									if pv.IsObject() {
-										mimeNode := pv.Get("mimeType")
-										if !mimeNode.Exists() {
-											mimeNode = pv.Get("mime_type")
-										}
-										mimeType := cloneTrimmedString(mimeNode.String())
-										if len(mimeType) >= 6 && strings.EqualFold(mimeType[:6], "image/") {
-											imageOutCount++
-											if firstImageMime == "" {
-												firstImageMime = mimeType
-											}
-										}
-									}
-								}
-								return true
-							})
-							return true
-						})
-					}
-				}
-				return true
-			})
-			return true
-		})
-		if webSearchGrounded || webSearchQueries > 0 || webChunks > 0 || fileChunks > 0 || mapsChunks > 0 || urlFetchCount > 0 || codeExecCount > 0 || fnCallCount > 0 {
-			if detail.ToolUsageDetails == nil {
-				detail.ToolUsageDetails = &usage.ToolUsageDetails{}
-			}
-			if webSearchGrounded {
-				calls := int64(1)
-				if webSearchQueries > 1 {
-					calls = webSearchQueries
-				}
-				detail.ToolUsageDetails.WebSearchCalls = usage.Int64Ptr(calls)
-				detail.WebSearchRequests = usage.Int64Ptr(calls)
-			}
-			if webSearchQueries > 0 {
-				detail.ToolUsageDetails.WebSearchQueries = usage.Int64Ptr(webSearchQueries)
-			}
-			if webChunks > 0 {
-				detail.ToolUsageDetails.NumSearchResults = usage.Int64Ptr(webChunks)
-				detail.ToolUsageDetails.NumSourcesUsed = usage.Int64Ptr(webChunks)
-			}
-			if fileChunks > 0 {
-				detail.ToolUsageDetails.FileSearchCalls = usage.Int64Ptr(fileChunks)
-			}
-			if urlFetchCount > 0 {
-				detail.ToolUsageDetails.WebFetchCalls = usage.Int64Ptr(urlFetchCount)
-			}
-			if codeExecCount > 0 {
-				detail.ToolUsageDetails.CodeExecutionCalls = usage.Int64Ptr(codeExecCount)
-			}
-			if fnCallCount > 0 {
-				detail.ToolUsageDetails.ToolCallsRequested = usage.Int64Ptr(fnCallCount)
-			}
-			if mapsChunks > 0 {
-				if detail.ToolUsageDetails.Extra == nil {
-					detail.ToolUsageDetails.Extra = make(map[string]int64)
-				}
-				detail.ToolUsageDetails.Extra["google_maps_chunks"] = mapsChunks
-			}
-		}
-		if imageOutCount > 0 {
-			detail.ImageCount = usage.Int64Ptr(imageOutCount)
-			if firstImageMime != "" {
-				if detail.ImageDetails == nil {
-					detail.ImageDetails = &usage.ImageDetails{}
-				}
-				detail.ImageDetails.MimeType = firstImageMime
-			}
-		}
-	}
-	if preds.Exists() && preds.IsArray() {
-		var count int64
-		var firstMime string
-		preds.ForEach(func(_, pred ojson.Result) bool {
-			if !pred.IsObject() {
-				return true
-			}
-			var hasImg bool
-			var mime string
-			pred.ForEach(func(pk, pv ojson.Result) bool {
-				switch pk.String() {
-				case "bytesBase64Encoded", "gcsUri":
-					if pv.Type == ojson.String && len(pv.Raw) > 2 {
-						hasImg = true
-					}
-				case "mimeType":
-					if pv.Type == ojson.String {
-						mime = cloneTrimmedString(pv.String())
-					}
-				}
-				return true
-			})
-			if hasImg {
-				count++
-				if firstMime == "" {
-					firstMime = mime
-				}
-			}
-			return true
-		})
-		if count > 0 {
-			detail.ImageCount = usage.Int64Ptr(count)
-			if firstMime != "" {
-				if detail.ImageDetails == nil {
-					detail.ImageDetails = &usage.ImageDetails{}
-				}
-				detail.ImageDetails.MimeType = firstMime
-			}
-		}
-	}
-}
-
-// ApplyGeminiRequestImageConfig populates detail.RequestedImageDetails from a Gemini or Vertex
-// request payload without overwriting upstream-returned detail.ImageDetails.
-func ApplyGeminiRequestImageConfig(detail *usage.Detail, requestPayload []byte) {
-	if detail == nil || detail.ImageCount == nil || *detail.ImageCount <= 0 {
-		return
-	}
-	detail.RequestedImageDetails = ParseRequestImageDetails(requestPayload)
-}
-
 func parseInteractionsUsageDetail(node ojson.Result) usage.Detail {
 	cacheRead := firstExistingUsageNode(node, "cache_read_tokens", "cacheReadTokens")
 	toolUseTokens := firstExistingUsageNode(node, "tool_use_tokens", "total_tool_use_tokens", "toolUseTokens", "totalToolUseTokens").Int()
@@ -3742,7 +3321,7 @@ func ParseInteractionsUsage(data []byte) usage.Detail {
 		return usage.Detail{}
 	}
 	if node.Get("promptTokenCount").Exists() || node.Get("candidatesTokenCount").Exists() {
-		detail := parseGeminiFamilyUsageDetail(node)
+		detail := parseInteractionsTokenCountUsageDetail(node)
 		detail.ResponseServiceTier = extractResponseServiceTier(data)
 		return detail
 	}
@@ -3782,85 +3361,6 @@ func ParseInteractionsStreamUsage(line []byte) (usage.Detail, bool) {
 	return detail, true
 }
 
-func ParseGeminiUsage(data []byte) usage.Detail {
-	if len(data) == 0 || !ojson.ValidBytes(data) {
-		return usage.Detail{}
-	}
-	root := util.ParseGJSONBytesNoCopy(data)
-	var (
-		node           ojson.Result
-		candidatesNode ojson.Result
-		predsNode      ojson.Result
-	)
-	root.ForEach(func(key, val ojson.Result) bool {
-		switch key.String() {
-		case "usageMetadata", "usage_metadata":
-			if !node.Exists() {
-				node = val
-			}
-		case "candidates":
-			candidatesNode = val
-		case "predictions":
-			predsNode = val
-		case "response":
-			if val.IsObject() {
-				val.ForEach(func(rk, rv ojson.Result) bool {
-					switch rk.String() {
-					case "usageMetadata", "usage_metadata":
-						if !node.Exists() {
-							node = rv
-						}
-					case "candidates":
-						if !candidatesNode.Exists() {
-							candidatesNode = rv
-						}
-					}
-					return true
-				})
-			}
-		}
-		return true
-	})
-	var detail usage.Detail
-	if node.Exists() {
-		detail = parseGeminiFamilyUsageDetail(node)
-	}
-	if candidatesNode.Exists() || predsNode.Exists() {
-		applyGeminiNodesArtifacts(&detail, candidatesNode, predsNode)
-	}
-	return detail
-}
-
-func ParseGeminiStreamUsage(line []byte) (usage.Detail, bool) {
-	payload := jsonPayload(line)
-	if len(payload) == 0 {
-		return usage.Detail{}, false
-	}
-	hasCamel := bytes.Contains(payload, geminiUsageMetaMarker)
-	hasSnake := !hasCamel && bytes.Contains(payload, geminiUsageMetaSnakeMarker)
-	if (!hasCamel && !hasSnake) || !ojson.ValidBytes(payload) {
-		return usage.Detail{}, false
-	}
-	root := util.ParseGJSONBytesNoCopy(payload)
-	var node ojson.Result
-	if hasCamel {
-		node = root.Get("usageMetadata")
-	} else {
-		node = root.Get("usage_metadata")
-	}
-	if !node.Exists() {
-		return usage.Detail{}, false
-	}
-	detail := parseGeminiFamilyUsageDetail(node)
-	if !hasNonZeroTokenUsage(detail) {
-		return usage.Detail{}, false
-	}
-	if hasGeminiCandidateArtifactMarker(payload) {
-		applyGeminiPayloadArtifacts(&detail, root)
-	}
-	return detail, true
-}
-
 func firstExistingUsageNode(root ojson.Result, paths ...string) ojson.Result {
 	for _, path := range paths {
 		node := root.Get(path)
@@ -3894,227 +3394,7 @@ func invalidUsageTokenBreakdown(total int64) usage.TokenBreakdown {
 	}
 }
 
-func ParseAntigravityUsage(data []byte) usage.Detail {
-	return ParseGeminiUsage(data)
-}
-
-func ParseAntigravityStreamUsage(line []byte) (usage.Detail, bool) {
-	payload := jsonPayload(line)
-	if len(payload) == 0 {
-		return usage.Detail{}, false
-	}
-	hasCamel := bytes.Contains(payload, geminiUsageMetaMarker)
-	hasSnake := !hasCamel && bytes.Contains(payload, geminiUsageMetaSnakeMarker)
-	if (!hasCamel && !hasSnake) || !ojson.ValidBytes(payload) {
-		return usage.Detail{}, false
-	}
-	root := util.ParseGJSONBytesNoCopy(payload)
-	node := root.Get("response.usageMetadata")
-	if !node.Exists() && hasCamel {
-		node = root.Get("usageMetadata")
-	}
-	if !node.Exists() && hasSnake {
-		node = root.Get("usage_metadata")
-	}
-	if !node.Exists() {
-		return usage.Detail{}, false
-	}
-	detail := parseGeminiFamilyUsageDetail(node)
-	if hasGeminiCandidateArtifactMarker(payload) {
-		applyGeminiPayloadArtifacts(&detail, root)
-	}
-	return detail, true
-}
-
-var stopChunkWithoutUsage sync.Map
-
-func rememberStopWithoutUsage(traceID string) {
-	stopChunkWithoutUsage.Store(traceID, struct{}{})
-	time.AfterFunc(10*time.Minute, func() { stopChunkWithoutUsage.Delete(traceID) })
-}
-
-// FilterSSEUsageMetadata removes usageMetadata from SSE events that are not
-// terminal (finishReason != "stop"). Stop chunks are left untouched. This
-// function is shared between aistudio and antigravity executors.
-func FilterSSEUsageMetadata(payload []byte) []byte {
-	if len(payload) == 0 {
-		return payload
-	}
-
-	lines := bytes.Split(payload, []byte("\n"))
-	modified := false
-	foundData := false
-	for idx, line := range lines {
-		trimmed := bytes.TrimSpace(line)
-		if len(trimmed) == 0 || !bytes.HasPrefix(trimmed, []byte("data:")) {
-			continue
-		}
-		foundData = true
-		dataIdx := bytes.Index(line, []byte("data:"))
-		if dataIdx < 0 {
-			continue
-		}
-		rawJSON := bytes.TrimSpace(line[dataIdx+5:])
-		traceID := strings.Clone(ojson.GetBytesNoCopy(rawJSON, "traceId").String())
-		if isStopChunkWithoutUsage(rawJSON) && traceID != "" {
-			rememberStopWithoutUsage(traceID)
-			continue
-		}
-		if traceID != "" {
-			if _, ok := stopChunkWithoutUsage.Load(traceID); ok && hasUsageMetadata(rawJSON) {
-				stopChunkWithoutUsage.Delete(traceID)
-				continue
-			}
-		}
-
-		cleaned, changed := StripUsageMetadataFromJSON(rawJSON)
-		if !changed {
-			continue
-		}
-		rebuiltCap := dataIdx + 5
-		if len(cleaned) > 0 {
-			rebuiltCap += 1 + len(cleaned)
-		}
-		rebuilt := make([]byte, 0, rebuiltCap)
-		rebuilt = append(rebuilt, line[:dataIdx]...)
-		rebuilt = append(rebuilt, "data:"...)
-		if len(cleaned) > 0 {
-			rebuilt = append(rebuilt, ' ')
-			rebuilt = append(rebuilt, cleaned...)
-		}
-		lines[idx] = rebuilt
-		modified = true
-	}
-	if !modified {
-		if !foundData {
-			// Handle payloads that are raw JSON without SSE data: prefix.
-			trimmed := bytes.TrimSpace(payload)
-			cleaned, changed := StripUsageMetadataFromJSON(trimmed)
-			if !changed {
-				return payload
-			}
-			return cleaned
-		}
-		return payload
-	}
-	return bytes.Join(lines, []byte("\n"))
-}
-
-// StripUsageMetadataFromJSON drops usageMetadata unless finishReason is present (terminal).
-// It handles both formats:
-// - Aistudio: candidates.0.finishReason
-// - Antigravity: response.candidates.0.finishReason
-func StripUsageMetadataFromJSON(rawJSON []byte) ([]byte, bool) {
-	jsonBytes := bytes.TrimSpace(rawJSON)
-	if len(jsonBytes) == 0 || !bytes.Contains(jsonBytes, geminiUsageMetaMarker) || !ojson.ValidBytes(jsonBytes) {
-		return rawJSON, false
-	}
-
-	root := util.ParseGJSONBytesNoCopy(jsonBytes)
-	var (
-		finishReason string
-		topUsage     ojson.Result
-		respUsage    ojson.Result
-		topUsageKey  ojson.Result
-		respUsageKey ojson.Result
-	)
-	root.ForEach(func(key, val ojson.Result) bool {
-		switch key.String() {
-		case "usageMetadata":
-			topUsage = val
-			topUsageKey = key
-		case "candidates":
-			if finishReason == "" && val.IsArray() {
-				finishReason = strings.TrimSpace(val.Get("0.finishReason").String())
-			}
-		case "response":
-			if val.IsObject() {
-				val.ForEach(func(rk, rv ojson.Result) bool {
-					switch rk.String() {
-					case "usageMetadata":
-						respUsage = rv
-						respUsageKey = rk
-					case "candidates":
-						if finishReason == "" && rv.IsArray() {
-							finishReason = strings.TrimSpace(rv.Get("0.finishReason").String())
-						}
-					}
-					return true
-				})
-			}
-		}
-		return true
-	})
-
-	if finishReason != "" || (!topUsage.Exists() && !respUsage.Exists()) {
-		return rawJSON, false
-	}
-
-	// Fast single-allocation key rename when only one usageMetadata exists
-	// (avoids 2 full-buffer sjson copies on multi-MB 4K image chunks).
-	if topUsage.Exists() != respUsage.Exists() {
-		key := topUsageKey
-		if respUsage.Exists() {
-			key = respUsageKey
-		}
-		if key.Raw == string(geminiUsageMetaMarker) && key.Index > 0 &&
-			key.Index+len(key.Raw) <= len(jsonBytes) {
-			keyPos := key.Index + 1 // Right after the selected key's opening quote.
-			out := make([]byte, 0, len(jsonBytes)+3)
-			out = append(out, jsonBytes[:keyPos]...)
-			out = append(out, "cpaUsageMetadata"...)
-			out = append(out, jsonBytes[keyPos+len("usageMetadata"):]...)
-			return out, true
-		}
-	}
-
-	doc := ojson.NewDoc(jsonBytes)
-	var changed bool
-	if topUsage.Exists() {
-		_ = doc.SetRaw("cpaUsageMetadata", topUsage.Raw)
-		_ = doc.Delete("usageMetadata")
-		changed = true
-	}
-	if respUsage.Exists() {
-		_ = doc.SetRaw("response.cpaUsageMetadata", respUsage.Raw)
-		_ = doc.Delete("response.usageMetadata")
-		changed = true
-	}
-	if !changed {
-		return rawJSON, false
-	}
-	return doc.Bytes(), true
-}
-
-func hasUsageMetadata(jsonBytes []byte) bool {
-	if len(jsonBytes) == 0 || !ojson.ValidBytes(jsonBytes) {
-		return false
-	}
-	if ojson.GetBytesNoCopy(jsonBytes, "usageMetadata").Exists() {
-		return true
-	}
-	if ojson.GetBytesNoCopy(jsonBytes, "response.usageMetadata").Exists() {
-		return true
-	}
-	return false
-}
-
 var finishReasonMarker = []byte(`"finishReason"`)
-
-func isStopChunkWithoutUsage(jsonBytes []byte) bool {
-	if len(jsonBytes) == 0 || !bytes.Contains(jsonBytes, finishReasonMarker) || bytes.Contains(jsonBytes, geminiUsageMetaMarker) || !ojson.ValidBytes(jsonBytes) {
-		return false
-	}
-	finishReason := ojson.GetBytesNoCopy(jsonBytes, "candidates.0.finishReason")
-	if !finishReason.Exists() {
-		finishReason = ojson.GetBytesNoCopy(jsonBytes, "response.candidates.0.finishReason")
-	}
-	trimmed := strings.TrimSpace(finishReason.String())
-	if !finishReason.Exists() || trimmed == "" {
-		return false
-	}
-	return !hasUsageMetadata(jsonBytes)
-}
 
 func JSONPayload(line []byte) []byte {
 	return jsonPayload(line)

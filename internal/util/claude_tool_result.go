@@ -43,8 +43,7 @@ func ConvertClaudeToolResult(block ojson.Result) ClaudeToolResult {
 // blocks, a single object, or absent. Some Claude->Gemini translators previously
 // wrote content.Raw straight through ojson.SetBytes, which double-encoded string
 // content and flattened structured arrays (including base64 image data) into one
-// opaque escaped string. This helper mirrors the Antigravity Claude translator,
-// which already handles structured content correctly:
+// opaque escaped string. This helper preserves structured content semantics:
 //
 //   - string             -> plain string result (no double-encoding)
 //   - single non-image   -> raw JSON result (structure preserved)
@@ -53,8 +52,8 @@ func ConvertClaudeToolResult(block ojson.Result) ClaudeToolResult {
 //   - object             -> raw JSON result, or image -> Images with empty result
 //   - absent/empty       -> empty string result
 //
-// Unlike Antigravity, image blocks without base64 data are dropped rather than
-// emitted as empty inline data parts, matching the Gemini image part guards.
+// Image blocks without base64 data are dropped rather than emitted as empty
+// inline data parts, matching the Interactions image part guards.
 func ConvertClaudeToolResultContent(content ojson.Result) ClaudeToolResult {
 	switch {
 	case content.Type == ojson.String:

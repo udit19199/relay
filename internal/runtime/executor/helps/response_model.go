@@ -74,51 +74,6 @@ func extractClaudeResponseModelEvent(data []byte) (model string, terminal bool) 
 	}
 }
 
-// extractGeminiResponseModelEvent extracts the response model from a Google Gemini / Vertex / AIStudio response.
-func extractGeminiResponseModelEvent(data []byte) (model string, terminal bool) {
-	if !ojson.ValidBytes(data) {
-		return "", false
-	}
-	m := ojson.GetBytesNoCopy(data, "response.modelVersion")
-	if !m.Exists() || m.Type != ojson.String {
-		m = ojson.GetBytesNoCopy(data, "modelVersion")
-	}
-	if !m.Exists() || m.Type != ojson.String {
-		m = ojson.GetBytesNoCopy(data, "interaction.model")
-	}
-	if !m.Exists() || m.Type != ojson.String {
-		m = ojson.GetBytesNoCopy(data, "model")
-	}
-	var served string
-	if m.Type == ojson.String {
-		served = strings.TrimSpace(m.String())
-		if len(served) > maxResponseModelLength {
-			served = ""
-		} else {
-			served = strings.Clone(served)
-		}
-	}
-	cand := ojson.GetBytesNoCopy(data, "candidates.0.finishReason")
-	if !cand.Exists() {
-		cand = ojson.GetBytesNoCopy(data, "response.candidates.0.finishReason")
-	}
-	terminal = cand.Exists() && cand.String() != ""
-	if !terminal {
-		objectType := ojson.GetBytesNoCopy(data, "object").String()
-		finishReason := ojson.GetBytesNoCopy(data, "choices.0.finish_reason").String()
-		terminal = objectType == "chat.completion" || finishReason != ""
-	}
-	if !terminal {
-		eventType := ojson.GetBytesNoCopy(data, "event_type").String()
-		if eventType == "" {
-			eventType = ojson.GetBytesNoCopy(data, "type").String()
-		}
-		status := ojson.GetBytesNoCopy(data, "interaction.status").String()
-		terminal = isInteractionsTerminal(eventType, status)
-	}
-	return served, terminal
-}
-
 // extractGenericResponseModelEvent extracts the response model from standard JSON / SSE responses.
 func extractGenericResponseModelEvent(data []byte) (model string, terminal bool) {
 	if !ojson.ValidBytes(data) {

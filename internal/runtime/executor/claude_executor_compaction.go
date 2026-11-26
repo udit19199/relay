@@ -55,17 +55,17 @@ func (e *ClaudeExecutor) executeClaudeCompaction(ctx context.Context, auth *clip
 	if errSummary != nil {
 		return resp, errSummary
 	}
-	summaryText, errExtract := helps.ExtractAntigravitySummaryText(summaryResp.Payload)
+	summaryText, errExtract := helps.ExtractResponsesSummaryText(summaryResp.Payload)
 	if errExtract != nil {
 		return resp, fmt.Errorf("extract summary: %w", errExtract)
 	}
-	capsule, errSeal := helps.SealAntigravityCompaction(summaryText, baseModel)
+	capsule, errSeal := helps.SealResponsesCompaction(summaryText, baseModel)
 	if errSeal != nil {
 		return resp, fmt.Errorf("seal compaction capsule: %w", errSeal)
 	}
 
 	inputTokens, outputTokens, totalTokens, cachedTokens := claudeCompactionResponsesUsage(summaryResp.Payload)
-	respPayload := helps.BuildAntigravityCompactionResponse(baseModel, capsule, inputTokens, outputTokens, totalTokens)
+	respPayload := helps.BuildResponsesCompactionResponse(baseModel, capsule, inputTokens, outputTokens, totalTokens)
 	respPayload, _ = ojson.SetBytes(respPayload, "usage.input_tokens_details.cached_tokens", cachedTokens)
 	return cliproxyexecutor.Response{
 		Payload: respPayload,
@@ -89,7 +89,7 @@ func (e *ClaudeExecutor) executeClaudeCompactionStream(ctx context.Context, auth
 	outputTokens := int(ojson.GetBytesNoCopy(summaryResp.Payload, "usage.output_tokens").Int())
 	totalTokens := int(ojson.GetBytesNoCopy(summaryResp.Payload, "usage.total_tokens").Int())
 	cachedTokens := int(ojson.GetBytesNoCopy(summaryResp.Payload, "usage.input_tokens_details.cached_tokens").Int())
-	chunks := helps.BuildAntigravityCompactionStreamChunks(baseModel, capsule, inputTokens, outputTokens, totalTokens)
+	chunks := helps.BuildResponsesCompactionStreamChunks(baseModel, capsule, inputTokens, outputTokens, totalTokens)
 	for i := range chunks {
 		chunks[i] = patchClaudeCompactionStreamUsage(chunks[i], inputTokens, outputTokens, totalTokens, cachedTokens)
 	}
@@ -128,7 +128,7 @@ func prepareClaudeCompactionSummaryPayload(payload []byte, modelName string) []b
 	tools := ojson.GetBytesNoCopy(payload, "tools")
 	additionalTools := ojson.GetBytesNoCopy(payload, "additional_tools")
 	doc := ojson.NewDoc(payload)
-	helps.PrepareAntigravityCompactionSummaryPayloadDoc(doc, modelName)
+	helps.PrepareResponsesCompactionSummaryPayloadDoc(doc, modelName)
 	if tools.Exists() {
 		_ = doc.SetRaw("tools", tools.Raw)
 	}

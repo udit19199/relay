@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/MoeForge/moego/ojson"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/clienterror"
@@ -477,69 +476,6 @@ func TestParseClaudeUsageFallsBackToTopLevelThinkingTokens(t *testing.T) {
 	}
 	if detail.TokenBreakdown.Output.NonReasoningTokens != 6 {
 		t.Fatalf("token breakdown = %+v", detail.TokenBreakdown)
-	}
-}
-
-func TestParseGeminiUsageNormalizesCachedContent(t *testing.T) {
-	detail := ParseGeminiUsage([]byte(`{"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":2,"cachedContentTokenCount":4,"totalTokenCount":12}}`))
-	if detail.CachedTokens != 4 {
-		t.Fatalf("cached tokens = %d, want 4", detail.CachedTokens)
-	}
-	if detail.CacheReadTokens != 4 {
-		t.Fatalf("cache read tokens = %d, want 4", detail.CacheReadTokens)
-	}
-	if detail.TokenBreakdown.Input.UncachedTokens != 6 || detail.TokenBreakdown.TotalTokens != 12 {
-		t.Fatalf("token breakdown = %+v", detail.TokenBreakdown)
-	}
-}
-
-func TestParseGeminiUsageIncludesToolUsePromptTokens(t *testing.T) {
-	detail := ParseGeminiUsage([]byte(`{"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":2,"thoughtsTokenCount":3,"toolUsePromptTokenCount":5,"totalTokenCount":20}}`))
-	if detail.InputTokens != 15 || detail.TotalTokens != 20 {
-		t.Fatalf("detail = %+v", detail)
-	}
-	if !detail.TokenBreakdown.Valid() || detail.TokenBreakdown.Quality != usage.TokenAccountingQualityComplete ||
-		detail.TokenBreakdown.Input.UncachedTokens != 15 || detail.TokenBreakdown.Output.ReasoningTokens != 3 {
-		t.Fatalf("token breakdown = %+v", detail.TokenBreakdown)
-	}
-}
-
-func TestParseGeminiStreamUsageSkipsZeroPlaceholder(t *testing.T) {
-	lines := [][]byte{
-		[]byte(`data: {"usageMetadata":{"promptTokenCount":0,"candidatesTokenCount":0,"thoughtsTokenCount":0,"totalTokenCount":0}}`),
-		[]byte(`data: {"usageMetadata":{"promptTokenCount":17984,"candidatesTokenCount":2668,"thoughtsTokenCount":1028,"totalTokenCount":21680}}`),
-	}
-
-	accepted := make([]usage.Detail, 0, len(lines))
-	for _, line := range lines {
-		detail, ok := ParseGeminiStreamUsage(line)
-		if ok {
-			accepted = append(accepted, detail)
-		}
-	}
-
-	if len(accepted) != 1 {
-		t.Fatalf("accepted usage count = %d, want 1", len(accepted))
-	}
-	detail := accepted[0]
-	if detail.InputTokens != 17984 || detail.OutputTokens != 2668 || detail.ReasoningTokens != 1028 || detail.TotalTokens != 21680 {
-		t.Fatalf("accepted usage detail = %+v", detail)
-	}
-}
-
-func TestParseGeminiUsageRejectsInvalidToolUseSums(t *testing.T) {
-	tests := map[string]string{
-		"negative": `{"usageMetadata":{"promptTokenCount":10,"toolUsePromptTokenCount":-1,"totalTokenCount":10}}`,
-		"overflow": `{"usageMetadata":{"promptTokenCount":9223372036854775807,"toolUsePromptTokenCount":1,"totalTokenCount":9223372036854775807}}`,
-	}
-	for name, payload := range tests {
-		t.Run(name, func(t *testing.T) {
-			detail := ParseGeminiUsage([]byte(payload))
-			if detail.InputTokens < 0 || !detail.TokenBreakdown.Valid() ||
-				detail.TokenBreakdown.Quality != usage.TokenAccountingQualityInconsistent {
-				t.Fatalf("detail = %+v", detail)
-			}
-		})
 	}
 }
 
@@ -1565,52 +1501,6 @@ func TestParseClaudeUsageExtractsCacheTTLServerToolsIterationsAndCost(t *testing
 	}
 }
 
-func TestParseGeminiAndAntigravityUsageWithModalitiesAndTools(t *testing.T) {
-	payload := []byte(`{"candidates":[{"content":{"parts":[{"executableCode":{"language":"PYTHON","code":"print(1)"}},{"functionCall":{"name":"lookup","args":{"q":"a"}}},{"inlineData":{"mimeType":"image/png","data":"AA=="}}]},"groundingMetadata":{"webSearchQueries":["gemini pricing","vertex grounding"],"groundingChunks":[{"web":{"uri":"https://a.example"}},{"web":{"uri":"https://b.example"}},{"retrievedContext":{"uri":"gs://b/doc"}}]},"urlContextMetadata":{"urlMetadata":[{"retrievedUrl":"https://c.example"}]}}],"usageMetadata":{"promptTokenCount":1000,"cachedContentTokenCount":400,"candidatesTokenCount":300,"thoughtsTokenCount":120,"toolUsePromptTokenCount":50,"totalTokenCount":1470,"trafficType":"ON_DEMAND_PRIORITY","promptTokensDetails":[{"modality":"TEXT","tokenCount":800},{"modality":"IMAGE","tokenCount":150},{"modality":"DOCUMENT","tokenCount":50}],"cacheTokensDetails":[{"modality":"TEXT","tokenCount":300},{"modality":"IMAGE","tokenCount":100}],"candidatesTokensDetails":[{"modality":"TEXT","tokenCount":100},{"modality":"IMAGE","tokenCount":200}]}}`)
-	detail := ParseGeminiUsage(payload)
-	ApplyGeminiRequestImageConfig(&detail, []byte(`{"generationConfig":{"imageConfig":{"aspectRatio":"16:9","imageSize":"2K"}}}`))
-	if detail.InputTokens != 1050 || detail.OutputTokens != 300 || detail.ReasoningTokens != 120 || detail.TotalTokens != 1470 {
-		t.Fatalf("unexpected Gemini token totals: %+v", detail)
-	}
-	if detail.TextInputTokens == nil || *detail.TextInputTokens != 800 || detail.ImageInputTokens == nil || *detail.ImageInputTokens != 150 || detail.FileInputTokens == nil || *detail.FileInputTokens != 50 || detail.CachedTextTokens == nil || *detail.CachedTextTokens != 300 || detail.CachedImageTokens == nil || *detail.CachedImageTokens != 100 {
-		t.Fatalf("unexpected Gemini input modalities: %+v", detail)
-	}
-	if detail.TextOutputTokens == nil || *detail.TextOutputTokens != 100 || detail.ImageOutputTokens == nil || *detail.ImageOutputTokens != 200 {
-		t.Fatalf("unexpected Gemini output modalities: %+v", detail)
-	}
-	if detail.UpstreamServiceTier != "ON_DEMAND_PRIORITY" || detail.ResponseServiceTier != "ON_DEMAND_PRIORITY" {
-		t.Fatalf("unexpected Gemini trafficType tier: upstream=%q response=%q", detail.UpstreamServiceTier, detail.ResponseServiceTier)
-	}
-	if detail.WebSearchRequests == nil || *detail.WebSearchRequests != 2 || detail.ToolUsageDetails == nil ||
-		detail.ToolUsageDetails.WebSearchCalls == nil || *detail.ToolUsageDetails.WebSearchCalls != 2 ||
-		detail.ToolUsageDetails.WebSearchQueries == nil || *detail.ToolUsageDetails.WebSearchQueries != 2 ||
-		detail.ToolUsageDetails.NumSearchResults == nil || *detail.ToolUsageDetails.NumSearchResults != 2 ||
-		detail.ToolUsageDetails.FileSearchCalls == nil || *detail.ToolUsageDetails.FileSearchCalls != 1 ||
-		detail.ToolUsageDetails.WebFetchCalls == nil || *detail.ToolUsageDetails.WebFetchCalls != 1 ||
-		detail.ToolUsageDetails.CodeExecutionCalls == nil || *detail.ToolUsageDetails.CodeExecutionCalls != 1 ||
-		detail.ToolUsageDetails.ToolCallsRequested == nil || *detail.ToolUsageDetails.ToolCallsRequested != 1 ||
-		detail.ToolUsageDetails.Extra["tool_use_prompt_tokens"] != 50 {
-		t.Fatalf("unexpected Gemini ToolUsageDetails: %+v", detail.ToolUsageDetails)
-	}
-	if detail.ImageCount == nil || *detail.ImageCount != 1 || detail.ImageDetails == nil || detail.ImageDetails.MimeType != "image/png" {
-		t.Fatalf("unexpected Gemini response ImageCount/ImageDetails: count=%+v details=%+v", detail.ImageCount, detail.ImageDetails)
-	}
-	if detail.RequestedImageDetails == nil || detail.RequestedImageDetails.AspectRatio != "16:9" || detail.RequestedImageDetails.ImageSize != "2K" {
-		t.Fatalf("unexpected Gemini RequestedImageDetails: %+v", detail.RequestedImageDetails)
-	}
-
-	var streamBuf StreamUsageBuffer
-	streamBuf.ObserveAntigravityStream([]byte(`data: {"response":{"candidates":[{"content":{"parts":[{"functionCall":{"name":"tool_a","args":{}}}]},"groundingMetadata":{"webSearchQueries":["q1"],"groundingChunks":[{"web":{"uri":"https://x.example"}}]}}]}}`))
-	streamBuf.ObserveAntigravityStream([]byte(`data: {"response":{"candidates":[{"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":120,"candidatesTokenCount":30,"totalTokenCount":150}}}`))
-	streamDetail, ok := streamBuf.Detail()
-	if !ok {
-		t.Fatal("expected streamBuf.Detail() ok = true")
-	}
-	if streamDetail.TotalTokens != 150 || streamDetail.WebSearchRequests == nil || *streamDetail.WebSearchRequests != 1 || streamDetail.ToolUsageDetails == nil || streamDetail.ToolUsageDetails.ToolCallsRequested == nil || *streamDetail.ToolUsageDetails.ToolCallsRequested != 1 {
-		t.Fatalf("unexpected Antigravity stream merged usage: %+v tools=%+v", streamDetail, streamDetail.ToolUsageDetails)
-	}
-}
-
 func TestParseCodexUsageWithCollectedOutputItemsAndImageToolUsage(t *testing.T) {
 	completed := []byte(`{"type":"response.completed","response":{"id":"resp_codex_1","service_tier":"priority","prompt_cache_retention":"24h","output":[],"usage":{"input_tokens":1200,"input_tokens_details":{"cached_tokens":1024,"text_tokens":1100,"image_tokens":100,"cached_tokens_details":{"text_tokens":1024}},"output_tokens":350,"output_tokens_details":{"reasoning_tokens":200,"text_tokens":150},"total_tokens":1550,"attribution":{"tier":"priority"}},"tool_usage":{"image_gen":{"input_tokens":80,"input_tokens_details":{"text_tokens":30,"image_tokens":50},"output_tokens":1056,"output_tokens_details":{"image_tokens":1056,"text_tokens":0},"total_tokens":1136}}}}`)
 	itemsByIndex := map[int64][]byte{
@@ -1817,64 +1707,6 @@ func TestClaudeStreamToolDeduplicationOwnsIDsAndCountsMultipleSearches(t *testin
 	}
 }
 
-func TestGeminiStreamUsageAccumulatesToolExecutions(t *testing.T) {
-	for _, wrapped := range []bool{false, true} {
-		t.Run(fmt.Sprintf("wrapped=%v", wrapped), func(t *testing.T) {
-			var b StreamUsageBuffer
-			observe := func(payload string) {
-				if wrapped {
-					b.ObserveAntigravityStream([]byte(`data: {"response":` + payload + `}`))
-				} else {
-					b.ObserveGeminiStream([]byte("data: " + payload))
-				}
-			}
-			for _, name := range []string{"first", "second"} {
-				observe(fmt.Sprintf(`{"candidates":[{"content":{"parts":[{"functionCall":{"name":%q,"args":{}}},{"executableCode":{"language":"PYTHON","code":"print(1)"}},{"inlineData":{"mimeType":"image/png","data":"AA=="}}]},"groundingMetadata":{"webSearchQueries":["q1","q2"]}}]}`, name))
-				d, ok := b.Detail()
-				if !ok || d.ToolUsageDetails == nil || d.ToolUsageDetails.ToolCallsRequested == nil ||
-					d.ToolUsageDetails.CodeExecutionCalls == nil {
-					t.Fatalf("missing incremental tool usage: %+v", d)
-				}
-				want := int64(1)
-				if name == "second" {
-					want = 2
-				}
-				if *d.ToolUsageDetails.ToolCallsRequested != want || *d.ToolUsageDetails.CodeExecutionCalls != want ||
-					d.ImageCount == nil || *d.ImageCount != want {
-					t.Fatalf("incremental counts: tools=%+v images=%v, want %d", d.ToolUsageDetails, d.ImageCount, want)
-				}
-			}
-			observe(`{"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":2,"totalTokenCount":12,"toolUsePromptTokenCount":1}}`)
-			d, _ := b.Detail()
-			if d.TotalTokens != 12 || *d.ToolUsageDetails.ToolCallsRequested != 2 ||
-				*d.ToolUsageDetails.CodeExecutionCalls != 2 || *d.ImageCount != 2 ||
-				d.WebSearchRequests == nil || *d.WebSearchRequests != 2 ||
-				d.ToolUsageDetails.Extra["tool_use_prompt_tokens"] != 1 {
-				t.Fatalf("terminal usage lost counts or double-counted grounding: %+v tools=%+v", d, d.ToolUsageDetails)
-			}
-		})
-	}
-}
-
-func TestStripUsageMetadataPreservesToolArguments(t *testing.T) {
-	for _, wrapped := range []bool{false, true} {
-		t.Run(fmt.Sprintf("wrapped=%v", wrapped), func(t *testing.T) {
-			raw := `{"usageMetadata":{"promptTokenCount":5},"candidates":[{"content":{"parts":[{"functionCall":{"name":"save","args":{"usageMetadata":{"value":1}}}}]}}]}`
-			prefix := ""
-			if wrapped {
-				raw = `{"response":` + raw + `}`
-				prefix = "response."
-			}
-			out, changed := StripUsageMetadataFromJSON([]byte(raw))
-			if !changed || !ojson.ValidBytes(out) || ojson.GetBytes(out, prefix+"usageMetadata").Exists() ||
-				ojson.GetBytes(out, prefix+"cpaUsageMetadata.promptTokenCount").Int() != 5 ||
-				ojson.GetBytes(out, prefix+"candidates.0.content.parts.0.functionCall.args.usageMetadata.value").Int() != 1 {
-				t.Fatalf("metadata rename changed the wrong field: %s", out)
-			}
-		})
-	}
-}
-
 func TestCodexUsageOwnsImageMetadataStrings(t *testing.T) {
 	for _, imageTool := range []bool{false, true} {
 		t.Run(fmt.Sprintf("image_tool=%v", imageTool), func(t *testing.T) {
@@ -1963,66 +1795,6 @@ func TestOpenAIStreamMultipleImageCompletionsWithoutUsage(t *testing.T) {
 	d, ok := b.Detail()
 	if !ok || d.ImageCount == nil || *d.ImageCount != 2 || d.ImageDetails == nil || d.ImageDetails.Size != "1024x1536" {
 		t.Fatalf("image stream detail = %+v details=%+v, want ImageCount=2 and latest size", d, d.ImageDetails)
-	}
-}
-
-func TestGeminiPartialArgsDeduplicationAndScannerReuse(t *testing.T) {
-	combined := []byte(`{"candidates":[{"content":{"role":"model","parts":[{"functionCall":{"name":"get_weather","partialArgs":[{"jsonPath":"$.city","stringValue":"Par","willContinue":true}],"willContinue":true}},{"functionCall":{"partialArgs":[{"jsonPath":"$.city","stringValue":"is"}],"willContinue":true}},{"functionCall":{}},{"functionCall":{"name":"get_weather","partialArgs":[{"jsonPath":"$.city","stringValue":"Lyon"}],"willContinue":false}}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":5,"totalTokenCount":15}}`)
-	d := ParseGeminiUsage(combined)
-	if d.ToolUsageDetails == nil || d.ToolUsageDetails.ToolCallsRequested == nil || *d.ToolUsageDetails.ToolCallsRequested != 2 {
-		t.Fatalf("direct ParseGeminiUsage ToolCallsRequested = %+v, want 2", d.ToolUsageDetails)
-	}
-
-	var b StreamUsageBuffer
-	for _, chunk := range []string{
-		`data: {"candidates":[{"index":0,"content":{"role":"model","parts":[{"functionCall":{"name":"get_weather","partialArgs":[{"jsonPath":"$.city","stringValue":"Tok","willContinue":true}],"willContinue":true}}]}}]}`,
-		`data: {"candidates":[{"index":0,"content":{"role":"model","parts":[{"functionCall":{"partialArgs":[{"jsonPath":"$.city","stringValue":"yo","willContinue":true}],"willContinue":true}}]}}]}`,
-		`data: {"candidates":[{"index":0,"content":{"role":"model","parts":[{"functionCall":{"partialArgs":[{"jsonPath":"$.city"},{"jsonPath":"$.days","numberValue":0}],"willContinue":true}}]}}]}`,
-		`data: {"candidates":[{"index":0,"content":{"role":"model","parts":[{"functionCall":{"name":"get_weather","partialArgs":[{"jsonPath":"$.city","stringValue":"Os","willContinue":true}],"willContinue":true}}]}}]}`,
-		`data: {"candidates":[{"index":0,"content":{"role":"model","parts":[{"functionCall":{"partialArgs":[{"jsonPath":"$.city","stringValue":"aka"}]}}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":5,"totalTokenCount":15}}`,
-	} {
-		b.ObserveGeminiStream([]byte(chunk))
-	}
-	dStream, ok := b.Detail()
-	if !ok || dStream.ToolUsageDetails == nil || dStream.ToolUsageDetails.ToolCallsRequested == nil || *dStream.ToolUsageDetails.ToolCallsRequested != 2 {
-		t.Fatalf("stream ToolCallsRequested = %+v, want 2", dStream.ToolUsageDetails)
-	}
-
-	first := `data: {"candidates":[{"index":0,"content":{"parts":[{"functionCall":{"name":"weather","partialArgs":[{"jsonPath":"$.city","stringValue":"Paris"}],"willContinue":true}}]}}]}`
-	filler := `data: {"candidates":[{"content":{"parts":[{"text":"` + strings.Repeat("X", 120) + `"}]}}]}`
-	last := `data: {"candidates":[{"index":0,"content":{"parts":[{"functionCall":{"name":"weather","partialArgs":[{"jsonPath":"$.city","stringValue":"London"}],"willContinue":false}}]}}]}`
-	scanner := bufio.NewScanner(strings.NewReader(first + "\n" + strings.Repeat(filler+"\n", 100) + last + "\n"))
-	var scannerBuf StreamUsageBuffer
-	for scanner.Scan() {
-		scannerBuf.ObserveGeminiStream(scanner.Bytes())
-	}
-	if err := scanner.Err(); err != nil {
-		t.Fatal(err)
-	}
-	dScanner, ok := scannerBuf.Detail()
-	if !ok || dScanner.ToolUsageDetails == nil || dScanner.ToolUsageDetails.ToolCallsRequested == nil || *dScanner.ToolUsageDetails.ToolCallsRequested != 2 {
-		t.Fatalf("scanner reuse ToolCallsRequested = %+v, want 2", dScanner.ToolUsageDetails)
-	}
-}
-
-func TestGeminiStreamUsageMergePreservesEarlierModalitiesAndTier(t *testing.T) {
-	for _, wrapped := range []bool{false, true} {
-		t.Run(map[bool]string{false: "gemini", true: "antigravity"}[wrapped], func(t *testing.T) {
-			var b StreamUsageBuffer
-			observe := func(s string) {
-				if wrapped {
-					b.ObserveAntigravityStream([]byte(`data: {"response":` + s + `}`))
-				} else {
-					b.ObserveGeminiStream([]byte("data: " + s))
-				}
-			}
-			observe(`{"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":1,"totalTokenCount":11,"trafficType":"ON_DEMAND","promptTokensDetails":[{"modality":"IMAGE","tokenCount":10}]}}`)
-			observe(`{"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":2,"totalTokenCount":12}}`)
-			d, _ := b.Detail()
-			if d.ImageInputTokens == nil || *d.ImageInputTokens != 10 || d.UpstreamServiceTier != "ON_DEMAND" {
-				t.Fatalf("lost structured usage: %+v", d)
-			}
-		})
 	}
 }
 

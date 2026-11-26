@@ -280,7 +280,7 @@ func normalizeGluedSSEEvents(chunk []byte) []byte {
 	if len(chunk) == 0 {
 		return chunk
 	}
-	// Antigravity/Gemini translators emit event frames without trailing blank lines.
+	// Some translators emit event frames without trailing blank lines.
 	// When multiple frames are buffered back-to-back they can glue as "...}event:...".
 	// Only split when the bytes before the glue close a valid SSE data JSON object.
 	chunk = safeReplaceGlued(chunk, []byte("}event:"), []byte("}\n\nevent:"))

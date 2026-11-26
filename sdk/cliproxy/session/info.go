@@ -84,10 +84,8 @@ func (object sessionObject) Get(path string) ojson.Result {
 //  1. X-Claude-Code-Session-Id
 //  2. Claude Code metadata.user_id session
 //  3. Session-Id / Session_id (Codex and compatible clients)
-//  4. X-Http-Session-Id (Antigravity CLI)
 //  5. X-Session-ID / X-Session-Affinity / X-Slot-Session-Id
 //  6. X-Conversation-Id / X-Thread-Id / X-Client-Request-Id
-//  7. Gemini cachedContent
 //  8. OpenAI thread_id
 //  9. session_id / sessionId
 //  10. prompt_cache_key (pck:), conversation.id (conv:), metadata.user_id (user:)
@@ -440,32 +438,6 @@ func ExtractSessionInfo(headers http.Header, payload []byte, metadata map[string
 			info.ParentSessionID = "codex:" + parentCandidate
 			info.AgentName = "subagent"
 			info.IsSubagent = true
-		} else {
-			info.AgentName = "main"
-		}
-		return finalizeSessionInfo(info)
-	}
-
-	// 4. Antigravity CLI (agy) Headers
-	if sid := sessionHeaderValue(headers, "X-Http-Session-Id"); sid != "" {
-		info.ClientType = "agy"
-		info.SessionID = "agy:" + sid
-		parentSID := sessionHeaderValue(headers, "X-Parent-Session-ID")
-		if parentSID == "" {
-			parentSID = sessionHeaderValue(headers, "X-Parent-Session-Id")
-		}
-		if parentSID == "" {
-			parentSID = sessionHeaderValue(headers, "X-Parent-ID")
-		}
-		if parentSID == "" {
-			parentSID = sessionHeaderValue(headers, "X-Parent-Id")
-		}
-		if parentSID != "" && parentSID != sid {
-			info.ParentSessionID = "agy:" + parentSID
-			info.AgentName = "subagent"
-		} else if parentCandidate != "" && parentCandidate != sid {
-			info.ParentSessionID = "agy:" + parentCandidate
-			info.AgentName = "subagent"
 		} else {
 			info.AgentName = "main"
 		}

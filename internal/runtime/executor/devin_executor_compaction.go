@@ -18,7 +18,7 @@ import (
 func (e *DevinExecutor) executeDevinResponsesCompaction(ctx context.Context, auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
 	var resp cliproxyexecutor.Response
 	baseModel := thinking.ParseSuffix(req.Model).ModelName
-	summaryPayload := helps.PrepareAntigravityCompactionSummaryPayload(helps.ResponsesCompactionSourcePayload(req, opts), baseModel)
+	summaryPayload := helps.PrepareResponsesCompactionSummaryPayload(helps.ResponsesCompactionSourcePayload(req, opts), baseModel)
 	summaryReq := cliproxyexecutor.Request{
 		Model:    req.Model,
 		Payload:  summaryPayload,

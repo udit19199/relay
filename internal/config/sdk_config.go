@@ -82,7 +82,7 @@ type SDKConfig struct {
 	// Empty or invalid values use the default 3h.
 	VideoResultAuthCacheTTL string `yaml:"video-result-auth-cache-ttl,omitempty" json:"video-result-auth-cache-ttl,omitempty"`
 
-	// ForceModelPrefix requires explicit model prefixes (e.g., "teamA/gemini-3-pro-preview")
+	// ForceModelPrefix requires explicit model prefixes (e.g., "teamA/claude-sonnet-4-6")
 	// to target prefixed credentials. When false, unprefixed model requests may use prefixed
 	// credentials as well.
 	ForceModelPrefix bool `yaml:"force-model-prefix" json:"force-model-prefix"`

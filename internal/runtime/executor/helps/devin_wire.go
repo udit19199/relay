@@ -617,7 +617,7 @@ func ParseDevinFrame(payload []byte) (DevinFrameResult, error) {
 }
 
 // SanitizeDevinSystemPrompt strips Claude Code attribution and CLI identity headers
-// (referencing Antigravity conventions), and applies zero-width obfuscation for configured sensitive words.
+// and applies zero-width obfuscation for configured sensitive words.
 func SanitizeDevinSystemPrompt(prompt string, matcher *SensitiveWordMatcher) string {
 	if prompt == "" {
 		return ""

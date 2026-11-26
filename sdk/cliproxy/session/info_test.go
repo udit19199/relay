@@ -139,15 +139,6 @@ func TestExtractSessionInfoAllClients(t *testing.T) {
 		t.Errorf("Codex fork with Session-Id header and body thread_id mismatch: %+v", info)
 	}
 
-	// 5. Antigravity X-Http-Session-Id
-	agyHeaders := http.Header{
-		"X-Http-Session-Id": []string{"agy-sess-888"},
-	}
-	info, ok = ExtractSessionInfo(agyHeaders, nil, nil)
-	if !ok || info.ClientType != "agy" || info.SessionID != "agy:agy-sess-888" {
-		t.Errorf("Antigravity mismatch: %+v", info)
-	}
-
 	// 6. Payload with metadata.agent_id and parent_session_id
 	payload := []byte(`{
 		"session_id": "payload-child-10",

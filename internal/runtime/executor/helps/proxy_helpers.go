@@ -386,7 +386,7 @@ const proxyPoolAnonymousScope = "anonymous"
 // Pooling must never mix accounts on one TCP/TLS connection: a shared connection
 // correlates distinct identities upstream, and a rotated key would keep reusing a
 // socket that was opened with the old one. Every credential therefore gets its own
-// pool, mirroring the Antigravity executor's credential-scoped pools. The scope is
+// pool. The scope is
 // only ever compared, never logged, so it cannot leak credential material.
 func proxyPoolScope(auth *cliproxyauth.Auth) string {
 	if auth == nil {

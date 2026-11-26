@@ -119,7 +119,7 @@ func ObfuscateSensitiveWordsDoc(doc *ojson.Doc, matcher *SensitiveWordMatcher) b
 	return modified
 }
 
-// ObfuscateSensitiveWordsInSystemInstruction obfuscates sensitive words in an Antigravity system instruction.
+// ObfuscateSensitiveWordsInSystemInstruction obfuscates sensitive words in a system instruction.
 func ObfuscateSensitiveWordsInSystemInstruction(payload []byte, matcher *SensitiveWordMatcher) []byte {
 	if matcher == nil || matcher.regex == nil || len(payload) == 0 {
 		return payload
@@ -131,7 +131,7 @@ func ObfuscateSensitiveWordsInSystemInstruction(payload []byte, matcher *Sensiti
 	return doc.Bytes()
 }
 
-// ObfuscateSensitiveWordsInSystemInstructionDoc obfuscates sensitive words in an Antigravity system instruction in place on doc.
+// ObfuscateSensitiveWordsInSystemInstructionDoc obfuscates sensitive words in a system instruction in place on doc.
 func ObfuscateSensitiveWordsInSystemInstructionDoc(doc *ojson.Doc, matcher *SensitiveWordMatcher) bool {
 	if matcher == nil || matcher.regex == nil || doc == nil || doc.Len() == 0 {
 		return false

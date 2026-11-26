@@ -74,7 +74,7 @@ func StartModelsUpdater(ctx context.Context) {
 }
 
 // detectChangedProviders compares two model catalogs and returns provider names
-// whose model definitions differ. Gemini changes affect both Gemini protocols,
+// whose model definitions differ. Model-family changes can affect multiple protocols,
 // while Codex tiers (free/team/plus/pro) are grouped under one "codex" provider.
 func detectChangedProviders(oldData, newData *staticModelsJSON) []string {
 	if oldData == nil || newData == nil {

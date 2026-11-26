@@ -17,7 +17,7 @@ import (
 
 var functionNameSanitizer = regexp.MustCompile(`[^a-zA-Z0-9_.:-]`)
 
-// SanitizeFunctionName ensures a function name matches the requirements for Gemini/Vertex AI.
+// SanitizeFunctionName ensures a function name matches the requirements for Interactions function declarations.
 // It replaces invalid characters with underscores, ensures it starts with a letter or underscore,
 // and truncates it to 64 characters if necessary.
 // Regex Rule: [^a-zA-Z0-9_.:-] replaced with _.

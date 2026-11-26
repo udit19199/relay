@@ -53,11 +53,11 @@ type ModelInfo struct {
 	Created int64 `json:"created"`
 	// OwnedBy indicates the organization that owns the model
 	OwnedBy string `json:"owned_by"`
-	// Type indicates the model type (e.g., "claude", "gemini", "openai")
+	// Type indicates the model type (e.g., "claude", "openai", "interactions")
 	Type string `json:"type"`
 	// DisplayName is the human-readable name for the model
 	DisplayName string `json:"display_name,omitempty"`
-	// Name is used for Gemini-style model names
+	// Name is used for provider-native model names
 	Name string `json:"name,omitempty"`
 	// Version is the model version
 	Version string `json:"version,omitempty"`
@@ -83,7 +83,7 @@ type ModelInfo struct {
 	// SupportedOutputModalities lists supported output modalities (e.g., TEXT, IMAGE)
 	SupportedOutputModalities []string `json:"supportedOutputModalities,omitempty"`
 	// SupportsWebSearch indicates this model is listed by
-	// fetchAvailableModels.webSearchModelIds and can execute native googleSearch.
+	// fetchAvailableModels.webSearchModelIds and can execute native web search.
 	SupportsWebSearch bool `json:"supports_web_search,omitempty"`
 
 	// SupportConfigurationUpdate reports internal support for configuration_update.
@@ -94,7 +94,7 @@ type ModelInfo struct {
 	NativeCapabilities *NativeCapabilities `json:"-"`
 
 	// Thinking holds provider-specific reasoning/thinking budget capabilities.
-	// This is optional and currently used for Gemini thinking budget normalization.
+	// This is optional and currently used for model-specific thinking budget normalization.
 	Thinking *ThinkingSupport `json:"thinking,omitempty"`
 
 	// Config holds model-specific runtime overrides loaded from models.json.
@@ -445,7 +445,7 @@ func (r *ModelRegistry) triggerModelsUnregistered(provider, clientID string) {
 // RegisterClient registers a client and its supported models
 // Parameters:
 //   - clientID: Unique identifier for the client
-//   - clientProvider: Provider name (e.g., "gemini", "claude", "openai")
+//   - clientProvider: Provider name (e.g., "interactions", "claude", "openai")
 //   - models: List of models that this client can provide
 func (r *ModelRegistry) RegisterClient(clientID, clientProvider string, models []*ModelInfo) {
 	r.mutex.Lock()
@@ -1451,7 +1451,7 @@ func (r *ModelRegistry) IsModelQuotaExceededForClient(clientID, modelID string) 
 
 // GetAvailableModels returns all models that have at least one available client
 // Parameters:
-//   - handlerType: The handler type to filter models for (e.g., "openai", "claude", "gemini")
+//   - handlerType: The handler type to filter models for (e.g., "openai", "claude", "interactions")
 //
 // Returns:
 //   - []map[string]any: List of available models in the requested format
@@ -1964,7 +1964,7 @@ func (r *ModelRegistry) CleanupExpiredQuotas() {
 // available clients that are not suspended or over quota.
 //
 // Parameters:
-//   - handlerType: The API handler type (e.g., "openai", "claude", "gemini")
+//   - handlerType: The API handler type (e.g., "openai", "claude", "interactions")
 //
 // Returns:
 //   - string: The model ID of the first available model, or empty string if none available

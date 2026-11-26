@@ -1,7 +1,6 @@
 package helps
 
 import (
-	"bytes"
 	"strings"
 	"testing"
 )
@@ -36,20 +35,6 @@ func BenchmarkObserveClaudeStream_TextDelta(b *testing.B) {
 	}
 }
 
-func BenchmarkObserveGeminiStream_TextAndUsage(b *testing.B) {
-	deltaChunk := []byte(`data: {"candidates":[{"content":{"parts":[{"text":"Go 1.24 was released in "}],"role":"model"},"index":0}],"usageMetadata":{"promptTokenCount":22,"candidatesTokenCount":12,"totalTokenCount":114,"promptTokensDetails":[{"modality":"TEXT","tokenCount":22}],"thoughtsTokenCount":80,"serviceTier":"standard"},"modelVersion":"gemini-3.8-flash"}`)
-	finalChunk := []byte(`data: {"candidates":[{"content":{"parts":[{"text":"2025."}],"role":"model"},"finishReason":"STOP","index":0,"groundingMetadata":{"webSearchQueries":["Go 1.24 release year"],"groundingChunks":[{"web":{"uri":"https://go.dev/doc/devel/release","title":"Release History"}}]}}],"usageMetadata":{"promptTokenCount":103,"candidatesTokenCount":22,"totalTokenCount":286,"promptTokensDetails":[{"modality":"TEXT","tokenCount":103}],"thoughtsTokenCount":161,"serviceTier":"standard"},"modelVersion":"gemini-3.8-flash"}`)
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		var buf StreamUsageBuffer
-		for j := 0; j < 10; j++ {
-			buf.ObserveGeminiStream(deltaChunk)
-		}
-		buf.ObserveGeminiStream(finalChunk)
-	}
-}
-
 func BenchmarkParseOpenAIImageUsage_LargeBase64(b *testing.B) {
 	reqPayload := []byte(`{"model":"grok-imagine-image","prompt":"A minimal orange square","response_format":"b64_json","aspect_ratio":"16:9","resolution":"1k"}`)
 	largeB64 := strings.Repeat("QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVowMTIzNDU2Nzg5", 30000) // ~1.44MB
@@ -59,26 +44,6 @@ func BenchmarkParseOpenAIImageUsage_LargeBase64(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		detail := ParseOpenAIImageUsage(reqPayload, respPayload)
-		if detail.ImageCount == nil || *detail.ImageCount != 1 {
-			b.Fatal("expected image count 1")
-		}
-	}
-}
-
-func BenchmarkParseGeminiUsage_LargeBase64(b *testing.B) {
-	reqPayload := []byte(`{"contents":[{"role":"user","parts":[{"text":"draw"}]}],"generationConfig":{"responseModalities":["TEXT","IMAGE"],"imageConfig":{"aspectRatio":"16:9","imageSize":"1K"}}}`)
-	largeB64 := strings.Repeat("QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVowMTIzNDU2Nzg5", 30000) // ~1.44MB
-	var buf bytes.Buffer
-	buf.WriteString(`{"candidates":[{"content":{"parts":[{"inlineData":{"mimeType":"image/jpeg","data":"`)
-	buf.WriteString(largeB64)
-	buf.WriteString(`"}}],"role":"model"},"finishReason":"STOP","index":0}],"usageMetadata":{"promptTokenCount":11,"candidatesTokenCount":1343,"totalTokenCount":1354,"promptTokensDetails":[{"modality":"TEXT","tokenCount":11}],"candidatesTokensDetails":[{"modality":"IMAGE","tokenCount":1120}],"serviceTier":"standard"}}`)
-	respPayload := buf.Bytes()
-	b.SetBytes(int64(len(respPayload)))
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		detail := ParseGeminiUsage(respPayload)
-		ApplyGeminiRequestImageConfig(&detail, reqPayload)
 		if detail.ImageCount == nil || *detail.ImageCount != 1 {
 			b.Fatal("expected image count 1")
 		}

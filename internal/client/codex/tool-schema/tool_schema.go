@@ -233,7 +233,7 @@ func normalizeCodexToolFieldTypesDoc(doc *ojson.Doc, paramsPath string, params o
 
 // NormalizeCodexToolIntegerTypes normalizes specified tool parameter declarations
 // from number to integer for Codex clients across supported tool formats (OpenAI,
-// Claude input_schema, Gemini function_declarations, and namespace tools).
+// Claude input_schema, Interactions function_declarations, and namespace tools).
 func NormalizeCodexToolIntegerTypes(body []byte, headers http.Header) []byte {
 	if len(body) == 0 || !IsCodexUserAgent(headers) {
 		return body
@@ -318,7 +318,7 @@ func normalizeToolIntegerTypesInElementDoc(doc *ojson.Doc, tool ojson.Result, to
 		return false
 	}
 
-	// Handle Gemini function declarations
+	// Handle Interactions function declarations
 	for _, declKey := range []string{"function_declarations", "functionDeclarations"} {
 		decls := tool.Get(declKey)
 		if decls.IsArray() {
