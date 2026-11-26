@@ -460,21 +460,6 @@ func TestExecutorAdapterExecuteStreamSameFormatMissingDoneIsSeededAndDropped(t *
 // second registered same-format normalizer (Gemini to Gemini) under split
 // and coalesced chunk delivery. Gemini streams have no [DONE] marker, so
 // nothing extra is seeded when the channel closes.
-func TestExecutorAdapterExecuteStreamGeminiSameFormatStripsSSEFraming(t *testing.T) {
-	adapter := streamAdapterForTest(t, sdktranslator.FormatGemini,
-		[]byte("data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"Hi\"}]}}"),
-		[]byte("]}\n\ndata: {\"candidates\":[{\"finishReason\":\"STOP\"}]}\n\n"),
-	)
-	got, err := executeSameFormatStream(t, adapter, sdktranslator.FormatGemini)
-	if err != nil {
-		t.Fatalf("stream returned error: %v", err)
-	}
-	want := []string{
-		`{"candidates":[{"content":{"parts":[{"text":"Hi"}]}}]}`,
-		`{"candidates":[{"finishReason":"STOP"}]}`,
-	}
-	assertStringsEqual(t, "gemini", got, want)
-}
 
 // TestExecutorAdapterExecuteStreamSameFormatBareJSONUnchanged covers plugins
 // that already emit bare payloads (as the documented examples do): they must

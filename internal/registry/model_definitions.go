@@ -28,38 +28,19 @@ const (
 
 // staticModelsJSON mirrors the top-level structure of models.json.
 type staticModelsJSON struct {
-	Claude      []*ModelInfo `json:"claude"`
-	Gemini      []*ModelInfo `json:"gemini"`
-	Vertex      []*ModelInfo `json:"vertex"`
-	AIStudio    []*ModelInfo `json:"aistudio"`
-	CodexFree   []*ModelInfo `json:"codex-free"`
-	CodexTeam   []*ModelInfo `json:"codex-team"`
-	CodexPlus   []*ModelInfo `json:"codex-plus"`
-	CodexPro    []*ModelInfo `json:"codex-pro"`
-	Antigravity []*ModelInfo `json:"antigravity"`
-	XAI         []*ModelInfo `json:"xai"`
-	Devin       []*ModelInfo `json:"devin"`
-	Meta        []*ModelInfo `json:"meta"`
+	Claude    []*ModelInfo `json:"claude"`
+	CodexFree []*ModelInfo `json:"codex-free"`
+	CodexTeam []*ModelInfo `json:"codex-team"`
+	CodexPlus []*ModelInfo `json:"codex-plus"`
+	CodexPro  []*ModelInfo `json:"codex-pro"`
+	XAI       []*ModelInfo `json:"xai"`
+	Devin     []*ModelInfo `json:"devin"`
+	Meta      []*ModelInfo `json:"meta"`
 }
 
 // GetClaudeModels returns the standard Claude model definitions.
 func GetClaudeModels() []*ModelInfo {
 	return cloneModelInfos(getModels().Claude)
-}
-
-// GetGeminiModels returns the standard Gemini model definitions.
-func GetGeminiModels() []*ModelInfo {
-	return cloneModelInfos(getModels().Gemini)
-}
-
-// GetGeminiVertexModels returns Gemini model definitions for Vertex AI.
-func GetGeminiVertexModels() []*ModelInfo {
-	return cloneModelInfos(getModels().Vertex)
-}
-
-// GetAIStudioModels returns model definitions for AI Studio.
-func GetAIStudioModels() []*ModelInfo {
-	return cloneModelInfos(getModels().AIStudio)
 }
 
 // GetCodexFreeModels returns model definitions for the Codex free plan tier.
@@ -80,11 +61,6 @@ func GetCodexPlusModels() []*ModelInfo {
 // GetCodexProModels returns model definitions for the Codex pro plan tier.
 func GetCodexProModels() []*ModelInfo {
 	return WithCodexBuiltins(cloneModelInfos(getModels().CodexPro))
-}
-
-// GetAntigravityModels returns the standard Antigravity model definitions.
-func GetAntigravityModels() []*ModelInfo {
-	return cloneModelInfos(getModels().Antigravity)
 }
 
 var staticDevinModels = []*ModelInfo{
@@ -550,12 +526,7 @@ func cloneModelInfos(models []*ModelInfo) []*ModelInfo {
 //
 // Supported channels:
 //   - claude
-//   - gemini
-//   - gemini-interactions
-//   - vertex
-//   - aistudio
 //   - codex
-//   - antigravity
 //   - xai
 //   - devin
 //   - meta
@@ -564,18 +535,8 @@ func GetStaticModelDefinitionsByChannel(channel string) []*ModelInfo {
 	switch key {
 	case "claude":
 		return GetClaudeModels()
-	case "gemini":
-		return GetGeminiModels()
-	case "gemini-interactions":
-		return GetGeminiModels()
-	case "vertex":
-		return GetGeminiVertexModels()
-	case "aistudio":
-		return GetAIStudioModels()
 	case "codex":
 		return GetCodexProModels()
-	case "antigravity":
-		return GetAntigravityModels()
 	case "xai", "x-ai", "grok":
 		return GetXAIModels()
 	case "devin":
@@ -627,11 +588,7 @@ func LookupStaticModelInfo(modelID string) *ModelInfo {
 	data := getModels()
 	allModels := [][]*ModelInfo{
 		data.Claude,
-		data.Gemini,
-		data.Vertex,
-		data.AIStudio,
 		data.CodexPro,
-		data.Antigravity,
 		data.XAI,
 		GetDevinModels(),
 		GetMetaModels(),

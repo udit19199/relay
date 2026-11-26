@@ -52,7 +52,7 @@ func TestTranslateRequestReturningErrorRefusesEmptiedAttachmentTurns(t *testing.
 		{
 			name:     "responses to gemini",
 			from:     sdktranslator.FormatOpenAIResponse,
-			to:       sdktranslator.FormatGemini,
+			to:       sdktranslator.FormatClaude,
 			refused:  `{"model":"m","input":[` + responsesHistory + `,{"type":"message","role":"user","content":[{"type":"input_file","file_id":"file-1"}]}]}`,
 			accepted: `{"model":"m","input":[` + responsesHistory + `,{"type":"message","role":"user","content":[{"type":"input_file","file_data":"data:application/pdf;base64,JVBERi0xLjQK"}]}]}`,
 			wantType: "input_file",
@@ -60,7 +60,7 @@ func TestTranslateRequestReturningErrorRefusesEmptiedAttachmentTurns(t *testing.
 		{
 			name:     "responses to antigravity",
 			from:     sdktranslator.FormatOpenAIResponse,
-			to:       sdktranslator.FormatAntigravity,
+			to:       sdktranslator.FormatClaude,
 			refused:  `{"model":"m","input":[` + responsesHistory + `,{"type":"message","role":"user","content":[{"type":"input_file","file_id":"file-1"}]}]}`,
 			accepted: `{"model":"m","input":[` + responsesHistory + `,{"type":"message","role":"user","content":[{"type":"input_file","file_data":"data:application/pdf;base64,JVBERi0xLjQK"}]}]}`,
 			wantType: "input_file",

@@ -58,7 +58,7 @@ func TestRegistryTranslateRequestAppliesSummaryIntent(t *testing.T) {
 		{
 			name:       "responses null summary disables Gemini summaries",
 			from:       FormatOpenAIResponse,
-			to:         FormatGemini,
+			to:         FormatClaude,
 			input:      `{"reasoning":{"effort":"high","summary":null}}`,
 			translated: `{"generationConfig":{"thinkingConfig":{"thinkingLevel":"high"}}}`,
 			path:       "generationConfig.thinkingConfig.includeThoughts",
@@ -68,7 +68,7 @@ func TestRegistryTranslateRequestAppliesSummaryIntent(t *testing.T) {
 		{
 			name:       "Google Chat extension overrides effort",
 			from:       FormatOpenAI,
-			to:         FormatGemini,
+			to:         FormatClaude,
 			input:      `{"reasoning_effort":"high","extra_body":{"google":{"thinking_config":{"include_thoughts":false}}}}`,
 			translated: `{"generationConfig":{"thinkingConfig":{"thinkingLevel":"high","includeThoughts":true}}}`,
 			path:       "generationConfig.thinkingConfig.includeThoughts",
@@ -144,7 +144,7 @@ func TestRegistryTranslateRequestPreservesNativeClaudeMissingDisplay(t *testing.
 func TestRegistryTranslateRequestDoesNotMixSummaryIntoFallback(t *testing.T) {
 	registry := NewRegistry()
 	body := []byte(`{"model":"gemini-3.6-flash","reasoning":{"summary":"auto"},"input":"hi"}`)
-	out := registry.TranslateRequest(FormatOpenAIResponse, FormatGemini, "gemini-3.6-flash", body, false)
+	out := registry.TranslateRequest(FormatOpenAIResponse, FormatClaude, "gemini-3.6-flash", body, false)
 	if !bytes.Equal(out, body) {
 		t.Fatalf("missing translator changed fallback body: got %s, want %s", out, body)
 	}
@@ -158,7 +158,7 @@ func TestRegistryTranslateRequestPluginMissDoesNotMixSummary(t *testing.T) {
 	hooks := &fakePluginHooks{requestTranslateOK: false}
 	registry.SetPluginHooks(hooks)
 	body := []byte(`{"model":"gemini-3.6-flash","reasoning":{"summary":"auto"},"input":"hi"}`)
-	out := registry.TranslateRequest(FormatOpenAIResponse, FormatGemini, "gemini-3.6-flash", body, false)
+	out := registry.TranslateRequest(FormatOpenAIResponse, FormatClaude, "gemini-3.6-flash", body, false)
 	if !bytes.Equal(out, body) {
 		t.Fatalf("plugin translation miss changed fallback body: got %s, want %s", out, body)
 	}
@@ -176,7 +176,7 @@ func TestRegistryTranslateRequestAppliesSummaryAfterPluginTranslation(t *testing
 	registry.SetPluginHooks(hooks)
 	out := registry.TranslateRequest(
 		FormatOpenAIResponse,
-		FormatGemini,
+		FormatClaude,
 		"gemini-3.6-flash",
 		[]byte(`{"reasoning":{"summary":"auto"},"input":"hi"}`),
 		false,
@@ -223,7 +223,7 @@ func TestRegistryTranslateRequestPluginNormalizerOwnsSourceSummaryIntent(t *test
 
 			out := registry.TranslateRequest(
 				FormatOpenAIResponse,
-				FormatGemini,
+				FormatClaude,
 				"gemini-3.6-flash",
 				[]byte(`{"reasoning":{"summary":"auto"},"input":"hi"}`),
 				false,
@@ -241,7 +241,7 @@ func TestRegistryTranslateRequestPluginNormalizerOwnsSourceSummaryIntent(t *test
 
 func TestRegistryTranslateRequestNormalizerOwnsFinalSummaryField(t *testing.T) {
 	registry := NewRegistry()
-	registry.Register(FormatOpenAIResponse, FormatGemini, func(_ string, _ []byte, _ bool) ([]byte, error) {
+	registry.Register(FormatOpenAIResponse, FormatClaude, func(_ string, _ []byte, _ bool) ([]byte, error) {
 		return []byte(`{"generationConfig":{"thinkingConfig":{"thinkingLevel":"high"}}}`), nil
 	}, ResponseTransform{})
 	hooks := &fakePluginHooks{normalizeRequest: func(body []byte) []byte {
@@ -255,7 +255,7 @@ func TestRegistryTranslateRequestNormalizerOwnsFinalSummaryField(t *testing.T) {
 
 	out := registry.TranslateRequest(
 		FormatOpenAIResponse,
-		FormatGemini,
+		FormatClaude,
 		"gemini-3.6-flash",
 		[]byte(`{"reasoning":{"effort":"high","summary":"auto"},"input":"hi"}`),
 		false,

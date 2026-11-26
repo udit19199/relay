@@ -157,8 +157,6 @@ func TestCodexSmallOutputBudgetsAllSourceFormats_Issue7304(t *testing.T) {
 		{name: "chat max_completion_tokens 1", from: sdktranslator.FormatOpenAI, payload: `{"model":"gpt-5.6-sol","max_completion_tokens":1,"messages":[{"role":"user","content":"Hi"}]}`, want: "16"},
 		{name: "chat max_output_tokens 1", from: sdktranslator.FormatOpenAI, payload: `{"model":"gpt-5.6-sol","max_output_tokens":1,"messages":[{"role":"user","content":"Hi"}]}`, want: "16"},
 		{name: "claude max_tokens 1", from: sdktranslator.FormatClaude, payload: `{"model":"gpt-5.6-sol","max_tokens":1,"messages":[{"role":"user","content":[{"type":"text","text":"Hi"}]}]}`, want: "16"},
-		{name: "gemini maxOutputTokens 1", from: sdktranslator.FormatGemini, payload: `{"model":"gpt-5.6-sol","contents":[{"role":"user","parts":[{"text":"Hi"}]}],"generationConfig":{"maxOutputTokens":1}}`, want: "16"},
-		{name: "gemini top-level max_tokens 1", from: sdktranslator.FormatGemini, payload: `{"model":"gpt-5.6-sol","contents":[{"role":"user","parts":[{"text":"Hi"}]}],"max_tokens":1}`, want: "16"},
 		{name: "interactions max_output_tokens 1", from: sdktranslator.FormatInteractions, payload: `{"model":"gpt-5.6-sol","input":"Hi","max_output_tokens":1}`, want: "16"},
 		{name: "interactions generation_config 1", from: sdktranslator.FormatInteractions, payload: `{"model":"gpt-5.6-sol","input":"Hi","generation_config":{"max_output_tokens":1}}`, want: "16"},
 		{

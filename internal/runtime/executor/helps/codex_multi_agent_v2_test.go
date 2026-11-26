@@ -62,7 +62,7 @@ func geminiToolHistoryPayload(turns int) []byte {
 // TestTranslateRequestPairMatchesSeparateTranslations pins the reuse fast path to
 // the behavior of translating both payloads independently.
 func TestTranslateRequestPairMatchesSeparateTranslations(t *testing.T) {
-	from := sdktranslator.FormatGemini
+	from := sdktranslator.FormatClaude
 	to := sdktranslator.FromString("antigravity")
 	cfg := &config.Config{}
 	const model = "gemini-3.6-flash-high"
@@ -106,7 +106,7 @@ func TestTranslateRequestPairMatchesSeparateTranslations(t *testing.T) {
 // TestTranslateRequestPairTranslatesDistinctPayloads guards the case where the
 // executor really does hand over two different requests.
 func TestTranslateRequestPairTranslatesDistinctPayloads(t *testing.T) {
-	from := sdktranslator.FormatGemini
+	from := sdktranslator.FormatClaude
 	to := sdktranslator.FromString("antigravity")
 	cfg := &config.Config{}
 	const model = "gemini-3.6-flash-high"
@@ -148,7 +148,7 @@ func TestTranslateRequestPairInvokesPluginOncePerInput(t *testing.T) {
 			}
 			base, work := TranslateRequestPairWithCodexMultiAgentV2(
 				context.Background(), http.Header{}, &config.Config{},
-				sdktranslator.FormatGemini, sdktranslator.FormatAntigravity,
+				sdktranslator.FormatClaude, sdktranslator.FormatClaude,
 				"gemini-3.6-flash-high", payload, request, stream,
 			)
 			if hooks.calls != wantCalls {
@@ -214,7 +214,7 @@ func TestTranslateRequestEnvelopePairWithCodexMultiAgentV2UsesModelInfo(t *testi
 		NativeCapabilities: &registry.NativeCapabilities{WebSearch: &trueVal},
 	}
 	envelope := sdktranslator.RequestEnvelope{Format: sdktranslator.FormatOpenAIResponse, Model: model, ModelInfo: enabled}
-	base, work, errPair := TranslateRequestEnvelopePairWithCodexMultiAgentV2(context.Background(), http.Header{}, &config.Config{}, sdktranslator.FormatOpenAIResponse, sdktranslator.FormatAntigravity, envelope, input, input)
+	base, work, errPair := TranslateRequestEnvelopePairWithCodexMultiAgentV2(context.Background(), http.Header{}, &config.Config{}, sdktranslator.FormatOpenAIResponse, sdktranslator.FormatClaude, envelope, input, input)
 	if errPair != nil {
 		t.Fatalf("translate request pair: %v", errPair)
 	}
@@ -230,7 +230,7 @@ func TestTranslateRequestEnvelopePairWithCodexMultiAgentV2UsesModelInfo(t *testi
 		NativeCapabilities: &registry.NativeCapabilities{WebSearch: &falseVal},
 	}
 	envelope.ModelInfo = disabled
-	_, workDisabled, errPair := TranslateRequestEnvelopePairWithCodexMultiAgentV2(context.Background(), http.Header{}, &config.Config{}, sdktranslator.FormatOpenAIResponse, sdktranslator.FormatAntigravity, envelope, input, input)
+	_, workDisabled, errPair := TranslateRequestEnvelopePairWithCodexMultiAgentV2(context.Background(), http.Header{}, &config.Config{}, sdktranslator.FormatOpenAIResponse, sdktranslator.FormatClaude, envelope, input, input)
 	if errPair != nil {
 		t.Fatalf("translate request pair: %v", errPair)
 	}
@@ -429,7 +429,7 @@ func TestTranslateRequestWithCodexMultiAgentV2_NormalizesCodexToolTypes(t *testi
 		headers,
 		&config.Config{},
 		sdktranslator.FormatOpenAIResponse,
-		sdktranslator.FormatGemini,
+		sdktranslator.FormatClaude,
 		"gemini-2.5-flash",
 		payload,
 		false,

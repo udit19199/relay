@@ -897,28 +897,28 @@ func TestConfigV8InjectsDistinctAuthIndexesForDistinctConnectionPools(t *testing
 	file := filepath.Join(t.TempDir(), "config.yaml")
 	raw := `config-version: 8
 api-keys:
-  gemini:
-    - name: gemini-group
+  codex:
+    - name: codex-group
       base-url: "https://example.invalid"
       connection-pool:
         enabled: true
         idle-conn-timeout: "120s"
         max-idle-conns-per-host: 2
       keys:
-        - api-key: "shared-gemini-key"
-        - api-key: "shared-gemini-key"
+        - api-key: "shared-codex-key"
+        - api-key: "shared-codex-key"
           connection-pool:
             idle-conn-timeout: ""
             max-idle-conns-per-host: 5
-  vertex:
-    - name: vertex-group
-      base-url: "https://vertex.example.invalid"
+  claude:
+    - name: claude-group
+      base-url: "https://claude.example.invalid"
       connection-pool:
         enabled: true
         max-idle-conns-per-host: 2
       keys:
-        - api-key: "shared-vertex-key"
-        - api-key: "shared-vertex-key"
+        - api-key: "shared-claude-key"
+        - api-key: "shared-claude-key"
           connection-pool:
             max-idle-conns-per-host: 6
 `
@@ -948,7 +948,7 @@ api-keys:
 	router := gin.New()
 	router.GET("/v8/management/config/*path", h.ConfigV8)
 
-	for _, provider := range []string{"gemini", "vertex"} {
+	for _, provider := range []string{"codex", "claude"} {
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/v8/management/config/api-keys/"+provider, nil))
 		if w.Code != http.StatusOK {

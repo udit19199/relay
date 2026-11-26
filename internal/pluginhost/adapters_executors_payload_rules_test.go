@@ -211,38 +211,6 @@ func TestExecutorAdapterPayloadRulesCanonicalizeSourceFormatAlias(t *testing.T) 
 	}
 }
 
-func TestExecutorAdapterPayloadRulesUseAntigravityRequestRoot(t *testing.T) {
-	host := New()
-	host.runtimeConfig = payloadRulesConfig("antigravity", "", map[string]any{"generationConfig.maxOutputTokens": 64})
-
-	var pluginPayload []byte
-	adapter := newCurrentExecutorAdapterForTest(host, "payload-antigravity-plugin", &fakeExecutor{
-		identifier: "plugin-provider",
-		execute: func(_ context.Context, req pluginapi.ExecutorRequest) (pluginapi.ExecutorResponse, error) {
-			pluginPayload = append([]byte(nil), req.Payload...)
-			return pluginapi.ExecutorResponse{Payload: []byte(`{"response":{}}`)}, nil
-		},
-	}, []sdktranslator.Format{sdktranslator.FormatAntigravity}, []sdktranslator.Format{sdktranslator.FormatAntigravity})
-
-	_, errExecute := adapter.Execute(context.Background(), nil, coreexecutor.Request{
-		Model:   "claude-model",
-		Format:  sdktranslator.FormatAntigravity,
-		Payload: []byte(`{"model":"claude-model","request":{"contents":[{"role":"user","parts":[{"text":"hi"}]}]}}`),
-	}, coreexecutor.Options{
-		SourceFormat:   sdktranslator.FormatAntigravity,
-		ResponseFormat: sdktranslator.FormatAntigravity,
-	})
-	if errExecute != nil {
-		t.Fatalf("Execute() error = %v", errExecute)
-	}
-	if got := ojson.GetBytesNoCopy(pluginPayload, "request.generationConfig.maxOutputTokens").Int(); got != 64 {
-		t.Errorf("request.generationConfig.maxOutputTokens = %d, want 64: %s", got, pluginPayload)
-	}
-	if ojson.GetBytesNoCopy(pluginPayload, "generationConfig").Exists() {
-		t.Errorf("rule created a top-level generationConfig beside request: %s", pluginPayload)
-	}
-}
-
 func TestExecutorAdapterAppliesArrayIndexFilterOnlyOnceAcrossHostHTTP(t *testing.T) {
 	host := New()
 	models := []config.PayloadModelRule{{Name: "claude-model", Protocol: "openai"}}

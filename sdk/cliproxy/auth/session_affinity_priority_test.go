@@ -517,7 +517,7 @@ func TestSessionAffinitySelectorRebindOnQuotaLCPCompactionPreservesMetadataOnTra
 		{"role":"user","parts":[{"text":"step 3"}]}
 	]}`)
 	firstOpts := cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatGemini,
+		SourceFormat:    sdktranslator.FormatClaude,
 		OriginalRequest: firstPayload,
 		Metadata: map[string]any{
 			cliproxyexecutor.CallerScopeMetadataKey: "caller-compaction-quota",
@@ -551,7 +551,7 @@ func TestSessionAffinitySelectorRebindOnQuotaLCPCompactionPreservesMetadataOnTra
 		{"role":"user","parts":[{"text":"step 4"}]}
 	]}`)
 	compactedOpts := cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatGemini,
+		SourceFormat:    sdktranslator.FormatClaude,
 		OriginalRequest: compactedPayload,
 		Metadata: map[string]any{
 			cliproxyexecutor.CallerScopeMetadataKey: "caller-compaction-quota",
@@ -584,7 +584,7 @@ func TestSessionAffinitySelectorRebindOnQuotaLCPCompactionPreservesMetadataOnTra
 		{"role":"model","parts":[{"text":"ack 4"}]}
 	]}`)
 	nextOpts := cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatGemini,
+		SourceFormat:    sdktranslator.FormatClaude,
 		OriginalRequest: nextPayload,
 		Metadata: map[string]any{
 			cliproxyexecutor.CallerScopeMetadataKey: "caller-compaction-quota",

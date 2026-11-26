@@ -151,8 +151,6 @@ observability:
 		"/v1/chat/completions",
 		"/v1/responses",
 		"/v1/messages",
-		"/v1beta/models/gemini-2.5-pro:generateContent",
-		"/v1beta/interactions",
 	} {
 		t.Run("authenticated chunked body exceeding limit returns 413 on "+endpoint, func(t *testing.T) {
 			cfgNoLog := parseTestServerConfigYAML(t, `config-version: 8

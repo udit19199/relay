@@ -226,6 +226,46 @@ func InspectGeminiThoughtSignature(rawSignature string, opts ...GeminiThoughtSig
 	return info, nil
 }
 
+var geminiPartThoughtSignaturePaths = []string{
+	"thoughtSignature",
+	"thought_signature",
+	"functionCall.thoughtSignature",
+	"functionCall.thought_signature",
+	"functionResponse.thoughtSignature",
+	"functionResponse.thought_signature",
+	"extra_content.google.thought_signature",
+}
+
+func geminiPartThoughtSignature(part ojson.Result) (string, bool) {
+	for _, path := range geminiPartThoughtSignaturePaths {
+		result := part.Get(path)
+		if result.Exists() {
+			return result.String(), true
+		}
+	}
+	return "", false
+}
+
+func hasNormalizedGeminiPartThoughtSignature(part ojson.Result, replaySignature string) bool {
+	canonicalCount := 0
+	part.ForEach(func(key, _ ojson.Result) bool {
+		if key.String() == "thoughtSignature" {
+			canonicalCount++
+		}
+		return true
+	})
+	canonical := part.Get("thoughtSignature")
+	if canonicalCount != 1 || canonical.Type != ojson.String || canonical.String() != replaySignature {
+		return false
+	}
+	for _, path := range geminiPartThoughtSignaturePaths[1:] {
+		if part.Get(path).Exists() {
+			return false
+		}
+	}
+	return true
+}
+
 // ValidateGeminiThoughtSignatures validates thoughtSignature fields in a Gemini
 // native payload. The first functionCall in each parallel-call group of a model
 // Content must have a valid provider signature or allowed synthetic sentinel.

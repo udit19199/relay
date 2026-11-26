@@ -219,14 +219,7 @@ func TestDefaultTokenCountTranslatorPairs(t *testing.T) {
 		want  string
 	}{
 		{"openai-to-claude", sdktranslator.FormatOpenAI, sdktranslator.FormatClaude, `{"usage":{"prompt_tokens":13}}`, `{"input_tokens":13}`},
-		{"openai-to-gemini", sdktranslator.FormatOpenAI, sdktranslator.FormatGemini, `{"usage":{"prompt_tokens":13}}`, `{"totalTokens":13,"promptTokensDetails":[{"modality":"TEXT","tokenCount":13}]}`},
-		{"gemini-to-claude", sdktranslator.FormatGemini, sdktranslator.FormatClaude, `{"totalTokens":13,"usageMetadata":{"promptTokenCount":13}}`, `{"input_tokens":13}`},
 		{"codex-to-claude", sdktranslator.FormatCodex, sdktranslator.FormatClaude, `{"response":{"usage":{"input_tokens":13,"total_tokens":13}}}`, `{"input_tokens":13}`},
-		{"codex-to-gemini", sdktranslator.FormatCodex, sdktranslator.FormatGemini, `{"response":{"usage":{"input_tokens":13,"total_tokens":13}}}`, `{"totalTokens":13,"promptTokensDetails":[{"modality":"TEXT","tokenCount":13}]}`},
-		{"claude-to-gemini", sdktranslator.FormatClaude, sdktranslator.FormatGemini, `{"input_tokens":13}`, `{"totalTokens":13,"promptTokensDetails":[{"modality":"TEXT","tokenCount":13}]}`},
-		{"gemini-to-gemini", sdktranslator.FormatGemini, sdktranslator.FormatGemini, `{"totalTokens":13,"usageMetadata":{"promptTokenCount":13}}`, `{"totalTokens":13,"promptTokensDetails":[{"modality":"TEXT","tokenCount":13}]}`},
-		{"antigravity-to-claude", sdktranslator.FormatAntigravity, sdktranslator.FormatClaude, `{"totalTokens":13}`, `{"input_tokens":13}`},
-		{"antigravity-to-gemini", sdktranslator.FormatAntigravity, sdktranslator.FormatGemini, `{"totalTokens":13}`, `{"totalTokens":13,"promptTokensDetails":[{"modality":"TEXT","tokenCount":13}]}`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -3058,7 +3058,7 @@ func TestClaudeExecutor_CountTokensCountsLocallyWithoutUpstreamRequest(t *testin
 		Payload: payload,
 	}, cliproxyexecutor.Options{
 		SourceFormat:   sdktranslator.FormatClaude,
-		ResponseFormat: sdktranslator.FormatGemini,
+		ResponseFormat: sdktranslator.FormatClaude,
 	})
 	if err != nil {
 		t.Fatalf("CountTokens() Gemini response error = %v", err)
@@ -10494,13 +10494,13 @@ func TestClaudeExecutor_ChatCompletionsDefaultMaxTokensAndPayloadDefaultRule(t *
 			},
 			{
 				name:      "gemini omitted maxOutputTokens uses payload.default",
-				format:    sdktranslator.FormatGemini,
+				format:    sdktranslator.FormatClaude,
 				payload:   `{"contents":[{"role":"user","parts":[{"text":"hi"}]}]}`,
 				wantLimit: 16384,
 			},
 			{
 				name:      "gemini explicit maxOutputTokens preserved",
-				format:    sdktranslator.FormatGemini,
+				format:    sdktranslator.FormatClaude,
 				payload:   `{"contents":[{"role":"user","parts":[{"text":"hi"}]}],"generationConfig":{"maxOutputTokens":4096}}`,
 				wantLimit: 4096,
 			},

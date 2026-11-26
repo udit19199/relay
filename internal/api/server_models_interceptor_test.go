@@ -126,51 +126,6 @@ func TestModelsEndpoint_ExposesResponseToPluginInterceptors_Claude(t *testing.T)
 	}
 }
 
-func TestModelsEndpoint_ExposesResponseToPluginInterceptors_Gemini(t *testing.T) {
-	server := newTestServer(t)
-
-	var intercepted bool
-	var capturedReq pluginapi.ResponseInterceptRequest
-
-	server.handlers.SetPluginHost(&mockModelListInterceptorHost{
-		interceptResponse: func(_ context.Context, req pluginapi.ResponseInterceptRequest) pluginapi.ResponseInterceptResponse {
-			intercepted = true
-			capturedReq = req
-			headers := make(http.Header)
-			for k, v := range req.ResponseHeaders {
-				headers[k] = v
-			}
-			headers.Set("X-Plugin-Gemini", "true")
-			transformedBody := `{"models":[{"name":"models/gemini-custom","displayName":"Custom Gemini"}]}`
-			return pluginapi.ResponseInterceptResponse{
-				Headers: headers,
-				Body:    []byte(transformedBody),
-			}
-		},
-	})
-
-	req := httptest.NewRequest(http.MethodGet, "/v1beta/models", nil)
-	req.Header.Set("Authorization", "Bearer test-key")
-	rr := httptest.NewRecorder()
-	server.engine.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d body = %s", rr.Code, http.StatusOK, rr.Body.String())
-	}
-	if !intercepted {
-		t.Fatal("plugin InterceptResponse was not called for /v1beta/models")
-	}
-	if capturedReq.SourceFormat != "gemini" {
-		t.Fatalf("captured SourceFormat = %q, want %q", capturedReq.SourceFormat, "gemini")
-	}
-	if rr.Header().Get("X-Plugin-Gemini") != "true" {
-		t.Fatalf("header X-Plugin-Gemini = %q, want %q", rr.Header().Get("X-Plugin-Gemini"), "true")
-	}
-	if !strings.Contains(rr.Body.String(), "gemini-custom") {
-		t.Fatalf("response body did not contain intercepted model: %s", rr.Body.String())
-	}
-}
-
 func TestModelsEndpoint_ExposesResponseToPluginInterceptors_GrokShell(t *testing.T) {
 	server := newTestServer(t)
 

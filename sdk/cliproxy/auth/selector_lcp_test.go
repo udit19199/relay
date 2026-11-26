@@ -504,58 +504,6 @@ func TestSessionAffinityCodexSubagentInheritsParentThread(t *testing.T) {
 	}
 }
 
-func TestSessionAffinityCodexForkInheritsParentOnGeminiModel(t *testing.T) {
-	t.Parallel()
-
-	selector := NewSessionAffinitySelectorWithConfig(SessionAffinityConfig{
-		Fallback: &RoundRobinSelector{},
-		TTL:      time.Minute,
-	})
-	defer selector.Stop()
-
-	auths := []*Auth{{ID: "auth-1", Provider: "antigravity"}, {ID: "auth-2", Provider: "antigravity"}}
-
-	// 1. Parent thread binds to an antigravity auth
-	parentOpts := cliproxyexecutor.Options{
-		Headers:         http.Header{"Session-Id": []string{"parent-gemini-thread"}},
-		OriginalRequest: []byte(`{"input":[{"role":"user","content":"parent query"}]}`),
-		Metadata:        map[string]any{},
-	}
-	parentAuth, errParent := selector.Pick(context.Background(), "mixed", "gemini-3.8-flash-high", parentOpts, auths)
-	if errParent != nil {
-		t.Fatalf("parent Pick() error = %v", errParent)
-	}
-
-	// 2. Forked thread carries X-Codex-Turn-Metadata with forked_from_thread_id
-	// Even on Gemini/Antigravity where subagents are non-inheriting, conversational FORKS must inherit parent auth!
-	forkOpts := cliproxyexecutor.Options{
-		Headers: http.Header{
-			"Session-Id": []string{"fork-gemini-thread"},
-			"X-Codex-Turn-Metadata": []string{
-				`{"session_id":"fork-gemini-thread","forked_from_thread_id":"parent-gemini-thread","request_kind":"turn"}`,
-			},
-		},
-		OriginalRequest: []byte(`{"input":[{"role":"user","content":"fork query"}]}`),
-		Metadata:        map[string]any{},
-	}
-	forkAuth, errFork := selector.Pick(context.Background(), "mixed", "gemini-3.8-flash-high", forkOpts, auths)
-	if errFork != nil {
-		t.Fatalf("fork Pick() error = %v", errFork)
-	}
-	if forkAuth.ID != parentAuth.ID {
-		t.Fatalf("conversational fork did not inherit parent auth on Gemini: got %q, want %q", forkAuth.ID, parentAuth.ID)
-	}
-	if got := forkOpts.Metadata[cliproxyexecutor.CanonicalSessionIDMetadataKey]; got != "codex:fork-gemini-thread" {
-		t.Fatalf("fork canonical session ID = %v, want codex:fork-gemini-thread", got)
-	}
-	if got := forkOpts.Metadata[cliproxyexecutor.ParentSessionIDMetadataKey]; got != "codex:parent-gemini-thread" {
-		t.Fatalf("fork parent session ID = %v, want codex:parent-gemini-thread", got)
-	}
-	if isFork, ok := forkOpts.Metadata[cliproxyexecutor.IsForkMetadataKey].(bool); !ok || !isFork {
-		t.Fatalf("expected is_fork=true in metadata, got %v", forkOpts.Metadata[cliproxyexecutor.IsForkMetadataKey])
-	}
-}
-
 func TestSessionAffinityCodexMultiAgentV2CollabSpawn(t *testing.T) {
 	t.Parallel()
 
@@ -1073,25 +1021,6 @@ func TestSessionAffinitySelectorPromptCacheKeyCamelCase(t *testing.T) {
 	}
 }
 
-func TestSessionAffinitySelectorNestedAntigravityPayload(t *testing.T) {
-	t.Parallel()
-
-	payload := []byte(`{
-		"project_id": "proj-123",
-		"request": {
-			"parentSessionId": "parent-456",
-			"sessionId": "child-789"
-		}
-	}`)
-	primary, fallback := extractExplicitSessionIDs(nil, payload, nil)
-	if primary != "session:child-789" {
-		t.Fatalf("primary = %q, want session:child-789", primary)
-	}
-	if fallback != "session:parent-456" {
-		t.Fatalf("fallback = %q, want session:parent-456", fallback)
-	}
-}
-
 func TestSessionCacheTinyTTLNoPanic(t *testing.T) {
 	t.Parallel()
 
@@ -1102,74 +1031,6 @@ func TestSessionCacheTinyTTLNoPanic(t *testing.T) {
 	cache.Set("test-key", "auth-1")
 	cache.Touch("test-key", "auth-1")
 	cache.Stop()
-}
-
-func TestSessionAffinityClaudeMetadataSubagentNonInheritingGeminiModel(t *testing.T) {
-	t.Parallel()
-
-	selector := NewSessionAffinitySelectorWithConfig(SessionAffinityConfig{
-		Fallback:         &RoundRobinSelector{},
-		TTL:              time.Minute,
-		SubagentAffinity: boolPointer(false),
-	})
-	defer selector.Stop()
-
-	auths := []*Auth{
-		{ID: "auth-a", Provider: "antigravity", Status: StatusActive},
-		{ID: "auth-b", Provider: "antigravity", Status: StatusActive},
-	}
-
-	// 1. Parent request binds to auth-a
-	parentOpts := cliproxyexecutor.Options{
-		OriginalRequest: []byte(`{"model":"gemini-3.7-flash-high","metadata":{"user_id":"{\"device_id\":\"dev-1\",\"session_id\":\"sess-main-1\"}"},"messages":[{"role":"user","content":"parent task"}]}`),
-		Metadata:        map[string]any{},
-	}
-	parentAuth, errParent := selector.Pick(context.Background(), "mixed", "gemini-3.7-flash-high", parentOpts, auths)
-	if errParent != nil {
-		t.Fatalf("parent Pick() error = %v", errParent)
-	}
-	if parentAuth.ID != "auth-a" {
-		t.Fatalf("parent auth = %q, want auth-a", parentAuth.ID)
-	}
-	if got := parentOpts.Metadata[cliproxyexecutor.CanonicalSessionIDMetadataKey]; got != "claude:sess-main-1" {
-		t.Fatalf("parent canonical session ID = %v, want claude:sess-main-1", got)
-	}
-
-	// 2. Subagent 1 request with X-Claude-Code-Agent-Id header and metadata.user_id in payload
-	subagent1Opts := cliproxyexecutor.Options{
-		Headers: http.Header{
-			"X-Claude-Code-Agent-Id": []string{"subagent-001"},
-		},
-		OriginalRequest: []byte(`{"model":"gemini-3.7-flash-high","metadata":{"user_id":"{\"device_id\":\"dev-1\",\"session_id\":\"sess-main-1\"}"},"messages":[{"role":"user","content":"subagent 1 task"}]}`),
-		Metadata:        map[string]any{},
-	}
-	subagent1Auth, errSub1 := selector.Pick(context.Background(), "mixed", "gemini-3.7-flash-high", subagent1Opts, auths)
-	if errSub1 != nil {
-		t.Fatalf("subagent 1 Pick() error = %v", errSub1)
-	}
-	// When SubagentAffinity is false, subagents must NOT inherit the parent's auth; they should balance to auth-b
-	if subagent1Auth.ID != "auth-b" {
-		t.Fatalf("subagent 1 should not inherit parent auth when subagent affinity is disabled, got %q, want auth-b", subagent1Auth.ID)
-	}
-	if got := subagent1Opts.Metadata[cliproxyexecutor.CanonicalSessionIDMetadataKey]; got != "claude:sess-main-1:agent:subagent-001" {
-		t.Fatalf("subagent 1 canonical session ID = %v, want claude:sess-main-1:agent:subagent-001", got)
-	}
-
-	// 3. Subsequent turn for subagent 1 must retain auth-b
-	subagent1Turn2Opts := cliproxyexecutor.Options{
-		Headers: http.Header{
-			"X-Claude-Code-Agent-Id": []string{"subagent-001"},
-		},
-		OriginalRequest: []byte(`{"model":"gemini-3.7-flash-high","metadata":{"user_id":"{\"device_id\":\"dev-1\",\"session_id\":\"sess-main-1\"}"},"messages":[{"role":"user","content":"subagent 1 turn 2"}]}`),
-		Metadata:        map[string]any{},
-	}
-	subagent1Turn2Auth, errSub1Turn2 := selector.Pick(context.Background(), "mixed", "gemini-3.7-flash-high", subagent1Turn2Opts, auths)
-	if errSub1Turn2 != nil {
-		t.Fatalf("subagent 1 turn 2 Pick() error = %v", errSub1Turn2)
-	}
-	if subagent1Turn2Auth.ID != "auth-b" {
-		t.Fatalf("subagent 1 turn 2 affinity broken: got %q, want auth-b", subagent1Turn2Auth.ID)
-	}
 }
 
 func TestSessionAffinitySelectorLCPForkDerivesDistinctSessionIDAndParentLineage(t *testing.T) {
@@ -1502,7 +1363,7 @@ func TestSessionAffinitySelectorLCPCompactionPreservesAffinityAndLineage(t *test
 		{"role":"user","parts":[{"text":"step 3"}]}
 	]}`)
 	firstOpts := cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatGemini,
+		SourceFormat:    sdktranslator.FormatClaude,
 		OriginalRequest: firstPayload,
 		Metadata: map[string]any{
 			cliproxyexecutor.CallerScopeMetadataKey: "caller-harness-1",
@@ -1536,7 +1397,7 @@ func TestSessionAffinitySelectorLCPCompactionPreservesAffinityAndLineage(t *test
 		{"role":"user","parts":[{"text":"step 4"}]}
 	]}`)
 	compactedOpts := cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatGemini,
+		SourceFormat:    sdktranslator.FormatClaude,
 		OriginalRequest: compactedPayload,
 		Metadata: map[string]any{
 			cliproxyexecutor.CallerScopeMetadataKey: "caller-harness-1",
@@ -1588,7 +1449,7 @@ func TestSessionAffinitySelectorLCPCompactionPreservesAffinityAndLineage(t *test
 		{"role":"model","parts":[{"text":"ack 4"}]}
 	]}`)
 	nextOpts := cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatGemini,
+		SourceFormat:    sdktranslator.FormatClaude,
 		OriginalRequest: nextPayload,
 		Metadata: map[string]any{
 			cliproxyexecutor.CallerScopeMetadataKey: "caller-harness-1",
@@ -1621,7 +1482,7 @@ func TestSessionAffinitySelectorLookupAffinityProviderAlias(t *testing.T) {
 
 	auths := []*Auth{{ID: "auth-gemini-1", Status: StatusActive}}
 	opts := cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatGemini,
+		SourceFormat:    sdktranslator.FormatClaude,
 		OriginalRequest: []byte(`{"contents":[{"role":"user","parts":[{"text":"hello lookup"}]}]}`),
 		Metadata: map[string]any{
 			cliproxyexecutor.CallerScopeMetadataKey:             "caller-lookup",

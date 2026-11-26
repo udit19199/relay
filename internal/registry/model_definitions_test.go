@@ -72,13 +72,6 @@ func TestCodexConfigurationUpdateCapability(t *testing.T) {
 	}
 }
 
-func TestGetStaticModelDefinitionsByChannelSupportsGeminiInteractions(t *testing.T) {
-	models := GetStaticModelDefinitionsByChannel("gemini-interactions")
-	if len(models) == 0 {
-		t.Fatal("GetStaticModelDefinitionsByChannel(gemini-interactions) returned no models")
-	}
-}
-
 func TestModelOverrideHeadersFromEmbeddedModels(t *testing.T) {
 	const wantUA = "codex-tui/0.154.0 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.154.0)"
 	got := ModelOverrideHeaders("gpt-5.6-luna")
@@ -91,25 +84,6 @@ func TestModelOverrideHeadersFromEmbeddedModels(t *testing.T) {
 	if got := ModelOverrideHeaders("gpt-5.4"); got != nil {
 		t.Fatalf("ModelOverrideHeaders(gpt-5.4) = %#v, want nil", got)
 	}
-}
-
-func TestGeminiVertexModelsUseFlashLiteReleaseID(t *testing.T) {
-	const releaseID = "gemini-3.1-flash-lite"
-	const previewID = releaseID + "-preview"
-
-	for _, model := range GetGeminiVertexModels() {
-		if model == nil {
-			continue
-		}
-		if model.ID == previewID {
-			t.Fatalf("Vertex model ID = %q, want release ID %q", model.ID, releaseID)
-		}
-		if model.ID == releaseID {
-			return
-		}
-	}
-
-	t.Fatalf("Vertex models do not contain %q", releaseID)
 }
 
 func TestWithXAIBuiltinsIncludesImage20(t *testing.T) {

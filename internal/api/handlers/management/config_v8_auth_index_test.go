@@ -305,13 +305,13 @@ api-keys:
 	proxyYAML := `config-version: 8
 port: 8317
 api-keys:
-  vertex:
-    - name: vertex-group
-      base-url: https://api.vertex.invalid
+  codex:
+    - name: codex-proxy-group
+      base-url: https://api.openai.invalid
       proxy-url: http://proxy.group.invalid:8080
       keys:
-        - api-key: sk-vertex-inherited
-        - api-key: sk-vertex-explicit-empty
+        - api-key: sk-codex-proxy-inherited
+        - api-key: sk-codex-proxy-explicit-empty
           proxy-url: ""
 `
 	proxyPath := filepath.Join(dir, "proxy-config.yaml")
@@ -328,7 +328,7 @@ api-keys:
 		IDGenerator: synthesizer.NewStableIDGenerator(),
 	})
 	if errProxySynth != nil || len(proxyAuths) != 2 {
-		t.Fatalf("synthesize vertex auths: %v, len=%d", errProxySynth, len(proxyAuths))
+		t.Fatalf("synthesize codex auths: %v, len=%d", errProxySynth, len(proxyAuths))
 	}
 	proxyManager := coreauth.NewManager(nil, nil, nil)
 	for _, a := range proxyAuths {
@@ -344,21 +344,21 @@ api-keys:
 	routerProxy.GET("/v8/management/config/*path", hProxy.ConfigV8)
 
 	rec = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "/v8/management/config/api-keys/vertex", nil)
+	req = httptest.NewRequest(http.MethodGet, "/v8/management/config/api-keys/codex", nil)
 	routerProxy.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
-		t.Fatalf("GET /v8/management/config/api-keys/vertex: status=%d body=%s", rec.Code, rec.Body.String())
+		t.Fatalf("GET /v8/management/config/api-keys/codex: status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	var vertexGroups []map[string]any
-	if errDecode := json.Unmarshal(rec.Body.Bytes(), &vertexGroups); errDecode != nil {
+	var codexGroups []map[string]any
+	if errDecode := json.Unmarshal(rec.Body.Bytes(), &codexGroups); errDecode != nil {
 		t.Fatalf("decode vertex groups: %v", errDecode)
 	}
-	vertexKeys := vertexGroups[0]["keys"].([]any)
-	if got := vertexKeys[0].(map[string]any)["auth_index"]; got != wantInheritedIndex {
-		t.Fatalf("vertex key 0 auth_index = %q, want %q", got, wantInheritedIndex)
+	codexKeys := codexGroups[0]["keys"].([]any)
+	if got := codexKeys[0].(map[string]any)["auth_index"]; got != wantInheritedIndex {
+		t.Fatalf("codex key 0 auth_index = %q, want %q", got, wantInheritedIndex)
 	}
-	if got := vertexKeys[1].(map[string]any)["auth_index"]; got != wantExplicitEmptyIndex {
-		t.Fatalf("vertex key 1 auth_index = %q, want %q", got, wantExplicitEmptyIndex)
+	if got := codexKeys[1].(map[string]any)["auth_index"]; got != wantExplicitEmptyIndex {
+		t.Fatalf("codex key 1 auth_index = %q, want %q", got, wantExplicitEmptyIndex)
 	}
 
 	// 10. Plugin options and headers retaining auth_index outside of credential level
@@ -436,12 +436,12 @@ api-keys:
 	dupVertexYAML := `config-version: 8
 port: 8317
 api-keys:
-  vertex:
-    - name: vertex-group
-      base-url: https://api.vertex.invalid
+  codex:
+    - name: codex-proxy-group
+      base-url: https://api.openai.invalid
       keys:
-        - api-key: sk-vertex-shared
-        - api-key: sk-vertex-shared
+        - api-key: sk-codex-proxy-shared
+        - api-key: sk-codex-proxy-shared
 `
 	dupVertexPath := filepath.Join(dir, "dup-vertex-config.yaml")
 	if errWrite := os.WriteFile(dupVertexPath, []byte(dupVertexYAML), 0600); errWrite != nil {
@@ -456,7 +456,7 @@ api-keys:
 		Now:         time.Now(),
 		IDGenerator: synthesizer.NewStableIDGenerator(),
 	})
-	// Runtime deduplicates identical vertex keys to 1 credential!
+	// Runtime deduplicates identical codex keys to 1 credential!
 	if errDupSynth != nil || len(dupAuths) != 1 {
 		t.Fatalf("synthesize dup vertex auth: %v, len=%d", errDupSynth, len(dupAuths))
 	}
@@ -471,10 +471,10 @@ api-keys:
 	routerDup.GET("/v8/management/config/*path", hDup.ConfigV8)
 
 	rec = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "/v8/management/config/api-keys/vertex", nil)
+	req = httptest.NewRequest(http.MethodGet, "/v8/management/config/api-keys/codex", nil)
 	routerDup.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
-		t.Fatalf("GET /v8/management/config/api-keys/vertex: status=%d body=%s", rec.Code, rec.Body.String())
+		t.Fatalf("GET /v8/management/config/api-keys/codex: status=%d body=%s", rec.Code, rec.Body.String())
 	}
 	var dupVertexGroups []map[string]any
 	if errDecode := json.Unmarshal(rec.Body.Bytes(), &dupVertexGroups); errDecode != nil {

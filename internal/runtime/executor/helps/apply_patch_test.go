@@ -28,7 +28,7 @@ func TestApplyPatchTranslationError(t *testing.T) {
 
 func TestApplyPatchFinalizeOptionalCanonicalState(t *testing.T) {
 	original := []byte(`{"tools":[{"type":"custom","name":"apply_patch"}]}`)
-	for _, source := range []sdktranslator.Format{sdktranslator.FormatOpenAI, sdktranslator.FormatClaude, sdktranslator.FormatGemini, sdktranslator.FormatInteractions} {
+	for _, source := range []sdktranslator.Format{sdktranslator.FormatOpenAI, sdktranslator.FormatClaude, sdktranslator.FormatClaude, sdktranslator.FormatInteractions} {
 		t.Run(source.String(), func(t *testing.T) {
 			var param any
 			InitializeApplyPatchStream(context.Background(), source, sdktranslator.FormatOpenAIResponse, "model", original, original, &param)
@@ -106,7 +106,7 @@ func TestApplyPatchCanceledEOFStillRecordsFailure(t *testing.T) {
 	usage.RegisterNamedPlugin("task6-canceled-eof", capture)
 	var param any
 	original := []byte(`{"tools":[{"type":"custom","name":"apply_patch"}]}`)
-	InitializeApplyPatchStream(context.Background(), sdktranslator.FormatGemini, sdktranslator.FormatOpenAIResponse, "m", original, original, &param)
+	InitializeApplyPatchStream(context.Background(), sdktranslator.FormatClaude, sdktranslator.FormatOpenAIResponse, "m", original, original, &param)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	reporter := NewUsageReporter(ctx, "task6-canceled-eof", "m", nil)

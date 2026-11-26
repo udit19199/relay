@@ -59,7 +59,6 @@ func TestDevinExecutorRefusesAnUnsendableMediaOnlyTurnBeforeCallingUpstream(t *t
 		{"inline audio", sdktranslator.FormatInteractions, devinInteractionsPayload(`{"type":"user_input","content":[{"type":"audio","mime_type":"audio/wav","data":"UklGRg=="}]}`), "audio"},
 		{"whitespace text does not hide it", sdktranslator.FormatInteractions, devinInteractionsPayload(`{"type":"user_input","content":[{"type":"text","text":" \n"},{"type":"video","mime_type":"video/mp4","uri":"https://example.test/a.mp4"}]}`), "video"},
 		{"emptied turn before a later text turn", sdktranslator.FormatInteractions, `{"input":[{"type":"user_input","content":[{"type":"image","mime_type":"image/png","uri":"https://example.test/a.png"}]},{"type":"model_output","content":[{"type":"text","text":"ok"}]},{"type":"user_input","content":[{"type":"text","text":"next"}]}]}`, "image"},
-		{"gemini fileData through interactions", sdktranslator.FormatGemini, geminiFile, "image"},
 		{"claude whitespace text beside an unrepresentable image", sdktranslator.FormatClaude, claudeWhitespaceImage, "image"},
 	}
 	for _, tc := range cases {
