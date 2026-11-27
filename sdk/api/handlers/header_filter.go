@@ -106,6 +106,24 @@ func connectionScopedHeaders(src http.Header) map[string]struct{} {
 	return scoped
 }
 
+func cloneHeader(src http.Header) http.Header {
+	if src == nil {
+		return nil
+	}
+	dst := make(http.Header, len(src))
+	for key, values := range src {
+		dst[key] = append([]string(nil), values...)
+	}
+	return dst
+}
+
+func downstreamHeadersFromExecutor(headers http.Header, passthrough bool) http.Header {
+	if !passthrough {
+		return nil
+	}
+	return FilterUpstreamHeaders(headers)
+}
+
 // WriteUpstreamHeaders writes filtered upstream headers to the gin response writer.
 // Headers already set by CPA (e.g., Content-Type) are NOT overwritten.
 func WriteUpstreamHeaders(dst http.Header, src http.Header) {

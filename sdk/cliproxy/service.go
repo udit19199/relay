@@ -9,7 +9,6 @@ import (
 	"sync/atomic"
 
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/api"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/pluginhost"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/watcher"
 	sdkaccess "github.com/router-for-me/CLIProxyAPI/v8/sdk/access"
 	sdkAuth "github.com/router-for-me/CLIProxyAPI/v8/sdk/auth"
@@ -97,9 +96,6 @@ type Service struct {
 
 	// cooldownStateStore persists runtime cooldown state when enabled.
 	cooldownStateStore coreauth.CooldownStateStore
-
-	// pluginHost owns dynamic plugin lifecycle and runtime capability adapters.
-	pluginHost *pluginhost.Host
 
 	// shutdownOnce ensures shutdown is called only once.
 	shutdownOnce sync.Once

@@ -13,10 +13,8 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gin-gonic/gin"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/clienterror"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 	log "github.com/sirupsen/logrus"
 	xcurrency "golang.org/x/text/currency"
 )
@@ -25,7 +23,6 @@ type credentialQuotaRequest struct {
 	AuthIndexSnake  *string `json:"auth_index"`
 	AuthIndexCamel  *string `json:"authIndex"`
 	AuthIndexPascal *string `json:"AuthIndex"`
-	PluginID        string  `json:"plugin_id"`
 	Provider        string  `json:"provider"`
 }
 
@@ -40,22 +37,6 @@ func (r credentialQuotaRequest) resolveAuthIndex() string {
 		return strings.TrimSpace(*r.AuthIndexPascal)
 	}
 	return ""
-}
-
-// GetQuotaProviders returns the list of registered quota providers.
-func (h *Handler) GetQuotaProviders(c *gin.Context) {
-	if h == nil {
-		c.JSON(http.StatusOK, gin.H{"providers": []any{}})
-		return
-	}
-	h.mu.Lock()
-	host := h.pluginHost
-	h.mu.Unlock()
-	if host == nil {
-		c.JSON(http.StatusOK, gin.H{"providers": []any{}})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"providers": host.QuotaProviders(c.Request.Context())})
 }
 
 // FetchCredentialQuota retrieves normalized quota for a credential via its quota provider or declarative probe.
@@ -103,43 +84,6 @@ func (h *Handler) FetchCredentialQuota(c *gin.Context) {
 		return
 	}
 
-	h.mu.Lock()
-	host := h.pluginHost
-	h.mu.Unlock()
-
-	pluginID := strings.TrimSpace(body.PluginID)
-	provider := strings.TrimSpace(body.Provider)
-	if provider == "" {
-		provider = auth.Provider
-	}
-
-	if host != nil {
-		req := pluginapi.QuotaFetchRequest{
-			AuthIndex:  auth.Index,
-			AuthID:     auth.ID,
-			Provider:   provider,
-			Metadata:   auth.Metadata,
-			Attributes: auth.Attributes,
-		}
-		var quotaResp pluginapi.QuotaFetchResponse
-		var handled bool
-		var errFetch error
-		if pluginID != "" {
-			quotaResp, handled, errFetch = host.FetchQuotaByPlugin(c.Request.Context(), pluginID, req)
-		} else {
-			quotaResp, handled, errFetch = host.FetchQuota(c.Request.Context(), req)
-		}
-		if handled {
-			if errFetch != nil {
-				log.WithError(errFetch).Warnf("failed to fetch quota for credential %s", auth.Index)
-				c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("failed to fetch quota: %v", errFetch)})
-				return
-			}
-			c.JSON(http.StatusOK, quotaResp)
-			return
-		}
-	}
-
 	// Fallback to declarative quota probe if configured in metadata
 	if auth.Metadata != nil {
 		if rawProbe, okProbe := auth.Metadata["quota_probe"]; okProbe && rawProbe != nil {
@@ -160,259 +104,11 @@ func (h *Handler) FetchCredentialQuota(c *gin.Context) {
 	c.JSON(http.StatusNotImplemented, gin.H{"error": "no quota provider available for credential"})
 }
 
-// ResetCredentialQuota resets quota or usage for a credential.
-func (h *Handler) ResetCredentialQuota(c *gin.Context) {
-	var body credentialQuotaRequest
-	if errBind := c.ShouldBindJSON(&body); errBind != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
-		return
-	}
-	authIndex := body.resolveAuthIndex()
-	if authIndex == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "auth_index is required"})
-		return
-	}
-
-	auth := h.authByIndex(authIndex)
-	if auth == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "auth not found"})
-		return
-	}
-
-	h.mu.Lock()
-	host := h.pluginHost
-	h.mu.Unlock()
-
-	if host == nil {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "plugin host unavailable"})
-		return
-	}
-
-	pluginID := strings.TrimSpace(body.PluginID)
-	provider := strings.TrimSpace(body.Provider)
-	if provider == "" {
-		provider = auth.Provider
-	}
-
-	req := pluginapi.QuotaResetRequest{
-		AuthIndex:  auth.Index,
-		AuthID:     auth.ID,
-		Provider:   provider,
-		Metadata:   auth.Metadata,
-		Attributes: auth.Attributes,
-	}
-
-	var resetResp pluginapi.QuotaResetResponse
-	var handled bool
-	var errReset error
-
-	if pluginID != "" {
-		if !host.HasQuotaProviderForPlugin(pluginID) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "quota provider not found for plugin"})
-			return
-		}
-		resetResp, handled, errReset = host.ResetQuotaByPlugin(c.Request.Context(), pluginID, req)
-		if !handled {
-			c.JSON(http.StatusNotFound, gin.H{"error": "quota provider not found for plugin"})
-			return
-		}
-	} else {
-		if !host.HasQuotaProviderContext(c.Request.Context(), provider) {
-			c.JSON(http.StatusNotImplemented, gin.H{"error": "no quota provider available for credential to reset"})
-			return
-		}
-		resetResp, handled, errReset = host.ResetQuota(c.Request.Context(), req)
-		if !handled {
-			c.JSON(http.StatusBadGateway, gin.H{"error": "quota provider did not handle reset request"})
-			return
-		}
-	}
-
-	if errReset != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("plugin quota reset failed: %v", errReset)})
-		return
-	}
-	if !resetResp.Success {
-		msg := resetResp.Message
-		if msg == "" {
-			msg = "quota reset rejected by provider"
-		}
-		c.JSON(http.StatusBadGateway, gin.H{"error": msg})
-		return
-	}
-
-	if h.authManager != nil {
-		updated, _, errResetCore := h.authManager.ResetQuota(c.Request.Context(), auth.ID)
-		if errResetCore != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to reset routing quota: %v", errResetCore)})
-			return
-		}
-		if updated != nil {
-			updated.EnsureIndex()
-		}
-	}
-
-	resp := gin.H{
-		"status":     "ok",
-		"auth_index": auth.Index,
-	}
-	if resetResp.Message != "" {
-		resp["message"] = resetResp.Message
-	}
-	c.JSON(http.StatusOK, resp)
-}
-
-// GetPluginQuota handles GET /v0/management/plugins/:id/quota?auth_index=...
-func (h *Handler) GetPluginQuota(c *gin.Context) {
-	pluginID := strings.TrimSpace(c.Param("id"))
-	authIndex := strings.TrimSpace(c.Query("auth_index"))
-	if authIndex == "" {
-		authIndex = strings.TrimSpace(c.Query("authIndex"))
-	}
-	if authIndex == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "auth_index is required"})
-		return
-	}
-	h.fetchQuotaForPlugin(c, pluginID, authIndex)
-}
-
-// FetchPluginQuota handles POST /v0/management/plugins/:id/quota
-func (h *Handler) FetchPluginQuota(c *gin.Context) {
-	pluginID := strings.TrimSpace(c.Param("id"))
-	var body credentialQuotaRequest
-	if errBind := c.ShouldBindJSON(&body); errBind != nil {
-		c.JSON(clienterror.HTTPStatusFromErrorOr(errBind, http.StatusBadRequest), gin.H{"error": "invalid request body"})
-		return
-	}
-	authIndex := body.resolveAuthIndex()
-	if authIndex == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "auth_index is required"})
-		return
-	}
-	h.fetchQuotaForPlugin(c, pluginID, authIndex)
-}
-
-func (h *Handler) fetchQuotaForPlugin(c *gin.Context, pluginID, authIndex string) {
-	auth := h.authByIndex(authIndex)
-	if auth == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "auth not found"})
-		return
-	}
-
-	h.mu.Lock()
-	host := h.pluginHost
-	h.mu.Unlock()
-
-	if host == nil || !host.HasQuotaProviderForPlugin(pluginID) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "quota provider not found for plugin"})
-		return
-	}
-
-	quotaResp, handled, errFetch := host.FetchQuotaByPlugin(c.Request.Context(), pluginID, pluginapi.QuotaFetchRequest{
-		AuthIndex:  auth.Index,
-		AuthID:     auth.ID,
-		Provider:   auth.Provider,
-		Metadata:   auth.Metadata,
-		Attributes: auth.Attributes,
-	})
-	if !handled {
-		c.JSON(http.StatusNotFound, gin.H{"error": "quota provider not found for plugin"})
-		return
-	}
-	if errFetch != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("failed to fetch quota: %v", errFetch)})
-		return
-	}
-	c.JSON(http.StatusOK, quotaResp)
-}
-
-// ResetPluginQuota handles DELETE /v0/management/plugins/:id/quota and POST /v0/management/plugins/:id/quota/reset
-func (h *Handler) ResetPluginQuota(c *gin.Context) {
-	pluginID := strings.TrimSpace(c.Param("id"))
-	authIndex := strings.TrimSpace(c.Query("auth_index"))
-	if authIndex == "" {
-		authIndex = strings.TrimSpace(c.Query("authIndex"))
-	}
-	if authIndex == "" {
-		var body credentialQuotaRequest
-		if errBind := c.ShouldBindJSON(&body); errBind != nil {
-			if status := clienterror.HTTPStatusFromError(errBind); status == http.StatusRequestEntityTooLarge {
-				c.JSON(status, gin.H{"error": errBind.Error()})
-				return
-			}
-		}
-		authIndex = body.resolveAuthIndex()
-	}
-	if authIndex == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "auth_index is required"})
-		return
-	}
-
-	auth := h.authByIndex(authIndex)
-	if auth == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "auth not found"})
-		return
-	}
-
-	h.mu.Lock()
-	host := h.pluginHost
-	h.mu.Unlock()
-
-	if host == nil || !host.HasQuotaProviderForPlugin(pluginID) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "quota provider not found for plugin"})
-		return
-	}
-
-	resetResp, handled, errReset := host.ResetQuotaByPlugin(c.Request.Context(), pluginID, pluginapi.QuotaResetRequest{
-		AuthIndex:  auth.Index,
-		AuthID:     auth.ID,
-		Provider:   auth.Provider,
-		Metadata:   auth.Metadata,
-		Attributes: auth.Attributes,
-	})
-	if !handled {
-		c.JSON(http.StatusNotFound, gin.H{"error": "quota provider not found for plugin"})
-		return
-	}
-	if errReset != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("failed to reset quota: %v", errReset)})
-		return
-	}
-	if !resetResp.Success {
-		msg := resetResp.Message
-		if msg == "" {
-			msg = "quota reset rejected by plugin"
-		}
-		c.JSON(http.StatusBadGateway, gin.H{"error": msg})
-		return
-	}
-
-	if h.authManager != nil {
-		updated, _, errResetCore := h.authManager.ResetQuota(c.Request.Context(), auth.ID)
-		if errResetCore != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to reset routing quota: %v", errResetCore)})
-			return
-		}
-		if updated != nil {
-			updated.EnsureIndex()
-		}
-	}
-
-	resp := gin.H{
-		"status":     "ok",
-		"auth_index": auth.Index,
-	}
-	if resetResp.Message != "" {
-		resp["message"] = resetResp.Message
-	}
-	c.JSON(http.StatusOK, resp)
-}
-
-func (h *Handler) executeQuotaProbe(c *gin.Context, auth *coreauth.Auth, probe map[string]any) (pluginapi.QuotaFetchResponse, bool, error) {
+func (h *Handler) executeQuotaProbe(c *gin.Context, auth *coreauth.Auth, probe map[string]any) (QuotaFetchResponse, bool, error) {
 	urlStr, _ := probe["url"].(string)
 	urlStr = strings.TrimSpace(urlStr)
 	if urlStr == "" {
-		return pluginapi.QuotaFetchResponse{}, false, nil
+		return QuotaFetchResponse{}, false, nil
 	}
 
 	method, _ := probe["method"].(string)
@@ -442,10 +138,10 @@ func (h *Handler) executeQuotaProbe(c *gin.Context, auth *coreauth.Auth, probe m
 		var errToken error
 		token, errToken = h.resolveTokenForAuth(c.Request.Context(), auth, "")
 		if errToken != nil {
-			return pluginapi.QuotaFetchResponse{}, true, fmt.Errorf("probe authentication failed: %w", errToken)
+			return QuotaFetchResponse{}, true, fmt.Errorf("probe authentication failed: %w", errToken)
 		}
 		if token == "" {
-			return pluginapi.QuotaFetchResponse{}, true, fmt.Errorf("probe authentication token not found for credential")
+			return QuotaFetchResponse{}, true, fmt.Errorf("probe authentication token not found for credential")
 		}
 		urlStr = strings.ReplaceAll(urlStr, "$TOKEN$", token)
 		rawData = strings.ReplaceAll(rawData, "$TOKEN$", token)
@@ -458,7 +154,7 @@ func (h *Handler) executeQuotaProbe(c *gin.Context, auth *coreauth.Auth, probe m
 
 	req, errReq := http.NewRequestWithContext(c.Request.Context(), method, urlStr, reqBody)
 	if errReq != nil {
-		return pluginapi.QuotaFetchResponse{}, false, fmt.Errorf("build probe request: %w", errReq)
+		return QuotaFetchResponse{}, false, fmt.Errorf("build probe request: %w", errReq)
 	}
 
 	for k, v := range headers {
@@ -476,7 +172,7 @@ func (h *Handler) executeQuotaProbe(c *gin.Context, auth *coreauth.Auth, probe m
 
 	resp, errDo := client.Do(req)
 	if errDo != nil {
-		return pluginapi.QuotaFetchResponse{}, true, fmt.Errorf("probe request failed: %w", errDo)
+		return QuotaFetchResponse{}, true, fmt.Errorf("probe request failed: %w", errDo)
 	}
 	defer func() {
 		if errClose := resp.Body.Close(); errClose != nil {
@@ -486,15 +182,15 @@ func (h *Handler) executeQuotaProbe(c *gin.Context, auth *coreauth.Auth, probe m
 
 	respBytes, errRead := io.ReadAll(resp.Body)
 	if errRead != nil {
-		return pluginapi.QuotaFetchResponse{}, true, fmt.Errorf("read probe response: %w", errRead)
+		return QuotaFetchResponse{}, true, fmt.Errorf("read probe response: %w", errRead)
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return pluginapi.QuotaFetchResponse{}, true, fmt.Errorf("probe returned status %d: %s", resp.StatusCode, string(respBytes))
+		return QuotaFetchResponse{}, true, fmt.Errorf("probe returned status %d: %s", resp.StatusCode, string(respBytes))
 	}
 
 	if !json.Valid(respBytes) {
-		return pluginapi.QuotaFetchResponse{}, true, fmt.Errorf("upstream probe response is not valid JSON")
+		return QuotaFetchResponse{}, true, fmt.Errorf("upstream probe response is not valid JSON")
 	}
 
 	var serverOffsetMs int64
@@ -507,7 +203,7 @@ func (h *Handler) executeQuotaProbe(c *gin.Context, auth *coreauth.Auth, probe m
 	if mappingRaw, okMapping := probe["mapping"].(map[string]any); okMapping {
 		mappedResp, errMap := mapProbeResponse(respBytes, mappingRaw)
 		if errMap != nil {
-			return pluginapi.QuotaFetchResponse{}, true, fmt.Errorf("probe response mapping failed: %w", errMap)
+			return QuotaFetchResponse{}, true, fmt.Errorf("probe response mapping failed: %w", errMap)
 		}
 		if mappedResp.ServerTimeOffsetMs == 0 {
 			mappedResp.ServerTimeOffsetMs = serverOffsetMs
@@ -519,15 +215,15 @@ func (h *Handler) executeQuotaProbe(c *gin.Context, auth *coreauth.Auth, probe m
 	if errRaw := json.Unmarshal(respBytes, &rawQuota); errRaw == nil {
 		for key := range rawQuota {
 			if strings.EqualFold(key, "summary") {
-				delete(rawQuota, key) // Optional plugin data must not invalidate core quota fields.
+				delete(rawQuota, key) // Optional upstream data must not invalidate core quota fields.
 			}
 		}
 		if coreQuotaJSON, errMarshal := json.Marshal(rawQuota); errMarshal == nil {
-			var quotaResp pluginapi.QuotaFetchResponse
+			var quotaResp QuotaFetchResponse
 			if errJSON := json.Unmarshal(coreQuotaJSON, &quotaResp); errJSON == nil {
 				hasPlan := quotaResp.Subscription != nil && strings.TrimSpace(quotaResp.Subscription.Plan) != ""
 				// Filter groups to retain only buckets with an actual valid numeric remaining fraction in raw JSON
-				filteredGroups := make([]pluginapi.QuotaGroup, 0, len(quotaResp.Groups))
+				filteredGroups := make([]QuotaGroup, 0, len(quotaResp.Groups))
 				groupsRes := ojson.GetBytesNoCopy(respBytes, "groups")
 				if groupsRes.IsArray() {
 					for gIdx, grp := range groupsRes.Array() {
@@ -539,7 +235,7 @@ func (h *Handler) executeQuotaProbe(c *gin.Context, auth *coreauth.Auth, probe m
 							continue
 						}
 						origGroup := quotaResp.Groups[gIdx]
-						validBuckets := make([]pluginapi.QuotaBucket, 0, len(origGroup.Buckets))
+						validBuckets := make([]QuotaBucket, 0, len(origGroup.Buckets))
 						for bIdx, bkt := range bucketsRes.Array() {
 							if bIdx >= len(origGroup.Buckets) {
 								break
@@ -574,10 +270,10 @@ func (h *Handler) executeQuotaProbe(c *gin.Context, auth *coreauth.Auth, probe m
 		}
 	}
 
-	return pluginapi.QuotaFetchResponse{}, true, fmt.Errorf("upstream probe response does not match normalized quota shape or declared mapping")
+	return QuotaFetchResponse{}, true, fmt.Errorf("upstream probe response does not match normalized quota shape or declared mapping")
 }
 
-func filterUsableQuotaSummary(raw []byte) []pluginapi.QuotaMetric {
+func filterUsableQuotaSummary(raw []byte) []QuotaMetric {
 	var rawQuota map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &rawQuota); err != nil {
 		return nil
@@ -595,7 +291,7 @@ func filterUsableQuotaSummary(raw []byte) []pluginapi.QuotaMetric {
 	if !summaryResult.IsArray() {
 		return nil
 	}
-	usable := make([]pluginapi.QuotaMetric, 0, len(summaryResult.Array()))
+	usable := make([]QuotaMetric, 0, len(summaryResult.Array()))
 	for _, rawMetric := range summaryResult.Array() {
 		keyResult := rawMetric.Get("key")
 		labelResult := rawMetric.Get("label")
@@ -605,7 +301,7 @@ func filterUsableQuotaSummary(raw []byte) []pluginapi.QuotaMetric {
 		if keyResult.Type != ojson.String || labelResult.Type != ojson.String || key == "" || label == "" || value.Type != ojson.Number || math.IsNaN(value.Float()) || math.IsInf(value.Float(), 0) {
 			continue
 		}
-		metric := pluginapi.QuotaMetric{
+		metric := QuotaMetric{
 			Key:   strings.Clone(key),
 			Label: strings.Clone(label),
 			Value: value.Float(),
@@ -659,12 +355,12 @@ func parseNumericFraction(res ojson.Result) (float64, bool) {
 	}
 }
 
-func mapProbeResponse(respBytes []byte, mapping map[string]any) (pluginapi.QuotaFetchResponse, error) {
-	out := pluginapi.QuotaFetchResponse{}
+func mapProbeResponse(respBytes []byte, mapping map[string]any) (QuotaFetchResponse, error) {
+	out := QuotaFetchResponse{}
 	if planPath, ok := mapping["plan"].(string); ok && planPath != "" {
 		if res := ojson.GetBytesNoCopy(respBytes, planPath); res.Exists() && strings.TrimSpace(res.String()) != "" {
 			if out.Subscription == nil {
-				out.Subscription = &pluginapi.QuotaSubscription{}
+				out.Subscription = &QuotaSubscription{}
 			}
 			out.Subscription.Plan = strings.Clone(res.String())
 		}
@@ -672,14 +368,14 @@ func mapProbeResponse(respBytes []byte, mapping map[string]any) (pluginapi.Quota
 	if tierPath, ok := mapping["tier_name"].(string); ok && tierPath != "" {
 		if res := ojson.GetBytesNoCopy(respBytes, tierPath); res.Exists() && strings.TrimSpace(res.String()) != "" {
 			if out.Subscription == nil {
-				out.Subscription = &pluginapi.QuotaSubscription{}
+				out.Subscription = &QuotaSubscription{}
 			}
 			out.Subscription.TierName = strings.Clone(res.String())
 		}
 	} else if tierPath, ok := mapping["tierName"].(string); ok && tierPath != "" {
 		if res := ojson.GetBytesNoCopy(respBytes, tierPath); res.Exists() && strings.TrimSpace(res.String()) != "" {
 			if out.Subscription == nil {
-				out.Subscription = &pluginapi.QuotaSubscription{}
+				out.Subscription = &QuotaSubscription{}
 			}
 			out.Subscription.TierName = strings.Clone(res.String())
 		}
@@ -687,14 +383,14 @@ func mapProbeResponse(respBytes []byte, mapping map[string]any) (pluginapi.Quota
 	if tierIDPath, ok := mapping["tier_id"].(string); ok && tierIDPath != "" {
 		if res := ojson.GetBytesNoCopy(respBytes, tierIDPath); res.Exists() && strings.TrimSpace(res.String()) != "" {
 			if out.Subscription == nil {
-				out.Subscription = &pluginapi.QuotaSubscription{}
+				out.Subscription = &QuotaSubscription{}
 			}
 			out.Subscription.TierID = strings.Clone(res.String())
 		}
 	} else if tierIDPath, ok := mapping["tierId"].(string); ok && tierIDPath != "" {
 		if res := ojson.GetBytesNoCopy(respBytes, tierIDPath); res.Exists() && strings.TrimSpace(res.String()) != "" {
 			if out.Subscription == nil {
-				out.Subscription = &pluginapi.QuotaSubscription{}
+				out.Subscription = &QuotaSubscription{}
 			}
 			out.Subscription.TierID = strings.Clone(res.String())
 		}
@@ -707,7 +403,7 @@ func mapProbeResponse(respBytes []byte, mapping map[string]any) (pluginapi.Quota
 			if !okGM {
 				continue
 			}
-			group := pluginapi.QuotaGroup{}
+			group := QuotaGroup{}
 			if namePath, okName := gm["display_name"].(string); okName {
 				if res := ojson.GetBytesNoCopy(respBytes, namePath); res.Exists() && strings.TrimSpace(res.String()) != "" {
 					group.DisplayName = strings.Clone(res.String())
@@ -764,7 +460,7 @@ func mapProbeResponse(respBytes []byte, mapping map[string]any) (pluginapi.Quota
 						if !hasFraction {
 							continue
 						}
-						bucket := pluginapi.QuotaBucket{
+						bucket := QuotaBucket{
 							Window:            strings.Clone(item.Get(winKey).String()),
 							RemainingFraction: frac,
 							ResetTime:         strings.Clone(item.Get(resetKey).String()),
@@ -804,7 +500,7 @@ func mapProbeResponse(respBytes []byte, mapping map[string]any) (pluginapi.Quota
 					if !hasFraction {
 						continue
 					}
-					bucket := pluginapi.QuotaBucket{
+					bucket := QuotaBucket{
 						RemainingFraction: frac,
 					}
 					if win, ok := bm["window"].(string); ok {

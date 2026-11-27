@@ -32,18 +32,6 @@ func (s *Server) registerManagementRoutes() {
 		mgmt.GET("/config.yaml", s.mgmt.GetConfigYAML)
 		mgmt.PUT("/config.yaml", s.mgmt.PutConfigYAML)
 		mgmt.GET("/latest-version", s.mgmt.GetLatestVersion)
-		mgmt.GET("/plugins", s.mgmt.ListPlugins)
-		mgmt.GET("/plugin-store", s.mgmt.ListPluginStore)
-		mgmt.POST("/plugin-store/:id/install", s.mgmt.InstallPluginFromStore)
-		mgmt.DELETE("/plugins/:id", s.mgmt.DeletePlugin)
-		mgmt.PATCH("/plugins/:id/enabled", s.mgmt.PatchPluginEnabled)
-		mgmt.GET("/plugins/:id/config", s.mgmt.GetPluginConfig)
-		mgmt.PUT("/plugins/:id/config", s.mgmt.PutPluginConfig)
-		mgmt.PATCH("/plugins/:id/config", s.mgmt.PatchPluginConfig)
-		mgmt.GET("/plugins/:id/quota", s.mgmt.GetPluginQuota)
-		mgmt.POST("/plugins/:id/quota", s.mgmt.FetchPluginQuota)
-		mgmt.DELETE("/plugins/:id/quota", s.mgmt.ResetPluginQuota)
-		mgmt.POST("/plugins/:id/quota/reset", s.mgmt.ResetPluginQuota)
 
 		mgmt.GET("/debug", s.mgmt.GetDebug)
 		mgmt.PUT("/debug", s.mgmt.PutDebug)
@@ -81,9 +69,7 @@ func (s *Server) registerManagementRoutes() {
 		mgmt.PATCH("/quota-exceeded/switch-preview-model", s.mgmt.PutSwitchPreviewModel)
 		mgmt.POST("/reset-quota", s.mgmt.ResetQuota)
 
-		mgmt.GET("/quota/providers", s.mgmt.GetQuotaProviders)
 		mgmt.POST("/quota/fetch", s.mgmt.FetchCredentialQuota)
-		mgmt.POST("/quota/reset", s.mgmt.ResetCredentialQuota)
 
 		mgmt.GET("/api-keys", s.mgmt.GetAPIKeys)
 		mgmt.PUT("/api-keys", s.mgmt.PutAPIKeys)
@@ -202,88 +188,6 @@ func (s *Server) managementAvailable(c *gin.Context) bool {
 		return false
 	}
 	return true
-}
-
-func (s *Server) refreshPluginManagementRoutes() {
-	if s == nil || s.pluginHost == nil || s.engine == nil {
-		return
-	}
-	s.pluginHost.RegisterManagementRoutes(context.Background(), s.registeredManagementRouteKeys())
-}
-
-// RefreshPluginManagementRoutes rebuilds plugin-owned Management API routes.
-func (s *Server) RefreshPluginManagementRoutes() {
-	s.refreshPluginManagementRoutes()
-}
-
-func (s *Server) registeredManagementRouteKeys() map[string]struct{} {
-	out := make(map[string]struct{})
-	if s == nil || s.engine == nil {
-		return out
-	}
-	for _, route := range s.engine.Routes() {
-		if strings.HasPrefix(route.Path, "/v0/management/") || route.Path == "/v0/management" {
-			out[strings.ToUpper(strings.TrimSpace(route.Method))+" "+route.Path] = struct{}{}
-		}
-	}
-	return out
-}
-
-func (s *Server) pluginManagementNoRoute(c *gin.Context) {
-	if s == nil || c == nil || c.Request == nil || c.Request.URL == nil {
-		if c != nil {
-			c.AbortWithStatus(http.StatusNotFound)
-		}
-		return
-	}
-	path := c.Request.URL.Path
-	if strings.HasPrefix(path, "/v0/resource/plugins/") {
-		s.pluginResourceNoRoute(c)
-		return
-	}
-	if path != "/v0/management" && !strings.HasPrefix(path, "/v0/management/") {
-		c.AbortWithStatus(http.StatusNotFound)
-		return
-	}
-	if s.pluginHost == nil || s.mgmt == nil {
-		c.AbortWithStatus(http.StatusNotFound)
-		return
-	}
-	if !s.managementAvailable(c) {
-		return
-	}
-	s.mgmt.Middleware()(c)
-	if c.IsAborted() {
-		return
-	}
-	if s.mgmt.ServePluginAuthURL(c) {
-		c.Abort()
-		return
-	}
-	if s.pluginHost.ServeManagementHTTP(c.Writer, c.Request) {
-		c.Abort()
-		return
-	}
-	c.AbortWithStatus(http.StatusNotFound)
-}
-
-func (s *Server) pluginResourceNoRoute(c *gin.Context) {
-	if s == nil || c == nil || c.Request == nil || c.Request.URL == nil {
-		if c != nil {
-			c.AbortWithStatus(http.StatusNotFound)
-		}
-		return
-	}
-	cfg := s.getConfig()
-	if cfg == nil || s.pluginHost == nil {
-		c.AbortWithStatus(http.StatusNotFound)
-		return
-	}
-	if s.pluginHost.ServeResourceHTTP(c.Writer, c.Request) {
-		c.Abort()
-		return
-	}
-	c.AbortWithStatus(http.StatusNotFound)
 }
 
 func (s *Server) serveManagementControlPanel(c *gin.Context) {

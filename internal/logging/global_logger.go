@@ -53,8 +53,7 @@ type LogFormatter struct{}
 // logFieldOrder defines the display order for common log fields.
 var logFieldOrder = []string{
 	"provider", "model",
-	"plugin_id", "plugin_name", "source_id",
-	"version", "active_version", "retired_version", "overwritten",
+	"version",
 	"mode", "budget", "level", "original_mode", "original_value", "min", "max", "clamped_to", "error",
 	"credential", "auth_id", "auth_index", "connection", "proxy_scheme", "remote_transport",
 	"operation", "upstream_host", "reused", "was_idle", "idle_time",
@@ -76,8 +75,6 @@ var quotedLogFields = map[string]struct{}{
 	"state":            {},
 	"reason":           {},
 }
-
-var pluginPathFieldOrder = []string{"path", "active_path", "retired_path"}
 
 func formatLogFieldValue(key string, value any) string {
 	if _, quoted := quotedLogFields[key]; quoted {
@@ -118,13 +115,6 @@ func (m *LogFormatter) Format(entry *log.Entry) ([]byte, error) {
 		for _, k := range logFieldOrder {
 			if v, ok := entry.Data[k]; ok {
 				fields = append(fields, fmt.Sprintf("%s=%s", k, formatLogFieldValue(k, v)))
-			}
-		}
-		if pluginID, ok := entry.Data["plugin_id"]; ok && strings.TrimSpace(fmt.Sprint(pluginID)) != "" {
-			for _, k := range pluginPathFieldOrder {
-				if v, ok := entry.Data[k]; ok {
-					fields = append(fields, fmt.Sprintf("%s=%v", k, v))
-				}
 			}
 		}
 		if len(fields) > 0 {

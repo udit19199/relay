@@ -21,7 +21,6 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/githubauth"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/logging"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/managementasset"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/pluginhost"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/redisqueue"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/relaycli"
@@ -120,12 +119,6 @@ func main() {
 			}
 			_, _ = fmt.Fprint(out, s+"\n")
 		})
-	}
-
-	pluginHost := pluginhost.New()
-	if bootstrapCfg := loadPluginBootstrapConfig(pluginBootstrapConfigPath(os.Args[1:], DefaultConfigPath)); bootstrapCfg != nil {
-		pluginHost.ApplyConfig(context.Background(), bootstrapCfg)
-		pluginHost.RegisterCommandLineFlags(context.Background(), flag.CommandLine)
 	}
 
 	// Parse the command-line flags.
@@ -245,16 +238,6 @@ func main() {
 
 	// Register built-in access providers before constructing services.
 	configaccess.Register(&cfg.SDKConfig)
-	pluginHost.ApplyConfig(context.Background(), cfg)
-	if pluginHost.HasTriggeredCommandLineFlags() {
-		if exitCode, handled := pluginHost.ExecuteCommandLine(context.Background(), os.Args[0], os.Args[1:], configFilePath, flag.CommandLine); handled {
-			if exitCode != 0 {
-				os.Exit(exitCode)
-			}
-			return
-		}
-	}
-
 	// Handle different command modes based on the provided flags.
 
 	if siwcBind != "" {
@@ -288,62 +271,6 @@ func main() {
 		// Start the main proxy service
 		managementasset.StartAutoUpdater(context.Background(), configFilePath)
 		registry.SetLocalModelCatalogs(localModel)
-		cmd.StartServiceWithPluginHost(cfg, configFilePath, password, pluginHost, serverOptions...)
+		cmd.StartServiceWithOptions(cfg, configFilePath, password, serverOptions...)
 	}
-}
-
-func pluginBootstrapConfigPath(args []string, defaultPath string) string {
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-		switch {
-		case arg == "--":
-			return defaultPluginBootstrapConfigPath(defaultPath)
-		case arg == "-config" || arg == "--config":
-			if i+1 < len(args) {
-				return args[i+1]
-			}
-			return defaultPluginBootstrapConfigPath(defaultPath)
-		case strings.HasPrefix(arg, "-config="):
-			return strings.TrimPrefix(arg, "-config=")
-		case strings.HasPrefix(arg, "--config="):
-			return strings.TrimPrefix(arg, "--config=")
-		}
-	}
-	return defaultPluginBootstrapConfigPath(defaultPath)
-}
-
-func defaultPluginBootstrapConfigPath(defaultPath string) string {
-	if strings.TrimSpace(defaultPath) != "" {
-		return defaultPath
-	}
-	wd, errGetwd := os.Getwd()
-	if errGetwd != nil {
-		return "config.yaml"
-	}
-	return filepath.Join(wd, "config.yaml")
-}
-
-func loadPluginBootstrapConfig(path string) *config.Config {
-	raw, errReadFile := os.ReadFile(path)
-	if errReadFile != nil {
-		if !errors.Is(errReadFile, os.ErrNotExist) {
-			log.Warnf("failed to read plugin bootstrap config: %v", errReadFile)
-		}
-		cfg := &config.Config{}
-		cfg.NormalizePluginsConfig()
-		return cfg
-	}
-	if len(strings.TrimSpace(string(raw))) == 0 {
-		cfg := &config.Config{}
-		cfg.NormalizePluginsConfig()
-		return cfg
-	}
-	cfg, errParseConfig := config.ParseConfigBytes(raw)
-	if errParseConfig != nil {
-		log.Warnf("failed to parse plugin bootstrap config: %v", errParseConfig)
-		cfg = &config.Config{}
-		cfg.NormalizePluginsConfig()
-		return cfg
-	}
-	return cfg
 }

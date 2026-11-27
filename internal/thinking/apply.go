@@ -11,12 +11,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type pluginProviderApplier struct {
-	owner    string
-	priority int
-	applier  ProviderApplier
-}
-
 var providerAppliersMu sync.RWMutex
 
 // nativeProviderAppliers maps built-in provider names to their implementations.
@@ -26,9 +20,6 @@ var nativeProviderAppliers = map[string]ProviderApplier{
 	"codex":  nil,
 	"xai":    nil,
 }
-
-// pluginProviderAppliers maps plugin-owned provider names to their implementations.
-var pluginProviderAppliers = map[string]pluginProviderApplier{}
 
 // GetProviderApplier returns the ProviderApplier for the given provider name.
 // Returns nil if the provider is not registered.
@@ -42,27 +33,11 @@ func GetProviderApplier(provider string) ProviderApplier {
 	if nativeApplier, okNative := nativeProviderAppliers[provider]; okNative {
 		return nativeApplier
 	}
-	return pluginProviderAppliers[provider].applier
+	return nil
 }
 
-func getPluginProviderApplier(provider string) ProviderApplier {
-	provider = normalizedProviderName(provider)
-	if provider == "" {
-		return nil
-	}
-	providerAppliersMu.RLock()
-	defer providerAppliersMu.RUnlock()
-	return pluginProviderAppliers[provider].applier
-}
-
-func resolveProviderApplier(providerFormat, providerKey string) (ProviderApplier, bool) {
-	if applier := getPluginProviderApplier(providerKey); applier != nil {
-		return applier, true
-	}
-	if applier := getPluginProviderApplier(providerFormat); applier != nil {
-		return applier, true
-	}
-	return GetProviderApplier(providerFormat), false
+func resolveProviderApplier(providerFormat string) ProviderApplier {
+	return GetProviderApplier(providerFormat)
 }
 
 // RegisterProvider registers a provider applier by name.
@@ -74,52 +49,6 @@ func RegisterProvider(name string, applier ProviderApplier) {
 	providerAppliersMu.Lock()
 	defer providerAppliersMu.Unlock()
 	nativeProviderAppliers[name] = applier
-}
-
-// RegisterPluginProvider registers a plugin-owned provider applier.
-func RegisterPluginProvider(owner string, name string, priority int, applier ProviderApplier) bool {
-	owner = strings.TrimSpace(owner)
-	name = normalizedProviderName(name)
-	if owner == "" || name == "" || applier == nil {
-		return false
-	}
-	providerAppliersMu.Lock()
-	defer providerAppliersMu.Unlock()
-	if _, native := nativeProviderAppliers[name]; native {
-		return false
-	}
-	current, exists := pluginProviderAppliers[name]
-	if exists && (current.priority > priority || (current.priority == priority && current.owner <= owner)) {
-		return false
-	}
-	pluginProviderAppliers[name] = pluginProviderApplier{
-		owner:    owner,
-		priority: priority,
-		applier:  applier,
-	}
-	return true
-}
-
-// UnregisterPluginProviders removes all provider appliers owned by one plugin.
-func UnregisterPluginProviders(owner string) {
-	owner = strings.TrimSpace(owner)
-	if owner == "" {
-		return
-	}
-	providerAppliersMu.Lock()
-	defer providerAppliersMu.Unlock()
-	for provider, record := range pluginProviderAppliers {
-		if record.owner == owner {
-			delete(pluginProviderAppliers, provider)
-		}
-	}
-}
-
-// ClearPluginProviders removes all plugin-owned provider appliers.
-func ClearPluginProviders() {
-	providerAppliersMu.Lock()
-	defer providerAppliersMu.Unlock()
-	pluginProviderAppliers = map[string]pluginProviderApplier{}
 }
 
 func normalizedProviderName(provider string) string {
@@ -226,7 +155,7 @@ func ApplyThinkingWithModelInfoDoc(doc *ojson.Doc, sourceBody []byte, model stri
 
 // ApplyThinkingWithModelInfoAndSummary applies the exact configured model
 // definition with a summary intent already resolved across source translation
-// and plugin normalization.
+// normalization.
 func ApplyThinkingWithModelInfoAndSummary(body, sourceBody []byte, model string, fromFormat string, toFormat string, providerKey string, modelInfo *registry.ModelInfo, summaryConfig SummaryConfig, normalizedUpdatesChanged ...bool) ([]byte, error) {
 	return applyThinking(body, sourceBody, model, fromFormat, toFormat, providerKey, modelInfo, true, summaryConfig, normalizedUpdatesChanged...)
 }
@@ -300,7 +229,7 @@ func applyThinkingDocCore(doc *ojson.Doc, docValid bool, sourceBody []byte, mode
 	nativeResponses := responseTarget && isResponsesFormat(fromFormat) && supportsUpdates
 
 	// 2. Route check: Get provider applier after target cleanup.
-	applier, isPluginApplier := resolveProviderApplier(providerFormat, providerKey)
+	applier := resolveProviderApplier(providerFormat)
 	if applier == nil {
 		log.WithFields(log.Fields{
 			"provider": providerFormat,
@@ -335,14 +264,14 @@ func applyThinkingDocCore(doc *ojson.Doc, docValid bool, sourceBody []byte, mode
 		}
 		return modified, nil
 	}
-	if !isPluginApplier && fromFormat == "claude" && providerFormat == "claude" && !suffixResult.HasSuffix && (!docValid || !doc.Get("thinking").Exists()) {
+	if fromFormat == "claude" && providerFormat == "claude" && !suffixResult.HasSuffix && (!docValid || !doc.Get("thinking").Exists()) {
 		// Native Claude effort is independent of thinking activation.
 		if applySummaryConfigForProviderDoc(doc, docValid, providerFormat, baseModel, providerKey, modelInfo, summaryConfig) {
 			modified = true
 		}
 		return modified, nil
 	}
-	if IsUserDefinedModel(modelInfo) || (isPluginApplier && modelInfo.Thinking == nil) {
+	if IsUserDefinedModel(modelInfo) {
 		userMod, errUser := applyUserDefinedModelDoc(doc, docValid, modelInfo, fromFormat, providerFormat, providerKey, suffixResult, sourceConfig, nativeResponses, summaryConfig)
 		return modified || userMod, errUser
 	}
@@ -629,7 +558,7 @@ func applyUserDefinedModelDoc(doc *ojson.Doc, docValid bool, modelInfo *registry
 		return applySummaryConfigForProviderDoc(doc, docValid, toFormat, modelID, providerKey, modelInfo, summaryConfig), nil
 	}
 
-	applier, isPluginApplier := resolveProviderApplier(toFormat, providerKey)
+	applier := resolveProviderApplier(toFormat)
 	if applier == nil {
 		log.WithFields(log.Fields{
 			"model":    modelID,
@@ -638,9 +567,7 @@ func applyUserDefinedModelDoc(doc *ojson.Doc, docValid bool, modelInfo *registry
 		return false, nil
 	}
 
-	if !isPluginApplier {
-		config = normalizeUserDefinedConfig(config, fromFormat, toFormat)
-	}
+	config = normalizeUserDefinedConfig(config, fromFormat, toFormat)
 	log.WithFields(log.Fields{
 		"provider": toFormat,
 		"model":    modelID,

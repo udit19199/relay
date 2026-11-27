@@ -599,7 +599,7 @@ func IsV8ConfigLayout(root *yaml.Node) bool {
 	}
 	root = expandConfigAliases(root)
 	sections := v8AllowedRoots()
-	for _, shared := range []string{"api-keys", "plugins", "quota-exceeded", "routing", "client"} {
+	for _, shared := range []string{"api-keys", "quota-exceeded", "routing", "client"} {
 		delete(sections, shared)
 	}
 	for i := 0; i < len(root.Content); i += 2 {
@@ -629,7 +629,7 @@ func IsV8ConfigLayout(root *yaml.Node) bool {
 }
 
 func v8AllowedRoots() map[string]bool {
-	allowed := map[string]bool{"models": true, "config-version": true, "api-keys": true, "plugins": true, "quota-exceeded": true, "client": true}
+	allowed := map[string]bool{"models": true, "config-version": true, "api-keys": true, "quota-exceeded": true, "client": true}
 	for _, path := range v8Paths {
 		section, _, _ := strings.Cut(path.current, ".")
 		allowed[section] = true
@@ -907,7 +907,6 @@ func expandConfigAliases(node *yaml.Node) *yaml.Node {
 }
 
 // ValidateV8Config accepts only the v8 layout in management writes.
-// Plugin-owned configuration remains extensible through its existing decoder.
 func ValidateV8Config(data []byte) error {
 	var doc yaml.Node
 	if err := yaml.Unmarshal(data, &doc); err != nil {
@@ -949,7 +948,7 @@ func ValidateV8Config(data []byte) error {
 	}
 	deleteYAMLPath(flat, "config-version")
 	// Empty struct containers are valid replacements. Only strip known structural
-	// paths; empty user maps (headers, aliases, plugin options) carry real values.
+	// paths; empty user maps (headers, aliases, provider options) carry real values.
 	for _, path := range v8Paths {
 		parts := strings.Split(path.current, ".")
 		for end := len(parts) - 1; end > 0; end-- {

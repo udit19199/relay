@@ -11,7 +11,6 @@ import (
 
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 )
 
 // OpenCode Go is a first-class quota provider in Relay: an auth file with
@@ -40,20 +39,20 @@ func openCodeGoAPIKey(auth *coreauth.Auth) string {
 	return tokenValueForAuth(auth)
 }
 
-func (h *Handler) fetchOpenCodeGoQuota(ctx context.Context, auth *coreauth.Auth) (pluginapi.QuotaFetchResponse, error) {
+func (h *Handler) fetchOpenCodeGoQuota(ctx context.Context, auth *coreauth.Auth) (QuotaFetchResponse, error) {
 	key := openCodeGoAPIKey(auth)
 	if key == "" {
-		return pluginapi.QuotaFetchResponse{}, fmt.Errorf("opencode-go credential has no api_key")
+		return QuotaFetchResponse{}, fmt.Errorf("opencode-go credential has no api_key")
 	}
 	body, status, errFetch := h.usageBody(ctx, auth, openCodeGoUsageURL, key, openCodeGoQuotaTimeout, nil)
 	if errFetch != nil {
-		return pluginapi.QuotaFetchResponse{}, errFetch
+		return QuotaFetchResponse{}, errFetch
 	}
 	if status == http.StatusUnauthorized || status == http.StatusForbidden {
-		return pluginapi.QuotaFetchResponse{}, errOpenCodeGoKeyRejected
+		return QuotaFetchResponse{}, errOpenCodeGoKeyRejected
 	}
 	if status != http.StatusOK {
-		return pluginapi.QuotaFetchResponse{}, fmt.Errorf("usage request returned status %d", status)
+		return QuotaFetchResponse{}, fmt.Errorf("usage request returned status %d", status)
 	}
 	return parseOpenCodeGoUsage(body)
 }
@@ -61,7 +60,7 @@ func (h *Handler) fetchOpenCodeGoQuota(ctx context.Context, auth *coreauth.Auth)
 // parseOpenCodeGoUsage maps {"usage":{"rolling":{"status","percent","resetsAt"},...}}
 // to Relay's quota shape. "percent" is the share used; a rate-limited window
 // has nothing left whatever its percent says.
-func parseOpenCodeGoUsage(body []byte) (pluginapi.QuotaFetchResponse, error) {
+func parseOpenCodeGoUsage(body []byte) (QuotaFetchResponse, error) {
 	var decoded struct {
 		Usage map[string]struct {
 			Status   string   `json:"status"`
@@ -70,9 +69,9 @@ func parseOpenCodeGoUsage(body []byte) (pluginapi.QuotaFetchResponse, error) {
 		} `json:"usage"`
 	}
 	if errJSON := json.Unmarshal(body, &decoded); errJSON != nil {
-		return pluginapi.QuotaFetchResponse{}, fmt.Errorf("usage response is not valid JSON")
+		return QuotaFetchResponse{}, fmt.Errorf("usage response is not valid JSON")
 	}
-	group := pluginapi.QuotaGroup{DisplayName: "OpenCode Go"}
+	group := QuotaGroup{DisplayName: "OpenCode Go"}
 	for _, name := range []string{"rolling", "weekly", "monthly"} {
 		window, ok := decoded.Usage[name]
 		if !ok {
@@ -81,18 +80,18 @@ func parseOpenCodeGoUsage(body []byte) (pluginapi.QuotaFetchResponse, error) {
 		remaining := 0.0
 		if window.Status != "rate-limited" {
 			if window.Percent == nil {
-				return pluginapi.QuotaFetchResponse{}, fmt.Errorf("usage window %s has no percent", name)
+				return QuotaFetchResponse{}, fmt.Errorf("usage window %s has no percent", name)
 			}
 			remaining = min(1, max(0, 1-*window.Percent/100))
 		}
-		group.Buckets = append(group.Buckets, pluginapi.QuotaBucket{
+		group.Buckets = append(group.Buckets, QuotaBucket{
 			Window:            name,
 			RemainingFraction: remaining,
 			ResetTime:         window.ResetsAt,
 		})
 	}
 	if len(group.Buckets) == 0 {
-		return pluginapi.QuotaFetchResponse{}, fmt.Errorf("usage response has no windows")
+		return QuotaFetchResponse{}, fmt.Errorf("usage response has no windows")
 	}
-	return pluginapi.QuotaFetchResponse{Groups: []pluginapi.QuotaGroup{group}}, nil
+	return QuotaFetchResponse{Groups: []QuotaGroup{group}}, nil
 }

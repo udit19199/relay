@@ -11,12 +11,9 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	sdkaccess "github.com/router-for-me/CLIProxyAPI/v8/sdk/access"
-	sdkAuth "github.com/router-for-me/CLIProxyAPI/v8/sdk/auth"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/usage"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/config"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -70,7 +67,6 @@ func (s *Service) Run(ctx context.Context) error {
 	s.applyRetryConfig(cfg)
 	s.configureCooldownStateStore(cfg)
 
-	s.registerPluginAuthParser()
 	if s.coreManager != nil {
 		if errLoad := s.coreManager.Load(ctx); errLoad != nil {
 			log.Warnf("failed to load auth store: %v", errLoad)
@@ -110,7 +106,6 @@ func (s *Service) Run(ctx context.Context) error {
 
 	// handlers no longer depend on legacy clients; pass nil slice initially
 	s.server = api.NewServer(cfg, s.coreManager, s.accessManager, s.configPath, s.serverOptions...)
-	s.syncPluginRuntimeConfig(ctx)
 
 	if s.authManager == nil {
 		s.authManager = newDefaultAuthManager()
@@ -160,7 +155,6 @@ func (s *Service) Run(ctx context.Context) error {
 		watcherWrapper.SetAuthUpdateQueue(s.authUpdates)
 	}
 	watcherWrapper.SetConfig(s.currentConfig())
-	s.registerPluginAuthParser()
 
 	watcherCtx, watcherCancel := context.WithCancel(context.Background())
 	s.cfgMu.Lock()
@@ -171,7 +165,6 @@ func (s *Service) Run(ctx context.Context) error {
 	}
 	log.Info("file watcher started for config and auth directory changes")
 	s.configRuntimeMu.Lock()
-	s.syncPluginModelRuntime(ctx)
 	s.configRuntimeMu.Unlock()
 
 	s.registerModelRefreshCallback()
@@ -248,24 +241,6 @@ func (s *Service) Shutdown(ctx context.Context) error {
 				if shutdownErr == nil {
 					shutdownErr = errStop
 				}
-			}
-		}
-
-		if s.pluginHost != nil {
-			sdktranslator.SetPluginHooks(nil)
-			sdkAuth.RegisterPluginAuthParser(nil)
-			if watcher := s.currentWatcher(); watcher != nil {
-				watcher.SetPluginAuthParser(nil)
-			}
-			s.pluginHost.ApplyConfig(ctx, &config.Config{})
-			s.pluginHost.RegisterModels(ctx, registry.GetGlobalRegistry())
-			s.registerAvailableExecutors(ctx, executorRegistrationOptions{
-				includePlugins: true,
-			})
-			s.pluginHost.RegisterFrontendAuthProviders()
-			s.pluginHost.ShutdownAllContext(ctx)
-			if s.accessManager != nil {
-				s.accessManager.SetProviders(sdkaccess.RegisteredProviders())
 			}
 		}
 

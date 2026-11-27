@@ -420,11 +420,6 @@ func (m *Manager) executeStreamWithModelPool(ctx context.Context, executor Provi
 			execReq.Model = executionModel
 		}
 		execOpts := opts
-		var errIntercept error
-		execReq, execOpts, errIntercept = applyRequestAfterAuthInterceptor(ctx, executor, provider, execReq, execOpts, requestedModelAliasFromOptions(execOpts, routeModel))
-		if errIntercept != nil {
-			return nil, errIntercept
-		}
 		execReq = attachResolvedExecutionModelInfo(routing, execReq, auth, routeModel, execModel, executionModel != "")
 		if errCtx := ctx.Err(); errCtx != nil {
 			return nil, errCtx

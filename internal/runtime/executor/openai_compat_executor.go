@@ -917,7 +917,7 @@ func (e *OpenAICompatExecutor) CountTokens(ctx context.Context, auth *cliproxyau
 
 // Refresh is a no-op for API-key based compatibility providers.
 // OAuth-style credentials with a refresh token cannot be rotated here; callers
-// that need plugin/Home refresh must bind a refresh-capable executor instead.
+// that need OAuth rotation must use a provider with a refresh-capable executor instead.
 func (e *OpenAICompatExecutor) Refresh(ctx context.Context, auth *cliproxyauth.Auth) (*cliproxyauth.Auth, error) {
 	log.Debugf("openai compat executor: refresh called")
 	if openAICompatAuthHasRefreshToken(auth) {

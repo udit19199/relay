@@ -11,7 +11,6 @@ import (
 
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 )
 
 // Claude Code exposes the account's current subscription usage at this
@@ -61,10 +60,10 @@ func claudeTokenExpired(auth *coreauth.Auth) bool {
 	return true
 }
 
-func (h *Handler) fetchClaudeQuota(ctx context.Context, auth *coreauth.Auth) (pluginapi.QuotaFetchResponse, error) {
+func (h *Handler) fetchClaudeQuota(ctx context.Context, auth *coreauth.Auth) (QuotaFetchResponse, error) {
 	body, status, errFetch := h.claudeUsageBody(ctx, auth, claudeAccessToken(auth))
 	if errFetch != nil {
-		return pluginapi.QuotaFetchResponse{}, errFetch
+		return QuotaFetchResponse{}, errFetch
 	}
 	// Subscription access tokens live for hours; an idle credential can be
 	// past its expiry. Refresh once through the normal auth path and retry.
@@ -72,15 +71,15 @@ func (h *Handler) fetchClaudeQuota(ctx context.Context, auth *coreauth.Auth) (pl
 	if status == http.StatusUnauthorized && claudeTokenExpired(auth) && claudeHasRefreshToken(auth) {
 		refreshed := h.refreshClaudeAuth(ctx, auth)
 		if refreshed == nil {
-			return pluginapi.QuotaFetchResponse{}, fmt.Errorf("usage request returned status %d", status)
+			return QuotaFetchResponse{}, fmt.Errorf("usage request returned status %d", status)
 		}
 		body, status, errFetch = h.claudeUsageBody(ctx, refreshed, claudeAccessToken(refreshed))
 		if errFetch != nil {
-			return pluginapi.QuotaFetchResponse{}, errFetch
+			return QuotaFetchResponse{}, errFetch
 		}
 	}
 	if status != http.StatusOK {
-		return pluginapi.QuotaFetchResponse{}, fmt.Errorf("usage request returned status %d", status)
+		return QuotaFetchResponse{}, fmt.Errorf("usage request returned status %d", status)
 	}
 	return parseClaudeUsage(body)
 }
@@ -142,18 +141,18 @@ func claudeHasRefreshToken(auth *coreauth.Auth) bool {
 // "seven_day":{...}} to Relay's quota shape. Utilization is the share used,
 // so the remaining fraction is 1 - utilization/100. The weekly window is
 // required because the app and `relay status` show it for every account.
-func parseClaudeUsage(body []byte) (pluginapi.QuotaFetchResponse, error) {
+func parseClaudeUsage(body []byte) (QuotaFetchResponse, error) {
 	var decoded struct {
 		FiveHour *claudeUsageWindow `json:"five_hour"`
 		SevenDay *claudeUsageWindow `json:"seven_day"`
 	}
 	if errJSON := json.Unmarshal(body, &decoded); errJSON != nil {
-		return pluginapi.QuotaFetchResponse{}, fmt.Errorf("usage response is not valid JSON")
+		return QuotaFetchResponse{}, fmt.Errorf("usage response is not valid JSON")
 	}
 	if decoded.SevenDay == nil || decoded.SevenDay.Utilization == nil {
-		return pluginapi.QuotaFetchResponse{}, fmt.Errorf("usage response has no weekly window")
+		return QuotaFetchResponse{}, fmt.Errorf("usage response has no weekly window")
 	}
-	group := pluginapi.QuotaGroup{DisplayName: "Claude"}
+	group := QuotaGroup{DisplayName: "Claude"}
 	for _, item := range []struct {
 		name   string
 		window *claudeUsageWindow
@@ -165,14 +164,14 @@ func parseClaudeUsage(body []byte) (pluginapi.QuotaFetchResponse, error) {
 			continue
 		}
 		remaining := min(1, max(0, 1-*item.window.Utilization/100))
-		group.Buckets = append(group.Buckets, pluginapi.QuotaBucket{
+		group.Buckets = append(group.Buckets, QuotaBucket{
 			Window:            item.name,
 			RemainingFraction: remaining,
 			ResetTime:         item.window.ResetsAt,
 		})
 	}
 	if len(group.Buckets) == 0 {
-		return pluginapi.QuotaFetchResponse{}, fmt.Errorf("usage response has no windows")
+		return QuotaFetchResponse{}, fmt.Errorf("usage response has no windows")
 	}
-	return pluginapi.QuotaFetchResponse{Groups: []pluginapi.QuotaGroup{group}}, nil
+	return QuotaFetchResponse{Groups: []QuotaGroup{group}}, nil
 }

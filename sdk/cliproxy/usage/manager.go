@@ -40,7 +40,7 @@ type Record struct {
 	APIKey       string
 	// IsNativeKey reports whether the client API key was authenticated by CPA's native config provider.
 	IsNativeKey bool
-	// AccessProvider identifies the client request authentication provider (e.g. "config-inline" or plugin ID).
+	// AccessProvider identifies the client request authentication provider.
 	AccessProvider  string
 	SessionID       string
 	ParentSessionID string
@@ -58,7 +58,7 @@ type Record struct {
 	// protocol translation and payload defaults or overrides.
 	EffectiveServiceTier string
 	// RequestServiceTier is a deprecated input-only alias retained for existing
-	// plugin callers. It is normalized into ServiceTier and never emitted.
+	// internal callers. It is normalized into ServiceTier and never emitted.
 	RequestServiceTier string
 	// ResponseServiceTier stores the final tier reported by the upstream response.
 	ResponseServiceTier string
@@ -619,8 +619,8 @@ func GenerateEnabled(generate *bool) bool {
 	return *generate
 }
 
-// Plugin consumes usage records emitted by the proxy runtime.
-type Plugin interface {
+// Consumer consumes usage records emitted by the proxy runtime.
+type Consumer interface {
 	HandleUsage(ctx context.Context, record Record)
 }
 
@@ -629,7 +629,7 @@ type queueItem struct {
 	record Record
 }
 
-// Manager maintains a queue of usage records and delivers them to registered plugins.
+// Manager maintains a queue of usage records and delivers them to registered consumers.
 type Manager struct {
 	once     sync.Once
 	stopOnce sync.Once
@@ -640,9 +640,9 @@ type Manager struct {
 	queue  []queueItem
 	closed bool
 
-	pluginsMu sync.RWMutex
-	plugins   []Plugin
-	named     map[string]int
+	consumersMu sync.RWMutex
+	consumers   []Consumer
+	named       map[string]int
 }
 
 // NewManager constructs a manager with a buffered queue.
@@ -683,19 +683,19 @@ func (m *Manager) Stop() {
 	})
 }
 
-// Register appends a plugin to the delivery list.
-func (m *Manager) Register(plugin Plugin) {
-	if m == nil || plugin == nil {
+// Register appends a consumer to the delivery list.
+func (m *Manager) Register(consumer Consumer) {
+	if m == nil || consumer == nil {
 		return
 	}
-	m.pluginsMu.Lock()
-	m.plugins = append(m.plugins, plugin)
-	m.pluginsMu.Unlock()
+	m.consumersMu.Lock()
+	m.consumers = append(m.consumers, consumer)
+	m.consumersMu.Unlock()
 }
 
-// RegisterNamed registers or replaces a plugin by name.
-func (m *Manager) RegisterNamed(name string, plugin Plugin) {
-	if m == nil || plugin == nil {
+// RegisterNamed registers or replaces a consumer by name.
+func (m *Manager) RegisterNamed(name string, consumer Consumer) {
+	if m == nil || consumer == nil {
 		return
 	}
 	name = strings.TrimSpace(name)
@@ -703,21 +703,21 @@ func (m *Manager) RegisterNamed(name string, plugin Plugin) {
 		return
 	}
 
-	m.pluginsMu.Lock()
+	m.consumersMu.Lock()
 	if m.named == nil {
 		m.named = make(map[string]int)
 	}
-	if index, exists := m.named[name]; exists && index >= 0 && index < len(m.plugins) {
-		m.plugins[index] = plugin
-		m.pluginsMu.Unlock()
+	if index, exists := m.named[name]; exists && index >= 0 && index < len(m.consumers) {
+		m.consumers[index] = consumer
+		m.consumersMu.Unlock()
 		return
 	}
-	m.named[name] = len(m.plugins)
-	m.plugins = append(m.plugins, plugin)
-	m.pluginsMu.Unlock()
+	m.named[name] = len(m.consumers)
+	m.consumers = append(m.consumers, consumer)
+	m.consumersMu.Unlock()
 }
 
-// Publish enqueues a usage record for processing. If no plugin is registered
+// Publish enqueues a usage record for processing. If no consumer is registered
 // the record will be discarded downstream.
 func (m *Manager) Publish(ctx context.Context, record Record) {
 	if m == nil {
@@ -791,28 +791,28 @@ func (m *Manager) run(ctx context.Context) {
 }
 
 func (m *Manager) dispatch(item queueItem) {
-	m.pluginsMu.RLock()
-	plugins := make([]Plugin, len(m.plugins))
-	copy(plugins, m.plugins)
-	m.pluginsMu.RUnlock()
-	if len(plugins) == 0 {
+	m.consumersMu.RLock()
+	consumers := make([]Consumer, len(m.consumers))
+	copy(consumers, m.consumers)
+	m.consumersMu.RUnlock()
+	if len(consumers) == 0 {
 		return
 	}
-	for _, plugin := range plugins {
-		if plugin == nil {
+	for _, consumer := range consumers {
+		if consumer == nil {
 			continue
 		}
-		safeInvoke(plugin, item.ctx, item.record)
+		safeInvoke(consumer, item.ctx, item.record)
 	}
 }
 
-func safeInvoke(plugin Plugin, ctx context.Context, record Record) {
+func safeInvoke(consumer Consumer, ctx context.Context, record Record) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Errorf("usage: plugin panic recovered: %v", r)
+			log.Errorf("usage: consumer panic recovered: %v", r)
 		}
 	}()
-	plugin.HandleUsage(ctx, record)
+	consumer.HandleUsage(ctx, record)
 }
 
 var defaultManager = NewManager(512)
@@ -820,11 +820,13 @@ var defaultManager = NewManager(512)
 // DefaultManager returns the global usage manager instance.
 func DefaultManager() *Manager { return defaultManager }
 
-// RegisterPlugin registers a plugin on the default manager.
-func RegisterPlugin(plugin Plugin) { DefaultManager().Register(plugin) }
+// RegisterConsumer registers a consumer on the default manager.
+func RegisterConsumer(consumer Consumer) { DefaultManager().Register(consumer) }
 
-// RegisterNamedPlugin registers or replaces a named plugin on the default manager.
-func RegisterNamedPlugin(name string, plugin Plugin) { DefaultManager().RegisterNamed(name, plugin) }
+// RegisterNamedConsumer registers or replaces a named consumer on the default manager.
+func RegisterNamedConsumer(name string, consumer Consumer) {
+	DefaultManager().RegisterNamed(name, consumer)
+}
 
 // PublishRecord publishes a record using the default manager.
 func PublishRecord(ctx context.Context, record Record) { DefaultManager().Publish(ctx, record) }

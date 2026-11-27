@@ -11,7 +11,7 @@ import (
 // ApplyThinkingWithSourcePayload preserves summary visibility from the original
 // client payload while applying thinking configuration to its translated target
 // payload. currentSourcePayload is the payload that was translated, while
-// originalSourcePayload retains intent removed by an earlier interceptor.
+// originalSourcePayload retains intent removed by an earlier request rewrite.
 func ApplyThinkingWithSourcePayload(body, currentSourcePayload, originalSourcePayload []byte, model, fromFormat, toFormat, providerKey string) ([]byte, error) {
 	summary := translatedRequestSummaryConfig(body, currentSourcePayload, originalSourcePayload, model, fromFormat, toFormat)
 	return thinking.ApplyThinkingWithSummary(body, model, fromFormat, toFormat, providerKey, summary)
@@ -28,7 +28,7 @@ func ApplyThinkingWithSourcePayloadDoc(doc *ojson.Doc, currentSourcePayload, ori
 }
 
 // translatedRequestSummaryConfig gives the translated target payload precedence
-// so a plugin request normalizer can remove or rewrite a canonical summary field.
+// so an earlier request rewrite can remove or rewrite a canonical summary field.
 // The original source is consulted only when the payload that was translated no
 // longer carries the inbound intent, or when the target could not represent that
 // intent until model-aware thinking is applied later (notably Claude).
@@ -62,9 +62,9 @@ func translatedRequestSummaryConfig(body, currentSourcePayload, originalSourcePa
 
 	candidate := thinking.ApplySummaryConfigForModel(body, toFormat, model, currentSummary)
 	if thinking.ExtractExplicitSummaryConfig(candidate, toFormat).Mode != thinking.SummaryUnspecified {
-		// Registry translation applied this field before plugin normalization. If
+		// Registry translation applied this field before later request normalization. If
 		// it is absent now but can be represented on the normalized body, the
-		// normalizer deliberately removed it and must remain authoritative.
+		// rewrite deliberately removed it and must remain authoritative.
 		return thinking.SummaryConfig{}
 	}
 

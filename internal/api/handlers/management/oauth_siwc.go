@@ -287,7 +287,7 @@ func (s *oauthSessionStore) registerSIWC(state string, flow *siwcBindSession) bo
 			return false
 		}
 	}
-	s.sessions[state] = oauthSession{Provider: "codex", Source: oauthSessionSourceBuiltin, SIWC: flow, CreatedAt: now, ExpiresAt: now.Add(siwcBindTTL)}
+	s.sessions[state] = oauthSession{Provider: "codex", SIWC: flow, CreatedAt: now, ExpiresAt: now.Add(siwcBindTTL)}
 	return true
 }
 

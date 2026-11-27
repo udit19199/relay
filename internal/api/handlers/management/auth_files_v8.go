@@ -19,10 +19,7 @@ import (
 
 const (
 	oauthSessionProxyURLContextKey = "management.oauth.proxy_url"
-	oauthSessionProviderContextKey = "management.oauth.provider"
-	oauthSessionDomainContextKey   = "management.oauth.domain"
 	oauthSessionIsWebUIContextKey  = "management.oauth.is_webui"
-	oauthSessionMetadataContextKey = "management.oauth.metadata"
 	oauthSessionTargetContextKey   = "management.oauth.target"
 )
 
@@ -48,42 +45,6 @@ func oauthSessionProxyURLFromContext(c *gin.Context) string {
 	}
 	proxyURL, _ := val.(string)
 	return strings.TrimSpace(proxyURL)
-}
-
-func oauthSessionProviderFromContext(c *gin.Context) string {
-	if c == nil {
-		return ""
-	}
-	val, ok := c.Get(oauthSessionProviderContextKey)
-	if !ok {
-		return ""
-	}
-	provider, _ := val.(string)
-	return strings.TrimSpace(provider)
-}
-
-func oauthSessionDomainFromContext(c *gin.Context) string {
-	if c == nil {
-		return ""
-	}
-	val, ok := c.Get(oauthSessionDomainContextKey)
-	if !ok {
-		return ""
-	}
-	domain, _ := val.(string)
-	return strings.TrimSpace(domain)
-}
-
-func oauthSessionExtraMetadataFromContext(c *gin.Context) map[string]any {
-	if c == nil {
-		return nil
-	}
-	val, ok := c.Get(oauthSessionMetadataContextKey)
-	if !ok {
-		return nil
-	}
-	meta, _ := val.(map[string]any)
-	return cloneOAuthSessionMetadata(meta)
 }
 
 func validateOAuthSessionProxyURL(raw string) (string, error) {
@@ -234,26 +195,6 @@ func (h *Handler) StartOAuthV8(c *gin.Context) {
 				c.Set(oauthSessionProxyURLContextKey, validatedProxy)
 			}
 
-			if rawDomain, exists := bodyMap["domain"]; exists && rawDomain != nil {
-				domainStr, ok := rawDomain.(string)
-				if !ok {
-					c.JSON(http.StatusBadRequest, gin.H{"error": "invalid domain"})
-					return
-				}
-				if trimmed := strings.TrimSpace(domainStr); trimmed != "" {
-					c.Set(oauthSessionDomainContextKey, trimmed)
-				}
-			} else if rawChan, exists := bodyMap["channel"]; exists && rawChan != nil {
-				chanStr, ok := rawChan.(string)
-				if !ok {
-					c.JSON(http.StatusBadRequest, gin.H{"error": "invalid channel"})
-					return
-				}
-				if trimmed := strings.TrimSpace(chanStr); trimmed != "" {
-					c.Set(oauthSessionDomainContextKey, trimmed)
-				}
-			}
-
 			if rawWebUI, exists := bodyMap["is_webui"]; exists && rawWebUI != nil {
 				switch v := rawWebUI.(type) {
 				case bool:
@@ -304,18 +245,6 @@ func (h *Handler) StartOAuthV8(c *gin.Context) {
 				}
 			}
 
-			extraMeta := make(map[string]any)
-			for k, v := range bodyMap {
-				switch k {
-				case "provider", "proxy_url", "proxy-url", "is_webui", "name", "target_auth_id", "auth_id", "auth_index", "verify", "verify_model":
-					continue
-				default:
-					extraMeta[k] = v
-				}
-			}
-			if len(extraMeta) > 0 {
-				c.Set(oauthSessionMetadataContextKey, extraMeta)
-			}
 		}
 	}
 
@@ -380,8 +309,6 @@ func (h *Handler) StartOAuthV8(c *gin.Context) {
 		})
 	}
 
-	c.Set(oauthSessionProviderContextKey, provider)
-
 	switch strings.ToLower(strings.TrimSpace(provider)) {
 	case "":
 		c.JSON(http.StatusBadRequest, gin.H{"error": "provider is required"})
@@ -396,36 +323,13 @@ func (h *Handler) StartOAuthV8(c *gin.Context) {
 	case "meta":
 		h.RequestMetaToken(c)
 	default:
-		if !h.ServePluginAuthURL(c) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "provider_not_found"})
-		}
+		c.JSON(http.StatusNotFound, gin.H{"error": "provider_not_found"})
 	}
 }
 
 func (h *Handler) resolveTargetOAuthProvider(targetAuth *coreauth.Auth) string {
 	if targetAuth == nil {
 		return ""
-	}
-	if h != nil {
-		h.mu.Lock()
-		host := h.pluginHost
-		h.mu.Unlock()
-		if host != nil {
-			for _, key := range []string{"oauth_provider", "portal"} {
-				if targetAuth.Attributes != nil {
-					if candidate := strings.TrimSpace(targetAuth.Attributes[key]); candidate != "" && host.HasAuthProvider(candidate) {
-						return candidate
-					}
-				}
-				if targetAuth.Metadata != nil {
-					if raw, ok := targetAuth.Metadata[key].(string); ok {
-						if candidate := strings.TrimSpace(raw); candidate != "" && host.HasAuthProvider(candidate) {
-							return candidate
-						}
-					}
-				}
-			}
-		}
 	}
 	return strings.TrimSpace(targetAuth.Provider)
 }
@@ -464,10 +368,7 @@ func (h *Handler) oauthTargetProviderMatches(targetProvider, requestedProvider s
 	if h == nil {
 		return false
 	}
-	h.mu.Lock()
-	host := h.pluginHost
-	h.mu.Unlock()
-	return host != nil && host.SameAuthProvider(targetProvider, requestedProvider)
+	return false
 }
 
 // VerifyAuthFileV8 runs an operator-triggered, account-pinned inference verification

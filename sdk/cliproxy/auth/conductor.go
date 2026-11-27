@@ -10,7 +10,6 @@ import (
 
 	internalconfig "github.com/router-for-me/CLIProxyAPI/v8/internal/config"
 	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -108,20 +107,6 @@ type Selector interface {
 	Pick(ctx context.Context, provider, model string, opts cliproxyexecutor.Options, auths []*Auth) (*Auth, error)
 }
 
-type PluginScheduler interface {
-	PickAuth(context.Context, pluginapi.SchedulerPickRequest) (pluginapi.SchedulerPickResponse, bool, error)
-}
-
-// PluginSchedulerAcrossPriorities is an optional interface implemented by schedulers
-// that opt into receiving candidates across all priority tiers.
-type PluginSchedulerAcrossPriorities interface {
-	SchedulerWantsAcrossPriorities() bool
-}
-
-type pluginSchedulerState interface {
-	HasScheduler() bool
-}
-
 // StoppableSelector is an optional interface for selectors that hold resources.
 // Selectors that implement this interface will have Stop called during shutdown.
 type StoppableSelector interface {
@@ -192,8 +177,6 @@ type Manager struct {
 	authEpochs         map[string]uint64
 	authChangeWatchers map[string]map[chan struct{}]struct{}
 	scheduler          *authScheduler
-	// pluginScheduler runs outside m.mu before falling back to native selection.
-	pluginScheduler PluginScheduler
 	// providerOffsets tracks per-model provider rotation state for multi-provider routing.
 	providerOffsets map[string]int
 

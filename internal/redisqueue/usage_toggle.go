@@ -12,5 +12,5 @@ func init() {
 // This is controlled by the config field `usage-statistics-enabled` and the corresponding management API.
 func SetUsageStatisticsEnabled(enabled bool) { usageStatisticsEnabled.Store(enabled) }
 
-// UsageStatisticsEnabled reports whether the usage queue plugin should publish records.
+// UsageStatisticsEnabled reports whether the usage queue consumer should publish records.
 func UsageStatisticsEnabled() bool { return usageStatisticsEnabled.Load() }

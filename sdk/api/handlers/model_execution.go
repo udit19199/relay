@@ -7,28 +7,20 @@ import (
 	"strings"
 
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/interfaces"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/usage"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/proxyutil"
 	"golang.org/x/net/context"
 )
 
-const (
-	modelExecutionMetadataSourceKey = "source"
-	modelExecutionInternalSource    = "plugin_host_model_callback"
-)
-
 type modelExecutionOptions struct {
-	Headers                 http.Header
-	Query                   url.Values
-	InternalSource          bool
-	SkipInterceptorPluginID string
-	SkipRouterPluginID      string
-	ForcedProvider          string
-	AuthSelectionModel      string
-	ProxyURL                string
-	Path                    string
-	CallerScope             string
-	AllowSpeechModel        bool
+	Headers http.Header
+	Query   url.Values
+
+	ForcedProvider     string
+	AuthSelectionModel string
+	ProxyURL           string
+	Path               string
+	CallerScope        string
+	AllowSpeechModel   bool
 }
 
 // ProtocolExecutionRequest describes a route-level model execution request with explicit protocols.
@@ -44,25 +36,6 @@ type ProtocolExecutionRequest struct {
 	Query              url.Values
 	Alt                string
 	Path               string
-}
-
-// ModelExecutionRequest describes an internal model execution request.
-type ModelExecutionRequest struct {
-	EntryProtocol           string
-	ExitProtocol            string
-	Model                   string
-	Stream                  bool
-	Body                    []byte
-	Headers                 http.Header
-	Query                   url.Values
-	Alt                     string
-	SkipInterceptorPluginID string
-	SkipRouterPluginID      string
-	ForcedProvider          string
-	AuthID                  string
-	ProxyURL                string
-	Path                    string
-	CallerScope             string
 }
 
 // ModelExecutionResponse describes a non-streaming internal model execution response.
@@ -101,83 +74,6 @@ func (e *ModelExecutionStreamError) Error() string {
 		return e.Message
 	}
 	return http.StatusText(e.StatusCode)
-}
-
-// ExecuteModel executes an internal non-streaming model request.
-// Host model callbacks are non-recursive for their caller: when
-// skip plugin IDs are set, that plugin's interceptors and router are skipped
-// for the nested model execution while other plugins may still run.
-func (h *BaseAPIHandler) ExecuteModel(ctx context.Context, req ModelExecutionRequest) (ModelExecutionResponse, *interfaces.ErrorMessage) {
-	markNestedExecution(ctx)
-	ctx = usage.WithoutStreamDelivery(ctx)
-	if req.Stream {
-		return ModelExecutionResponse{}, modelExecutionModeError("ExecuteModel requires Stream=false")
-	}
-	if errProxy := validateModelExecutionProxy(req.ProxyURL); errProxy != nil {
-		return ModelExecutionResponse{}, errProxy
-	}
-	if req.AuthID != "" {
-		ctx = WithPinnedAuthID(ctx, req.AuthID)
-	}
-	allowImageModel := isModelExecutionImageProtocol(req.EntryProtocol) || isModelExecutionImageProtocol(req.ExitProtocol)
-	body, headers, errMsg := h.executeWithAuthManagerFormats(ctx, req.EntryProtocol, req.ExitProtocol, req.Model, cloneBytes(req.Body), req.Alt, allowImageModel, modelExecutionOptions{
-		Headers:                 req.Headers,
-		Query:                   req.Query,
-		InternalSource:          true,
-		SkipInterceptorPluginID: req.SkipInterceptorPluginID,
-		SkipRouterPluginID:      req.SkipRouterPluginID,
-		ForcedProvider:          req.ForcedProvider,
-		ProxyURL:                strings.TrimSpace(req.ProxyURL),
-		Path:                    strings.TrimSpace(req.Path),
-		CallerScope:             strings.TrimSpace(req.CallerScope),
-	})
-	if errMsg != nil {
-		return ModelExecutionResponse{}, errMsg
-	}
-	return ModelExecutionResponse{
-		StatusCode: http.StatusOK,
-		Headers:    cloneHeader(headers),
-		Body:       cloneBytes(body),
-	}, nil
-}
-
-// ExecuteModelStream executes an internal streaming model request.
-// Host model callbacks are non-recursive for their caller: when
-// skip plugin IDs are set, that plugin's interceptors and router are skipped
-// for the nested model execution while other plugins may still run.
-func (h *BaseAPIHandler) ExecuteModelStream(ctx context.Context, req ModelExecutionRequest) (ModelExecutionStream, *interfaces.ErrorMessage) {
-	markNestedExecution(ctx)
-	ctx = usage.WithoutStreamDelivery(ctx)
-	if !req.Stream {
-		return ModelExecutionStream{}, modelExecutionModeError("ExecuteModelStream requires Stream=true")
-	}
-	if errProxy := validateModelExecutionProxy(req.ProxyURL); errProxy != nil {
-		return ModelExecutionStream{}, errProxy
-	}
-	if req.AuthID != "" {
-		ctx = WithPinnedAuthID(ctx, req.AuthID)
-	}
-	allowImageModel := isModelExecutionImageProtocol(req.EntryProtocol) || isModelExecutionImageProtocol(req.ExitProtocol)
-	dataChan, headers, errChan := h.executeStreamWithAuthManagerFormats(ctx, req.EntryProtocol, req.ExitProtocol, req.Model, cloneBytes(req.Body), req.Alt, allowImageModel, modelExecutionOptions{
-		Headers:                 req.Headers,
-		Query:                   req.Query,
-		InternalSource:          true,
-		SkipInterceptorPluginID: req.SkipInterceptorPluginID,
-		SkipRouterPluginID:      req.SkipRouterPluginID,
-		ForcedProvider:          req.ForcedProvider,
-		ProxyURL:                strings.TrimSpace(req.ProxyURL),
-		Path:                    strings.TrimSpace(req.Path),
-		CallerScope:             strings.TrimSpace(req.CallerScope),
-	})
-	chunks, errMsg := prepareModelExecutionStream(ctx, dataChan, errChan)
-	if errMsg != nil {
-		return ModelExecutionStream{}, errMsg
-	}
-	return ModelExecutionStream{
-		StatusCode: http.StatusOK,
-		Headers:    cloneHeader(headers),
-		Chunks:     chunks,
-	}, nil
 }
 
 // ExecuteProtocolWithAuthManager executes a route-level non-streaming request with explicit protocols.
@@ -284,13 +180,6 @@ func cloneURLValues(src url.Values) url.Values {
 		dst[key] = append([]string(nil), values...)
 	}
 	return dst
-}
-
-func addModelExecutionSourceMetadata(meta map[string]any, internalSource bool) {
-	if !internalSource || meta == nil {
-		return
-	}
-	meta[modelExecutionMetadataSourceKey] = modelExecutionInternalSource
 }
 
 func prepareModelExecutionStream(ctx context.Context, dataChan <-chan []byte, errChan <-chan *interfaces.ErrorMessage) (<-chan ModelExecutionChunk, *interfaces.ErrorMessage) {

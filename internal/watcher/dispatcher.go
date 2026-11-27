@@ -150,7 +150,6 @@ func (w *Watcher) refreshAuthState(force bool) {
 	var (
 		cfg             *config.Config
 		authDir         string
-		parser          synthesizer.PluginAuthParser
 		previous        map[string]uint64
 		previousFiles   map[string]uint64
 		auths           []*coreauth.Auth
@@ -161,12 +160,11 @@ func (w *Watcher) refreshAuthState(force bool) {
 		w.activeAuthScans++
 		cfg = w.config
 		authDir = w.currentAuthDirLocked()
-		parser = w.pluginAuthParser
 		previous = maps.Clone(w.authRevisions)
 		previousFiles = maps.Clone(w.fileObservations)
 		w.clientsMutex.Unlock()
 
-		auths, incompleteFiles = snapshotCoreAuthsFunc(cfg, authDir, parser)
+		auths, incompleteFiles = snapshotCoreAuthsFunc(cfg, authDir)
 
 		w.clientsMutex.Lock()
 		w.activeAuthScans--
@@ -620,18 +618,17 @@ func normalizeAuth(a *coreauth.Auth) *coreauth.Auth {
 	return clone
 }
 
-func snapshotCoreAuths(cfg *config.Config, authDir string, parser synthesizer.PluginAuthParser) []*coreauth.Auth {
-	auths, _ := snapshotCoreAuthsWithIncomplete(cfg, authDir, parser)
+func snapshotCoreAuths(cfg *config.Config, authDir string) []*coreauth.Auth {
+	auths, _ := snapshotCoreAuthsWithIncomplete(cfg, authDir)
 	return auths
 }
 
-func snapshotCoreAuthsWithIncomplete(cfg *config.Config, authDir string, parser synthesizer.PluginAuthParser) ([]*coreauth.Auth, map[string]struct{}) {
+func snapshotCoreAuthsWithIncomplete(cfg *config.Config, authDir string) ([]*coreauth.Auth, map[string]struct{}) {
 	ctx := &synthesizer.SynthesisContext{
-		Config:           cfg,
-		AuthDir:          authDir,
-		Now:              time.Now(),
-		IDGenerator:      synthesizer.NewStableIDGenerator(),
-		PluginAuthParser: parser,
+		Config:      cfg,
+		AuthDir:     authDir,
+		Now:         time.Now(),
+		IDGenerator: synthesizer.NewStableIDGenerator(),
 	}
 
 	var out []*coreauth.Auth

@@ -9,7 +9,6 @@ import (
 
 	configaccess "github.com/router-for-me/CLIProxyAPI/v8/internal/access/config_access"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/api"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/pluginhost"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/watcher"
 	sdkaccess "github.com/router-for-me/CLIProxyAPI/v8/sdk/access"
@@ -51,9 +50,6 @@ type Builder struct {
 
 	// cooldownStateStore overrides runtime cooldown persistence.
 	cooldownStateStore coreauth.CooldownStateStore
-
-	// pluginHost owns dynamic plugin lifecycle and adapters.
-	pluginHost *pluginhost.Host
 
 	// postAuthHook is called after auth record creation and before persistence.
 	postAuthHook coreauth.PostAuthHook
@@ -159,12 +155,6 @@ func (b *Builder) WithCooldownStateStore(store coreauth.CooldownStateStore) *Bui
 	return b
 }
 
-// WithPluginHost overrides the dynamic plugin host used by the service.
-func (b *Builder) WithPluginHost(host *pluginhost.Host) *Builder {
-	b.pluginHost = host
-	return b
-}
-
 // WithServerOptions appends server configuration options used during construction.
 func (b *Builder) WithServerOptions(opts ...api.ServerOption) *Builder {
 	b.serverOptions = append(b.serverOptions, opts...)
@@ -207,10 +197,6 @@ func (b *Builder) Build() (*Service, error) {
 	if errValidate := b.cfg.ValidateCredentialWeights(); errValidate != nil {
 		return nil, fmt.Errorf("cliproxy: validate credential weights: %w", errValidate)
 	}
-	b.cfg.NormalizePluginsConfig()
-	if errResolvePluginsDir := b.cfg.ResolvePluginsDir(); errResolvePluginsDir != nil && b.cfg.Plugins.Enabled {
-		return nil, fmt.Errorf("cliproxy: %w", errResolvePluginsDir)
-	}
 
 	tokenProvider := b.tokenProvider
 	if tokenProvider == nil {
@@ -238,14 +224,6 @@ func (b *Builder) Build() (*Service, error) {
 	}
 
 	configaccess.Register(&b.cfg.SDKConfig)
-	pluginHost := b.pluginHost
-	if pluginHost == nil {
-		pluginHost = pluginhost.New()
-	}
-	if b.cfg != nil {
-		pluginHost.ApplyConfig(context.Background(), b.cfg)
-		pluginHost.RegisterFrontendAuthProviders()
-	}
 	accessManager.SetProviders(sdkaccess.RegisteredProviders())
 
 	coreManager := b.coreManager
@@ -270,9 +248,6 @@ func (b *Builder) Build() (*Service, error) {
 	coreManager.SetRoundTripperProvider(newDefaultRoundTripperProvider())
 	coreManager.SetConfig(b.cfg)
 	coreManager.SetOAuthModelAlias(b.cfg.OAuthModelAlias)
-	if pluginHost != nil {
-		coreManager.SetPluginScheduler(pluginHost)
-	}
 	if b.resultPolicy != nil {
 		coreManager.SetResultPolicy(b.resultPolicy)
 	}
@@ -288,7 +263,6 @@ func (b *Builder) Build() (*Service, error) {
 		accessManager:       accessManager,
 		coreManager:         coreManager,
 		cooldownStateStore:  cooldownStateStore,
-		pluginHost:          pluginHost,
 		appliedRoutingState: appliedRoutingState,
 		serverOptions:       append([]api.ServerOption(nil), b.serverOptions...),
 	}
@@ -299,7 +273,6 @@ func (b *Builder) Build() (*Service, error) {
 	}
 	service.serverOptions = append(service.serverOptions,
 		api.WithPostAuthPersistHook(service.runtimeAuthSyncHook()),
-		api.WithPluginHost(pluginHost),
 		api.WithConfigReloadHook(func(_ context.Context, _ *config.Config) {
 			service.reloadConfigFromWatcher()
 		}),

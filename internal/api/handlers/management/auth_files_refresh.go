@@ -71,13 +71,7 @@ func (h *Handler) RefreshAuthFiles(c *gin.Context) {
 	}
 
 	if c.GetBool(ConfigV8ContextKey) {
-		h.mu.Lock()
-		host := h.pluginHost
-		h.mu.Unlock()
 		quota := authFileQuotaContext{v8: true}
-		if host != nil {
-			quota.pluginIDs = host.QuotaProviderPluginIDs(ctx)
-		}
 		c.JSON(http.StatusOK, gin.H{
 			"ok":   true,
 			"auth": h.buildAuthFileEntry(refreshed, quota),

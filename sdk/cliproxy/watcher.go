@@ -43,9 +43,6 @@ func defaultWatcherFactory(configPath, authDir string, reload func(*config.Confi
 		rereadDiscardedFileSnapshot: func(auth *coreauth.Auth) {
 			w.RereadDiscardedFileSnapshot(auth)
 		},
-		setPluginAuthParser: func(parser PluginAuthParser) {
-			w.SetPluginAuthParser(parser)
-		},
 		reloadConfigIfChanged: func() {
 			w.ReloadConfigIfChanged()
 		},

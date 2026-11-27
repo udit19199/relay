@@ -90,10 +90,6 @@ func (w *Watcher) reloadClients(rescanAuth bool, affectedOAuthProviders []string
 		var incompleteRescanPaths map[string]struct{}
 		var incompleteRescanDir string
 
-		w.clientsMutex.RLock()
-		parser := w.pluginAuthParser
-		w.clientsMutex.RUnlock()
-
 		if resolvedAuthDir, errResolveAuthDir := w.resolveAuthDirForConfig(cfg); errResolveAuthDir != nil {
 			log.Errorf("failed to resolve auth directory for hash cache: %v", errResolveAuthDir)
 		} else if resolvedAuthDir != "" {
@@ -141,11 +137,10 @@ func (w *Watcher) reloadClients(rescanAuth bool, affectedOAuthProviders []string
 						}
 					}
 					ctx := &synthesizer.SynthesisContext{
-						Config:           cfg,
-						AuthDir:          resolvedAuthDir,
-						Now:              time.Now(),
-						IDGenerator:      synthesizer.NewStableIDGenerator(),
-						PluginAuthParser: parser,
+						Config:      cfg,
+						AuthDir:     resolvedAuthDir,
+						Now:         time.Now(),
+						IDGenerator: synthesizer.NewStableIDGenerator(),
 					}
 					generated, errSynthesize := synthesizer.SynthesizeAuthFile(ctx, fullPath, data)
 					if errSynthesize != nil {
@@ -348,7 +343,6 @@ func (w *Watcher) addOrUpdateClientLocked(path string) {
 	}
 	cfg := w.config
 	authDir := w.currentAuthDirLocked()
-	parser := w.pluginAuthParser
 	if prev, ok := w.lastAuthHashes[normalized]; ok && prev == curHash {
 		log.Debugf("auth file unchanged (hash match), skipping reload: %s", filepath.Base(path))
 		w.clientsMutex.Unlock()
@@ -376,11 +370,10 @@ func (w *Watcher) addOrUpdateClientLocked(path string) {
 
 	// Build synthesized auth entries for this single file only.
 	sctx := &synthesizer.SynthesisContext{
-		Config:           cfg,
-		AuthDir:          authDir,
-		Now:              time.Now(),
-		IDGenerator:      synthesizer.NewStableIDGenerator(),
-		PluginAuthParser: parser,
+		Config:      cfg,
+		AuthDir:     authDir,
+		Now:         time.Now(),
+		IDGenerator: synthesizer.NewStableIDGenerator(),
 	}
 	generated, errSynthesize := synthesizer.SynthesizeAuthFile(sctx, path, data)
 	if errSynthesize != nil {
@@ -452,7 +445,7 @@ func (w *Watcher) removeClientLocked(path string) {
 
 	updates := w.computePerPathUpdatesLocked(oldByID, map[string]*coreauth.Auth{})
 	// Only the whole-file removal path gets this mark. Content diffs may drop
-	// individual plugin auth IDs while their source file still exists.
+	// individual synthesized auth IDs while their source file still exists.
 	for index := range updates {
 		if updates[index].Action == AuthUpdateActionDelete {
 			updates[index].SetFileRemoval(true)

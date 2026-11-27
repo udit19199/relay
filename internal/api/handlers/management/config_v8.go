@@ -155,7 +155,7 @@ func (h *Handler) ConfigV8(c *gin.Context) {
 		preserveV8TURNSecrets(root, before)
 	}
 	// Revisions are owned by Home and must not become ordinary editable settings.
-	for _, field := range []string{"credentials/concurrency/lifecycle-config-revision", "credentials/concurrency/observation-barrier-revision", "plugins/auth-revision"} {
+	for _, field := range []string{"credentials/concurrency/lifecycle-config-revision", "credentials/concurrency/observation-barrier-revision"} {
 		old := configV8Node(before, strings.Split(field, "/"))
 		next := configV8Node(root, strings.Split(field, "/"))
 		var a, b any
@@ -192,7 +192,7 @@ func (h *Handler) ConfigV8(c *gin.Context) {
 		return
 	}
 	// Save the validated canonical tree directly: projecting runtime defaults
-	// back onto it loses explicit nulls, empty maps, and opaque plugin settings.
+	// back onto it loses explicit nulls, empty maps, and opaque settings.
 	// WriteConfig retains the inode of a mounted configuration file.
 	if err = WriteConfig(h.configFilePath, data); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "write_failed", "message": err.Error()})
@@ -320,7 +320,7 @@ func configV8Node(root *yaml.Node, parts []string) *yaml.Node {
 }
 
 // deleteConfigV8Path prunes only empty ancestors of the removed field. Other
-// explicit empty maps can carry inheritance or plugin semantics and stay intact.
+// explicit empty maps can carry inheritance semantics and stay intact.
 func deleteConfigV8Path(root *yaml.Node, parts []string) bool {
 	if root == nil || root.Kind != yaml.MappingNode || len(parts) == 0 {
 		return false

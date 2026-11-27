@@ -19,7 +19,6 @@ func (w *Watcher) SnapshotAuthFile(path string) ([]*coreauth.Auth, error) {
 	w.clientsMutex.RLock()
 	cfg := w.config
 	authDir := w.currentAuthDirLocked()
-	parser := w.pluginAuthParser
 	w.clientsMutex.RUnlock()
 	if cfg == nil || authDir == "" {
 		return nil, fmt.Errorf("file auth snapshot is not configured")
@@ -45,7 +44,6 @@ func (w *Watcher) SnapshotAuthFile(path string) ([]*coreauth.Auth, error) {
 		AuthDir:           authDir,
 		Now:               time.Now(),
 		IDGenerator:       synthesizer.NewStableIDGenerator(),
-		PluginAuthParser:  parser,
 		StrictFileParsing: true,
 	}, path, data)
 }

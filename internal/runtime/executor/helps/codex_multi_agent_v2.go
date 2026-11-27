@@ -47,8 +47,8 @@ func TranslateRequestEnvelopeWithCodexMultiAgentV2(ctx context.Context, headers 
 // TranslateRequestPairWithCodexMultiAgentV2 translates the untouched baseline
 // payload and the working payload that later stages mutate in place. Executors
 // normally assign the original payload to the request before translating, so the
-// same input is translated once, including plugin hooks, then copied into a
-// separate working buffer. This avoids duplicate plugin side effects and a full
+// same input is translated once, then copied into a
+// separate working buffer. This avoids a full
 // extra pass over payloads that can reach tens of megabytes.
 func TranslateRequestPairWithCodexMultiAgentV2(ctx context.Context, headers http.Header, cfg *config.Config, from, to sdktranslator.Format, model string, originalPayload, requestPayload []byte, stream bool) (original, working []byte) {
 	req := sdktranslator.RequestEnvelope{Format: from, Model: model, Stream: stream}
@@ -90,7 +90,7 @@ func sameByteSlice(a, b []byte) bool {
 }
 
 // TranslateRequestPairWithAPIKeyModelCompatibility avoids translating identical
-// inputs twice while retaining separate buffers and invoking plugins once per input.
+// inputs twice while retaining separate buffers.
 func TranslateRequestPairWithAPIKeyModelCompatibility(ctx context.Context, headers http.Header, cfg *config.Config, from, to sdktranslator.Format, model string, originalPayload, requestPayload []byte, stream, isCompat bool) (original, working []byte) {
 	original, working, _ = translateRequestPairWithAPIKeyModelCompatibility(ctx, headers, cfg, from, to, model, originalPayload, requestPayload, stream, isCompat)
 	return original, working
@@ -107,7 +107,7 @@ func translateRequestPairWithAPIKeyModelCompatibility(ctx context.Context, heade
 }
 
 // TranslateRequestPairWithAPIKeyModelCompatibilityAndUpdateIntent returns the
-// normalizer decision for the working payload, not for the baseline payload,
+// update decision for the working payload, not for the baseline payload,
 // and the working payload's error for a content part the target cannot
 // represent. A baseline failure alone is ignored.
 func TranslateRequestPairWithAPIKeyModelCompatibilityAndUpdateIntent(ctx context.Context, headers http.Header, cfg *config.Config, from, to sdktranslator.Format, model string, originalPayload, requestPayload []byte, stream, isCompat bool) (original, working []byte, updatesChanged bool, err error) {
@@ -121,8 +121,8 @@ func TranslateRequestPairWithAPIKeyModelCompatibilityAndUpdateIntent(ctx context
 	return original, working, updatesChanged, err
 }
 
-// TranslateRequestWithAPIKeyModelCompatibilityAndUpdateIntent returns the
-// plugin normalizer's request-scoped update decision for Responses targets.
+// TranslateRequestWithAPIKeyModelCompatibilityAndUpdateIntent reports whether
+// request-scoped configuration updates changed during translation.
 func TranslateRequestWithAPIKeyModelCompatibilityAndUpdateIntent(ctx context.Context, headers http.Header, cfg *config.Config, from, to sdktranslator.Format, model string, payload []byte, stream, isCompat bool) ([]byte, bool, error) {
 	return TranslateRequestWithAPIKeyModelCompatibilityAndUpdateIntentForExecutor(ctx, headers, cfg, "", from, to, model, payload, stream, isCompat)
 }
@@ -211,7 +211,7 @@ func translateRequestWithAPIKeyModelCompatibilityForExecutor(ctx context.Context
 
 	summaryConfig := thinking.ExtractTranslatedSummaryConfig(payload, from.String(), to.String())
 	translated = thinking.ApplySummaryConfigForModel(translated, to.String(), model, summaryConfig)
-	return sdktranslator.NormalizeRequest(ctx, from, to, model, translated, stream), convertErr
+	return translated, convertErr
 }
 
 // HasCodexMultiAgentV2NamespaceConflict reports whether the request defines

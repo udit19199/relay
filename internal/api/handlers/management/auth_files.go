@@ -44,7 +44,6 @@ var (
 	errAuthFileMustBeJSON = errors.New("auth file must be .json")
 	errInvalidAuthFile    = errors.New("invalid auth file")
 	errAuthFileNotFound   = errors.New("auth file not found")
-	errPluginVirtualAuth  = errors.New("plugin virtual auth cannot be modified directly; edit or delete the source auth file")
 	newCodexOAuthService  = func(cfg *config.Config) codexOAuthService { return codex.NewCodexAuth(cfg) }
 )
 
@@ -117,13 +116,7 @@ func (h *Handler) ListAuthFiles(c *gin.Context) {
 	}
 	nameFilter := strings.TrimSpace(c.Query("name"))
 	authIndexFilter := strings.TrimSpace(c.Query("auth_index"))
-	h.mu.Lock()
-	host := h.pluginHost
-	h.mu.Unlock()
 	quota := authFileQuotaContext{v8: c.GetBool(ConfigV8ContextKey)}
-	if host != nil {
-		quota.pluginIDs = host.QuotaProviderPluginIDs(c.Request.Context())
-	}
 	auths := h.authManager.List()
 	observedAt := time.Now().UTC()
 	if pagination.enabled {
@@ -476,10 +469,7 @@ func (h *Handler) listAuthFilesFromDisk(c *gin.Context, pagination authFilesPagi
 
 // authFileQuotaContext carries request-scoped quota capability data for auth file entries.
 type authFileQuotaContext struct {
-	// pluginIDs maps normalized provider keys to the quota plugin selected for them.
-	// A nil map means no quota plugins are available.
-	pluginIDs map[string]string
-	// v8 hides declarative quota_probe support because v8 only serves plugin quota routes.
+	// v8 hides declarative quota_probe support because declarative probes are served by the v0 quota route.
 	v8 bool
 }
 
@@ -682,13 +672,6 @@ func (h *Handler) buildAuthFileEntryLocked(auth *coreauth.Auth, quota authFileQu
 	if modelQuotas := modelQuotaObservationPayload(auth.Provider, auth.ModelStates); len(modelQuotas) > 0 {
 		entry["model_quotas"] = modelQuotas
 	}
-	if pluginID := quota.pluginIDs[strings.ToLower(strings.TrimSpace(auth.Provider))]; pluginID != "" {
-		entry["supports_quota"] = true
-		entry["quota_provider"] = auth.Provider
-		if quota.v8 {
-			entry["quota_plugin_id"] = pluginID
-		}
-	}
 	// Declarative quota_probe is only executed by the v0 quota/fetch route.
 	if !quota.v8 && auth.Metadata != nil {
 		if probe, okProbe := auth.Metadata["quota_probe"]; okProbe && probe != nil {
@@ -783,8 +766,8 @@ func (h *Handler) buildAuthFileEntryLocked(auth *coreauth.Auth, quota authFileQu
 		entry["request_retry"] = requestRetry
 	}
 	if quota.v8 {
-		// OAuth login entry the credential was signed in through; multi-entry plugins store it
-		// next to the provider, and the deprecated v0 route keeps its frozen response shape.
+		// OAuth login entry the credential was signed in through; the deprecated v0
+		// route keeps its frozen response shape.
 		if oauthProvider := authOAuthProvider(auth); oauthProvider != "" {
 			entry["oauth_provider"] = oauthProvider
 		}

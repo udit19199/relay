@@ -27,7 +27,6 @@ var corsExposedResponseHeaders = []string{
 	"X-CPA-VERSION",
 	"X-CPA-COMMIT",
 	"X-CPA-BUILD-DATE",
-	"X-CPA-SUPPORT-PLUGIN",
 	"X-CPA-HOME-VERSION",
 	"X-CPA-HOME-BUILD-DATE",
 	"X-SERVER-VERSION",

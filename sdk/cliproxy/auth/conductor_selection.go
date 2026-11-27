@@ -12,64 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/thinking"
 	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 )
-
-func (m *Manager) SetPluginScheduler(scheduler PluginScheduler) {
-	if m == nil {
-		return
-	}
-	m.mu.Lock()
-	m.pluginScheduler = scheduler
-	m.mu.Unlock()
-}
-
-func (m *Manager) hasPluginScheduler() bool {
-	if m == nil {
-		return false
-	}
-	m.mu.RLock()
-	scheduler := m.pluginScheduler
-	m.mu.RUnlock()
-	if scheduler == nil {
-		return false
-	}
-	if state, ok := scheduler.(pluginSchedulerState); ok {
-		return state.HasScheduler()
-	}
-	return true
-}
-
-func pluginSchedulerWantsAcrossPriorities(scheduler PluginScheduler) bool {
-	if scheduler == nil {
-		return false
-	}
-	if opt, ok := scheduler.(PluginSchedulerAcrossPriorities); ok && opt != nil {
-		return opt.SchedulerWantsAcrossPriorities()
-	}
-	return false
-}
-
-func (m *Manager) snapshotPluginScheduler() (PluginScheduler, bool) {
-	if m == nil {
-		return nil, false
-	}
-	m.mu.RLock()
-	scheduler := m.pluginScheduler
-	m.mu.RUnlock()
-	return scheduler, pluginSchedulerWantsAcrossPriorities(scheduler)
-}
-
-// PluginSchedulerWantsAcrossPriorities reports whether the configured plugin scheduler
-// opted into receiving candidates across all priority tiers.
-func (m *Manager) PluginSchedulerWantsAcrossPriorities() bool {
-	_, wants := m.snapshotPluginScheduler()
-	return wants
-}
 
 func isBuiltInSelector(selector Selector) bool {
 	switch selector.(type) {
@@ -771,10 +717,6 @@ func (m *Manager) LookupSessionAffinity(provider, model, sessionID string) (*Aut
 		return nil, "unsupported"
 	}
 	m.mu.RLock()
-	if m.pluginScheduler != nil {
-		m.mu.RUnlock()
-		return nil, "unsupported"
-	}
 	sel := m.selector
 	authProviderMap := make(map[string]string, len(m.auths))
 	for id, a := range m.auths {
@@ -930,7 +872,7 @@ func (m *Manager) availableAuthsForRouteModelForRequest(ctx context.Context, aut
 }
 
 // availableAuthsForSelector reports the candidates handed to priority-scoped consumers such as
-// the plugin scheduler, plus the candidates handed to the configured selector. Both are equal
+// priority-scoped scheduling, plus the candidates handed to the configured selector. Both are equal
 // unless session affinity or an across-priorities scheduler is active, in which case the selector
 // or scheduler additionally receives lower priority tiers.
 func (m *Manager) availableAuthsForSelector(ctx context.Context, selector Selector, auths []*Auth, provider, routeModel string, now time.Time, schedulerAcross bool, clientHeaders ...http.Header) (priorityAuths, selectorAuths []*Auth, err error) {
@@ -1183,78 +1125,6 @@ func cloneAuthSlice(auths []*Auth) []*Auth {
 	return out
 }
 
-func schedulerAuthCandidates(auths []*Auth) []pluginapi.SchedulerAuthCandidate {
-	if len(auths) == 0 {
-		return nil
-	}
-	out := make([]pluginapi.SchedulerAuthCandidate, 0, len(auths))
-	for _, auth := range auths {
-		if auth == nil {
-			continue
-		}
-		out = append(out, pluginapi.SchedulerAuthCandidate{
-			ID:         auth.ID,
-			Provider:   strings.ToLower(strings.TrimSpace(auth.Provider)),
-			Priority:   authPriority(auth),
-			Status:     string(auth.Status),
-			Attributes: schedulerSafeAttributes(auth.Attributes),
-		})
-	}
-	return out
-}
-
-func schedulerProviders(provider string, providers []string) []string {
-	out := make([]string, 0, len(providers)+1)
-	seen := make(map[string]struct{}, len(providers)+1)
-	addProvider := func(value string) {
-		value = strings.ToLower(strings.TrimSpace(value))
-		if value == "" || value == "mixed" {
-			return
-		}
-		if _, ok := seen[value]; ok {
-			return
-		}
-		seen[value] = struct{}{}
-		out = append(out, value)
-	}
-	addProvider(provider)
-	for _, value := range providers {
-		addProvider(value)
-	}
-	return out
-}
-
-func schedulerOptions(opts cliproxyexecutor.Options) pluginapi.SchedulerOptions {
-	return pluginapi.SchedulerOptions{
-		Headers:  cloneHTTPHeader(opts.Headers),
-		Metadata: cloneSchedulerAnyMap(opts.Metadata),
-	}
-}
-
-func pickSchedulerAuthByID(candidates []*Auth, authID string) *Auth {
-	authID = strings.TrimSpace(authID)
-	if authID == "" {
-		return nil
-	}
-	for _, candidate := range candidates {
-		if candidate != nil && candidate.ID == authID {
-			return candidate
-		}
-	}
-	return nil
-}
-
-func builtinSchedulerStrategy(delegate string) (schedulerStrategy, bool) {
-	switch strings.TrimSpace(delegate) {
-	case pluginapi.SchedulerBuiltinRoundRobin:
-		return schedulerStrategyRoundRobin, true
-	case pluginapi.SchedulerBuiltinFillFirst:
-		return schedulerStrategyFillFirst, true
-	default:
-		return schedulerStrategyCustom, false
-	}
-}
-
 func (m *Manager) pickViaBuiltinScheduler(ctx context.Context, strategy schedulerStrategy, provider string, providers []string, model string, opts cliproxyexecutor.Options, tried map[string]struct{}) (*Auth, bool, error) {
 	if m == nil || m.scheduler == nil {
 		return nil, false, nil
@@ -1288,71 +1158,6 @@ func clearSchedulerSelectionID(meta map[string]any) {
 		return
 	}
 	delete(meta, cliproxyexecutor.SelectionIDMetadataKey)
-}
-
-func (m *Manager) pickViaPluginScheduler(ctx context.Context, scheduler PluginScheduler, provider string, providers []string, model string, opts cliproxyexecutor.Options, tried map[string]struct{}, candidates []*Auth) (*Auth, bool, error) {
-	if scheduler == nil || len(candidates) == 0 {
-		clearSchedulerSelectionID(opts.Metadata)
-		return nil, false, nil
-	}
-	if state, ok := scheduler.(pluginSchedulerState); ok && !state.HasScheduler() {
-		clearSchedulerSelectionID(opts.Metadata)
-		return nil, false, nil
-	}
-	opts.EnsureMetadata()
-	selectionID := uuid.NewString()
-	opts.Metadata[cliproxyexecutor.SelectionIDMetadataKey] = selectionID
-	keepSelectionID := false
-	defer func() {
-		if !keepSelectionID {
-			clearSchedulerSelectionID(opts.Metadata)
-		}
-	}()
-	providerKey := strings.ToLower(strings.TrimSpace(provider))
-	requestProvider := providerKey
-	if providerKey == "mixed" {
-		requestProvider = ""
-	}
-	req := pluginapi.SchedulerPickRequest{
-		Provider:   requestProvider,
-		Providers:  schedulerProviders(providerKey, providers),
-		Model:      model,
-		Stream:     opts.Stream,
-		Options:    schedulerOptions(opts),
-		Candidates: schedulerAuthCandidates(candidates),
-	}
-	resp, handled, errPick := scheduler.PickAuth(ctx, req)
-	if errPick != nil {
-		return nil, true, errPick
-	}
-	if !handled || !resp.Handled {
-		return nil, false, nil
-	}
-	if resp.Reject {
-		rejectCode := strings.TrimSpace(resp.RejectCode)
-		if rejectCode == "" {
-			rejectCode = "auth_unavailable"
-		}
-		rejectMessage := strings.TrimSpace(resp.RejectReason)
-		if rejectMessage == "" {
-			rejectMessage = "scheduler rejected candidate selection"
-		}
-		return nil, true, wrapRequestStopError(&Error{Code: rejectCode, Message: rejectMessage})
-	}
-	if selected := pickSchedulerAuthByID(candidates, resp.AuthID); selected != nil {
-		keepSelectionID = true
-		return selected, true, nil
-	}
-
-	strategy, okStrategy := builtinSchedulerStrategy(resp.DelegateBuiltin)
-	if !okStrategy {
-		return nil, false, nil
-	}
-	selected, handledBuiltin, errBuiltin := m.pickViaBuiltinScheduler(ctx, strategy, providerKey, providers, model, opts, tried)
-	if errBuiltin == nil && handledBuiltin && selected != nil {
-		keepSelectionID = true
-	}
-	return selected, handledBuiltin, errBuiltin
 }
 
 func (m *Manager) authSupportsRouteModel(registryRef *registry.ModelRegistry, auth *Auth, routeModel string) bool {
@@ -1909,35 +1714,6 @@ func (m *Manager) PublishIfRegistrationCurrent(id string, registrationEpoch uint
 	return publish()
 }
 
-// UpdateIfRegistrationCurrent applies a plugin-returned auth update only
-// while the manager still holds the exact registration inputs the plugin
-// computation started from. It prevents an old plugin result from adopting
-// a removed or re-registered identity merely because its zero registration
-// epoch would otherwise inherit the current epoch during Update.
-func (m *Manager) UpdateIfRegistrationCurrent(ctx context.Context, base *Auth, updated *Auth) (*Auth, bool, error) {
-	if m == nil || base == nil || updated == nil || base.ID == "" || updated.ID != base.ID {
-		return nil, false, nil
-	}
-	releaseMutation, errMutation := m.lockAuthMutationContext(ctx, base.ID)
-	if errMutation != nil {
-		return nil, false, errMutation
-	}
-	defer releaseMutation()
-	m.mu.RLock()
-	current, ok := m.auths[base.ID]
-	matches := ok && current != nil && modelRegistrationInputsMatch(current, base.RegistrationEpoch, base.Prefix, base.Provider, base.Disabled || base.Status == StatusDisabled, base.AuthKind(), base.Attributes)
-	m.mu.RUnlock()
-	if !matches {
-		return nil, false, nil
-	}
-	committedAuth, didCommit, persistCooldown, errUpdate := m.updateInternalLocked(ctx, nil, updated, updateModeReplace)
-	releaseMutation()
-	if errUpdate == nil && didCommit && committedAuth != nil {
-		m.finishAuthUpdate(ctx, committedAuth, persistCooldown)
-	}
-	return committedAuth, errUpdate == nil && didCommit && committedAuth != nil, errUpdate
-}
-
 func modelRegistrationInputsMatch(current *Auth, registrationEpoch uint64, prefix, provider string, disabled bool, authKind string, attributes map[string]string) bool {
 	if current == nil {
 		return false
@@ -2123,7 +1899,6 @@ func (m *Manager) pickNextLegacyOnce(ctx context.Context, provider, model string
 
 	pinnedAuthID := pinnedAuthIDFromMetadata(opts.Metadata)
 	eligibility := authSelectionEligibilityForRequest(ctx, opts)
-	pluginScheduler, schedulerAcross := m.snapshotPluginScheduler()
 
 	m.mu.RLock()
 	selector := m.selector
@@ -2184,19 +1959,18 @@ func (m *Manager) pickNextLegacyOnce(ctx context.Context, provider, model string
 		}
 		candidates = append(candidates, candidate)
 	}
-	canInspectUnavailableAffinity := hasAffinity && affinitySelector != nil && affinitySelector.rebindOnNever && pluginScheduler == nil
+	canInspectUnavailableAffinity := hasAffinity && affinitySelector != nil && affinitySelector.rebindOnNever
 	if len(candidates) == 0 && !canInspectUnavailableAffinity {
 		m.mu.RUnlock()
 		return nil, nil, &Error{Code: "auth_not_found", Message: "no auth available"}
 	}
 	now := time.Now()
 	var (
-		available     []*Auth
 		selectorAuths []*Auth
 		errAvailable  error
 	)
 	if len(candidates) > 0 {
-		available, selectorAuths, errAvailable = m.availableAuthsForSelector(ctx, selector, candidates, provider, model, now, schedulerAcross, opts.Headers)
+		_, selectorAuths, errAvailable = m.availableAuthsForSelector(ctx, selector, candidates, provider, model, now, false, opts.Headers)
 		if errAvailable != nil && !canInspectUnavailableAffinity {
 			m.mu.RUnlock()
 			m.warnLogAuthUnavailable(ctx, []string{provider}, model, opts, tried, errAvailable)
@@ -2215,7 +1989,9 @@ func (m *Manager) pickNextLegacyOnce(ctx context.Context, provider, model string
 	transientAuthIDs := m.transientlyUnavailableSessionAffinityAuthIDs(ctx, selector, affinityCandidates, model, now, opts.Headers)
 	m.mu.RUnlock()
 
-	selected, handled, errPick := m.pickViaPluginScheduler(ctx, pluginScheduler, provider, []string{provider}, model, opts, tried, available)
+	var selected *Auth
+	handled := false
+	var errPick error
 	if errPick != nil {
 		m.warnLogAuthUnavailable(ctx, []string{provider}, model, opts, tried, errPick)
 		return nil, nil, errPick
@@ -2312,7 +2088,7 @@ func (m *Manager) pickNext(ctx context.Context, provider, model string, opts cli
 	opts.Metadata[cliproxyexecutor.SessionAffinityProviderMetadataKey] = provider
 	opts.Metadata[cliproxyexecutor.SessionAffinityModelMetadataKey] = model
 
-	if m.hasPluginScheduler() || !m.useSchedulerFastPath() {
+	if !m.useSchedulerFastPath() {
 		return m.pickNextLegacy(ctx, provider, model, opts, tried)
 	}
 	eligibility := authSelectionEligibilityForRequest(ctx, opts)
@@ -2447,7 +2223,6 @@ func (m *Manager) pickNextMixedLegacy(ctx context.Context, providers []string, m
 	if len(providerSet) == 0 {
 		return nil, nil, "", &Error{Code: "provider_not_found", Message: "no provider supplied"}
 	}
-	pluginScheduler, schedulerAcross := m.snapshotPluginScheduler()
 
 	m.mu.RLock()
 	selector := m.selector
@@ -2512,19 +2287,18 @@ func (m *Manager) pickNextMixedLegacy(ctx context.Context, providers []string, m
 		}
 		candidates = append(candidates, candidate)
 	}
-	canInspectUnavailableAffinity := hasAffinity && affinitySelector != nil && affinitySelector.rebindOnNever && pluginScheduler == nil
+	canInspectUnavailableAffinity := hasAffinity && affinitySelector != nil && affinitySelector.rebindOnNever
 	if len(candidates) == 0 && !canInspectUnavailableAffinity {
 		m.mu.RUnlock()
 		return nil, nil, "", &Error{Code: "auth_not_found", Message: "no auth available"}
 	}
 	now := time.Now()
 	var (
-		available     []*Auth
 		selectorAuths []*Auth
 		errAvailable  error
 	)
 	if len(candidates) > 0 {
-		available, selectorAuths, errAvailable = m.availableAuthsForSelector(ctx, selector, candidates, "mixed", model, now, schedulerAcross, opts.Headers)
+		_, selectorAuths, errAvailable = m.availableAuthsForSelector(ctx, selector, candidates, "mixed", model, now, false, opts.Headers)
 		if errAvailable != nil && !canInspectUnavailableAffinity {
 			m.mu.RUnlock()
 			m.warnLogAuthUnavailable(ctx, providers, model, opts, tried, errAvailable)
@@ -2543,7 +2317,9 @@ func (m *Manager) pickNextMixedLegacy(ctx context.Context, providers []string, m
 	transientAuthIDs := m.transientlyUnavailableSessionAffinityAuthIDs(ctx, selector, affinityCandidates, model, now, opts.Headers)
 	m.mu.RUnlock()
 
-	selected, handled, errPick := m.pickViaPluginScheduler(ctx, pluginScheduler, "mixed", providers, model, opts, tried, available)
+	var selected *Auth
+	handled := false
+	var errPick error
 	if errPick != nil {
 		m.warnLogAuthUnavailable(ctx, providers, model, opts, tried, errPick)
 		return nil, nil, "", errPick
@@ -2632,7 +2408,7 @@ func (m *Manager) pickNextMixedOnce(ctx context.Context, providers []string, mod
 	opts.Metadata[cliproxyexecutor.SessionAffinityProviderMetadataKey] = "mixed"
 	opts.Metadata[cliproxyexecutor.SessionAffinityModelMetadataKey] = model
 
-	if m.hasPluginScheduler() || !m.useSchedulerFastPath() {
+	if !m.useSchedulerFastPath() {
 		return m.pickNextMixedLegacy(ctx, providers, model, opts, tried)
 	}
 
