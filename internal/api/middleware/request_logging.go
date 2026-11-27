@@ -496,7 +496,20 @@ func decodeCapturedRequestBodyForLogWithLimit(raw []byte, encoding string, limit
 }
 
 func decodeCapturedZstdRequestBodyWithLimit(raw []byte, limit int64) ([]byte, bool, error) {
-	// One decoder goroutine and a bounded window: a frame that declares a larger window is not decoded (the raw bytes are logged).
+	// One decoder goroutine and bounded output: frames past the window or log limit stay raw because bytes that would be cut are not worth memory.
+	var header zstd.Header
+	if errHeader := header.Decode(raw); errHeader == nil {
+		window := header.WindowSize
+		if header.SingleSegment {
+			window = header.FrameContentSize
+		}
+		if window > maxCapturedZstdWindowBytes {
+			return nil, false, fmt.Errorf("zstd frame window %d exceeds %d", window, maxCapturedZstdWindowBytes)
+		}
+		if limit > 0 && header.HasFCS && header.FrameContentSize > uint64(limit) {
+			return nil, false, fmt.Errorf("zstd frame declares %d decoded bytes, over the %d log limit", header.FrameContentSize, limit)
+		}
+	}
 	decoder, errNewReader := zstd.NewReader(bytes.NewReader(raw), zstd.WithDecoderConcurrency(1), zstd.WithDecoderMaxWindow(maxCapturedZstdWindowBytes))
 	if errNewReader != nil {
 		return nil, false, fmt.Errorf("failed to create zstd request decoder: %w", errNewReader)

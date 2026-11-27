@@ -393,11 +393,24 @@ func TestDecodeCapturedRequestBodyForLogWithLimitTruncatesZstdExpansion(t *testi
 	if errNewWriter != nil {
 		t.Fatalf("zstd.NewWriter: %v", errNewWriter)
 	}
-	if _, errWrite := encoder.Write(payload); errWrite != nil {
+	if _, errWrite := encoder.Write(payload[:512]); errWrite != nil {
+		t.Fatalf("zstd write: %v", errWrite)
+	}
+	if errFlush := encoder.Flush(); errFlush != nil {
+		t.Fatalf("zstd flush: %v", errFlush)
+	}
+	if _, errWrite := encoder.Write(payload[512:]); errWrite != nil {
 		t.Fatalf("zstd write: %v", errWrite)
 	}
 	if errClose := encoder.Close(); errClose != nil {
 		t.Fatalf("zstd close: %v", errClose)
+	}
+	var header zstd.Header
+	if errDecode := header.Decode(compressed.Bytes()); errDecode != nil {
+		t.Fatalf("zstd header decode: %v", errDecode)
+	}
+	if header.HasFCS {
+		t.Fatal("streamed test frame unexpectedly declares its content size")
 	}
 
 	decoded := decodeCapturedRequestBodyForLogWithLimit(compressed.Bytes(), "zstd", 64)
@@ -941,6 +954,66 @@ func TestCaptureRequestInfoDoesNotDecodeASingleSegmentBomb(t *testing.T) {
 	}
 	if grown := after.TotalAlloc - before.TotalAlloc; grown > 16<<20 {
 		t.Fatalf("decoding a window-bomb allocated %d MiB", grown>>20)
+	}
+}
+
+func TestDecodeCapturedZstdDecodesASmallSingleSegmentBody(t *testing.T) {
+	payload := []byte(`{"model":"x"}`)
+	encoder, errNewWriter := zstd.NewWriter(nil)
+	if errNewWriter != nil {
+		t.Fatal(errNewWriter)
+	}
+	raw := encoder.EncodeAll(payload, nil)
+	decoded, truncated, errDecode := decodeCapturedZstdRequestBodyWithLimit(raw, 1<<20)
+	if errDecode != nil {
+		t.Fatal(errDecode)
+	}
+	if truncated || !bytes.Equal(decoded, payload) {
+		t.Fatalf("decoded %q truncated %t, want %q", decoded, truncated, payload)
+	}
+}
+
+func TestDecodeCapturedZstdLogsDeclaredOversizedBodyRaw(t *testing.T) {
+	encoder, errNewWriter := zstd.NewWriter(nil)
+	if errNewWriter != nil {
+		t.Fatal(errNewWriter)
+	}
+	raw := encoder.EncodeAll(make([]byte, 2<<10), nil)
+	got := decodeCapturedRequestBodyForLogWithLimit(raw, "zstd", 1<<10)
+	if !bytes.Equal(got, raw) {
+		t.Fatalf("a body declaring more than the log limit must stay raw, got %d bytes want %d", len(got), len(raw))
+	}
+}
+
+func TestDecodeCapturedZstdTruncatesStreamedBodyWithoutDeclaredSize(t *testing.T) {
+	var compressed bytes.Buffer
+	encoder, errNewWriter := zstd.NewWriter(&compressed)
+	if errNewWriter != nil {
+		t.Fatal(errNewWriter)
+	}
+	if _, errWrite := encoder.Write(make([]byte, 1<<10)); errWrite != nil {
+		t.Fatal(errWrite)
+	}
+	if errFlush := encoder.Flush(); errFlush != nil {
+		t.Fatal(errFlush)
+	}
+	if _, errWrite := encoder.Write(make([]byte, 1<<10)); errWrite != nil {
+		t.Fatal(errWrite)
+	}
+	if errClose := encoder.Close(); errClose != nil {
+		t.Fatal(errClose)
+	}
+	raw := compressed.Bytes()
+	var header zstd.Header
+	if errDecode := header.Decode(raw); errDecode != nil {
+		t.Fatal(errDecode)
+	}
+	if header.HasFCS {
+		t.Fatal("streamed test frame unexpectedly declares its content size")
+	}
+	got := decodeCapturedRequestBodyForLogWithLimit(raw, "zstd", 1<<10)
+	if !bytes.HasPrefix(got, make([]byte, 1<<10)) || !bytes.HasSuffix(got, []byte("[DECOMPRESSED REQUEST BODY TRUNCATED]")) {
+		t.Fatalf("streamed body was not truncated with the marker, got %d bytes", len(got))
 	}
 }
 
