@@ -129,9 +129,6 @@ type Config struct {
 	// XAIKey defines xAI API key configurations using the same structure as Codex API keys.
 	XAIKey []XAIKey `yaml:"xai-api-key" json:"xai-api-key"`
 
-	// MetaKey defines Meta API key configurations using the same structure as Codex API keys.
-	MetaKey []MetaKey `yaml:"meta-api-key" json:"meta-api-key"`
-
 	// XAI configures provider-wide xAI request behavior.
 	XAI XAIConfig `yaml:"xai" json:"xai"`
 
@@ -168,14 +165,14 @@ type Config struct {
 
 	// OAuthModelAlias defines global model name aliases for OAuth/file-backed auth channels.
 	// These aliases affect both model listing and model routing for supported channels:
-	// claude, codex, xai, meta.
+	// claude, codex, xai.
 	//
 	// NOTE: This does not apply to existing per-credential model alias features under:
-	// codex-api-key, xai-api-key, meta-api-key, claude-api-key, and openai-compatibility.
+	// codex-api-key, xai-api-key, claude-api-key, and openai-compatibility.
 	OAuthModelAlias map[string][]OAuthModelAlias `yaml:"oauth-model-alias,omitempty" json:"oauth-model-alias,omitempty"`
 
 	// OAuthRequestScopedErrors defines per-provider request-scoped error rules applied to OAuth/file-backed auth entries.
-	// Supported channels include: claude, codex, xai, meta.
+	// Supported channels include: claude, codex, xai.
 	//
 	// NOTE: This applies only to OAuth credentials and does not affect per-credential request-scoped-errors under *-api-key.
 	OAuthRequestScopedErrors map[string][]RequestScopedErrorRule `yaml:"oauth-request-scoped-errors,omitempty" json:"oauth-request-scoped-errors,omitempty"`

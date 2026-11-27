@@ -163,35 +163,35 @@ func TestEnsureIndexUsesCredentialIdentity(t *testing.T) {
 		t.Fatalf("same provider/key with different source should share auth_index, got %q vs %q", claudeIndex, duplicateIndex)
 	}
 
-	metaAuth1 := &Auth{
-		Provider: "meta",
-		ID:       "meta:apikey:token1",
+	xaiAuth1 := &Auth{
+		Provider: "xai",
+		ID:       "xai:apikey:token1",
 		Attributes: map[string]string{
-			"api_key":   "meta-secret",
-			"base_url":  "https://api.meta.ai/v1",
+			"api_key":   "xai-secret",
+			"base_url":  "https://api.x.ai/v1",
 			"proxy_url": "socks5://127.0.0.1:1080",
 			"prefix":    "fast-",
-			"source":    "config:meta[token1]",
+			"source":    "config:xai[token1]",
 		},
 	}
-	metaAuth2 := &Auth{
-		Provider: "meta",
-		ID:       "meta:apikey:token2",
+	xaiAuth2 := &Auth{
+		Provider: "xai",
+		ID:       "xai:apikey:token2",
 		Attributes: map[string]string{
-			"api_key":   "meta-secret",
-			"base_url":  "https://api.meta.ai/v1",
+			"api_key":   "xai-secret",
+			"base_url":  "https://api.x.ai/v1",
 			"proxy_url": "",
 			"prefix":    "",
-			"source":    "config:meta[token2]",
+			"source":    "config:xai[token2]",
 		},
 	}
-	metaIndex1 := metaAuth1.EnsureIndex()
-	metaIndex2 := metaAuth2.EnsureIndex()
-	if metaIndex1 == "" {
-		t.Fatal("meta index should not be empty")
+	xaiIndex1 := xaiAuth1.EnsureIndex()
+	xaiIndex2 := xaiAuth2.EnsureIndex()
+	if xaiIndex1 == "" {
+		t.Fatal("xai index should not be empty")
 	}
-	if metaIndex1 != metaIndex2 {
-		t.Fatalf("meta auth index should remain stable across proxy/prefix changes, got %q vs %q", metaIndex1, metaIndex2)
+	if xaiIndex1 != xaiIndex2 {
+		t.Fatalf("xai auth index should remain stable across proxy/prefix changes, got %q vs %q", xaiIndex1, xaiIndex2)
 	}
 }
 

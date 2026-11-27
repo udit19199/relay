@@ -468,9 +468,7 @@ func authHasRefreshCredential(auth *Auth) bool {
 	if _, hasSIWC, _ := CodexSIWCNeedsRefresh(auth, time.Now()); hasSIWC {
 		return true
 	}
-	// Meta exchanges its device token for a replacement API key after a 401.
-	return authProviderIs(auth, "meta") &&
-		(authMetadataString(auth, "dca_token") != "" || strings.TrimSpace(auth.Attributes["dca_token"]) != "")
+	return false
 }
 
 // CredentialsChanged reports whether authentication credentials (tokens or API keys)

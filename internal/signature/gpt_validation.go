@@ -44,8 +44,8 @@ func InspectGPTReasoningSignature(rawSignature string) (*GPTReasoningSignatureIn
 	native := sig
 	routerSuffix := ""
 	if head, tail, ok := strings.Cut(sig, "."); ok {
-		if !isValidMetaRouterSuffix(tail) {
-			return nil, fmt.Errorf("invalid GPT reasoning signature: router suffix must be 1-%d alphanumeric characters", maxMetaRouterSuffixLen)
+		if !isValidRouterSuffix(tail) {
+			return nil, fmt.Errorf("invalid GPT reasoning signature: router suffix must be 1-%d alphanumeric characters", maxRouterSuffixLen)
 		}
 		native = head
 		routerSuffix = tail

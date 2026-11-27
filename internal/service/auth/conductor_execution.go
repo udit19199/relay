@@ -985,16 +985,8 @@ func (m *Manager) PrepareRequestAuth(ctx context.Context, preparer RequestAuthPr
 		return preparer.PrepareRequestAuth(ctx, auth.Clone())
 	}
 
-	isMeta := authProviderIs(auth, "meta")
-	var prepareMu *sync.Mutex
-	if isMeta {
-		// Meta also mints on 401 recovery. Serialize both paths per credential.
-		lockValue, _ := m.refreshLocks.LoadOrStore(id, &authRefreshLock{})
-		prepareMu = &lockValue.(*authRefreshLock).mu
-	} else {
-		lockValue, _ := m.requestPrepareLocks.LoadOrStore(id, &requestAuthPrepareLock{})
-		prepareMu = &lockValue.(*requestAuthPrepareLock).mu
-	}
+	lockValue, _ := m.requestPrepareLocks.LoadOrStore(id, &requestAuthPrepareLock{})
+	prepareMu := &lockValue.(*requestAuthPrepareLock).mu
 	prepareMu.Lock()
 	defer prepareMu.Unlock()
 
@@ -1005,10 +997,6 @@ func (m *Manager) PrepareRequestAuth(ctx context.Context, preparer RequestAuthPr
 		target = current.Clone()
 	}
 	m.mu.RUnlock()
-	if current == nil && isMeta {
-		return nil, fmt.Errorf("prepare meta auth: credential no longer registered")
-	}
-
 	if !preparer.ShouldPrepareRequestAuth(target) {
 		return target, nil
 	}
@@ -1028,9 +1016,6 @@ func (m *Manager) PrepareRequestAuth(ctx context.Context, preparer RequestAuthPr
 	}
 	if saved != nil {
 		return saved, nil
-	}
-	if isMeta {
-		return nil, fmt.Errorf("prepare meta auth: credential removed during mint")
 	}
 	return target, nil
 }

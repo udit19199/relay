@@ -2543,10 +2543,6 @@ func parseSignatureBytes(sigStr string) ([]byte, string) {
 		return []byte(s), "openai"
 	case internalsignature.SignatureProviderGemini:
 		return []byte(s), "gemini"
-	case internalsignature.SignatureProviderMeta:
-		// Positively foreign to the Devin backend: never supplement it as a
-		// sealed signature.
-		return nil, ""
 	}
 	if strings.HasPrefix(s, "AY") {
 		return []byte(s), "gemini"
@@ -2579,8 +2575,6 @@ func parseSignatureBytes(sigStr string) ([]byte, string) {
 			return decoded, "openai"
 		case internalsignature.SignatureProviderGemini:
 			return []byte(s), "gemini"
-		case internalsignature.SignatureProviderMeta:
-			return nil, ""
 		}
 		if strings.HasPrefix(decStr, "CAQS") || strings.HasPrefix(decStr, "CAIS") {
 			return decoded, "anthropic"
@@ -2616,8 +2610,6 @@ func detectSignatureType(sig string) string {
 		return "openai"
 	case internalsignature.SignatureProviderGemini:
 		return "gemini"
-	case internalsignature.SignatureProviderMeta:
-		return ""
 	}
 	if strings.HasPrefix(s, "CAQS") || strings.HasPrefix(s, "CAIS") {
 		return "anthropic"

@@ -543,18 +543,12 @@ func (m *Manager) updateInternalLocked(ctx context.Context, base, auth *Auth, mo
 		cooldownStateChanged = clearCooldownStateForAuth(auth, now) || cooldownStateChanged
 	}
 	auth.EnsureIndex()
-	// Save before publication, including the transactional Meta mint path.
-	// Runtime-only changes made during I/O are merged below, never overwritten.
+	// Save before publication. Runtime-only changes made during I/O are merged
+	// below, never overwritten.
 	existingBeforeSave := existing.Clone()
 	refreshPatchBeforeSave := auth.CodexRefreshPatch
-	persistMetaMint := (mode == updateModePrepare || mode == updateModeRefresh) && authProviderIs(auth, "meta")
 	if errPersist := m.persistLocked(ctx, auth); errPersist != nil {
-		// A minted Meta key must reach the store before requests can use it.
-		if persistMetaMint {
-			m.mu.Unlock()
-			return nil, false, false, fmt.Errorf("persist meta auth: %w", errPersist)
-		}
-		// Ordinary persistence failures remain non-fatal, but never silent.
+		// Persistence failures remain non-fatal, but never silent.
 		log.WithFields(log.Fields{"auth_id": auth.ID, "credential": auth.ID, "provider": auth.Provider}).Warnf("failed to persist updated auth %s (%s): %v", auth.Provider, auth.ID, errPersist)
 	}
 	if m.authEpochs[auth.ID] != auth.RegistrationEpoch {

@@ -763,12 +763,6 @@ type XAIKey = CodexKey
 // XAIModel uses the Codex model mapping structure for xAI models.
 type XAIModel = CodexModel
 
-// MetaKey uses the Codex API key structure for native Meta Muse execution.
-type MetaKey = CodexKey
-
-// MetaModel uses the Codex model mapping structure for Meta Muse models.
-type MetaModel = CodexModel
-
 // OpenAICompatibility represents the configuration for OpenAI API compatibility
 // with external providers, allowing model aliases to be routed through OpenAI API format.
 type OpenAICompatibility struct {

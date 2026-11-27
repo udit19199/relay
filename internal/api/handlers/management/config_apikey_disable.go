@@ -98,25 +98,6 @@ func toggleConfigAPIKeyExcludedAll(cfg *config.Config, auth *coreauth.Auth, disa
 			return true, nil
 		}
 	}
-	for i := range cfg.MetaKey {
-		entry := &cfg.MetaKey[i]
-		key := strings.TrimSpace(entry.APIKey)
-		base := strings.TrimSpace(entry.BaseURL)
-		proxyURL := strings.TrimSpace(entry.ProxyURL)
-		prefix := strings.TrimSpace(entry.Prefix)
-		if key == "" && base == "" {
-			continue
-		}
-		idParts := []string{key, base, proxyURL, prefix, config.FormatSortedHeaders(entry.Headers)}
-		if poolID := config.FormatConnectionPoolDedupID(entry.ConnectionPool); poolID != "" {
-			idParts = append(idParts, poolID)
-		}
-		id, _ := idGen.Next("meta:apikey", idParts...)
-		if id == authID {
-			entry.ExcludedModels = setConfigAPIKeyExcludedAll(entry.ExcludedModels, disable)
-			return true, nil
-		}
-	}
 
 	return false, nil
 }

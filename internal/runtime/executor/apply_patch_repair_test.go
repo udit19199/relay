@@ -59,16 +59,11 @@ func task6RepairSSE(events [][]byte) string {
 }
 
 func task6RepairExecutor(provider string) coreauth.ProviderExecutor {
-	switch provider {
-	case "meta":
-		return NewMetaExecutor(&config.Config{})
-	default:
-		return NewXAIExecutor(&config.Config{})
-	}
+	return NewXAIExecutor(&config.Config{})
 }
 
 func TestApplyPatchRepairResponsesSourceTerminalHTTP(t *testing.T) {
-	for _, provider := range []string{"xai", "meta"} {
+	for _, provider := range []string{"xai"} {
 		for _, mode := range []string{"args-eof", "item-eof", "empty", "done", "response.completed", "response.incomplete", "response.done"} {
 			t.Run(provider+"/"+mode, func(t *testing.T) {
 				body := task6RepairSSE(task6RepairSource(mode))
@@ -450,7 +445,7 @@ func TestApplyPatchRepairGatewayInitializesGinTestMode(t *testing.T) {
 }
 
 func TestApplyPatchRepairResponsesSourceTerminalNonStream(t *testing.T) {
-	for _, provider := range []string{"xai", "meta"} {
+	for _, provider := range []string{"xai"} {
 		for _, mode := range []string{"args-eof", "item-eof", "empty", "done"} {
 			t.Run(provider+"/"+mode, func(t *testing.T) {
 				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -598,7 +593,7 @@ func TestApplyPatchRepairXAIWebsocketCompactionUsage(t *testing.T) {
 }
 
 func TestApplyPatchRepairOrdinaryEmptyHTTPPassthrough(t *testing.T) {
-	for _, provider := range []string{"xai", "meta"} {
+	for _, provider := range []string{"xai"} {
 		t.Run(provider, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 			defer server.Close()

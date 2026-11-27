@@ -403,10 +403,6 @@ func configuredModelAliasEntries(cfg *internalconfig.Config, auth *Auth) []model
 		if entry := resolveXAIAPIKeyConfig(cfg, auth); entry != nil {
 			models = asModelAliasEntries(entry.Models)
 		}
-	case "meta":
-		if entry := resolveMetaAPIKeyConfig(cfg, auth); entry != nil {
-			models = asModelAliasEntries(entry.Models)
-		}
 	default:
 		providerKey, compatName := openAICompatAttrs(auth)
 		if compatName != "" || authProviderIs(auth, "openai-compatibility") {
@@ -541,10 +537,6 @@ func (m *Manager) rebuildAPIKeyModelAliasLocked(cfg *internalconfig.Config) {
 			if entry := resolveXAIAPIKeyConfig(cfg, auth); entry != nil {
 				compileAPIKeyModelAliasForModels(byAlias, entry.Models)
 			}
-		case "meta":
-			if entry := resolveMetaAPIKeyConfig(cfg, auth); entry != nil {
-				compileAPIKeyModelAliasForModels(byAlias, entry.Models)
-			}
 		default:
 			providerKey, compatName := openAICompatAttrs(auth)
 			if compatName != "" || authProviderIs(auth, "openai-compatibility") {
@@ -653,8 +645,6 @@ func (m *Manager) applyAPIKeyModelAliasWithRouting(routing *apiKeyModelRoutingSn
 		upstreamModel = resolveUpstreamModelForCodexAPIKey(cfg, auth, requestedModel)
 	case "xai":
 		upstreamModel = resolveUpstreamModelForXAIAPIKey(cfg, auth, requestedModel)
-	case "meta":
-		upstreamModel = resolveUpstreamModelForMetaAPIKey(cfg, auth, requestedModel)
 	default:
 		upstreamModel = resolveUpstreamModelForOpenAICompatAPIKey(cfg, auth, requestedModel)
 	}
@@ -741,13 +731,6 @@ func resolveXAIAPIKeyConfig(cfg *internalconfig.Config, auth *Auth) *internalcon
 	return resolveAPIKeyConfig(cfg.XAIKey, auth)
 }
 
-func resolveMetaAPIKeyConfig(cfg *internalconfig.Config, auth *Auth) *internalconfig.MetaKey {
-	if cfg == nil {
-		return nil
-	}
-	return resolveAPIKeyConfig(cfg.MetaKey, auth)
-}
-
 func resolveUpstreamModelForClaudeAPIKey(cfg *internalconfig.Config, auth *Auth, requestedModel string) string {
 	entry := resolveClaudeAPIKeyConfig(cfg, auth)
 	if entry == nil {
@@ -766,14 +749,6 @@ func resolveUpstreamModelForCodexAPIKey(cfg *internalconfig.Config, auth *Auth, 
 
 func resolveUpstreamModelForXAIAPIKey(cfg *internalconfig.Config, auth *Auth, requestedModel string) string {
 	entry := resolveXAIAPIKeyConfig(cfg, auth)
-	if entry == nil {
-		return ""
-	}
-	return resolveModelAliasFromConfigModels(requestedModel, asModelAliasEntries(entry.Models))
-}
-
-func resolveUpstreamModelForMetaAPIKey(cfg *internalconfig.Config, auth *Auth, requestedModel string) string {
-	entry := resolveMetaAPIKeyConfig(cfg, auth)
 	if entry == nil {
 		return ""
 	}

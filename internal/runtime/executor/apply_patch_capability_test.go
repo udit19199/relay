@@ -13,7 +13,7 @@ func TestApplyPatchActualExecutors(t *testing.T) {
 		NewOpenAICompatExecutor("arbitrary-consumer-provider", cfg), NewClaudeExecutor(cfg),
 		NewDevinExecutor(cfg),
 		NewCodexExecutor(cfg), NewCodexWebsocketsExecutor(cfg), NewCodexAutoExecutor(cfg),
-		NewXAIExecutor(cfg), NewXAIWebsocketsExecutor(cfg), NewXAIAutoExecutor(cfg), NewMetaExecutor(cfg),
+		NewXAIExecutor(cfg), NewXAIWebsocketsExecutor(cfg), NewXAIAutoExecutor(cfg),
 	} {
 		support, okSupport := exec.(coreauth.ApplyPatchSupport)
 		if !okSupport || !support.SupportsApplyPatch() {

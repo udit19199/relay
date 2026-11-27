@@ -30,7 +30,7 @@ func TestV8ExampleLoadsAndRoundTrips(t *testing.T) {
 	if err = ValidateV8Config(example); err != nil {
 		t.Fatalf("active template must use the v8 layout: %v", err)
 	}
-	for _, count := range []int{len(active.CodexKey), len(active.ClaudeKey), len(active.XAIKey), len(active.MetaKey), len(active.OpenAICompatibility)} {
+	for _, count := range []int{len(active.CodexKey), len(active.ClaudeKey), len(active.XAIKey), len(active.OpenAICompatibility)} {
 		if count != 0 {
 			t.Fatal("placeholder upstream credentials must remain commented")
 		}
@@ -67,7 +67,7 @@ func TestV8ExampleLoadsAndRoundTrips(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Port != 8317 || len(cfg.APIKeys) != 3 || len(cfg.CodexKey) != 1 || len(cfg.ClaudeKey) != 2 || len(cfg.XAIKey) != 1 || len(cfg.MetaKey) != 1 || len(cfg.OpenAICompatibility) != 1 {
+	if cfg.Port != 8317 || len(cfg.APIKeys) != 3 || len(cfg.CodexKey) != 1 || len(cfg.ClaudeKey) != 2 || len(cfg.XAIKey) != 1 || len(cfg.OpenAICompatibility) != 1 {
 		t.Fatal("v8 example fields did not reach runtime config")
 	}
 	if cfg.QuotaExceeded.SwitchProject || cfg.QuotaExceeded.SwitchPreviewModel {
@@ -145,7 +145,7 @@ func TestV8PresencePrecedenceAndCleanup(t *testing.T) {
 }
 
 func TestV8KeyInheritance(t *testing.T) {
-	for _, provider := range []string{"codex", "claude", "xai", "meta"} {
+	for _, provider := range []string{"codex", "claude", "xai"} {
 		t.Run(provider, func(t *testing.T) {
 			raw := "request-retry: 9\napi-keys:\n  " + provider + ":\n" + `    - name: shared
       base-url: https://example.invalid

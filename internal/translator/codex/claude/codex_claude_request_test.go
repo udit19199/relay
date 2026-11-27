@@ -758,22 +758,6 @@ func testMetaClaudeSignature() string {
 	}
 	return signature
 }
-
-func TestConvertClaudeRequestToCodex_AssistantMetaSignatureToReasoningItem(t *testing.T) {
-	signature := testMetaClaudeSignature()
-	payload := []byte(`{"model":"muse-spark-1.3","messages":[{"role":"assistant","content":[{"type":"thinking","thinking":"summary","signature":""},{"type":"text","text":"answer"}]},{"role":"user","content":"next"}]}`)
-	payload, _ = ojson.SetBytes(payload, "messages.0.content.0.signature", signature)
-
-	out, _ := ConvertClaudeRequestToCodex("muse-spark-1.3", payload, false)
-	reasoning := ojson.GetBytesNoCopy(out, "input.0")
-	if reasoning.Get("type").String() != "reasoning" {
-		t.Fatalf("input.0 type = %q, want reasoning; output=%s", reasoning.Get("type").String(), out)
-	}
-	if got := reasoning.Get("encrypted_content").String(); got != signature {
-		t.Fatalf("encrypted_content = %q, want Meta signature", got)
-	}
-}
-
 func TestConvertClaudeRequestToCodex_IgnoresMetaSignatureForNonMetaTargets(t *testing.T) {
 	signature := testMetaClaudeSignature()
 	payload := []byte(`{"messages":[{"role":"assistant","content":[{"type":"thinking","thinking":"summary","signature":""},{"type":"text","text":"answer"}]},{"role":"user","content":"next"}]}`)
@@ -788,45 +772,6 @@ func TestConvertClaudeRequestToCodex_IgnoresMetaSignatureForNonMetaTargets(t *te
 		})
 	}
 }
-
-func TestConvertClaudeRequestToCodex_AssistantRoutedMetaSignatureToReasoningItem(t *testing.T) {
-	// OpenRouter serves Meta Muse models and appends a dot-delimited
-	// alphanumeric suffix to the native envelope; the full value must replay
-	// verbatim.
-	signature := testMetaClaudeSignature() + "." + strings.Repeat("Ab3", 23)[:67]
-	payload := []byte(`{"model":"meta/muse-wonder","messages":[{"role":"assistant","content":[{"type":"thinking","thinking":"summary","signature":""},{"type":"text","text":"answer"}]},{"role":"user","content":"next"}]}`)
-	payload, _ = ojson.SetBytes(payload, "messages.0.content.0.signature", signature)
-
-	out, _ := ConvertClaudeRequestToCodex("meta/muse-wonder", payload, false)
-	reasoning := ojson.GetBytesNoCopy(out, "input.0")
-	if reasoning.Get("type").String() != "reasoning" {
-		t.Fatalf("input.0 type = %q, want reasoning; output=%s", reasoning.Get("type").String(), out)
-	}
-	if got := reasoning.Get("encrypted_content").String(); got != signature {
-		t.Fatalf("encrypted_content = %q, want routed Meta signature verbatim", got)
-	}
-
-	out, _ = ConvertClaudeRequestToCodex("gpt-5.4", payload, false)
-	if got := countRequestInputItemsByType(out, "reasoning"); got != 0 {
-		t.Fatalf("got %d reasoning items for non-Meta target, want 0; output=%s", got, out)
-	}
-
-	// A foreign GPT signature must not be replayed when the target is a Meta Muse model.
-	gptPayload := []byte(`{"model":"muse-spark-1.3","messages":[{"role":"assistant","content":[{"type":"thinking","thinking":"summary","signature":""},{"type":"text","text":"answer"}]},{"role":"user","content":"next"}]}`)
-	gptPayload, _ = ojson.SetBytes(gptPayload, "messages.0.content.0.signature", validCodexReasoningSignature())
-	out, _ = ConvertClaudeRequestToCodex("muse-spark-1.3", gptPayload, false)
-	if got := countRequestInputItemsByType(out, "reasoning"); got != 0 {
-		t.Fatalf("got %d reasoning items for GPT signature on Meta target, want 0; output=%s", got, out)
-	}
-
-	// When modelName is an unmapped upstream deployment alias, the client-requested
-	// Meta Muse model in the payload preserves Meta signatures.
-	aliasOut, _ := ConvertClaudeRequestToCodex("deployment-123", payload, false)
-	if got := countRequestInputItemsByType(aliasOut, "reasoning"); got != 1 {
-		t.Fatalf("got %d reasoning items for aliased Meta target, want 1; output=%s", got, aliasOut)
-	}
-}
-
 func TestConvertClaudeRequestToCodex_ResolvesReplayTargetModelOncePerRequest(t *testing.T) {
 	if raceDetectorEnabled {
 		t.Skip("allocation budgets are not meaningful with race detector instrumentation")

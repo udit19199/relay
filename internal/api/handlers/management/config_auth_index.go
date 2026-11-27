@@ -27,11 +27,6 @@ type xaiKeyWithAuthIndex struct {
 	AuthIndex string `json:"auth-index,omitempty"`
 }
 
-type metaKeyWithAuthIndex struct {
-	config.MetaKey
-	AuthIndex string `json:"auth-index,omitempty"`
-}
-
 type openAICompatibilityAPIKeyWithAuthIndex struct {
 	config.OpenAICompatibilityAPIKey
 	AuthIndex string `json:"auth-index,omitempty"`
@@ -247,7 +242,7 @@ func (h *Handler) injectV8APIKeyAuthIndexesLocked(root *yaml.Node, data []byte) 
 	}
 
 	authByConfigIndex := make(map[string]map[string]*coreauth.Auth)
-	for _, p := range []string{"codex", "claude", "xai", "meta"} {
+	for _, p := range []string{"codex", "claude", "xai"} {
 		authByConfigIndex[p] = make(map[string]*coreauth.Auth)
 		for _, a := range authsByProvider[p] {
 			if a != nil && a.Attributes != nil {
@@ -381,36 +376,6 @@ func (h *Handler) injectV8APIKeyAuthIndexesLocked(root *yaml.Node, data []byte) 
 			continue
 		}
 
-		if providerName == "meta" {
-			validIdx := 0
-			for _, group := range groupsNode.Content {
-				if group == nil || group.Kind != yaml.MappingNode {
-					continue
-				}
-				keysNode := configV8Node(group, []string{"keys"})
-				if keysNode == nil || keysNode.Kind != yaml.SequenceNode {
-					continue
-				}
-				for _, keyNode := range keysNode.Content {
-					if keyNode == nil || keyNode.Kind != yaml.MappingNode {
-						continue
-					}
-					apiKey := strings.TrimSpace(yamlMapScalar(keyNode, "api-key"))
-					if apiKey == "" || strings.HasPrefix(apiKey, "dca:") {
-						continue
-					}
-					targetIdx := strconv.Itoa(validIdx)
-					validIdx++
-					if a := authByConfigIndex["meta"][targetIdx]; a != nil {
-						if idx := resolveAuthIndex(a); idx != "" {
-							setMapScalar(keyNode, "auth_index", idx)
-						}
-					}
-				}
-			}
-			continue
-		}
-
 	}
 }
 
@@ -519,43 +484,6 @@ func (h *Handler) xaiKeysWithAuthIndex() []xaiKeyWithAuthIndex {
 		}
 		out[i] = xaiKeyWithAuthIndex{
 			XAIKey:    entry,
-			AuthIndex: authIndex,
-		}
-	}
-	return out
-}
-
-func (h *Handler) metaKeysWithAuthIndex() []metaKeyWithAuthIndex {
-	if h == nil {
-		return nil
-	}
-	liveIndexByID := h.liveAuthIndexByID()
-
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if h.cfg == nil {
-		return nil
-	}
-
-	idGen := synthesizer.NewStableIDGenerator()
-	out := make([]metaKeyWithAuthIndex, len(h.cfg.MetaKey))
-	for i := range h.cfg.MetaKey {
-		entry := h.cfg.MetaKey[i]
-		authIndex := ""
-		key := strings.TrimSpace(entry.APIKey)
-		base := strings.TrimSpace(entry.BaseURL)
-		proxyURL := strings.TrimSpace(entry.ProxyURL)
-		prefix := strings.TrimSpace(entry.Prefix)
-		if key != "" || base != "" {
-			idParts := []string{key, base, proxyURL, prefix, config.FormatSortedHeaders(entry.Headers)}
-			if poolID := config.FormatConnectionPoolDedupID(entry.ConnectionPool); poolID != "" {
-				idParts = append(idParts, poolID)
-			}
-			id, _ := idGen.Next("meta:apikey", idParts...)
-			authIndex = liveIndexByID[id]
-		}
-		out[i] = metaKeyWithAuthIndex{
-			MetaKey:   entry,
 			AuthIndex: authIndex,
 		}
 	}

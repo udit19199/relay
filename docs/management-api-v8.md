@@ -154,7 +154,7 @@ retain the corresponding business operation's fields.
 ## OAuth
 
 The login URL is shared by all providers. Set the required `provider` query
-parameter to `claude`, `codex`, `xai`, `devin`, or `meta`. For example:
+parameter to `claude`, `codex`, `xai`, or `devin`. For example:
 
 ```http
 GET /v8/management/oauth/auth-url?provider=codex

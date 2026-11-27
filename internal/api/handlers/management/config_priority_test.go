@@ -36,15 +36,6 @@ func TestPatchPriorityForEveryProvider(t *testing.T) {
 			get:      func(cfg *config.Config) int { return cfg.XAIKey[0].Priority },
 		},
 		{
-			name: "meta",
-			setup: func(cfg *config.Config) {
-				cfg.MetaKey = []config.MetaKey{{APIKey: "key", BaseURL: "https://example.com"}}
-			},
-			patch:    (*Handler).PatchMetaKey,
-			endpoint: "/v0/management/meta-api-key",
-			get:      func(cfg *config.Config) int { return cfg.MetaKey[0].Priority },
-		},
-		{
 			name: "codex",
 			setup: func(cfg *config.Config) {
 				cfg.CodexKey = []config.CodexKey{{APIKey: "key", BaseURL: "https://example.com"}}

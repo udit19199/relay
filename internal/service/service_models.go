@@ -138,16 +138,6 @@ func (s *Service) registerModelsForAuthWithConfigAndCache(ctx context.Context, c
 	case openCodeGoProvider:
 		models = s.openCodeGoModels(a)
 		models = applyExcludedModels(models, excluded)
-	case "meta":
-		models = registry.GetMetaModels()
-		if entry := resolveConfigMetaKeyForConfig(cfg, a); entry != nil {
-			if len(entry.Models) > 0 {
-				models = buildMetaConfigModels(entry)
-			}
-			if authKind == "apikey" {
-				excluded = entry.ExcludedModels
-			}
-		}
 		models = applyExcludedModels(models, excluded)
 	default:
 		// Handle OpenAI-compatibility providers by name using config
@@ -428,13 +418,6 @@ func resolveConfigXAIKeyForConfig(cfg *config.Config, auth *coreauth.Auth) *conf
 		return nil
 	}
 	return resolveConfigCodexStyleKey(auth, cfg.XAIKey, false)
-}
-
-func resolveConfigMetaKeyForConfig(cfg *config.Config, auth *coreauth.Auth) *config.MetaKey {
-	if cfg == nil {
-		return nil
-	}
-	return resolveConfigCodexStyleKey(auth, cfg.MetaKey, false)
 }
 
 func resolveConfigCodexStyleKey(auth *coreauth.Auth, entries []config.CodexKey, validateIndexCredentials bool) *config.CodexKey {
@@ -782,13 +765,6 @@ func buildXAIConfigModels(entry *config.XAIKey) []*ModelInfo {
 		return nil
 	}
 	return buildConfigModels(entry.Models, "xai", "xai", "xai")
-}
-
-func buildMetaConfigModels(entry *config.MetaKey) []*ModelInfo {
-	if entry == nil {
-		return nil
-	}
-	return buildConfigModels(entry.Models, "meta", "meta", "meta")
 }
 
 func buildCodexConfigModels(entry *config.CodexKey) []*ModelInfo {

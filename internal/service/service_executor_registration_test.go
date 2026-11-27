@@ -51,7 +51,6 @@ func TestRegisterAvailableExecutors(t *testing.T) {
 		"claude",
 		"xai",
 		"devin",
-		"meta",
 		"openai-compatibility",
 	}
 	for _, provider := range providers {
@@ -83,15 +82,15 @@ func TestRegisterExecutorForAuth_OpenAICompatUsesNamespacedProviderKey(t *testin
 		{
 			name: "native first",
 			auths: []*coreauth.Auth{
-				{ID: "native-meta", Provider: "meta"},
-				openAICompatMetaAuth(),
+				{ID: "native-xai", Provider: "xai"},
+				openAICompatXAIAuth(),
 			},
 		},
 		{
 			name: "compat first",
 			auths: []*coreauth.Auth{
-				openAICompatMetaAuth(),
-				{ID: "native-meta", Provider: "meta"},
+				openAICompatXAIAuth(),
+				{ID: "native-xai", Provider: "xai"},
 			},
 		},
 	}
@@ -105,15 +104,15 @@ func TestRegisterExecutorForAuth_OpenAICompatUsesNamespacedProviderKey(t *testin
 
 			service.registerExecutorsForAuths(tt.auths, true)
 
-			nativeExecutor, okNative := service.coreManager.Executor("meta")
+			nativeExecutor, okNative := service.coreManager.Executor("xai")
 			if !okNative {
-				t.Fatal("expected native meta executor")
+				t.Fatal("expected native xai executor")
 			}
-			if _, okKimi := nativeExecutor.(*runtimeexecutor.MetaExecutor); !okKimi {
-				t.Fatalf("native executor type = %T, want *executor.MetaExecutor", nativeExecutor)
+			if _, okKimi := nativeExecutor.(*runtimeexecutor.XAIAutoExecutor); !okKimi {
+				t.Fatalf("native executor type = %T, want *executor.XAIAutoExecutor", nativeExecutor)
 			}
 
-			compatExecutor, okCompat := service.coreManager.Executor("openai-compatible-meta")
+			compatExecutor, okCompat := service.coreManager.Executor("openai-compatible-xai")
 			if !okCompat {
 				t.Fatal("expected namespaced OpenAI-compatible executor")
 			}
@@ -124,14 +123,14 @@ func TestRegisterExecutorForAuth_OpenAICompatUsesNamespacedProviderKey(t *testin
 	}
 }
 
-func openAICompatMetaAuth() *coreauth.Auth {
+func openAICompatXAIAuth() *coreauth.Auth {
 	return &coreauth.Auth{
-		ID:       "compat-meta",
+		ID:       "compat-xai",
 		Provider: "openai-compatibility",
-		Label:    "meta",
+		Label:    "xai",
 		Attributes: map[string]string{
-			"compat_name":  "meta",
-			"provider_key": "meta",
+			"compat_name":  "xai",
+			"provider_key": "xai",
 		},
 	}
 }

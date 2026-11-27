@@ -70,7 +70,6 @@ func main() {
 	var loginProxyURL string
 	var xaiLogin bool
 	var devinLogin bool
-	var metaLogin bool
 	var siwcBind string
 	var configPath string
 	var password string
@@ -85,7 +84,6 @@ func main() {
 	flag.StringVar(&loginProxyURL, "login-proxy", "", "Proxy URL used for the OAuth login flow and saved as the new credential's proxy_url (http, https, socks5, socks5h)")
 	flag.BoolVar(&xaiLogin, "xai-login", false, "Login to xAI using OAuth")
 	flag.BoolVar(&devinLogin, "devin-login", false, "Login to Devin using OAuth")
-	flag.BoolVar(&metaLogin, "meta-login", false, "Login to Meta using OAuth")
 	flag.StringVar(&configPath, "config", DefaultConfigPath, "Configure File Path")
 	flag.StringVar(&siwcBind, "siwc-bind", "", "Bind Sign in with ChatGPT (SIWC) credentials to a Codex credential file")
 	flag.StringVar(&password, "password", "", "")
@@ -217,7 +215,7 @@ func main() {
 		ProxyURL:     loginProxyURL,
 	}
 
-	commandMode := siwcBind != "" || codexLogin || codexDeviceLogin || claudeLogin || xaiLogin || devinLogin || metaLogin
+	commandMode := siwcBind != "" || codexLogin || codexDeviceLogin || claudeLogin || xaiLogin || devinLogin
 	cloudConfigMissing := isCloudDeploy && !configFileExists
 	exampleAPIKeySafeMode := shouldEnableExampleAPIKeySafeMode(cfg, commandMode, cloudConfigMissing)
 	serverOptions := []api.ServerOption(nil)
@@ -250,8 +248,6 @@ func main() {
 		cmd.DoXAILogin(cfg, options)
 	} else if devinLogin {
 		cmd.DoDevinLogin(cfg, options)
-	} else if metaLogin {
-		cmd.DoMetaLogin(cfg, options)
 	} else {
 		// In cloud deploy mode without config file, just wait for shutdown signals
 		if isCloudDeploy && !configFileExists {

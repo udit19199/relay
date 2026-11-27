@@ -17,7 +17,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/udit19199/relay/internal/auth/claude"
 	"github.com/udit19199/relay/internal/auth/codex"
-	metaauth "github.com/udit19199/relay/internal/auth/meta"
 	xaiauth "github.com/udit19199/relay/internal/auth/xai"
 	"github.com/udit19199/relay/internal/config"
 	"github.com/udit19199/relay/internal/misc"
@@ -43,21 +42,12 @@ type xaiOAuthService interface {
 	CreateTokenStorage(bundle *xaiauth.AuthBundle) *xaiauth.TokenStorage
 }
 
-type metaOAuthService interface {
-	StartDeviceFlow(ctx context.Context) (*metaauth.DeviceCodeResponse, error)
-	WaitForAuthorization(ctx context.Context, dc *metaauth.DeviceCodeResponse) (*metaauth.MetaAuthBundle, error)
-	CreateTokenStorage(bundle *metaauth.MetaAuthBundle) *metaauth.MetaTokenStorage
-}
-
 var (
 	newClaudeOAuthService = func(cfg *config.Config, proxyURL string) claudeOAuthService {
 		return claude.NewClaudeAuthWithProxyURL(cfg, proxyURL)
 	}
 	newXAIOAuthService = func(cfg *config.Config, proxyURL string) xaiOAuthService {
 		return xaiauth.NewXAIAuthWithProxyURL(cfg, proxyURL)
-	}
-	newMetaOAuthService = func(cfg *config.Config, proxyURL string) metaOAuthService {
-		return metaauth.NewMetaAuthWithProxyURL(cfg, proxyURL)
 	}
 )
 
@@ -621,13 +611,6 @@ func authGrantFingerprint(auth *coreauth.Auth) string {
 				email = strings.TrimSpace(storage.Email)
 			}
 		}
-	case *metaauth.MetaTokenStorage:
-		if storage != nil {
-			accessToken = strings.TrimSpace(storage.AccessToken)
-			if email == "" {
-				email = strings.TrimSpace(storage.Email)
-			}
-		}
 	}
 	if auth.Metadata != nil {
 		if accessToken == "" {
@@ -795,146 +778,6 @@ func (h *Handler) RequestXAIToken(c *gin.Context) {
 	}()
 
 	c.JSON(200, response)
-}
-
-func (h *Handler) RequestMetaToken(c *gin.Context) {
-	ctx := context.Background()
-	ctx = PopulateAuthContext(ctx, c)
-
-	fmt.Println("Initializing Meta authentication...")
-
-	sessionProxyURL := oauthSessionProxyURLFromContext(c)
-	cfg := h.oauthConfigWithProxy(sessionProxyURL)
-	state := fmt.Sprintf("meta-%d", time.Now().UnixNano())
-	authSvc := newMetaOAuthService(cfg, sessionProxyURL)
-
-	deviceFlow, errStartDeviceFlow := authSvc.StartDeviceFlow(ctx)
-	if errStartDeviceFlow != nil {
-		log.Errorf("Failed to start Meta device flow: %s", redactSessionProxyInString(errStartDeviceFlow.Error(), sessionProxyURL))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to start device authorization flow"})
-		return
-	}
-	authURL := strings.TrimSpace(deviceFlow.VerificationURIComplete)
-	if authURL == "" {
-		authURL = strings.TrimSpace(deviceFlow.VerificationURI)
-	}
-
-	RegisterOAuthSessionWithProxy(state, "meta", sessionProxyURL)
-	response := gin.H{"status": "ok", "url": authURL, "state": state, "flow": "device"}
-	if userCode := strings.TrimSpace(deviceFlow.UserCode); userCode != "" {
-		response["user_code"] = userCode
-	}
-	if deviceFlow.ExpiresIn > 0 {
-		response["expires_in"] = deviceFlow.ExpiresIn
-	} else {
-		response["expires_in"] = int(metaauth.MaxPollDuration / time.Second)
-	}
-	bindOAuthSessionTarget(c, state, response)
-
-	go func() {
-		pollCtx, cancelPoll := context.WithCancel(ctx)
-		defer cancelPoll()
-		go watchOAuthSessionCancel(pollCtx, cancelPoll, state, "meta")
-
-		fmt.Println("Waiting for Meta authentication...")
-		bundle, errWaitForAuthorization := authSvc.WaitForAuthorization(pollCtx, deviceFlow)
-		if errWaitForAuthorization != nil {
-			if !IsOAuthSessionPending(state, "meta") {
-				return
-			}
-			log.Errorf("Meta authentication failed: %s", redactSessionProxyInString(errWaitForAuthorization.Error(), sessionProxyURL))
-			SetOAuthSessionError(state, redactSessionProxyInString(oauthSessionErrorWithCause("Authentication failed", errWaitForAuthorization), sessionProxyURL))
-			return
-		}
-		if !IsOAuthSessionPending(state, "meta") {
-			return
-		}
-
-		tokenStorage := authSvc.CreateTokenStorage(bundle)
-		if tokenStorage == nil || strings.TrimSpace(tokenStorage.AccessToken) == "" {
-			log.Error("Meta token exchange returned empty access token")
-			SetOAuthSessionError(state, "Failed to exchange token")
-			return
-		}
-
-		record := buildMetaAuthRecord(bundle, tokenStorage)
-		savedPath, okSaved := h.commitAndCompleteBuiltinOAuthSession(ctx, state, "meta", sessionProxyURL, record, "Failed to save token to file", false)
-		if !okSaved {
-			return
-		}
-
-		fmt.Printf("Authentication successful! Token saved to %s\n", savedPath)
-		fmt.Println("You can now use Meta services through this CLI")
-	}()
-
-	c.JSON(200, response)
-}
-
-func buildMetaAuthRecord(bundle *metaauth.MetaAuthBundle, tokenStorage *metaauth.MetaTokenStorage) *coreauth.Auth {
-	fileName := metaauth.CredentialFileName(tokenStorage.Email, tokenStorage.DCAToken)
-	label := strings.TrimSpace(tokenStorage.Email)
-	if label == "" {
-		label = "Meta"
-	}
-
-	metadata := map[string]any{
-		"type":         "meta",
-		"access_token": tokenStorage.AccessToken,
-		"token_type":   tokenStorage.TokenType,
-		"expires_in":   tokenStorage.ExpiresIn,
-		"expired":      tokenStorage.Expired,
-		"last_refresh": tokenStorage.LastRefresh,
-		"base_url":     tokenStorage.BaseURL,
-		"auth_kind":    "oauth",
-	}
-	if tokenStorage.DCAExpired != "" {
-		metadata["dca_expired"] = tokenStorage.DCAExpired
-	}
-	if tokenStorage.DCAExpiresAt > 0 {
-		metadata["dca_expires_at"] = tokenStorage.DCAExpiresAt
-	}
-	if tokenStorage.APIKey != "" {
-		metadata["api_key"] = tokenStorage.APIKey
-	}
-	if tokenStorage.DCAToken != "" {
-		metadata["dca_token"] = tokenStorage.DCAToken
-	}
-	if tokenStorage.Email != "" {
-		metadata["email"] = tokenStorage.Email
-	}
-	if tokenStorage.Name != "" {
-		metadata["name"] = tokenStorage.Name
-	}
-	if bundle != nil && bundle.MintedKey != nil {
-		metadata["subs_tier_name"] = bundle.MintedKey.SubsTierName
-		metadata["subs_tier_id"] = bundle.MintedKey.SubsTierID
-		metadata["is_subs_active"] = bundle.MintedKey.IsSubsActive
-		metadata["has_payment_method"] = bundle.MintedKey.HasPaymentMethod
-	}
-
-	attrs := map[string]string{
-		"auth_kind": "oauth",
-		"base_url":  tokenStorage.BaseURL,
-	}
-	if tokenStorage.APIKey != "" {
-		attrs["api_key"] = tokenStorage.APIKey
-	}
-	if tokenStorage.DCAToken != "" {
-		attrs["dca_token"] = tokenStorage.DCAToken
-	}
-	if tokenStorage.Email != "" {
-		attrs["email"] = tokenStorage.Email
-	}
-
-	return &coreauth.Auth{
-		ID:         fileName,
-		Provider:   "meta",
-		FileName:   fileName,
-		Label:      label,
-		Storage:    tokenStorage,
-		Metadata:   metadata,
-		Attributes: attrs,
-	}
 }
 
 // watchOAuthSessionCancel cancels pollCtx once the OAuth session is no longer pending.
@@ -1115,10 +958,6 @@ func authIdentityEmailAndAccountID(auth *coreauth.Auth) (email string, accountID
 				if email == "" {
 					email = strings.TrimSpace(storage.Email)
 				}
-			}
-		case *metaauth.MetaTokenStorage:
-			if storage != nil && email == "" {
-				email = strings.TrimSpace(storage.Email)
 			}
 		}
 	}

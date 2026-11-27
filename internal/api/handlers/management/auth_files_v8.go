@@ -320,8 +320,6 @@ func (h *Handler) StartOAuthV8(c *gin.Context) {
 		h.RequestXAIToken(c)
 	case "devin":
 		h.RequestDevinToken(c)
-	case "meta":
-		h.RequestMetaToken(c)
 	default:
 		c.JSON(http.StatusNotFound, gin.H{"error": "provider_not_found"})
 	}

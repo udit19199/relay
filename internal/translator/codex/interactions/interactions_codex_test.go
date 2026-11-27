@@ -415,16 +415,16 @@ func TestConvertCodexResponseToInteractionsStream_ReasoningSignature(t *testing.
 }
 
 func TestConvertInteractionsRequestToCodex_RestoresThoughtSignature(t *testing.T) {
-	metaSig := testInteractionsMetaSignature()
-	routedSig := metaSig + "." + strings.Repeat("Ab3", 23)[:67]
+	gptSig := testInteractionsGPTSignature()
+	routedSig := gptSig + "." + strings.Repeat("Ab3", 27)[:79]
 	for _, tc := range []struct {
 		name  string
 		model string
 		sig   string
 	}{
-		{"native meta", "muse-spark-1.3", metaSig},
-		{"namespaced router model", "meta/muse-wonder", metaSig},
-		{"routed meta verbatim", "meta/muse-wonder", routedSig},
+		{"native gpt", "gpt-5.4", gptSig},
+		{"namespaced router model", "openrouter/openai/gpt-5.6-luna-pro", gptSig},
+		{"routed gpt verbatim", "openrouter/openai/gpt-5.6-luna-pro", routedSig},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			payload := []byte(`{"model":"` + tc.model + `","input":[{"type":"thought","signature":"` + tc.sig + `","content":[{"type":"text","text":"thinking"}]}]}`)
@@ -469,21 +469,22 @@ func TestConvertInteractionsRequestToCodex_DropsEmptyThoughtSteps(t *testing.T) 
 	}
 
 	// A signatureless, textless thought step emits no item.
-	out, _ = ConvertInteractionsRequestToCodex("muse-spark-1.3", []byte(`{"input":[{"type":"thought"}]}`), false)
+	out, _ = ConvertInteractionsRequestToCodex("gpt-5.4", []byte(`{"input":[{"type":"thought"}]}`), false)
 	if got := len(ojson.GetBytesNoCopy(out, "input").Array()); got != 0 {
 		t.Fatalf("input len = %d, want 0. Output: %s", got, string(out))
 	}
 
 	// A duplicate accepted signature with no text emits nothing the second
 	// time either.
-	out, _ = ConvertInteractionsRequestToCodex("muse-spark-1.3", []byte(`{"input":[{"type":"thought","signature":"`+metaSig+`"},{"type":"thought","signature":"`+metaSig+`"}]}`), false)
+	gptDropSig := testInteractionsGPTSignature()
+	out, _ = ConvertInteractionsRequestToCodex("gpt-5.4", []byte(`{"input":[{"type":"thought","signature":"`+gptDropSig+`"},{"type":"thought","signature":"`+gptDropSig+`"}]}`), false)
 	if got := len(ojson.GetBytesNoCopy(out, "input").Array()); got != 1 {
 		t.Fatalf("input len = %d, want 1 (duplicate without text dropped). Output: %s", got, string(out))
 	}
 
 	// A signatureless thought with text is dropped too, and the message/tool
 	// items around it keep their order.
-	out, _ = ConvertInteractionsRequestToCodex("muse-spark-1.3", []byte(`{"input":[{"type":"user_input","content":[{"type":"text","text":"hi"}]},{"type":"thought","content":[{"type":"text","text":"thinking"}]},{"type":"function_call","name":"lookup","call_id":"call_1","arguments":{"q":"x"}}]}`), false)
+	out, _ = ConvertInteractionsRequestToCodex("gpt-5.4", []byte(`{"input":[{"type":"user_input","content":[{"type":"text","text":"hi"}]},{"type":"thought","content":[{"type":"text","text":"thinking"}]},{"type":"function_call","name":"lookup","call_id":"call_1","arguments":{"q":"x"}}]}`), false)
 	items := ojson.GetBytesNoCopy(out, "input").Array()
 	if len(items) != 2 || items[0].Get("type").String() != "message" || items[1].Get("type").String() != "function_call" {
 		t.Fatalf("input = %s, want [message, function_call] with the thought dropped", items)
@@ -491,7 +492,6 @@ func TestConvertInteractionsRequestToCodex_DropsEmptyThoughtSteps(t *testing.T) 
 }
 
 func TestConvertInteractionsRequestToCodex_ThoughtSignatureVariants(t *testing.T) {
-	metaSig := testInteractionsMetaSignature()
 	gptSig := testInteractionsGPTSignature()
 
 	// A cache-prefixed signature normalizes to its native payload.
@@ -501,17 +501,17 @@ func TestConvertInteractionsRequestToCodex_ThoughtSignatureVariants(t *testing.T
 	}
 
 	// The snake_case thought_signature spelling is accepted too.
-	out, _ = ConvertInteractionsRequestToCodex("muse-spark-1.3", []byte(`{"input":[{"type":"thought","thought_signature":"`+metaSig+`"}]}`), false)
-	if got := ojson.GetBytesNoCopy(out, "input.0.encrypted_content").String(); got != metaSig {
+	out, _ = ConvertInteractionsRequestToCodex("gpt-5.4", []byte(`{"input":[{"type":"thought","thought_signature":"`+gptSig+`"}]}`), false)
+	if got := ojson.GetBytesNoCopy(out, "input.0.encrypted_content").String(); got != gptSig {
 		t.Fatalf("thought_signature field should be accepted. Output: %s", string(out))
 	}
 
 	// An identical signature replays once; the duplicate thought is dropped.
-	out, _ = ConvertInteractionsRequestToCodex("muse-spark-1.3", []byte(`{"input":[{"type":"thought","signature":"`+metaSig+`","content":[{"type":"text","text":"one"}]},{"type":"thought","signature":"`+metaSig+`","content":[{"type":"text","text":"two"}]}]}`), false)
+	out, _ = ConvertInteractionsRequestToCodex("gpt-5.4", []byte(`{"input":[{"type":"thought","signature":"`+gptSig+`","content":[{"type":"text","text":"one"}]},{"type":"thought","signature":"`+gptSig+`","content":[{"type":"text","text":"two"}]}]}`), false)
 	if got := len(ojson.GetBytesNoCopy(out, "input").Array()); got != 1 {
 		t.Fatalf("input len = %d, want 1 (duplicate dropped). Output: %s", got, string(out))
 	}
-	if got := ojson.GetBytesNoCopy(out, "input.0.encrypted_content").String(); got != metaSig {
+	if got := ojson.GetBytesNoCopy(out, "input.0.encrypted_content").String(); got != gptSig {
 		t.Fatalf("first thought should carry the signature. Output: %s", string(out))
 	}
 }

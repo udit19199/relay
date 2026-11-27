@@ -225,21 +225,12 @@ func TestExecutorHelpersDocCrossMethodPipelines(t *testing.T) {
 		if !SanitizeCodexInputItemIDsDoc(doc) {
 			t.Fatal("expected SanitizeCodexInputItemIDsDoc to mutate doc")
 		}
-		if !SanitizeMetaWebSearchToolsDoc(doc) {
-			t.Fatal("expected SanitizeMetaWebSearchToolsDoc to mutate doc")
-		}
-		if !EnsureMetaMuseToolNamespaceDoc(doc) {
-			t.Fatal("expected EnsureMetaMuseToolNamespaceDoc to mutate doc")
-		}
 		out := doc.Bytes()
 		if got := ojson.GetBytesNoCopy(out, "input.0.id").String(); got != "msg_bad_id" {
 			t.Fatalf("input.0.id = %q, want msg_bad_id", got)
 		}
 		if len(ojson.GetBytesNoCopy(out, "input").Array()) != 1 {
 			t.Fatalf("expected tool_search_call to be stripped: %s", out)
-		}
-		if ojson.GetBytesNoCopy(out, "tools.0.search_content_types").Exists() {
-			t.Fatalf("expected search_content_types to be stripped: %s", out)
 		}
 	})
 }

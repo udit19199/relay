@@ -64,7 +64,6 @@ flowchart LR
 | Codex (ChatGPT plans) | `relay accounts add codex` | No, comes from CLIProxyAPI |
 | xAI | `relay accounts add xai` | No, comes from CLIProxyAPI |
 | Devin | `relay accounts add devin` | No, comes from CLIProxyAPI |
-| Meta | `relay accounts add meta` | No, comes from CLIProxyAPI |
 
 Relay removes the Google providers that CLIProxyAPI has (Gemini, Gemini CLI,
 Vertex, AI Studio, Antigravity), including the Gemini inbound API format.
@@ -136,7 +135,7 @@ per line, and exits non-zero on failure. `relay help` lists every flag.
    { "env": { "ANTHROPIC_BASE_URL": "http://127.0.0.1:8317", "ANTHROPIC_AUTH_TOKEN": "<client_key>" } }
    ```
 5. Add accounts. `relay accounts add claude --json --no-browser` (or `codex`,
-   `xai`, `devin`, `meta`) prints a `{"event":"sign_in_link","url":...}`
+   `xai`, `devin`) prints a `{"event":"sign_in_link","url":...}`
    line, waits up to 5 minutes, then prints the result line. Give the link to
    the user; the user signs in. For OpenCode Go, ask the user to run
    `OPENCODE_API_KEY=... relay accounts add opencode-go` themselves, so the key
@@ -162,7 +161,7 @@ complete a sign-in for the user.
 | `relay setup` | Creates `~/.relay`, keys, and the login service, then starts Relay. Safe to rerun. |
 | `relay status` | Accounts, how much of each limit is left, and fallback chains. |
 | `relay doctor` | Checks config, keys, the proxy, the login service, and every account, with a fix for each problem. |
-| `relay accounts add <provider>` | Browser sign-in for `claude`, `codex`, `xai`, `devin`, `meta`; API key for `opencode-go`. |
+| `relay accounts add <provider>` | Browser sign-in for `claude`, `codex`, `xai`, `devin`; API key for `opencode-go`. |
 | `relay accounts remove <name>` | Deletes a credential. |
 | `relay fallback set <model> <provider>[:<model>] ...` | Serves `<model>` from the first provider in the list that has capacity. |
 | `relay fallback clear <model>` | Removes a chain. |

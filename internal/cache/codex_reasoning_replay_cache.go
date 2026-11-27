@@ -399,7 +399,7 @@ func normalizeCodexReasoningReplayReasoningItem(itemResult ojson.Result) ([]byte
 	if encryptedContent != strings.TrimSpace(encryptedContent) {
 		return nil, false
 	}
-	if !signature.IsValidGPTReasoningSignature(encryptedContent) && !signature.IsValidMetaReasoningSignature(encryptedContent) {
+	if !signature.IsValidGPTReasoningSignature(encryptedContent) {
 		return nil, false
 	}
 

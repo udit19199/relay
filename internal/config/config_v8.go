@@ -66,7 +66,7 @@ var v8SharedStructPaths = []configPath{
 
 var v8KeyFamilies = []configPath{
 	{"codex-api-key", "codex"},
-	{"claude-api-key", "claude"}, {"xai-api-key", "xai"}, {"meta-api-key", "meta"},
+	{"claude-api-key", "claude"}, {"xai-api-key", "xai"},
 	{"openai-compatibility", "openai-compatibility"},
 }
 

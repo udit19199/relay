@@ -24,7 +24,6 @@ func newDefaultAuthManager() *authlogin.Manager {
 		authlogin.NewClaudeAuthenticator(),
 		authlogin.NewXAIAuthenticator(),
 		authlogin.NewDevinAuthenticator(),
-		authlogin.NewMetaAuthenticator(),
 	)
 }
 

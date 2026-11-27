@@ -301,7 +301,7 @@ func task6CaptureFailureUsageWithCheck(t *testing.T, id string, check func(usage
 }
 
 func TestApplyPatchResponsesInvalidTerminalUsage(t *testing.T) {
-	for _, provider := range []string{"xai", "meta"} {
+	for _, provider := range []string{"xai"} {
 		t.Run(provider, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "text/event-stream")
@@ -312,8 +312,6 @@ func TestApplyPatchResponsesInvalidTerminalUsage(t *testing.T) {
 			switch provider {
 			case "xai":
 				exec = NewXAIExecutor(&config.Config{})
-			case "meta":
-				exec = NewMetaExecutor(&config.Config{})
 			}
 			auth := &coreauth.Auth{ID: "task6-invalid-terminal", Provider: provider, Attributes: map[string]string{"api_key": "test", "base_url": server.URL}}
 			checkUsage := task6CaptureFailureUsage(t, auth.ID)
@@ -363,12 +361,8 @@ data: {"type":"response.completed","response":{"output":[{"type":"function_call"
 		stream   bool
 		compact  bool
 	}{
-		{name: "meta-direct", provider: "meta", body: `{"object":"response","output":[{"type":"function_call","id":"c","name":"apply_patch","arguments":"{}"}],"usage":{"input_tokens":5,"output_tokens":3}}`},
-		{name: "meta-direct-event", provider: "meta", body: `{"type":"response.completed","response":{"output":[{"type":"function_call","id":"c","name":"apply_patch","arguments":"{}"}],"usage":{"input_tokens":5,"output_tokens":3}}}`},
 		{name: "xai-compact", provider: "xai", body: `{"id":"r","output":[{"type":"function_call","id":"c","name":"apply_patch","arguments":"{}"}],"usage":{"input_tokens":5,"output_tokens":3}}`, compact: true},
-		{name: "meta-sse", provider: "meta", body: sseBody, stream: true},
 		{name: "xai-sse", provider: "xai", body: sseBody, stream: true},
-		{name: "meta-buffered-sse", provider: "meta", body: sseBody},
 		{name: "xai-buffered-sse", provider: "xai", body: sseBody},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -384,11 +378,7 @@ data: {"type":"response.completed","response":{"output":[{"type":"function_call"
 			defer server.Close()
 
 			var exec coreauth.ProviderExecutor
-			if tc.provider == "meta" {
-				exec = NewMetaExecutor(&config.Config{})
-			} else {
-				exec = NewXAIExecutor(&config.Config{})
-			}
+			exec = NewXAIExecutor(&config.Config{})
 			auth := &coreauth.Auth{ID: "task6-usage-" + tc.name, Provider: tc.provider, Attributes: map[string]string{"api_key": "test", "base_url": server.URL}}
 			checkUsage := task6CaptureFailureUsageWithCheck(t, auth.ID, func(record usage.Record) {
 				if record.Detail.InputTokens != 5 || record.Detail.OutputTokens != 3 {
@@ -419,7 +409,7 @@ data: {"type":"response.completed","response":{"output":[{"type":"function_call"
 }
 
 func TestApplyPatchHTTPGatewayErrorMatrix(t *testing.T) {
-	for _, provider := range []string{"custom-compat", "claude", "claude-oauth", "devin", "xai", "meta"} {
+	for _, provider := range []string{"custom-compat", "claude", "claude-oauth", "devin", "xai"} {
 		for _, mode := range []string{"nonstream", "stream", "eof"} {
 			t.Run(provider+"/"+mode, func(t *testing.T) {
 				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -444,7 +434,7 @@ func TestApplyPatchHTTPGatewayErrorMatrix(t *testing.T) {
 						_, _ = w.Write(task6DevinFrames(`{"input":7,"secret":"RAW_SECRET"}`, false, trailer))
 						return
 					}
-					if provider == "xai" || provider == "meta" {
+					if provider == "xai" {
 						w.Header().Set("Content-Type", "text/event-stream")
 						_, _ = io.WriteString(w, "data: {\"type\":\"response.created\",\"response\":{\"id\":\"r\"}}\n\n")
 						if mode == "eof" {
@@ -466,8 +456,6 @@ func TestApplyPatchHTTPGatewayErrorMatrix(t *testing.T) {
 					exec = NewDevinExecutor(&config.Config{})
 				case "xai":
 					exec = NewXAIExecutor(&config.Config{})
-				case "meta":
-					exec = NewMetaExecutor(&config.Config{})
 				}
 				auth := &coreauth.Auth{ID: "task6-http-" + provider + mode, Provider: exec.Identifier(), Attributes: map[string]string{"api_key": "test", "base_url": server.URL}}
 				if provider == "claude-oauth" {

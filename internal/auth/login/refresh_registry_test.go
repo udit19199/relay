@@ -16,7 +16,6 @@ func TestProviderRefreshLeads(t *testing.T) {
 		{name: "claude", authenticator: NewClaudeAuthenticator(), want: 4 * time.Hour},
 		{name: "xai", authenticator: NewXAIAuthenticator(), want: 5 * time.Minute},
 		{name: "devin", authenticator: NewDevinAuthenticator(), wantNil: true},
-		{name: "meta", authenticator: NewMetaAuthenticator(), wantNil: true},
 	}
 
 	for _, test := range tests {

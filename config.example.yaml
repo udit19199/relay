@@ -121,7 +121,7 @@ routing:
   # How long session-to-auth bindings are retained. Default: 1h
   session-affinity-ttl: "1h"
   # When true (default), subagents (child sessions with parent references) inherit and bind
-  # to the parent's upstream credential across all providers (Claude, Codex, xAI, Meta, and Devin),
+  # to the parent's upstream credential across all providers (Claude, Codex, xAI, and Devin),
   # for the same model, maximizing Prompt/KV Cache reuse and minimizing TTFT.
   # Guardian reviews (X-Openai-Subagent: guardian) may inherit across models from the
   # parent's most recent selection on the same real provider, if that credential is eligible.
@@ -711,25 +711,6 @@ upstream:
 #           weight: 5 # optional: weighted-round-robin share; omitted defaults to 1; maximum 1,000,000
 #           websockets: true # optional: use the xAI upstream websocket transport for downstream websocket requests
 #
-#   # Meta API keys (Muse Code)
-#   # Uses the native Meta executor targeting https://api.meta.ai/v1.
-#
-#   meta:
-#     - name: meta-1
-#       prefix: "meta" # optional: require calls like "meta/muse-spark-1.3" to target this credential
-#       disable-cooling: false # optional override: true disables cooling, false enables it; omit to inherit global
-#       request-retry: 3 # optional per-auth override; 0 disables additional rounds; omit or set < 0 to inherit global
-#       base-url: "https://api.meta.ai/v1" # optional: defaults to https://api.meta.ai/v1
-#       proxy-url: "socks5://proxy.example.com:1080" # optional: per-key proxy override
-#       models:
-#         - name: "muse-spark-1.3" # upstream model name
-#           alias: "muse-latest"   # client alias mapped to the upstream model
-#       excluded-models:
-#         - "muse-spark-1.1"
-#       keys:
-#         - api-key: "..."
-#           weight: 5 # optional: weighted-round-robin share; omitted defaults to 1; maximum 1,000,000
-#
 #   # OpenAI compatibility providers
 #
 #   openai-compatibility:
@@ -797,7 +778,7 @@ oauth:
 
   # Global OAuth model name aliases (per channel)
   # These aliases rename model IDs for both model listing and request routing.
-  # Supported channels: claude, codex, xai, meta.
+  # Supported channels: claude, codex, xai.
   # NOTE: These aliases do not apply to any of the upstream groups under api-keys.
   # NOTE: Because aliases affect the merged /v1 model list and merged request routing, overlapping
   # client-visible names can become ambiguous across providers. For strict backend pinning, use
@@ -829,13 +810,10 @@ oauth:
   #   xai:
   #     - name: "grok-4.3"
   #       alias: "grok-latest"
-  #   meta:
-  #     - name: "muse-spark-1.3"
-  #       alias: "muse-latest"
 
   # OAuth provider model settings (per channel)
   # Allows overriding model-level capabilities (such as context window) for OAuth credentials.
-  # Supported channels: claude, codex, xai, meta.
+  # Supported channels: claude, codex, xai.
   # settings:
   #   codex:
   #     - name: "gpt-6-sol"
@@ -856,8 +834,6 @@ oauth:
   #     - "gpt-5-codex-mini"
   #   xai:
   #     - "grok-3-mini"
-  #   meta:
-  #     - "muse-spark-1.1"
 
   # OAuth provider request-scoped error rules (custom error classification for OAuth credentials)
   # request-scoped-errors:
@@ -875,11 +851,6 @@ oauth:
   #     - status: 400
   #       match:
   #         - "max_tokens_exceeded"
-  #       action: "stop"
-  #   meta:
-  #     - status: 400
-  #       match:
-  #         - "context_length_exceeded"
   #       action: "stop"
 
   # Provider options below apply to OAuth/file-backed credentials.

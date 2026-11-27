@@ -19,11 +19,6 @@ func (e OpenAICompatExecutor) ForAPIKey() coreauth.ProviderExecutor {
 	return &e
 }
 
-func (e MetaExecutor) ForAPIKey() coreauth.ProviderExecutor {
-	e.cfg = e.cfg.ForAPIKey()
-	return &e
-}
-
 func (e XAIExecutor) ForAPIKey() coreauth.ProviderExecutor {
 	e.cfg = e.cfg.ForAPIKey()
 	return &e

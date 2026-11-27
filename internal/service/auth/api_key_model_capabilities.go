@@ -261,10 +261,6 @@ func compileAPIKeyModelCapabilitiesForAuth(cfg *internalconfig.Config, auth *Aut
 		if entry := resolveXAIAPIKeyConfig(cfg, auth); entry != nil {
 			compileConfiguredModelCapabilities(out, entry.Models, "xai")
 		}
-	case "meta":
-		if entry := resolveMetaAPIKeyConfig(cfg, auth); entry != nil {
-			compileConfiguredModelCapabilities(out, entry.Models, "meta")
-		}
 	default:
 		providerKey, compatName := openAICompatAttrs(auth)
 		if entry := resolveOpenAICompatConfigForAuth(cfg, auth, providerKey, compatName); entry != nil {

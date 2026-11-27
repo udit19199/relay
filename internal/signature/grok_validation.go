@@ -65,8 +65,8 @@ func InspectGrokEncryptedContent(raw string) (*GrokEncryptedContentInfo, error) 
 	native := sig
 	routerSuffix := ""
 	if head, tail, ok := strings.Cut(sig, "."); ok {
-		if !isValidMetaRouterSuffix(tail) {
-			return nil, fmt.Errorf("invalid Grok encrypted_content: router suffix must be 1-%d alphanumeric characters", maxMetaRouterSuffixLen)
+		if !isValidRouterSuffix(tail) {
+			return nil, fmt.Errorf("invalid Grok encrypted_content: router suffix must be 1-%d alphanumeric characters", maxRouterSuffixLen)
 		}
 		native = head
 		routerSuffix = tail
@@ -85,9 +85,6 @@ func InspectGrokEncryptedContent(raw string) (*GrokEncryptedContentInfo, error) 
 	if maybeSelfDescribingSignatureEnvelope(native) {
 		if strings.HasPrefix(native, "gAAAA") {
 			return nil, fmt.Errorf("Grok encrypted_content looks like GPT/Codex reasoning signature")
-		}
-		if IsValidMetaReasoningSignature(native) {
-			return nil, fmt.Errorf("Grok encrypted_content looks like Meta reasoning signature")
 		}
 		if IsValidClaudeThinkingSignature(native, ClaudeSignatureValidationOptions{Strict: true}) {
 			return nil, fmt.Errorf("Grok encrypted_content looks like Claude thinking signature")

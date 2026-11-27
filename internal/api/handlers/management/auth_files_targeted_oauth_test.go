@@ -14,7 +14,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/udit19199/relay/internal/auth/claude"
 	"github.com/udit19199/relay/internal/auth/devin"
-	metaauth "github.com/udit19199/relay/internal/auth/meta"
 	xaiauth "github.com/udit19199/relay/internal/auth/xai"
 	"github.com/udit19199/relay/internal/config"
 	coreauth "github.com/udit19199/relay/internal/service/auth"
@@ -124,53 +123,6 @@ func (s *targetedTestXAIOAuthService) CreateTokenStorage(bundle *xaiauth.AuthBun
 	}
 }
 
-type targetedTestMetaOAuthService struct {
-	email       string
-	accessToken string
-}
-
-func (s *targetedTestMetaOAuthService) StartDeviceFlow(_ context.Context) (*metaauth.DeviceCodeResponse, error) {
-	return &metaauth.DeviceCodeResponse{
-		DeviceCode:              "meta-dev-code",
-		UserCode:                "META-1234",
-		VerificationURI:         "https://auth.meta.com/device",
-		VerificationURIComplete: "https://auth.meta.com/device?user_code=META-1234",
-		ExpiresIn:               600,
-		Interval:                1,
-	}, nil
-}
-
-func (s *targetedTestMetaOAuthService) WaitForAuthorization(_ context.Context, _ *metaauth.DeviceCodeResponse) (*metaauth.MetaAuthBundle, error) {
-	return &metaauth.MetaAuthBundle{
-		TokenData: &metaauth.TokenData{
-			AccessToken: s.accessToken,
-			TokenType:   "Bearer",
-			ExpiresIn:   3600,
-		},
-		MintedKey: &metaauth.MintedKeyResponse{
-			APIKey:    "meta-api-key-" + s.accessToken,
-			BaseURL:   metaauth.DefaultAPIBaseURL,
-			UserEmail: s.email,
-		},
-		Email: s.email,
-	}, nil
-}
-
-func (s *targetedTestMetaOAuthService) CreateTokenStorage(bundle *metaauth.MetaAuthBundle) *metaauth.MetaTokenStorage {
-	return &metaauth.MetaTokenStorage{
-		Type:        "meta",
-		AuthKind:    "oauth",
-		AccessToken: bundle.TokenData.AccessToken,
-		DCAToken:    bundle.TokenData.AccessToken,
-		APIKey:      bundle.MintedKey.APIKey,
-		TokenType:   bundle.TokenData.TokenType,
-		ExpiresIn:   bundle.TokenData.ExpiresIn,
-		Expired:     time.Now().Add(time.Hour).UTC().Format(time.RFC3339),
-		BaseURL:     metaauth.DefaultAPIBaseURL,
-		Email:       bundle.Email,
-	}
-}
-
 func TestStartOAuthV8TargetedSessionRegistrationAcrossBuiltinProviders(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -213,7 +165,6 @@ func TestStartOAuthV8TargetedSessionRegistrationAcrossBuiltinProviders(t *testin
 		{provider: "codex", fileName: "codex-target.json", meta: map[string]any{"type": "codex", "email": "a@x.test", "account_id": "acc-1"}},
 		{provider: "claude", fileName: "claude-target.json", meta: map[string]any{"type": "claude", "email": "a@x.test", "account_uuid": "uuid-1"}},
 		{provider: "xai", fileName: "xai-target.json", meta: map[string]any{"type": "xai", "email": "a@x.test", "sub": "sub-1"}},
-		{provider: "meta", fileName: "meta-target.json", meta: map[string]any{"type": "meta", "email": "a@x.test"}},
 		{provider: "devin", fileName: "devin-target.json", meta: map[string]any{"type": "devin", "email": "a@x.test", "user_id": "usr-1"}},
 	}
 
@@ -271,7 +222,7 @@ func TestStartOAuthV8TargetedSessionRegistrationAcrossBuiltinProviders(t *testin
 	}
 }
 
-func TestTargetedOAuthReloginClaudeXAIMetaDevinAndAuthIndexVerify(t *testing.T) {
+func TestTargetedOAuthReloginClaudeXAIDevinAndAuthIndexVerify(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	authDir := t.TempDir()
@@ -286,11 +237,6 @@ func TestTargetedOAuthReloginClaudeXAIMetaDevinAndAuthIndexVerify(t *testing.T) 
 	origXAI := newXAIOAuthService
 	newXAIOAuthService = func(*config.Config, string) xaiOAuthService { return xaiSvc }
 	t.Cleanup(func() { newXAIOAuthService = origXAI })
-
-	metaSvc := &targetedTestMetaOAuthService{email: "a@x.test", accessToken: "meta-fresh-1"}
-	origMeta := newMetaOAuthService
-	newMetaOAuthService = func(*config.Config, string) metaOAuthService { return metaSvc }
-	t.Cleanup(func() { newMetaOAuthService = origMeta })
 
 	devinEmail := "a@x.test"
 	devinUserID := "usr-a"
@@ -349,7 +295,6 @@ func TestTargetedOAuthReloginClaudeXAIMetaDevinAndAuthIndexVerify(t *testing.T) 
 
 	claudeAuth := setupTarget("claude", "claude-custom.json", map[string]any{"type": "claude", "email": "a@x.test", "account_uuid": "uuid-a", "access_token": "old", "refresh_token": "old"})
 	_ = setupTarget("xai", "xai-custom.json", map[string]any{"type": "xai", "email": "a@x.test", "sub": "sub-a", "access_token": "old", "refresh_token": "old"})
-	_ = setupTarget("meta", "meta-custom.json", map[string]any{"type": "meta", "email": "a@x.test", "access_token": "old"})
 	_ = setupTarget("devin", "devin-custom.json", map[string]any{"type": "devin", "email": "a@x.test", "user_id": "usr-a", "api_key": "devin-session-token$old"})
 
 	h := NewHandlerWithoutConfigFilePath(&config.Config{AuthDir: authDir, Port: 8317}, manager)
@@ -412,26 +357,7 @@ func TestTargetedOAuthReloginClaudeXAIMetaDevinAndAuthIndexVerify(t *testing.T) 
 		t.Fatalf("xai match status = %#v, want ok & adopted", st)
 	}
 
-	// 3. Meta mismatch rejected, match updates meta-custom.json in place.
-	metaSvc.email = "wrong@x.test"
-	wMetaMismatch := httptest.NewRecorder()
-	router.ServeHTTP(wMetaMismatch, httptest.NewRequest(http.MethodPost, "/v8/management/oauth/auth-url", strings.NewReader(`{"provider":"meta","name":"meta-custom.json"}`)))
-	var metaMismatchStart struct{ State string }
-	_ = json.Unmarshal(wMetaMismatch.Body.Bytes(), &metaMismatchStart)
-	if st := pollOAuthStatusUntilDone(t, router, metaMismatchStart.State); st["status"] != "error" {
-		t.Fatalf("meta mismatch status = %#v, want error", st)
-	}
-
-	metaSvc.email = "a@x.test"
-	wMetaMatch := httptest.NewRecorder()
-	router.ServeHTTP(wMetaMatch, httptest.NewRequest(http.MethodPost, "/v8/management/oauth/auth-url", strings.NewReader(`{"provider":"meta","name":"meta-custom.json"}`)))
-	var metaMatchStart struct{ State string }
-	_ = json.Unmarshal(wMetaMatch.Body.Bytes(), &metaMatchStart)
-	if st := pollOAuthStatusUntilDone(t, router, metaMatchStart.State); st["status"] != "ok" || st["auth_id"] != "meta-custom.json" || st["adopted"] != true {
-		t.Fatalf("meta match status = %#v, want ok & adopted", st)
-	}
-
-	// 4. Devin mismatch rejected, match updates devin-custom.json in place.
+	// 3. Devin mismatch rejected, match updates devin-custom.json in place.
 	devinUserID = "usr-wrong"
 	wDevinMismatch := httptest.NewRecorder()
 	router.ServeHTTP(wDevinMismatch, httptest.NewRequest(http.MethodPost, "/v8/management/oauth/auth-url", strings.NewReader(`{"provider":"devin","name":"devin-custom.json"}`)))

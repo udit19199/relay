@@ -78,7 +78,6 @@ func ParseConfigBytes(data []byte) (*Config, error) {
 	// Apply the same sanitization pipeline.
 	cfg.SanitizeCodexKeys()
 	cfg.SanitizeXAIKeys()
-	cfg.SanitizeMetaKeys()
 	cfg.SanitizeCodexHeaderDefaults()
 	cfg.SanitizeClaudeHeaderDefaults()
 	cfg.SanitizeClaudeKeys()

@@ -18,58 +18,22 @@ import (
 	"github.com/udit19199/relay/internal/config"
 	coreauth "github.com/udit19199/relay/internal/service/auth"
 	"github.com/udit19199/relay/internal/watcher/diff"
-	"github.com/udit19199/relay/internal/watcher/synthesizer"
 	"gopkg.in/yaml.v3"
 )
-
-func TestApplyAuthExcludedModelsMeta_APIKey(t *testing.T) {
-	auth := &coreauth.Auth{Attributes: map[string]string{}}
-	perKey := []string{" Model-1 ", "model-2"}
-
-	synthesizer.ApplyAuthExcludedModelsMeta(auth, perKey, "apikey")
-
-	expected := diff.ComputeExcludedModelsHash([]string{"model-1", "model-2"})
-	if got := auth.Attributes["excluded_models_hash"]; got != expected {
-		t.Fatalf("expected hash %s, got %s", expected, got)
-	}
-	if got := auth.Attributes["auth_kind"]; got != "apikey" {
-		t.Fatalf("expected auth_kind=apikey, got %s", got)
-	}
-}
-
-func TestApplyAuthExcludedModelsMeta_OAuthProvider(t *testing.T) {
-	auth := &coreauth.Auth{
-		Provider:   "TestProv",
-		Attributes: map[string]string{},
-	}
-
-	synthesizer.ApplyAuthExcludedModelsMeta(auth, nil, "oauth")
-
-	// Global oauth-excluded-models are resolved at model registration, not stored on the auth.
-	for _, key := range []string{"excluded_models", "excluded_models_hash"} {
-		if got, ok := auth.Attributes[key]; ok {
-			t.Fatalf("expected %s to be absent, got %q", key, got)
-		}
-	}
-	if got := auth.Attributes["auth_kind"]; got != "oauth" {
-		t.Fatalf("expected auth_kind=oauth, got %s", got)
-	}
-}
 
 func TestBuildAPIKeyClientsCounts(t *testing.T) {
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{{APIKey: "c1"}},
 		CodexKey:  []config.CodexKey{{APIKey: "c1"}, {APIKey: "c2"}},
 		XAIKey:    []config.XAIKey{{APIKey: "x1"}},
-		MetaKey:   []config.MetaKey{{APIKey: "m1"}},
 		OpenAICompatibility: []config.OpenAICompatibility{
 			{APIKeyEntries: []config.OpenAICompatibilityAPIKey{{APIKey: "o1"}, {APIKey: "o2"}}},
 		},
 	}
 
-	claude, codex, xai, meta, compat := BuildAPIKeyClients(cfg)
-	if claude != 1 || codex != 2 || xai != 1 || meta != 1 || compat != 2 {
-		t.Fatalf("unexpected counts: %d %d %d %d %d", claude, codex, xai, meta, compat)
+	claude, codex, xai, compat := BuildAPIKeyClients(cfg)
+	if claude != 1 || codex != 2 || xai != 1 || compat != 2 {
+		t.Fatalf("unexpected counts: %d %d %d %d", claude, codex, xai, compat)
 	}
 }
 func TestNormalizeAuthStripsTemporalFields(t *testing.T) {

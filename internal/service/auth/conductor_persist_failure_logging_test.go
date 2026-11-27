@@ -148,27 +148,3 @@ func TestRefreshPersistFailureLogsWarn(t *testing.T) {
 
 	assertWarnEntry(t, hook, "failed to persist updated auth", "auth-refresh-persist-1", "claude", "permission denied")
 }
-
-// Meta mint persist failures propagate as errors and must be logged at warn
-// level (previously debug only, invisible at the default log level).
-func TestMetaRefreshPersistFailureLogsWarn(t *testing.T) {
-	hook := setupTestLoggerHook(t)
-	m := NewManager(&persistFailureStore{}, nil, nil)
-
-	auth := &Auth{
-		ID:       "auth-meta-persist-1",
-		Provider: "meta",
-		Metadata: map[string]any{"dca_token": "dca:valid"},
-	}
-	if _, errRegister := m.Register(WithSkipPersist(context.Background()), auth); errRegister != nil {
-		t.Fatalf("Register(skipPersist) returned error: %v", errRegister)
-	}
-	m.RegisterExecutor(&unauthorizedRefreshExecutor{id: "meta"})
-
-	hook.Reset()
-	if _, errRefresh := m.ForceRefreshAuth(context.Background(), auth.ID); errRefresh == nil {
-		t.Fatal("expected meta mint persist failure to return an error")
-	}
-
-	assertWarnEntry(t, hook, "persist refreshed auth", "auth-meta-persist-1", "meta", "permission denied")
-}
