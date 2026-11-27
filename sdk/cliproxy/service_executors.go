@@ -180,7 +180,7 @@ func (s *Service) registerAvailableExecutors(ctx context.Context, opts executorR
 		return
 	}
 	// Keep all Service-owned executor registration paths here so native,
-	// auth-derived, and plugin executors stay in the same binding order.
+	// and auth-derived executors stay in the same binding order.
 	if opts.includeBaseline {
 		s.registerExecutorsForAuths(baselineExecutorAuths(), opts.forceReplaceAuths)
 	}
@@ -296,9 +296,8 @@ func (s *Service) registerExecutorForAuth(a *coreauth.Auth, forceReplace bool) {
 }
 
 // registerOpenAICompatProviderExecutor binds a native OpenAI-compat executor, optionally
-// wrapping it so plugin AuthProvider refresh remains available.
 // When respectNonOwned is true, an existing non-owned executor is preserved unless it is a
-// bare OpenAI-compat executor that should be upgraded to the plugin-refresh wrapper.
+// bare OpenAI-compat executor that can be replaced during re-registration.
 func (s *Service) registerOpenAICompatProviderExecutor(providerKey string, auth *coreauth.Auth, cfg *config.Config, forceReplace bool, respectNonOwned bool) {
 	if s == nil || s.coreManager == nil {
 		return

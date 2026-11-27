@@ -21,7 +21,7 @@ func (s *Service) registerModelsForAuth(ctx context.Context, a *coreauth.Auth) b
 // fence rejected this computation: false means a newer auth state
 // superseded it mid-computation and a completion pass must reconcile the
 // latest auth. True also covers paths that attempt no publication
-// (cancellation, plugin errors, invalid input), so it never by itself
+// (cancellation, resolution errors, invalid input), so it never by itself
 // proves that models were published.
 func (s *Service) registerModelsForAuthWithCache(ctx context.Context, a *coreauth.Auth, compatCache *openAICompatibilityRegistrationCache) bool {
 	return s.registerModelsForAuthWithConfigAndCache(ctx, s.currentConfig(), a, compatCache)

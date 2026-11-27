@@ -520,7 +520,7 @@ func modelAliasChannel(auth *Auth) string {
 // OAuth model alias (e.g., API key authentication).
 //
 // Built-in channels: claude, codex, xai, meta.
-// Plugin OAuth providers use their normalized provider key as the channel.
+// Other OAuth providers use their normalized provider key as the channel.
 func OAuthModelAliasChannel(provider, authKind string) string {
 	provider = strings.ToLower(strings.TrimSpace(provider))
 	authKind = normalizeOAuthModelAliasAuthKind(authKind)

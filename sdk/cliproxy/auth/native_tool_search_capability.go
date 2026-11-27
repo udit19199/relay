@@ -8,7 +8,7 @@ import (
 
 // NativeToolSearchSupport optionally reports whether an executor can send Codex
 // tool_search to a credential as Anthropic native tool search. It does not
-// change ProviderExecutor or the plugin ABI.
+// change the ProviderExecutor interface.
 type NativeToolSearchSupport interface {
 	SupportsNativeToolSearch(auth *Auth, upstreamModel string) bool
 }

@@ -97,8 +97,7 @@ func (s *Service) handleAuthUpdates(ctx context.Context, updates []watcher.AuthU
 	if s == nil {
 		return
 	}
-	// Keep this path limited to the targeted auths. Global plugin rebuilds and
-	// Management API PATCH responses.
+	// Keep this path limited to the targeted auths.
 	s.authUpdateMu.Lock()
 	locked := true
 	defer func() {
@@ -252,7 +251,7 @@ func (s *Service) shouldSkipFileAuthDelete(path, id string) bool {
 		log.Debugf("skipping auth delete for %s: backing file is not confirmed missing", id)
 		return true
 	}
-	// A file can return with only a subset of its previous plugin auth IDs.
+	// A file can return with only a subset of its previous auth IDs.
 	// Read just this file so another file with the same ID cannot retain the auth.
 	auths, errSnapshotAuthFile := s.currentWatcher().SnapshotAuthFile(path)
 	if errSnapshotAuthFile != nil || len(auths) == 0 {
@@ -266,7 +265,7 @@ func (s *Service) shouldSkipFileAuthDelete(path, id string) bool {
 		}
 		hasAuth = true
 		// Store IDs retain case, but the file synthesizer lowercases IDs on Windows.
-		// Other platforms keep exact matching for case-sensitive plugin auth IDs.
+		// Other platforms keep exact matching for case-sensitive auth IDs.
 		if authIDMatches(auth.ID, id, runtime.GOOS == "windows") {
 			log.Debugf("skipping auth delete for %s: auth ID is present in the re-created file", id)
 			return true
@@ -515,9 +514,7 @@ func (s *Service) completeModelRegistrationForAuthWithCache(ctx context.Context,
 	}
 	if !published {
 		// The registration was fenced out because its registration inputs
-		// or the registry epoch changed mid-computation (e.g. a plugin
-		// persisting its model snapshot through host.auth.save during
-		// ModelsForAuth, issue #6718). The intervening change may not have
+		// or the registry epoch changed mid-computation. The intervening change may not have
 		// left this client's models behind, so reconcile the latest auth
 		// once instead of risking an empty model list. The retry
 		// recomputes from the latest snapshot;

@@ -1,7 +1,7 @@
 package auth
 
 // ApplyPatchSupport optionally advertises the actual executor's tool contract.
-// It does not change ProviderExecutor or the plugin ABI.
+// It does not change the ProviderExecutor interface.
 type ApplyPatchSupport interface {
 	SupportsApplyPatch() bool
 }
