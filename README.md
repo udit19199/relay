@@ -119,7 +119,7 @@ per line, and exits non-zero on failure. `relay help` lists every flag.
 
    ```bash
    git clone https://github.com/udit19199/relay.git ~/.relay-src 2>/dev/null || git -C ~/.relay-src pull
-   mkdir -p ~/.local/bin && cd ~/.relay-src && go build -trimpath -ldflags "-s -w" -o ~/.local/bin/relay ./cmd/server
+   mkdir -p ~/.local/bin && cd ~/.relay-src && go build -trimpath -ldflags "-s -w" -o ~/.local/bin/relay ./cmd/relay
    ```
 
 3. Run `~/.local/bin/relay setup --json`. It creates `~/.relay` with a config
@@ -199,7 +199,7 @@ export OPENAI_API_KEY=<client_key>
 ```
 
 The notch app is optional. Build it with
-`cd notch && ./scripts/package-local-app.sh` and copy
+`cd macos && ./scripts/package-local-app.sh` and copy
 `.build/release/Relay.app` to `/Applications`.
 
 ## Notch app
@@ -236,7 +236,7 @@ Relay would not exist without these projects:
   management API all come from it. Relay's git history keeps their commits.
 - **[Codex Account Switcher](https://github.com/liuzhao1225/codex-account-switcher)**
   by liuzhao1225 (MIT). The notch app started as a fork of this Mac app, and
-  its history is merged into `notch/`.
+  its history is merged into `macos/`.
 - **[vorssaint-utils](https://github.com/vorssaint/vorssaint-utils)** by
   Vorssaint (GPL-3.0-or-later). The notch shape and island placement code is
   copied from it; those files carry its license header.
@@ -257,6 +257,6 @@ I wrote Relay with coding agents doing a lot of the typing, under my direction.
 
 ## License
 
-The proxy is MIT licensed, see [LICENSE](LICENSE). The notch app in `notch/`
+The proxy is MIT licensed, see [LICENSE](LICENSE). The notch app in `macos/`
 is GPL-3.0-or-later as a whole, because it includes GPL code from
-vorssaint-utils. See [notch/README.md](notch/README.md#license).
+vorssaint-utils. See [macos/README.md](macos/README.md#license).

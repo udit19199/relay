@@ -24,6 +24,6 @@ On Unix, file claims synchronize their canonical directory ancestry before an ex
 
 All processes sharing credentials must use the same authoritative journal and this safety protocol. Older deployments or external clients refreshing the same grant cannot be coordinated by a journal they do not participate in.
 
-Direct SDK users can attach a `codex.RefreshJournal` using `WithRefreshJournal` or `SetRefreshJournal`. Without a configured auth directory or explicit journal, protection is process-local only; a caller persisting credentials across restarts must also provide a durable journal.
+Code that builds the auth manager directly can attach a `codex.RefreshJournal` using `WithRefreshJournal` or `SetRefreshJournal`. Without a configured auth directory or explicit journal, protection is process-local only; a caller persisting credentials across restarts must also provide a durable journal.
 
 These changes cover refreshes performed in this repository, including local SIWC refreshes.

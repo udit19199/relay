@@ -1,52 +1,52 @@
 # AGENTS.md
 
-Go 1.26+ proxy server providing OpenAI/Claude/Codex compatible APIs with OAuth and round-robin load balancing, plus its native macOS notch app in `notch/`.
+Go 1.26+ proxy server providing OpenAI/Claude/Codex compatible APIs with OAuth and round-robin load balancing, plus its native macOS notch app in `macos/`.
 
 ## Repository
-- GitHub: https://github.com/udit19199/relay (personal fork of https://github.com/router-for-me/CLIProxyAPI)
-- One repo for both parts: the Go proxy (everything outside `notch/`) and the Swift notch app (`notch/`). The former `sidekick` repo's history is merged into `notch/`.
+- GitHub: https://github.com/udit19199/relay (Go module `github.com/udit19199/relay`). Started as a fork of https://github.com/router-for-me/CLIProxyAPI; upstream is never merged. Take ideas from upstream fixes and rewrite them here.
+- One repo for both parts: the Go proxy (everything outside `macos/`) and the Swift notch app (`macos/`). The former `sidekick` repo's history is merged into `macos/`.
 
-## Notch app (`notch/`)
+## Notch app (`macos/`)
 - Native Swift/AppKit, macOS only. The notch island is the only interface: it lists Relay's accounts with 5-hour and weekly usage, adds accounts through Relay's browser OAuth, and removes credentials. Relay serves every account at once, so the app never switches accounts or writes credential files.
-- The only contract between the two parts is Relay's management API at `127.0.0.1:8317`: `GET`/`DELETE /v0/management/auth-files`, `POST /v0/management/quota/fetch`, `*-auth-url`, `get-auth-status`, `oauth-session`. Go code never imports or launches Swift code, and the reverse. When syncing upstream, keep these routes working; the app depends on them.
-- OpenCode Go is a first-class account type: an auth file with `"type": "opencode-go"` and `"api_key"`. Relay fetches its rolling/weekly/monthly limits natively (`opencode_go_quota.go`) and serves inference through the OpenAI-compatible executor against `https://opencode.ai/inference/go/v1` (the synthesizer sets `base_url`, `api_key`, `User-Agent: relay`, `X-Opencode-Session: $CPA-SESSION-ID` which OpenCode Go requires, and prefix `opencode-go`; no config block). Models are discovered from `/models` on load and hourly (`sdk/cliproxy/opencode_go_models.go`, last list kept on failure) and exposed only as `opencode-go/<model>`, so catalog entries like Claude models never shadow the native providers.
+- The only contract between the two parts is Relay's management API at `127.0.0.1:8317`: `GET`/`DELETE /v0/management/auth-files`, `POST /v0/management/quota/fetch`, `*-auth-url`, `get-auth-status`, `oauth-session`. Go code never imports or launches Swift code, and the reverse. Keep these routes working; the app depends on them.
+- OpenCode Go is a first-class account type: an auth file with `"type": "opencode-go"` and `"api_key"`. Relay fetches its rolling/weekly/monthly limits natively (`opencode_go_quota.go`) and serves inference through the OpenAI-compatible executor against `https://opencode.ai/inference/go/v1` (the synthesizer sets `base_url`, `api_key`, `User-Agent: relay`, `X-Opencode-Session: $CPA-SESSION-ID` which OpenCode Go requires, and prefix `opencode-go`; no config block). Models are discovered from `/models` on load and hourly (`internal/service/opencode_go_models.go`, last list kept on failure) and exposed only as `opencode-go/<model>`, so catalog entries like Claude models never shadow the native providers.
 - The app reads the management key from `~/.relay/management.key` (0600). It must match `remote-management.secret-key` in `~/.relay/config.yaml`.
-- `notch/Sources/RelayCore` holds the Relay API client and usage mapping only. Small concrete types; no protocol layers, no Keychain, no daemon, no menu-bar item.
-- Verify with `cd notch && swift build`, then package and install: `notch/scripts/package-local-app.sh`, replace `/Applications/Relay.app` with the built bundle, relaunch, and compare the island's numbers with `auth-files`.
-- `notch/` is GPL-3.0-or-later as a whole (MIT app sources plus GPL island code; see `notch/README.md`). The Go proxy stays MIT.
+- `macos/Sources/RelayCore` holds the Relay API client and usage mapping only. Small concrete types; no protocol layers, no Keychain, no daemon, no menu-bar item.
+- Verify with `cd macos && swift build`, then package and install: `macos/scripts/package-local-app.sh`, replace `/Applications/Relay.app` with the built bundle, relaunch, and compare the island's numbers with `auth-files`.
+- `macos/` is GPL-3.0-or-later as a whole (MIT app sources plus GPL island code; see `macos/README.md`). The Go proxy stays MIT.
 
 ## Commands
 ```bash
 gofmt -w . # Format (required after Go changes)
-go build -trimpath -ldflags "-s -w" -o cli-proxy-api ./cmd/server # Build
-go run ./cmd/server # Run dev server
+go build -trimpath -ldflags "-s -w" -o relay ./cmd/relay # Build
+go run ./cmd/relay # Run dev server
 go test ./... # Run all tests
 go test -v -run TestName ./path/to/pkg # Run single test
-go build -trimpath -ldflags "-s -w" -o test-output ./cmd/server && rm test-output # Verify compile (REQUIRED after changes)
+go build -trimpath -ldflags "-s -w" -o test-output ./cmd/relay && rm test-output # Verify compile (REQUIRED after changes)
 ```
 - Common flags: `--config <path>`, `--local-model`, `--no-browser`, `--oauth-callback-port <port>`
 
 ## Config
 - Default config: `config.yaml` (template: `config.example.yaml`)
 - `.env` is auto-loaded from the working directory
-- Auth material defaults under `auths/`
-- Storage: file-based auth material under `auths/`
+- Auth material lives in `~/.relay/auths` (`auth-dir`)
 
 ## Architecture
-- `cmd/server/` — Server entrypoint
+- `cmd/relay/` — Server entrypoint
 - `internal/api/` — Gin HTTP API (routes, middleware, modules)
 - `internal/api/modules/amp/` — Amp integration (Amp-style routes + reverse proxy)
 - `internal/thinking/` — Main thinking/reasoning pipeline. `ApplyThinking()` (apply.go) parses suffixes (`suffix.go`, suffix overrides body), normalizes config to canonical `ThinkingConfig` (`types.go`), normalizes and validates centrally (`validate.go`/`convert.go`), then applies provider-specific output via `ProviderApplier`. Do not break this "canonical representation → per-provider translation" architecture.
 - `internal/runtime/executor/` — Per-provider runtime executors (incl. Codex WebSocket)
-- `internal/translator/` — Provider protocol translators (and shared `common`)
+- `internal/translator/` — Provider protocol translators (and shared `common`); `internal/translator/registry/` holds the translator registry they register into
 - `internal/registry/` — Model registry + remote updater (`StartModelsUpdater`); `--local-model` disables remote updates
-- `internal/store/` — Storage implementations and secret resolution
-- `internal/managementasset/` — Config snapshots and management assets
+- `internal/service/` — Service core: builder, lifecycle, watchers. `internal/service/auth/` is the credential manager (selection, cooldowns, quota probe), `internal/service/executor/` the executor interfaces, `internal/service/usage/` usage records
+- `internal/api/handlers/` — Inbound API handlers (`openai/`, `claude/`); `internal/api/handlers/management/` the management API
+- `internal/auth/` — Provider OAuth clients; `internal/auth/login/` login flows and the file token store
+- `internal/access/` — Inbound client API-key auth; `internal/access/config_access/` builds providers from config
 - `internal/cache/` — Request signature caching
 - `internal/watcher/` — Config hot-reload and watchers
-- `internal/usage/` — Usage and token accounting
-- `sdk/cliproxy/` — Embeddable SDK entry (service/builder/watchers/pipeline)
-- `internal/relaycli/` — Relay's own commands (`setup`, `status`, `doctor`, `accounts`, `fallback`), dispatched from the top of `main()` in `cmd/server/main.go`. They talk to the running proxy only through `/v8/management` (plus `/v0/management/quota/fetch`, which has no v8 route), print one JSON object with `--json`, and are what coding agents use to install and run Relay (README "Agent setup"). `RELAY_HOME` overrides `~/.relay`. Fallback chains are credential `priority` plus per-credential `model_aliases`, with each credential's place recorded under `relay_fallback`; OpenCode Go aliases are published without the `opencode-go/` prefix (`withOpenCodeGoAliases`) so a chain can include it.
+- `internal/cmd/` — Login commands and service startup used by `cmd/relay`
+- `internal/relaycli/` — Relay's own commands (`setup`, `status`, `doctor`, `accounts`, `fallback`), dispatched from the top of `main()` in `cmd/relay/main.go`. They talk to the running proxy only through `/v8/management` (plus `/v0/management/quota/fetch`, which has no v8 route), print one JSON object with `--json`, and are what coding agents use to install and run Relay (README "Agent setup"). `RELAY_HOME` overrides `~/.relay`. Fallback chains are credential `priority` plus per-credential `model_aliases`, with each credential's place recorded under `relay_fallback`; OpenCode Go aliases are published without the `opencode-go/` prefix (`withOpenCodeGoAliases`) so a chain can include it.
 - `test/` — Cross-module integration tests
 
 ## Code Conventions
@@ -66,6 +66,6 @@ go build -trimpath -ldflags "-s -w" -o test-output ./cmd/server && rm test-outpu
 - Wrap defer errors: `defer func() { if err := f.Close(); err != nil { log.Errorf(...) } }()`
 - Use logrus structured logging; avoid leaking secrets/tokens in logs
 - Avoid panics in HTTP handlers; prefer logged errors and meaningful HTTP status codes
-- Timeouts are allowed only during credential acquisition; after an upstream connection is established, do not set timeouts for any subsequent network behavior. Intentional exceptions that must remain allowed are the Codex websocket liveness deadlines in `internal/runtime/executor/codex_websockets_executor.go`, the management APICall timeout in `internal/api/handlers/management/api_tools.go`, the OpenCode Go quota fetch timeout in `internal/api/handlers/management/opencode_go_quota.go`, the Claude quota fetch timeout in `internal/api/handlers/management/claude_quota.go`, the OpenCode Go model-list fetch timeout in `sdk/cliproxy/opencode_go_models.go`
+- Timeouts are allowed only during credential acquisition; after an upstream connection is established, do not set timeouts for any subsequent network behavior. Intentional exceptions that must remain allowed are the Codex websocket liveness deadlines in `internal/runtime/executor/codex_websockets_executor.go`, the management APICall timeout in `internal/api/handlers/management/api_tools.go`, the OpenCode Go quota fetch timeout in `internal/api/handlers/management/opencode_go_quota.go`, the Claude quota fetch timeout in `internal/api/handlers/management/claude_quota.go`, the OpenCode Go model-list fetch timeout in `internal/service/opencode_go_models.go`
 - Avoid wall-clock `time.Sleep` in TTL, expiration, ordering, or cache-eviction unit tests due to platform timer granularity (e.g. Windows default timer resolution of ~15.6ms) and CI jitter under load; prefer controllable clocks (`nowFunc` / mock clock), explicit timestamp manipulation, or deterministic synchronization primitives.
 - Endpoints under the `/v0/management` base URL are deprecated and no longer maintained. For any feature changes, do not modify endpoints under `/v0/management` unless necessary to fix compilation errors. Exception: `/v0/management/quota/fetch` is the notch app's only quota route, so providers add their live readings there.
