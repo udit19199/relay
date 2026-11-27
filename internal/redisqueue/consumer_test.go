@@ -261,7 +261,7 @@ func TestUsageQueueConsumerAsyncUsesRecordResponseHeaders(t *testing.T) {
 		mgr := coreusage.NewManager(16)
 		defer mgr.Stop()
 
-		mgr.Register(pluginFunc(func(ctx context.Context, _ coreusage.Record) {
+		mgr.Register(consumerFunc(func(ctx context.Context, _ coreusage.Record) {
 			nextHeaders := http.Header{}
 			nextHeaders.Set("X-Upstream-Request-Id", "upstream-req-2")
 			internallogging.SetResponseHeaders(ctx, nextHeaders)
@@ -345,7 +345,7 @@ func TestUsageQueueConsumerAsyncIgnoresRecycledGinContext(t *testing.T) {
 		mgr := coreusage.NewManager(16)
 		defer mgr.Stop()
 
-		mgr.Register(pluginFunc(func(_ context.Context, _ coreusage.Record) {
+		mgr.Register(consumerFunc(func(_ context.Context, _ coreusage.Record) {
 			ginCtx.Request = httptest.NewRequest(http.MethodGet, "http://example.com/v1/responses", nil)
 			ginCtx.Status(http.StatusOK)
 		}))
@@ -508,9 +508,9 @@ func requireMissingField(t *testing.T, payload map[string]json.RawMessage, key s
 	}
 }
 
-type pluginFunc func(context.Context, coreusage.Record)
+type consumerFunc func(context.Context, coreusage.Record)
 
-func (fn pluginFunc) HandleUsage(ctx context.Context, record coreusage.Record) {
+func (fn consumerFunc) HandleUsage(ctx context.Context, record coreusage.Record) {
 	fn(ctx, record)
 }
 
@@ -808,27 +808,27 @@ func TestUsageQueueConsumerPayloadDistinguishesNativeKey(t *testing.T) {
 			requireStringField(t, payload, "access_provider", "config-inline")
 		})
 
-		t.Run("plugin_key", func(t *testing.T) {
+		t.Run("consumer_key", func(t *testing.T) {
 			gin.SetMode(gin.TestMode)
 			w := httptest.NewRecorder()
 			ginCtx, _ := gin.CreateTestContext(w)
-			ginCtx.Set("userApiKey", "plugin-principal-456")
-			ginCtx.Set("accessProvider", "custom-auth-plugin")
+			ginCtx.Set("userApiKey", "consumer-principal-456")
+			ginCtx.Set("accessProvider", "custom-auth-consumer")
 
 			ctx := context.WithValue(context.Background(), "gin", ginCtx)
-			ctx = internallogging.WithRequestID(ctx, "req-plugin-1")
+			ctx = internallogging.WithRequestID(ctx, "req-consumer-1")
 
 			consumer := &usageQueueConsumer{}
 			consumer.HandleUsage(ctx, coreusage.Record{
 				Provider: "openai",
 				Model:    "gpt-5.4",
-				APIKey:   "plugin-principal-456",
+				APIKey:   "consumer-principal-456",
 			})
 
 			payload := popSinglePayload(t)
-			requireStringField(t, payload, "api_key", "plugin-principal-456")
+			requireStringField(t, payload, "api_key", "consumer-principal-456")
 			requireBoolField(t, payload, "is_native_key", false)
-			requireStringField(t, payload, "access_provider", "custom-auth-plugin")
+			requireStringField(t, payload, "access_provider", "custom-auth-consumer")
 		})
 
 		t.Run("record_explicit_native", func(t *testing.T) {
