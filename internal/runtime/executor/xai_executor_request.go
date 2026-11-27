@@ -114,7 +114,7 @@ func (e *XAIExecutor) prepareResponsesRequestToDoc(ctx context.Context, req clip
 	preserveXAIResponsesOutputControlsDoc(origDoc, originalPayload, from)
 	originalTranslated = origDoc.Bytes()
 
-	body, updatesChanged, err := helps.TranslateRequestWithAPIKeyModelCompatibilityAndUpdateIntentForExecutor(ctx, opts.Headers, e.cfg, e.Identifier(), from, to, targetModel, bytes.Clone(req.Payload), stream, helps.APIKeyModelIsCompat(req))
+	body, err := helps.TranslateRequestReturningErrorForExecutor(ctx, opts.Headers, e.cfg, e.Identifier(), from, to, targetModel, bytes.Clone(req.Payload), stream, helps.APIKeyModelIsCompat(req))
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +122,7 @@ func (e *XAIExecutor) prepareResponsesRequestToDoc(ctx context.Context, req clip
 	helps.SetStringIfDifferentDoc(doc, "model", baseModel)
 	preserveXAIResponsesOutputControlsDoc(doc, req.Payload, from)
 
-	if err = helps.ApplyRequestThinkingDoc(doc, req, opts, from.String(), e.Identifier(), e.Identifier(), updatesChanged); err != nil {
+	if err = helps.ApplyRequestThinkingDoc(doc, req, opts, from.String(), e.Identifier(), e.Identifier()); err != nil {
 		return nil, err
 	}
 

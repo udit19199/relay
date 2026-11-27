@@ -102,45 +102,14 @@ func TranslateRequestPairReturningError(ctx context.Context, headers http.Header
 }
 
 func translateRequestPairWithAPIKeyModelCompatibility(ctx context.Context, headers http.Header, cfg *config.Config, from, to sdktranslator.Format, model string, originalPayload, requestPayload []byte, stream, isCompat bool) (original, working []byte, err error) {
-	original, working, _, err = TranslateRequestPairWithAPIKeyModelCompatibilityAndUpdateIntent(ctx, headers, cfg, from, to, model, originalPayload, requestPayload, stream, isCompat)
-	return original, working, err
-}
-
-// TranslateRequestPairWithAPIKeyModelCompatibilityAndUpdateIntent returns the
-// update decision for the working payload, not for the baseline payload,
-// and the working payload's error for a content part the target cannot
-// represent. A baseline failure alone is ignored.
-func TranslateRequestPairWithAPIKeyModelCompatibilityAndUpdateIntent(ctx context.Context, headers http.Header, cfg *config.Config, from, to sdktranslator.Format, model string, originalPayload, requestPayload []byte, stream, isCompat bool) (original, working []byte, updatesChanged bool, err error) {
-	original, updatesChanged, err = TranslateRequestWithAPIKeyModelCompatibilityAndUpdateIntent(ctx, headers, cfg, from, to, model, originalPayload, stream, isCompat)
+	original, err = translateRequestWithAPIKeyModelCompatibilityForExecutor(ctx, headers, cfg, "", from, to, model, originalPayload, stream, isCompat)
 	if sameByteSlice(originalPayload, requestPayload) {
 		// A single translation serves both payloads, so its error is the working error.
-		return original, append([]byte(nil), original...), updatesChanged, err
+		return original, append([]byte(nil), original...), err
 	}
 	// Only the working payload is sent upstream, so only its error counts.
-	working, updatesChanged, err = TranslateRequestWithAPIKeyModelCompatibilityAndUpdateIntent(ctx, headers, cfg, from, to, model, requestPayload, stream, isCompat)
-	return original, working, updatesChanged, err
-}
-
-// TranslateRequestWithAPIKeyModelCompatibilityAndUpdateIntent reports whether
-// request-scoped configuration updates changed during translation.
-func TranslateRequestWithAPIKeyModelCompatibilityAndUpdateIntent(ctx context.Context, headers http.Header, cfg *config.Config, from, to sdktranslator.Format, model string, payload []byte, stream, isCompat bool) ([]byte, bool, error) {
-	return TranslateRequestWithAPIKeyModelCompatibilityAndUpdateIntentForExecutor(ctx, headers, cfg, "", from, to, model, payload, stream, isCompat)
-}
-
-// TranslateRequestWithAPIKeyModelCompatibilityAndUpdateIntentForExecutor
-// translates a request while applying client schema compatibility for the
-// actual target executor.
-func TranslateRequestWithAPIKeyModelCompatibilityAndUpdateIntentForExecutor(ctx context.Context, headers http.Header, cfg *config.Config, targetExecutor string, from, to sdktranslator.Format, model string, payload []byte, stream, isCompat bool) ([]byte, bool, error) {
-	if !isCompat || (to == sdktranslator.FormatCodex && from != sdktranslator.FormatClaude) {
-		translated := sdktranslator.RequestEnvelope{Format: from, Model: model, Stream: stream, Body: payload}
-		if IsCodexUserAgent(headers) && !isCodexTargetExecutor(targetExecutor) {
-			translated.Body = NormalizeCodexToolIntegerTypes(translated.Body, headers)
-		}
-		translated = multiagentv2.TranslateRequestEnvelopeWithCodexMultiAgentV2(ctx, headers, cfg, from, to, translated)
-		return translated.Body, translated.ConfigurationUpdatesChanged, translated.Err
-	}
-	body, err := translateRequestWithAPIKeyModelCompatibilityForExecutor(ctx, headers, cfg, targetExecutor, from, to, model, payload, stream, isCompat)
-	return body, false, err
+	working, err = translateRequestWithAPIKeyModelCompatibilityForExecutor(ctx, headers, cfg, "", from, to, model, requestPayload, stream, isCompat)
+	return original, working, err
 }
 
 // TranslateRequestWithAPIKeyModelCompatibility applies compatibility-aware
@@ -158,7 +127,13 @@ func TranslateRequestWithAPIKeyModelCompatibilityForExecutor(ctx context.Context
 
 // TranslateRequestReturningError reports a content part the target cannot represent.
 func TranslateRequestReturningError(ctx context.Context, headers http.Header, cfg *config.Config, from, to sdktranslator.Format, model string, payload []byte, stream, isCompat bool) ([]byte, error) {
-	return translateRequestWithAPIKeyModelCompatibilityForExecutor(ctx, headers, cfg, "", from, to, model, payload, stream, isCompat)
+	return TranslateRequestReturningErrorForExecutor(ctx, headers, cfg, "", from, to, model, payload, stream, isCompat)
+}
+
+// TranslateRequestReturningErrorForExecutor reports a content part the target
+// cannot represent while preserving the actual target executor's schema policy.
+func TranslateRequestReturningErrorForExecutor(ctx context.Context, headers http.Header, cfg *config.Config, targetExecutor string, from, to sdktranslator.Format, model string, payload []byte, stream, isCompat bool) ([]byte, error) {
+	return translateRequestWithAPIKeyModelCompatibilityForExecutor(ctx, headers, cfg, targetExecutor, from, to, model, payload, stream, isCompat)
 }
 
 func translateRequestWithAPIKeyModelCompatibilityForExecutor(ctx context.Context, headers http.Header, cfg *config.Config, targetExecutor string, from, to sdktranslator.Format, model string, payload []byte, stream, isCompat bool) ([]byte, error) {

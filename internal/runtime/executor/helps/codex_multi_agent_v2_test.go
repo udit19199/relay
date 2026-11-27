@@ -157,14 +157,13 @@ func TestTranslateRequestCompatibilityForExecutorToolIntegerTypes(t *testing.T) 
 							headers = http.Header{"User-Agent": []string{ua}, "X-Openai-Subagent": []string{"collab_spawn"}}
 						}
 						payload := []byte(route.payload)
-						out, changed, _ := TranslateRequestWithAPIKeyModelCompatibilityAndUpdateIntentForExecutor(t.Context(), headers, &config.Config{}, target.name, route.from, route.to, "model", payload, false, compat)
+						out, _ := TranslateRequestReturningErrorForExecutor(t.Context(), headers, &config.Config{}, target.name, route.from, route.to, "model", payload, false, compat)
 						outputs := map[string][]byte{
-							"update_intent": out,
+							"erroring_body": out,
 							"body":          TranslateRequestWithAPIKeyModelCompatibilityForExecutor(t.Context(), headers, &config.Config{}, target.name, route.from, route.to, "model", payload, false, compat),
 						}
 						if target.name == "" {
 							outputs["legacy_body"] = TranslateRequestWithAPIKeyModelCompatibility(t.Context(), headers, &config.Config{}, route.from, route.to, "model", payload, false, compat)
-							outputs["legacy_update_intent"], _, _ = TranslateRequestWithAPIKeyModelCompatibilityAndUpdateIntent(t.Context(), headers, &config.Config{}, route.from, route.to, "model", payload, false, compat)
 						}
 						wantType := "number"
 						if ua == "codex_cli_rs/0.1" && !target.preserve {
@@ -177,9 +176,6 @@ func TestTranslateRequestCompatibilityForExecutorToolIntegerTypes(t *testing.T) 
 							if got := ojson.GetBytes(body, route.properties+".unrelated.type").String(); got != "number" {
 								t.Errorf("%s: unrelated.type = %q, want number", entry, got)
 							}
-						}
-						if changed {
-							t.Error("schema normalization reported a configuration update")
 						}
 						if string(payload) != route.payload {
 							t.Error("source payload was mutated")

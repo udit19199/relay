@@ -38,34 +38,29 @@ const (
 var dataTag = []byte("data:")
 
 func translateCodexRequestPair(from, to sdktranslator.Format, model string, originalPayload, payload []byte, stream bool, preserveEmptyThinkingBlocks ...bool) ([]byte, []byte) {
-	original, body, _, _ := translateCodexRequestPairWithUpdateIntent(from, to, model, originalPayload, payload, stream, preserveEmptyThinkingBlocks...)
+	original, body, _ := translateCodexRequestPairContext(context.Background(), from, to, model, originalPayload, payload, stream, preserveEmptyThinkingBlocks...)
 	return original, body
 }
 
-func translateCodexRequestPairWithUpdateIntent(from, to sdktranslator.Format, model string, originalPayload, payload []byte, stream bool, preserveEmptyThinkingBlocks ...bool) ([]byte, []byte, bool, error) {
-	return translateCodexRequestPairWithUpdateIntentContext(context.Background(), from, to, model, originalPayload, payload, stream, preserveEmptyThinkingBlocks...)
-}
-
-func translateCodexRequestPairWithUpdateIntentContext(ctx context.Context, from, to sdktranslator.Format, model string, originalPayload, payload []byte, stream bool, preserveEmptyThinkingBlocks ...bool) ([]byte, []byte, bool, error) {
+func translateCodexRequestPairContext(ctx context.Context, from, to sdktranslator.Format, model string, originalPayload, payload []byte, stream bool, preserveEmptyThinkingBlocks ...bool) ([]byte, []byte, error) {
 	isCompat := len(preserveEmptyThinkingBlocks) > 0 && preserveEmptyThinkingBlocks[0]
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	translate := func(raw []byte) ([]byte, bool, error) {
+	translate := func(raw []byte) ([]byte, error) {
 		if isCompat && from == sdktranslator.FormatClaude && to == sdktranslator.FormatCodex {
-			body, err := helps.TranslateRequestReturningError(ctx, nil, nil, from, to, model, raw, stream, true)
-			return body, false, err
+			return helps.TranslateRequestReturningError(ctx, nil, nil, from, to, model, raw, stream, true)
 		}
 		translated := sdktranslator.TranslateRequestEnvelope(ctx, from, to, sdktranslator.RequestEnvelope{Format: from, Model: model, Stream: stream, Body: raw})
-		return translated.Body, translated.ConfigurationUpdatesChanged, translated.Err
+		return translated.Body, translated.Err
 	}
 	if bytes.Equal(originalPayload, payload) {
-		body, changed, err := translate(payload)
-		return body, body, changed, err
+		body, err := translate(payload)
+		return body, body, err
 	}
-	originalTranslated, _, _ := translate(originalPayload)
-	body, changed, err := translate(payload)
-	return originalTranslated, body, changed, err
+	originalTranslated, _ := translate(originalPayload)
+	body, err := translate(payload)
+	return originalTranslated, body, err
 }
 
 // codexMinOutputTokens is the smallest integer max_output_tokens value the ChatGPT

@@ -98,34 +98,34 @@ func ApplyThinkingWithSummaryDoc(doc *ojson.Doc, model, fromFormat, toFormat, pr
 
 // ApplyThinkingWithSourceAndSummary applies thinking using the original source
 // request when translation has already changed the target protocol.
-func ApplyThinkingWithSourceAndSummary(body, sourceBody []byte, model, fromFormat, toFormat, providerKey string, summaryConfig SummaryConfig, normalizedUpdatesChanged ...bool) ([]byte, error) {
-	return applyThinking(body, sourceBody, model, fromFormat, toFormat, providerKey, nil, false, summaryConfig, normalizedUpdatesChanged...)
+func ApplyThinkingWithSourceAndSummary(body, sourceBody []byte, model, fromFormat, toFormat, providerKey string, summaryConfig SummaryConfig) ([]byte, error) {
+	return applyThinking(body, sourceBody, model, fromFormat, toFormat, providerKey, nil, false, summaryConfig)
 }
 
 // ApplyThinkingWithSourceAndSummaryDoc applies thinking onto doc in place using
 // the original source request.
-func ApplyThinkingWithSourceAndSummaryDoc(doc *ojson.Doc, sourceBody []byte, model, fromFormat, toFormat, providerKey string, summaryConfig SummaryConfig, normalizedUpdatesChanged ...bool) error {
+func ApplyThinkingWithSourceAndSummaryDoc(doc *ojson.Doc, sourceBody []byte, model, fromFormat, toFormat, providerKey string, summaryConfig SummaryConfig) error {
 	if doc == nil {
 		return nil
 	}
-	_, err := applyThinkingDocCore(doc, doc.Len() > 0, sourceBody, model, fromFormat, toFormat, providerKey, nil, false, summaryConfig, normalizedUpdatesChanged...)
+	_, err := applyThinkingDocCore(doc, doc.Len() > 0, sourceBody, model, fromFormat, toFormat, providerKey, nil, false, summaryConfig)
 	return err
 }
 
 // ApplyThinkingWithFallbackModelInfoAndSummary applies thinking using the global
 // registry first and falls back to fallbackModelInfo when the registry has no
 // entry for the model.
-func ApplyThinkingWithFallbackModelInfoAndSummary(body, sourceBody []byte, model, fromFormat, toFormat, providerKey string, fallbackModelInfo *registry.ModelInfo, summaryConfig SummaryConfig, normalizedUpdatesChanged ...bool) ([]byte, error) {
-	return applyThinking(body, sourceBody, model, fromFormat, toFormat, providerKey, fallbackModelInfo, false, summaryConfig, normalizedUpdatesChanged...)
+func ApplyThinkingWithFallbackModelInfoAndSummary(body, sourceBody []byte, model, fromFormat, toFormat, providerKey string, fallbackModelInfo *registry.ModelInfo, summaryConfig SummaryConfig) ([]byte, error) {
+	return applyThinking(body, sourceBody, model, fromFormat, toFormat, providerKey, fallbackModelInfo, false, summaryConfig)
 }
 
 // ApplyThinkingWithFallbackModelInfoAndSummaryDoc applies thinking onto doc in place
 // using the global registry first and falling back to fallbackModelInfo.
-func ApplyThinkingWithFallbackModelInfoAndSummaryDoc(doc *ojson.Doc, sourceBody []byte, model, fromFormat, toFormat, providerKey string, fallbackModelInfo *registry.ModelInfo, summaryConfig SummaryConfig, normalizedUpdatesChanged ...bool) error {
+func ApplyThinkingWithFallbackModelInfoAndSummaryDoc(doc *ojson.Doc, sourceBody []byte, model, fromFormat, toFormat, providerKey string, fallbackModelInfo *registry.ModelInfo, summaryConfig SummaryConfig) error {
 	if doc == nil {
 		return nil
 	}
-	_, err := applyThinkingDocCore(doc, doc.Len() > 0, sourceBody, model, fromFormat, toFormat, providerKey, fallbackModelInfo, false, summaryConfig, normalizedUpdatesChanged...)
+	_, err := applyThinkingDocCore(doc, doc.Len() > 0, sourceBody, model, fromFormat, toFormat, providerKey, fallbackModelInfo, false, summaryConfig)
 	return err
 }
 
@@ -156,31 +156,31 @@ func ApplyThinkingWithModelInfoDoc(doc *ojson.Doc, sourceBody []byte, model stri
 // ApplyThinkingWithModelInfoAndSummary applies the exact configured model
 // definition with a summary intent already resolved across source translation
 // normalization.
-func ApplyThinkingWithModelInfoAndSummary(body, sourceBody []byte, model string, fromFormat string, toFormat string, providerKey string, modelInfo *registry.ModelInfo, summaryConfig SummaryConfig, normalizedUpdatesChanged ...bool) ([]byte, error) {
-	return applyThinking(body, sourceBody, model, fromFormat, toFormat, providerKey, modelInfo, true, summaryConfig, normalizedUpdatesChanged...)
+func ApplyThinkingWithModelInfoAndSummary(body, sourceBody []byte, model string, fromFormat string, toFormat string, providerKey string, modelInfo *registry.ModelInfo, summaryConfig SummaryConfig) ([]byte, error) {
+	return applyThinking(body, sourceBody, model, fromFormat, toFormat, providerKey, modelInfo, true, summaryConfig)
 }
 
 // ApplyThinkingWithModelInfoAndSummaryDoc applies the exact configured model
 // definition onto doc in place with a pre-resolved summary intent.
-func ApplyThinkingWithModelInfoAndSummaryDoc(doc *ojson.Doc, sourceBody []byte, model string, fromFormat string, toFormat string, providerKey string, modelInfo *registry.ModelInfo, summaryConfig SummaryConfig, normalizedUpdatesChanged ...bool) error {
+func ApplyThinkingWithModelInfoAndSummaryDoc(doc *ojson.Doc, sourceBody []byte, model string, fromFormat string, toFormat string, providerKey string, modelInfo *registry.ModelInfo, summaryConfig SummaryConfig) error {
 	if doc == nil {
 		return nil
 	}
-	_, err := applyThinkingDocCore(doc, doc.Len() > 0, sourceBody, model, fromFormat, toFormat, providerKey, modelInfo, true, summaryConfig, normalizedUpdatesChanged...)
+	_, err := applyThinkingDocCore(doc, doc.Len() > 0, sourceBody, model, fromFormat, toFormat, providerKey, modelInfo, true, summaryConfig)
 	return err
 }
 
-func applyThinking(body, sourceBody []byte, model string, fromFormat string, toFormat string, providerKey string, resolvedModelInfo *registry.ModelInfo, modelInfoResolved bool, summaryConfig SummaryConfig, normalizedUpdatesChanged ...bool) ([]byte, error) {
+func applyThinking(body, sourceBody []byte, model string, fromFormat string, toFormat string, providerKey string, resolvedModelInfo *registry.ModelInfo, modelInfoResolved bool, summaryConfig SummaryConfig) ([]byte, error) {
 	docValid := len(body) > 0 && ojson.ValidBytes(body)
 	doc := ojson.NewDoc(body)
-	modified, err := applyThinkingDocCore(doc, docValid, sourceBody, model, fromFormat, toFormat, providerKey, resolvedModelInfo, modelInfoResolved, summaryConfig, normalizedUpdatesChanged...)
+	modified, err := applyThinkingDocCore(doc, docValid, sourceBody, model, fromFormat, toFormat, providerKey, resolvedModelInfo, modelInfoResolved, summaryConfig)
 	if !modified {
 		return body, err
 	}
 	return doc.Bytes(), err
 }
 
-func applyThinkingDocCore(doc *ojson.Doc, docValid bool, sourceBody []byte, model string, fromFormat string, toFormat string, providerKey string, resolvedModelInfo *registry.ModelInfo, modelInfoResolved bool, summaryConfig SummaryConfig, normalizedUpdatesChanged ...bool) (bool, error) {
+func applyThinkingDocCore(doc *ojson.Doc, docValid bool, sourceBody []byte, model string, fromFormat string, toFormat string, providerKey string, resolvedModelInfo *registry.ModelInfo, modelInfoResolved bool, summaryConfig SummaryConfig) (bool, error) {
 	if doc == nil {
 		return false, nil
 	}
@@ -208,15 +208,12 @@ func applyThinkingDocCore(doc *ojson.Doc, docValid bool, sourceBody []byte, mode
 	}
 
 	// Resolve source intent before stripping unsupported target input items.
-	updatesChanged := len(normalizedUpdatesChanged) > 0 && normalizedUpdatesChanged[0]
 	var sourceConfig ThinkingConfig
 	if isResponsesFormat(fromFormat) {
-		if !updatesChanged || providerFormat == "codex" || providerFormat == "xai" {
-			if !updatesChanged && len(sourceBody) > 0 {
-				sourceConfig = extractCodexUsageConfig(sourceBody)
-			} else {
-				sourceConfig = extractCodexUsageConfigDoc(doc, docValid)
-			}
+		if len(sourceBody) > 0 {
+			sourceConfig = extractCodexUsageConfig(sourceBody)
+		} else {
+			sourceConfig = extractCodexUsageConfigDoc(doc, docValid)
 		}
 	}
 	responseTarget := providerFormat == "codex" || providerFormat == "xai"
@@ -316,7 +313,7 @@ func applyThinkingDocCore(doc *ojson.Doc, docValid bool, sourceBody []byte, mode
 		}).Debug("thinking: config from model suffix |")
 	} else {
 		config = sourceConfig
-		if !hasThinkingConfig(config) && !updatesChanged && modelInfoResolved && len(sourceBody) > 0 {
+		if !hasThinkingConfig(config) && modelInfoResolved && len(sourceBody) > 0 {
 			config = extractSourceThinkingConfig(sourceBody, fromFormat)
 		}
 		if !hasThinkingConfig(config) {

@@ -47,10 +47,6 @@ func TestPairTranslationReportsOnlyTheWorkingError(t *testing.T) {
 			routes[name] = func(original, working []byte) ([]byte, []byte, error) {
 				return TranslateRequestPairReturningError(ctx, nil, &config.Config{}, sdktranslator.FormatClaude, to, "m", original, working, false, compat)
 			}
-			routes[name+" with update intent"] = func(original, working []byte) ([]byte, []byte, error) {
-				originalBody, workingBody, _, err := TranslateRequestPairWithAPIKeyModelCompatibilityAndUpdateIntent(ctx, nil, &config.Config{}, sdktranslator.FormatClaude, to, "m", original, working, false, compat)
-				return originalBody, workingBody, err
-			}
 		}
 	}
 
@@ -86,8 +82,6 @@ func TestResponsesFileIDOnlyReturns400OnEveryPath(t *testing.T) {
 		requireUnsupportedPart(t, "single", single, "input_file")
 		_, _, pair := TranslateRequestPairReturningError(context.Background(), nil, &config.Config{}, sdktranslator.FormatOpenAIResponse, sdktranslator.FormatClaude, "claude-sonnet-4", payload, payload, false, compat)
 		requireUnsupportedPart(t, "pair", pair, "input_file")
-		_, _, _, intent := TranslateRequestPairWithAPIKeyModelCompatibilityAndUpdateIntent(context.Background(), nil, &config.Config{}, sdktranslator.FormatOpenAIResponse, sdktranslator.FormatClaude, "claude-sonnet-4", payload, payload, false, compat)
-		requireUnsupportedPart(t, "pair with update intent", intent, "input_file")
 	}
 }
 
