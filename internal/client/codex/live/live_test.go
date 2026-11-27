@@ -144,16 +144,16 @@ func (p *homeUnauthorizedUsageCapture) wait(t *testing.T) coreusage.Record {
 	}
 }
 
-type noopHomeUnauthorizedUsagePlugin struct{}
+type noopHomeUnauthorizedUsageConsumer struct{}
 
-func (noopHomeUnauthorizedUsagePlugin) HandleUsage(context.Context, coreusage.Record) {}
+func (noopHomeUnauthorizedUsageConsumer) HandleUsage(context.Context, coreusage.Record) {}
 
 func registerHomeUnauthorizedUsageCapture(t *testing.T, name, authID string) *homeUnauthorizedUsageCapture {
 	t.Helper()
 	capture := &homeUnauthorizedUsageCapture{authID: authID, records: make(chan coreusage.Record, 1)}
-	coreusage.RegisterNamedPlugin(name, capture)
+	coreusage.RegisterNamedConsumer(name, capture)
 	t.Cleanup(func() {
-		coreusage.RegisterNamedPlugin(name, noopHomeUnauthorizedUsagePlugin{})
+		coreusage.RegisterNamedConsumer(name, noopHomeUnauthorizedUsageConsumer{})
 	})
 	return capture
 }

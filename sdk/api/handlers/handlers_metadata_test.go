@@ -345,8 +345,8 @@ func TestGetContextWithCancelIsolatesUsagePublishFromReusedGinContext(t *testing
 	gin.SetMode(gin.TestMode)
 	const model = "issue-7056-unauthenticated-model"
 	capture := &issue7056UsageCapture{records: make(chan coreusage.Record, 1), model: model}
-	coreusage.RegisterNamedPlugin(t.Name(), capture)
-	t.Cleanup(func() { coreusage.RegisterNamedPlugin(t.Name(), &issue7056UsageCapture{}) })
+	coreusage.RegisterNamedConsumer(t.Name(), capture)
+	t.Cleanup(func() { coreusage.RegisterNamedConsumer(t.Name(), &issue7056UsageCapture{}) })
 
 	router := gin.New()
 	var (

@@ -1,13 +1,11 @@
 package watcher
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/watcher/synthesizer"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 )
 
@@ -49,17 +47,13 @@ func TestSnapshotAuthFile(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
 		data    string
-		parser  synthesizer.PluginAuthParser
 		wantID  string
 		wantErr bool
 		missing bool
 	}{
 		{name: "builtin_relative_id", data: `{"type":"codex"}`, wantID: "account.json"},
-		{name: "plugin_id", data: `{"type":"plugin","ids":["b"]}`, parser: &fileDeleteTestParser{}, wantID: "b"},
 		{name: "empty", data: ""},
 		{name: "malformed_json", data: `{"type":`, wantErr: true},
-		{name: "empty_plugin_result", data: `{"type":"plugin","ids":[]}`, parser: &fileDeleteTestParser{}},
-		{name: "plugin_error_no_builtin_fallback", data: `{"type":"codex"}`, parser: &fileDeleteTestParser{err: fmt.Errorf("simulated parser failure")}, wantErr: true},
 		{name: "missing_file", missing: true, wantErr: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -72,10 +66,10 @@ func TestSnapshotAuthFile(t *testing.T) {
 			}
 			// Another file must never contribute IDs to the single-file snapshot.
 			otherPath := filepath.Join(dir, "other.json")
-			if errWriteFile := os.WriteFile(otherPath, []byte(`{"type":"plugin","ids":["a"]}`), 0o600); errWriteFile != nil {
+			if errWriteFile := os.WriteFile(otherPath, []byte(`{"type":"codex"}`), 0o600); errWriteFile != nil {
 				t.Fatal(errWriteFile)
 			}
-			w := &Watcher{authDir: dir, config: &config.Config{AuthDir: dir}, pluginAuthParser: tc.parser}
+			w := &Watcher{authDir: dir, config: &config.Config{AuthDir: dir}}
 			auths, errSnapshotAuthFile := w.SnapshotAuthFile(path)
 			if (errSnapshotAuthFile != nil) != tc.wantErr {
 				t.Fatalf("snapshot error=%v, want error=%t", errSnapshotAuthFile, tc.wantErr)

@@ -9,13 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/pluginhost"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/watcher/synthesizer"
-	sdkAuth "github.com/router-for-me/CLIProxyAPI/v8/sdk/auth"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/config"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
 )
 
 // Without a watcher, a registration dropped for obsolete global exclusions
@@ -28,12 +25,8 @@ func TestModelRegistrationDroppedForGlobalExclusionsIsReplacedWithoutWatcher(t *
 	modelA, modelB := models[0].ID, models[1].ID
 	oldCfg := &config.Config{OAuthExcludedModels: map[string][]string{"claude": {modelA}}}
 	newCfg := &config.Config{OAuthExcludedModels: map[string][]string{"claude": {modelB}}}
-	service := &Service{cfg: oldCfg, coreManager: coreauth.NewManager(nil, nil, nil), pluginHost: pluginhost.New()}
+	service := &Service{cfg: oldCfg, coreManager: coreauth.NewManager(nil, nil, nil)}
 	service.applyPprofConfigContextFn = func(context.Context, *config.Config) bool { return true }
-	t.Cleanup(func() {
-		sdkAuth.RegisterPluginAuthParser(nil)
-		sdktranslator.SetPluginHooks(nil)
-	})
 
 	var reads atomic.Int32
 	oldStarted, oldRelease, oldDone := make(chan struct{}), make(chan struct{}), make(chan struct{})
@@ -106,7 +99,7 @@ func TestModelRegistrationFenceRetainsGlobalExclusionsAfterAuthUpdate(t *testing
 				t.Fatal("config update was rejected")
 			}
 			auth = auth.Clone()
-			auth.Attributes["note"] = "updated by plugin"
+			auth.Attributes["note"] = "updated by consumer"
 			if withManager {
 				var errUpdate error
 				auth, errUpdate = service.coreManager.Update(t.Context(), auth)
@@ -114,7 +107,7 @@ func TestModelRegistrationFenceRetainsGlobalExclusionsAfterAuthUpdate(t *testing
 					t.Fatal(errUpdate)
 				}
 			}
-			// Updating auth inputs must not let an old plugin result adopt the new config.
+			// Updating auth inputs must not let an old consumer result adopt the new config.
 			fence = fence.withAuth(auth)
 			if fence.publishModels(service, auth.ID, "claude", []*ModelInfo{{ID: "model-b"}}) {
 				t.Error("obsolete config published models after auth update")

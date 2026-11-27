@@ -154,7 +154,7 @@ func TestApplyOAuthModelAlias_Meta(t *testing.T) {
 	}
 }
 
-func TestApplyOAuthModelAlias_PluginProvider(t *testing.T) {
+func TestApplyOAuthModelAlias_CustomProvider(t *testing.T) {
 	cfg := &config.Config{
 		OAuthModelAlias: map[string][]config.OAuthModelAlias{
 			"sample-provider": {
@@ -171,14 +171,14 @@ func TestApplyOAuthModelAlias_PluginProvider(t *testing.T) {
 		t.Fatalf("expected 1 model, got %d", len(out))
 	}
 	if out[0].ID != "sample-latest" {
-		t.Fatalf("expected plugin alias id %q, got %q", "sample-latest", out[0].ID)
+		t.Fatalf("expected custom provider alias id %q, got %q", "sample-latest", out[0].ID)
 	}
 	if out[0].Name != "models/sample-latest" {
-		t.Fatalf("expected plugin alias name %q, got %q", "models/sample-latest", out[0].Name)
+		t.Fatalf("expected custom provider alias name %q, got %q", "models/sample-latest", out[0].Name)
 	}
 }
 
-func TestApplyOAuthModelAlias_PluginProviderSkipsAPIKey(t *testing.T) {
+func TestApplyOAuthModelAlias_CustomProviderSkipsAPIKey(t *testing.T) {
 	cfg := &config.Config{
 		OAuthModelAlias: map[string][]config.OAuthModelAlias{
 			"sample-provider": {
@@ -192,7 +192,7 @@ func TestApplyOAuthModelAlias_PluginProviderSkipsAPIKey(t *testing.T) {
 
 	out := applyOAuthModelAlias(cfg, "sample-provider", "api_key", models)
 	if len(out) != 1 || out[0].ID != "sample-model-latest" {
-		t.Fatalf("expected API key plugin model to remain unchanged, got %#v", out)
+		t.Fatalf("expected API key custom provider model to remain unchanged, got %#v", out)
 	}
 }
 

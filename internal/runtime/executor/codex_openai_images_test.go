@@ -629,9 +629,9 @@ func TestCodexDirectOpenAIImageStreamAccountsLargeCompletedEvents(t *testing.T) 
 
 			alias := t.Name()
 			capture := &multiProviderUsageCapture{alias: alias, records: make(chan coreusage.Record, 4)}
-			coreusage.RegisterNamedPlugin(t.Name(), capture)
+			coreusage.RegisterNamedConsumer(t.Name(), capture)
 			t.Cleanup(func() {
-				coreusage.RegisterNamedPlugin(t.Name(), multiProviderNoopUsagePlugin{})
+				coreusage.RegisterNamedConsumer(t.Name(), multiProviderNoopUsageConsumer{})
 			})
 			ctx := coreusage.WithRequestedModelAlias(context.Background(), alias)
 			res, err := NewCodexExecutor(&config.Config{}).ExecuteStream(ctx, newCodexOpenAIImageTestAuth(server.URL), cliproxyexecutor.Request{

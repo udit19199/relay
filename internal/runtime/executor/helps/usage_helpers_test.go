@@ -1361,27 +1361,27 @@ func TestUsageReporter_DistinguishesNativeKey(t *testing.T) {
 		}
 	})
 
-	t.Run("plugin_key_via_gin", func(t *testing.T) {
+	t.Run("consumer_key_via_gin", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		ginCtx, _ := gin.CreateTestContext(w)
-		ginCtx.Set("userApiKey", "plugin-principal")
-		ginCtx.Set("accessProvider", "custom-auth-plugin")
+		ginCtx.Set("userApiKey", "consumer-principal")
+		ginCtx.Set("accessProvider", "custom-auth-consumer")
 
 		ctx := context.WithValue(context.Background(), "gin", ginCtx)
 		reporter := NewUsageReporter(ctx, "openai", "gpt-5.4", nil)
 		if reporter.IsNativeKey() {
 			t.Fatalf("reporter.IsNativeKey() = true, want false")
 		}
-		if reporter.AccessProvider() != "custom-auth-plugin" {
-			t.Fatalf("reporter.AccessProvider() = %q, want %q", reporter.AccessProvider(), "custom-auth-plugin")
+		if reporter.AccessProvider() != "custom-auth-consumer" {
+			t.Fatalf("reporter.AccessProvider() = %q, want %q", reporter.AccessProvider(), "custom-auth-consumer")
 		}
 
 		record := reporter.buildRecord(usage.Detail{TotalTokens: 10}, false, usage.Failure{})
 		if record.IsNativeKey {
 			t.Fatalf("record.IsNativeKey = true, want false")
 		}
-		if record.AccessProvider != "custom-auth-plugin" {
-			t.Fatalf("record.AccessProvider = %q, want %q", record.AccessProvider, "custom-auth-plugin")
+		if record.AccessProvider != "custom-auth-consumer" {
+			t.Fatalf("record.AccessProvider = %q, want %q", record.AccessProvider, "custom-auth-consumer")
 		}
 	})
 
@@ -1853,16 +1853,6 @@ func TestObserveResponsesStreamPreservesOutputItemDoneToolUsageWhenCompletedOutp
 		t.Fatalf("ObserveResponsesStream lost output_item.done tool usage: %+v", d.ToolUsageDetails)
 	}
 
-	var pluginBuf StreamUsageBuffer
-	ObservePluginExecutorStreamUsage("openai-response", []byte(strings.Join([]string{
-		`data: {"type":"response.output_item.done","output_index":0,"item":{"id":"fc_1","type":"function_call","status":"completed","call_id":"call_1","name":"lookup","arguments":"{}"}}`,
-		"",
-		`data: {"type":"response.completed","response":{"output":[],"usage":{"input_tokens":10,"output_tokens":5,"total_tokens":15}}}`,
-	}, "\n")), &pluginBuf)
-	pd, pok := pluginBuf.Detail()
-	if !pok || pd.ToolUsageDetails == nil || pd.ToolUsageDetails.ToolCallsRequested == nil || *pd.ToolUsageDetails.ToolCallsRequested != 1 {
-		t.Fatalf("ObservePluginExecutorStreamUsage lost output_item.done tool usage: %+v", pd.ToolUsageDetails)
-	}
 }
 
 func TestImageDetailsCloneStringsFromReusableBuffer(t *testing.T) {

@@ -462,14 +462,14 @@ func TestSaveTokenRecord_SubjectOnlyReloginKeepsEmailCredential(t *testing.T) {
 	}
 }
 
-func TestPatchAuthFileFields_DeletesPluginFields(t *testing.T) {
+func TestPatchAuthFileFields_DeletesCredentialFields(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	authDir := t.TempDir()
-	fileName := "plugin-auth.json"
+	fileName := "custom-auth.json"
 	filePath := filepath.Join(authDir, fileName)
 
 	initialContent := map[string]any{
-		"type":    "demo-plugin",
+		"type":    "custom-provider",
 		"token":   "tok-123",
 		"weight":  float64(10),
 		"headers": map[string]any{"X-Header": "val"},
@@ -488,9 +488,9 @@ func TestPatchAuthFileFields_DeletesPluginFields(t *testing.T) {
 	record := &coreauth.Auth{
 		ID:       fileName,
 		FileName: fileName,
-		Provider: "demo-plugin",
+		Provider: "custom-provider",
 		Metadata: map[string]any{
-			"type":    "demo-plugin",
+			"type":    "custom-provider",
 			"token":   "tok-123",
 			"weight":  float64(10),
 			"headers": map[string]any{"X-Header": "val"},
@@ -506,7 +506,7 @@ func TestPatchAuthFileFields_DeletesPluginFields(t *testing.T) {
 	// Patch weight: null to delete weight
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
-	body := `{"name":"plugin-auth.json","weight":null}`
+	body := `{"name":"custom-auth.json","weight":null}`
 	c.Request = httptest.NewRequest(http.MethodPatch, "/v0/management/auth-files/fields", strings.NewReader(body))
 	c.Request.Header.Set("Content-Type", "application/json")
 	h.PatchAuthFileFields(c)

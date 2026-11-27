@@ -44,8 +44,8 @@ func (*prematureResponsesStreamExecutor) ExecuteStream(_ context.Context, _ *cor
 	if req.Model == directInitialErrorResponsesModel {
 		return nil, &coreexecutor.RequestTerminatedError{
 			HTTPStatus: http.StatusTooManyRequests,
-			Header:     http.Header{"Retry-After": []string{"17"}, "X-Plugin-Response": []string{"true"}},
-			Body:       []byte(`{"error":{"message":"plugin direct response"}}`),
+			Header:     http.Header{"Retry-After": []string{"17"}, "X-Consumer-Response": []string{"true"}},
+			Body:       []byte(`{"error":{"message":"consumer direct response"}}`),
 		}
 	}
 	chunks := make(chan coreexecutor.StreamChunk, 2)
@@ -235,10 +235,10 @@ func TestResponsesHandlerPreservesDirectResponseBeforeFirstFrame(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, request)
 
-	if recorder.Code != http.StatusTooManyRequests || recorder.Header().Get("Retry-After") != "17" || recorder.Header().Get("X-Plugin-Response") != "true" {
+	if recorder.Code != http.StatusTooManyRequests || recorder.Header().Get("Retry-After") != "17" || recorder.Header().Get("X-Consumer-Response") != "true" {
 		t.Fatalf("direct response status=%d headers=%v body=%q", recorder.Code, recorder.Header(), recorder.Body.String())
 	}
-	if recorder.Body.String() != `{"error":{"message":"plugin direct response"}}` {
+	if recorder.Body.String() != `{"error":{"message":"consumer direct response"}}` {
 		t.Fatalf("direct response body = %q", recorder.Body.String())
 	}
 }

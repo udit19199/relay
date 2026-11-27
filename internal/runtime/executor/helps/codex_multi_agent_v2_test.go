@@ -14,36 +14,6 @@ import (
 	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
 )
 
-type pairRequestPluginHooks struct {
-	calls       int64
-	onNormalize func(body []byte)
-}
-
-func (h *pairRequestPluginHooks) NormalizeRequest(_ context.Context, _, _ sdktranslator.Format, _ string, body []byte, _ bool) []byte {
-	h.calls++
-	if h.onNormalize != nil {
-		h.onNormalize(body)
-	}
-	updated, _ := ojson.SetBytes(body, "plugin_call", h.calls)
-	return updated
-}
-
-func (*pairRequestPluginHooks) TranslateRequest(context.Context, sdktranslator.Format, sdktranslator.Format, string, []byte, bool) ([]byte, bool) {
-	return nil, false
-}
-
-func (*pairRequestPluginHooks) NormalizeResponseBefore(context.Context, sdktranslator.Format, sdktranslator.Format, string, []byte, []byte, []byte, bool) []byte {
-	return nil
-}
-
-func (*pairRequestPluginHooks) TranslateResponse(context.Context, sdktranslator.Format, sdktranslator.Format, string, []byte, []byte, []byte, bool) ([]byte, bool) {
-	return nil, false
-}
-
-func (*pairRequestPluginHooks) NormalizeResponseAfter(context.Context, sdktranslator.Format, sdktranslator.Format, string, []byte, []byte, []byte, bool) []byte {
-	return nil
-}
-
 func geminiToolHistoryPayload(turns int) []byte {
 	contents := []string{`{"role":"user","parts":[{"text":"start"}]}`}
 	for i := 0; i < turns; i++ {
@@ -130,48 +100,6 @@ func TestTranslateRequestPairTranslatesDistinctPayloads(t *testing.T) {
 	}
 }
 
-func TestTranslateRequestPairInvokesPluginOncePerInput(t *testing.T) {
-	hooks := &pairRequestPluginHooks{}
-	sdktranslator.SetPluginHooks(hooks)
-	t.Cleanup(func() { sdktranslator.SetPluginHooks(nil) })
-
-	payload := geminiToolHistoryPayload(1)
-	for _, stream := range []bool{false, true} {
-		for _, distinct := range []bool{false, true} {
-			hooks.calls = 0
-			request := payload
-			wantCalls := int64(1)
-			if distinct {
-				request = geminiToolHistoryPayload(2)
-				wantCalls = 2
-			}
-			base, work := TranslateRequestPairWithCodexMultiAgentV2(
-				context.Background(), http.Header{}, &config.Config{},
-				sdktranslator.FormatClaude, sdktranslator.FormatClaude,
-				"gemini-3.6-flash-high", payload, request, stream,
-			)
-			if hooks.calls != wantCalls {
-				t.Fatalf("stream=%v distinct=%v: plugin calls = %d, want %d", stream, distinct, hooks.calls, wantCalls)
-			}
-			if got := ojson.GetBytes(base, "plugin_call").Int(); got != 1 {
-				t.Fatalf("baseline plugin_call = %d, want 1", got)
-			}
-			if got := ojson.GetBytes(work, "plugin_call").Int(); got != wantCalls {
-				t.Fatalf("working plugin_call = %d, want %d", got, wantCalls)
-			}
-			if !distinct && !bytes.Equal(base, work) {
-				t.Fatal("same input produced different plugin results")
-			}
-			baselineBefore := bytes.Clone(base)
-			inputBefore := bytes.Clone(request)
-			work[0] = 'X'
-			if !bytes.Equal(base, baselineBefore) || !bytes.Equal(request, inputBefore) {
-				t.Fatal("working buffer aliases the baseline or input")
-			}
-		}
-	}
-}
-
 func TestSameByteSlice(t *testing.T) {
 	buf := []byte("payload")
 	cases := []struct {
@@ -194,83 +122,6 @@ func TestSameByteSlice(t *testing.T) {
 				t.Fatalf("sameByteSlice() = %v, want %v", got, tc.want)
 			}
 		})
-	}
-}
-
-func TestTranslateRequestWithAPIKeyModelCompatibility_InvokesPluginNormalizers(t *testing.T) {
-	var summaryDisplayInHook string
-	hooks := &pairRequestPluginHooks{
-		onNormalize: func(body []byte) {
-			summaryDisplayInHook = ojson.GetBytes(body, "thinking.display").String()
-		},
-	}
-	sdktranslator.SetPluginHooks(hooks)
-	t.Cleanup(func() { sdktranslator.SetPluginHooks(nil) })
-
-	cfg := &config.Config{}
-	payload := []byte(`{"model":"claude-3-5-sonnet","messages":[{"role":"user","content":"hello"}],"reasoning_effort":"high","include_reasoning":true}`)
-
-	out := TranslateRequestWithAPIKeyModelCompatibility(
-		context.Background(),
-		http.Header{},
-		cfg,
-		sdktranslator.FormatOpenAI,
-		sdktranslator.FormatClaude,
-		"claude-3-5-sonnet",
-		payload,
-		false,
-		true, // isCompat
-	)
-
-	if hooks.calls != 1 {
-		t.Fatalf("plugin hook calls = %d, want 1", hooks.calls)
-	}
-	if got := ojson.GetBytes(out, "plugin_call").Int(); got != 1 {
-		t.Fatalf("plugin_call = %d, want 1; output was %s", got, out)
-	}
-	// Assert summary config was applied to the body before invoking the normalizer hook
-	if summaryDisplayInHook != "summarized" {
-		t.Fatalf("expected thinking.display = summarized in body delivered to normalizer, got: %q", summaryDisplayInHook)
-	}
-
-	// Also verify that non-compat path invokes normalizers exactly once
-	hooks.calls = 0
-	outNonCompat := TranslateRequestWithAPIKeyModelCompatibility(
-		context.Background(),
-		http.Header{},
-		cfg,
-		sdktranslator.FormatClaude,
-		sdktranslator.FormatOpenAI,
-		"claude-3-5-sonnet",
-		payload,
-		false,
-		false, // non-compat
-	)
-	if hooks.calls != 1 {
-		t.Fatalf("non-compat plugin hook calls = %d, want 1", hooks.calls)
-	}
-	if got := ojson.GetBytes(outNonCompat, "plugin_call").Int(); got != 1 {
-		t.Fatalf("non-compat plugin_call = %d, want 1; output was %s", got, outNonCompat)
-	}
-
-	// Also verify stream = true path
-	hooks.calls = 0
-	outStream := TranslateRequestWithAPIKeyModelCompatibility(
-		context.Background(),
-		http.Header{},
-		cfg,
-		sdktranslator.FormatClaude,
-		sdktranslator.FormatOpenAI,
-		"claude-3-5-sonnet",
-		payload,
-		true, // stream
-		true, // isCompat
-	)
-	if hooks.calls != 1 {
-		t.Fatalf("stream compat plugin hook calls = %d, want 1", hooks.calls)
-	}
-	if got := ojson.GetBytes(outStream, "plugin_call").Int(); got != 1 {
-		t.Fatalf("stream compat plugin_call = %d, want 1; output was %s", got, outStream)
 	}
 }
 
@@ -328,7 +179,7 @@ func TestTranslateRequestCompatibilityForExecutorToolIntegerTypes(t *testing.T) 
 							}
 						}
 						if changed {
-							t.Error("schema normalization reported a plugin configuration update")
+							t.Error("schema normalization reported a configuration update")
 						}
 						if string(payload) != route.payload {
 							t.Error("source payload was mutated")

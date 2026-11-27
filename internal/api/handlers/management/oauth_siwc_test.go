@@ -355,7 +355,7 @@ func TestSIWCBindCommitSurvivesSessionExpiry(t *testing.T) {
 	if _, ok := f.store.Get(state); !ok {
 		t.Fatal("in-progress commit expired before reporting its outcome")
 	}
-	if f.store.CompleteProvider("codex", oauthSessionSourceBuiltin) != 0 {
+	if f.store.CompleteProvider("codex") != 0 {
 		t.Fatal("ordinary provider completion consumed SIWC binding")
 	}
 	f.store.Complete(state)

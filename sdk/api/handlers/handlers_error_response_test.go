@@ -85,8 +85,8 @@ func TestWriteErrorResponseDirectResponse(t *testing.T) {
 		Body:           []byte(`{"error":"blocked"}`),
 		Headers: http.Header{
 			"Content-Type":                {"application/problem+json"},
-			"X-Plugin-Policy":             {"blocked"},
-			"X-Cpa-Trace-Id":              {"plugin-trace"},
+			"X-Consumer-Policy":           {"blocked"},
+			"X-Cpa-Trace-Id":              {"consumer-trace"},
 			"Access-Control-Allow-Origin": {"https://untrusted.example"},
 		},
 	})
@@ -100,8 +100,8 @@ func TestWriteErrorResponseDirectResponse(t *testing.T) {
 	if got := recorder.Header().Get("Content-Type"); got != "application/problem+json" {
 		t.Fatalf("Content-Type = %q", got)
 	}
-	if got := recorder.Header().Get("X-Plugin-Policy"); got != "blocked" {
-		t.Fatalf("X-Plugin-Policy = %q", got)
+	if got := recorder.Header().Get("X-Consumer-Policy"); got != "blocked" {
+		t.Fatalf("X-Consumer-Policy = %q", got)
 	}
 	if got := recorder.Header().Get("X-Cpa-Trace-Id"); got != "local-trace" {
 		t.Fatalf("X-Cpa-Trace-Id = %q, want local value", got)

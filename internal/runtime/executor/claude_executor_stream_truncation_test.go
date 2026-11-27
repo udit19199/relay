@@ -36,13 +36,13 @@ func TestClaudeExecutorStreamTruncationReportsError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	pluginName := "test-claude-passthrough-truncation"
-	plugin := &captureClaudeUsagePlugin{
+	consumerName := "test-claude-passthrough-truncation"
+	consumer := &captureClaudeUsageConsumer{
 		records: make(chan usage.Record, 4),
 	}
-	usage.RegisterNamedPlugin(pluginName, plugin)
+	usage.RegisterNamedConsumer(consumerName, consumer)
 	t.Cleanup(func() {
-		usage.RegisterNamedPlugin(pluginName, noopClaudeUsagePlugin{})
+		usage.RegisterNamedConsumer(consumerName, noopClaudeUsageConsumer{})
 	})
 
 	exec := NewClaudeExecutor(&config.Config{})
@@ -85,7 +85,7 @@ func TestClaudeExecutorStreamTruncationReportsError(t *testing.T) {
 	}
 
 	select {
-	case record := <-plugin.records:
+	case record := <-consumer.records:
 		if !record.Failed {
 			t.Fatalf("expected usage record to be marked failed on truncated stream")
 		}
@@ -112,13 +112,13 @@ func TestClaudeExecutorTranslatedStreamTruncationReportsError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	pluginName := "test-claude-translated-truncation"
-	plugin := &captureClaudeUsagePlugin{
+	consumerName := "test-claude-translated-truncation"
+	consumer := &captureClaudeUsageConsumer{
 		records: make(chan usage.Record, 4),
 	}
-	usage.RegisterNamedPlugin(pluginName, plugin)
+	usage.RegisterNamedConsumer(consumerName, consumer)
 	t.Cleanup(func() {
-		usage.RegisterNamedPlugin(pluginName, noopClaudeUsagePlugin{})
+		usage.RegisterNamedConsumer(consumerName, noopClaudeUsageConsumer{})
 	})
 
 	exec := NewClaudeExecutor(&config.Config{})
@@ -156,7 +156,7 @@ func TestClaudeExecutorTranslatedStreamTruncationReportsError(t *testing.T) {
 	}
 
 	select {
-	case record := <-plugin.records:
+	case record := <-consumer.records:
 		if !record.Failed {
 			t.Fatalf("expected usage record to be marked failed on truncated translated stream")
 		}
@@ -299,13 +299,13 @@ func TestClaudeExecutorStreamErrorEventDoesNotCommitContinuityAndMarksFailed(t *
 	}))
 	defer server.Close()
 
-	pluginName := "test-claude-error-event-usage"
-	plugin := &captureClaudeUsagePlugin{
+	consumerName := "test-claude-error-event-usage"
+	consumer := &captureClaudeUsageConsumer{
 		records: make(chan usage.Record, 4),
 	}
-	usage.RegisterNamedPlugin(pluginName, plugin)
+	usage.RegisterNamedConsumer(consumerName, consumer)
 	t.Cleanup(func() {
-		usage.RegisterNamedPlugin(pluginName, noopClaudeUsagePlugin{})
+		usage.RegisterNamedConsumer(consumerName, noopClaudeUsageConsumer{})
 	})
 
 	exec := NewClaudeExecutor(&config.Config{})
@@ -346,7 +346,7 @@ func TestClaudeExecutorStreamErrorEventDoesNotCommitContinuityAndMarksFailed(t *
 	}
 
 	select {
-	case record := <-plugin.records:
+	case record := <-consumer.records:
 		if !record.Failed {
 			t.Fatal("expected usage record to be marked failed when upstream stream ends with error event")
 		}
@@ -457,12 +457,12 @@ func TestClaudeExecutorMultiLineDataMessageStopAndErrorEvents(t *testing.T) {
 	}
 }
 
-type captureAnyProviderUsagePlugin struct {
+type captureAnyProviderUsageConsumer struct {
 	provider string
 	records  chan usage.Record
 }
 
-func (p *captureAnyProviderUsagePlugin) HandleUsage(_ context.Context, record usage.Record) {
+func (p *captureAnyProviderUsageConsumer) HandleUsage(_ context.Context, record usage.Record) {
 	if p == nil || (p.provider != "" && record.Provider != p.provider) {
 		return
 	}
@@ -478,11 +478,11 @@ func TestTranslatedClaudeStreamTruncationPreservesBufferedUsageOnFailure(t *test
 		exec, auth, _ := newApplyPatchCompatTestExecutor(t, reply)
 		request := []byte(`{"model":"test","max_tokens":64,"messages":[{"role":"user","content":"hello"}],"stream":true}`)
 
-		pluginName := "test-openai-compat-claude-truncation-usage"
-		plugin := &captureAnyProviderUsagePlugin{provider: exec.Identifier(), records: make(chan usage.Record, 4)}
-		usage.RegisterNamedPlugin(pluginName, plugin)
+		consumerName := "test-openai-compat-claude-truncation-usage"
+		consumer := &captureAnyProviderUsageConsumer{provider: exec.Identifier(), records: make(chan usage.Record, 4)}
+		usage.RegisterNamedConsumer(consumerName, consumer)
 		t.Cleanup(func() {
-			usage.RegisterNamedPlugin(pluginName, noopClaudeUsagePlugin{})
+			usage.RegisterNamedConsumer(consumerName, noopClaudeUsageConsumer{})
 		})
 
 		result, err := exec.ExecuteStream(t.Context(), auth, cliproxyexecutor.Request{Model: "test", Payload: request}, cliproxyexecutor.Options{
@@ -498,7 +498,7 @@ func TestTranslatedClaudeStreamTruncationPreservesBufferedUsageOnFailure(t *test
 		}
 
 		select {
-		case record := <-plugin.records:
+		case record := <-consumer.records:
 			if !record.Failed {
 				t.Fatalf("expected failed usage record")
 			}
@@ -540,11 +540,11 @@ func TestClaudeExecutorStreamCancel499RecordsLastPacketUsage(t *testing.T) {
 			}))
 			defer server.Close()
 
-			pluginName := "test-claude-cancel-499-" + mode.name
-			plugin := &captureClaudeUsagePlugin{records: make(chan usage.Record, 4)}
-			usage.RegisterNamedPlugin(pluginName, plugin)
+			consumerName := "test-claude-cancel-499-" + mode.name
+			consumer := &captureClaudeUsageConsumer{records: make(chan usage.Record, 4)}
+			usage.RegisterNamedConsumer(consumerName, consumer)
 			t.Cleanup(func() {
-				usage.RegisterNamedPlugin(pluginName, noopClaudeUsagePlugin{})
+				usage.RegisterNamedConsumer(consumerName, noopClaudeUsageConsumer{})
 			})
 
 			exec := NewClaudeExecutor(&config.Config{})
@@ -580,7 +580,7 @@ func TestClaudeExecutorStreamCancel499RecordsLastPacketUsage(t *testing.T) {
 			}
 
 			select {
-			case record := <-plugin.records:
+			case record := <-consumer.records:
 				if !record.Failed || record.Fail.StatusCode != 499 {
 					t.Fatalf("expected failed=true status=499 on canceled stream, got failed=%v fail=%+v", record.Failed, record.Fail)
 				}

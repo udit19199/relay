@@ -530,7 +530,7 @@ func TestV8MigrationPreservesEmptyLegacyContainers(t *testing.T) {
 		for _, empty := range []string{"{}", "null"} {
 			t.Run(section.old+"/"+empty, func(t *testing.T) {
 				var doc, value yaml.Node
-				if err := yaml.Unmarshal([]byte("port: 8317\nplugins: {configs: {sample: {enabled: false, options: {}}}}\n"), &doc); err != nil {
+				if err := yaml.Unmarshal([]byte("port: 8317\n"), &doc); err != nil {
 					t.Fatal(err)
 				}
 				if err := yaml.Unmarshal([]byte(empty), &value); err != nil {
@@ -568,7 +568,7 @@ func TestV8MigrationPreservesEmptyLegacyContainers(t *testing.T) {
 					t.Fatal(err)
 				}
 				if !nodesStructurallyEqual(&beforeNode, &afterNode) {
-					t.Fatal("migration changed effective defaults or plugin options")
+					t.Fatal("migration changed effective defaults")
 				}
 				if err = yaml.Unmarshal(migrated, &doc); err != nil {
 					t.Fatal(err)

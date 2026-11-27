@@ -390,7 +390,7 @@ func TestManagerSavePreservesConcurrentRefreshState(t *testing.T) {
 func TestManagerSavedFieldsSkipPersistence(t *testing.T) {
 	ctx := context.Background()
 	store := &callbackAuthStore{save: func(*Auth) error { t.Fatal("unexpected Save"); return nil }}
-	for _, mode := range []string{"context", "nil-metadata", "runtime-only", "config-api-key", "plugin-virtual"} {
+	for _, mode := range []string{"context", "nil-metadata", "runtime-only", "config-api-key"} {
 		t.Run(mode, func(t *testing.T) {
 			manager := NewManager(store, nil, nil)
 			input := &Auth{ID: mode, Provider: "audit", Status: StatusActive, Metadata: map[string]any{"type": "audit"}}
@@ -404,8 +404,6 @@ func TestManagerSavedFieldsSkipPersistence(t *testing.T) {
 				input.Attributes = map[string]string{"runtime_only": "true"}
 			case "config-api-key":
 				input.Attributes = map[string]string{"source": "config", "api_key": "test"}
-			case "plugin-virtual":
-				MarkPluginVirtualAuth(input, "fixture", 0)
 			}
 			for _, operation := range []string{"Register", "Update"} {
 				var result *Auth

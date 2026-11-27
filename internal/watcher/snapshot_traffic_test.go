@@ -9,10 +9,8 @@ import (
 	"time"
 
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/watcher/synthesizer"
 	sdkauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/auth"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 )
 
 const trafficAuthFile = "claude.json"
@@ -172,12 +170,12 @@ func TestRefreshAuthStateAppliesExternalEditAfterRequestResult(t *testing.T) {
 	setTrafficConfig(w, excludedModelsConfig(w.authDir, "new-model"))
 	original := snapshotCoreAuthsFunc
 	t.Cleanup(func() { snapshotCoreAuthsFunc = original })
-	snapshotCoreAuthsFunc = func(cfg *config.Config, authDir string, parser synthesizer.PluginAuthParser) ([]*coreauth.Auth, map[string]struct{}) {
+	snapshotCoreAuthsFunc = func(cfg *config.Config, authDir string) ([]*coreauth.Auth, map[string]struct{}) {
 		manager.MarkResult(context.Background(), trafficRequestResult(true))
 		if errWrite := os.WriteFile(path, []byte(`{"type":"claude","email":"a@b.c","disabled":false,"note":"edited"}`), 0o600); errWrite != nil {
 			t.Error(errWrite)
 		}
-		return original(cfg, authDir, parser)
+		return original(cfg, authDir)
 	}
 	w.reloadClients(false, []string{"claude"}, false)
 	snapshotCoreAuthsFunc = original
@@ -262,86 +260,4 @@ func readJSONField(t *testing.T, path, key string) any {
 		t.Fatal(errUnmarshal)
 	}
 	return content[key]
-}
-
-// hostConfigParser parses claude auth files as an auth plugin does; its output depends on the
-// host config, which the plugin host sends with every parse request (here: *host).
-type hostConfigParser struct{ host *string }
-
-func (p hostConfigParser) ParseAuth(_ context.Context, req pluginapi.AuthParseRequest) (*coreauth.Auth, bool, error) {
-	var metadata map[string]any
-	if errUnmarshal := json.Unmarshal(req.RawJSON, &metadata); errUnmarshal != nil {
-		return nil, false, nil
-	}
-	return &coreauth.Auth{ID: req.FileName, Provider: "claude", Metadata: metadata, Attributes: map[string]string{"host_config": *p.host}}, true, nil
-}
-
-// An auth-files PATCH writes the file and the watcher reads that write; its persisted update
-// reaches the watcher only while a config reload's scan runs. The scan keeps the persisted
-// auth over its own snapshot and reads the file again afterwards, as a file event would, so
-// what the plugin parser derives from the new host config reaches the runtime.
-func TestRefreshAuthStateRereadsAuthPersistedDuringScan(t *testing.T) {
-	for _, kind := range []string{"runtime_patch", "login_snapshot"} {
-		t.Run(kind, func(t *testing.T) {
-			ctx := context.Background()
-			w, manager, path := newTrafficWatcher(t, true)
-			host := "old"
-			parser := hostConfigParser{host: &host}
-			w.SetPluginAuthParser(parser)
-
-			patched, _ := manager.GetByID(trafficAuthFile)
-			patched.Metadata["note"] = "patched"
-			persisted, errUpdate := manager.Update(ctx, patched)
-			if errUpdate != nil {
-				t.Fatalf("persisted update: %v", errUpdate)
-			}
-			if kind == "login_snapshot" {
-				data, errRead := os.ReadFile(path)
-				if errRead != nil {
-					t.Fatal(errRead)
-				}
-				auths, errSynth := synthesizer.SynthesizeAuthFile(&synthesizer.SynthesisContext{
-					Config:           excludedModelsConfig(w.authDir, "old-model"),
-					AuthDir:          w.authDir,
-					Now:              time.Now(),
-					IDGenerator:      synthesizer.NewStableIDGenerator(),
-					PluginAuthParser: parser,
-				}, path, data)
-				if errSynth != nil || len(auths) != 1 || !auths[0].HasFileSnapshot() {
-					t.Fatalf("synthesize login snapshot: err=%v auths=%v", errSynth, auths)
-				}
-				persisted = auths[0]
-			}
-			w.addOrUpdateClient(path)
-			written, _ := takeQueuedAuthUpdate(w, trafficAuthFile)
-			if !applyQueuedSnapshot(t, manager, written) {
-				t.Fatal("the PATCH's file event was discarded")
-			}
-			if got, _ := manager.GetByID(trafficAuthFile); got.Attributes["host_config"] != "old" {
-				t.Fatalf("runtime host_config = %q, want old", got.Attributes["host_config"])
-			}
-
-			setTrafficConfig(w, excludedModelsConfig(w.authDir, "new-model"))
-			host = "new"
-			original := snapshotCoreAuthsFunc
-			t.Cleanup(func() { snapshotCoreAuthsFunc = original })
-			snapshotCoreAuthsFunc = func(cfg *config.Config, authDir string, parser synthesizer.PluginAuthParser) ([]*coreauth.Auth, map[string]struct{}) {
-				w.dispatchPersistedAuthUpdate(AuthUpdate{Action: AuthUpdateActionModify, ID: trafficAuthFile, Auth: persisted})
-				return original(cfg, authDir, parser)
-			}
-			w.reloadClients(false, []string{"claude"}, false)
-			snapshotCoreAuthsFunc = original
-			update, ok := takeQueuedAuthUpdate(w, trafficAuthFile)
-			if !ok {
-				t.Fatal("nothing queued for the auth after the scan")
-			}
-			manager.MarkResult(ctx, trafficRequestResult(true))
-			applyQueuedSnapshot(t, manager, update)
-
-			if got, _ := manager.GetByID(trafficAuthFile); got.Attributes["host_config"] != "new" || got.Metadata["note"] != "patched" {
-				t.Fatalf("runtime host_config = %q note = %v, want the new host config and the PATCH's note", got.Attributes["host_config"], got.Metadata["note"])
-			}
-			requireNextScanKeeps(t, w)
-		})
-	}
 }

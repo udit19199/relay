@@ -56,9 +56,9 @@ func (c *codexResponseModelUsageCapture) HandleUsage(_ context.Context, record c
 	}
 }
 
-type codexResponseModelNoopUsagePlugin struct{}
+type codexResponseModelNoopUsageConsumer struct{}
 
-func (codexResponseModelNoopUsagePlugin) HandleUsage(context.Context, coreusage.Record) {}
+func (codexResponseModelNoopUsageConsumer) HandleUsage(context.Context, coreusage.Record) {}
 
 func (c *codexResponseModelUsageCapture) await(t *testing.T) coreusage.Record {
 	t.Helper()
@@ -76,9 +76,9 @@ func (c *codexResponseModelUsageCapture) await(t *testing.T) coreusage.Record {
 func TestCodexUsageRecordsCarryResponseModelPerModel(t *testing.T) {
 	const alias = "codex-response-model-wiring-test"
 	capture := &codexResponseModelUsageCapture{alias: alias, records: make(chan coreusage.Record, 4)}
-	coreusage.RegisterNamedPlugin(t.Name(), capture)
+	coreusage.RegisterNamedConsumer(t.Name(), capture)
 	t.Cleanup(func() {
-		coreusage.RegisterNamedPlugin(t.Name(), codexResponseModelNoopUsagePlugin{})
+		coreusage.RegisterNamedConsumer(t.Name(), codexResponseModelNoopUsageConsumer{})
 	})
 
 	ctx := coreusage.WithRequestedModelAlias(context.Background(), alias)

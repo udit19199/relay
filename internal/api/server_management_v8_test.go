@@ -1,16 +1,13 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/api/handlers/management"
@@ -49,8 +46,6 @@ func TestManagementV8IndependentContract(t *testing.T) {
 		"POST /v8/management/routing/cooldown/reset",
 		"POST /v8/management/routing/model-definitions/refresh",
 		"POST /v8/management/models/refresh",
-		"GET /v8/management/plugins/:id/quota", "POST /v8/management/plugins/:id/quota", "DELETE /v8/management/plugins/:id/quota",
-		"POST /v8/management/plugins/store/:id/install", "DELETE /v8/management/plugins/:id",
 	} {
 		if !routes[route] {
 			t.Errorf("missing route %s", route)
@@ -68,7 +63,7 @@ func TestManagementV8IndependentContract(t *testing.T) {
 		}
 		return strings.TrimSpace(response.Body.String())
 	}
-	for _, legacy := range []string{"debug", "request-retry", "api-keys", "codex-api-key", "auth-files", "codex-auth-url", "oauth/providers/codex/auth-url", "plugins/test-plugin/config"} {
+	for _, legacy := range []string{"debug", "request-retry", "api-keys", "codex-api-key", "auth-files", "codex-auth-url", "oauth/providers/codex/auth-url"} {
 		request(http.MethodGet, "/v8/management/"+legacy, "", http.StatusNotFound)
 	}
 	for _, route := range []struct{ method, path string }{
@@ -130,45 +125,5 @@ func TestManagementV8IndependentContract(t *testing.T) {
 	request(http.MethodPut, "/v0/management/request-retry", `{"value":2}`, http.StatusOK)
 	if got := request(http.MethodGet, "/v8/management/config/routing/retry/request-retry", "", http.StatusOK); got != "2" {
 		t.Fatalf("legacy write did not update the migrated field: %s", got)
-	}
-}
-
-func TestManagementV8PluginOperationMigratesConfiguration(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "config.yaml")
-	raw := fmt.Sprintf("codex: {disable-codex-cloaking: true}\nremote-management: {secret-key: test-password}\nplugins:\n  dir: %q\n  configs: {test-plugin: {enabled: false}}\n", filepath.ToSlash(dir))
-	if err := os.WriteFile(path, []byte(raw), 0600); err != nil {
-		t.Fatal(err)
-	}
-	cfg, err := config.LoadConfig(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	h := management.NewHandler(cfg, path, nil)
-	h.SetLocalPassword("test-password")
-	reloads := make(chan *config.Config, 1)
-	h.SetConfigReloadHook(func(_ context.Context, next *config.Config) { reloads <- next })
-	s := &Server{cfg: cfg, engine: gin.New(), mgmt: h}
-	s.managementRoutesEnabled.Store(true)
-	s.registerManagementRoutes()
-	req := httptest.NewRequest(http.MethodDelete, "/v8/management/plugins/test-plugin", nil)
-	req.RemoteAddr = "127.0.0.1:1234"
-	req.Header.Set("Authorization", "Bearer test-password")
-	response := httptest.NewRecorder()
-	s.engine.ServeHTTP(response, req)
-	if response.Code != http.StatusOK {
-		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
-	}
-	saved, err := os.ReadFile(path)
-	if err != nil || !strings.Contains(string(saved), "config-version: 8") {
-		t.Fatalf("plugin operation did not migrate the config: %v", err)
-	}
-	select {
-	case next := <-reloads:
-		if !next.ForAPIKey().Codex.DisableCodexCloaking || !next.Codex.DisableCodexCloaking {
-			t.Fatal("plugin operation published an incorrect configuration scope")
-		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("missing configuration reload")
 	}
 }

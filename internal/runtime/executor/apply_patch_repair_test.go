@@ -517,7 +517,7 @@ func TestApplyPatchRepairXAIWebsocketCompactionUsage(t *testing.T) {
 			exec.idStore = &xaiWebsocketIDStateStore{sessions: make(map[string]*xaiWebsocketIDState)}
 			auth := &cliproxyauth.Auth{ID: t.Name(), Provider: "xai", Attributes: map[string]string{"api_key": "test", "base_url": server.URL}}
 			capture := &task6UsageCapture{id: auth.ID, records: make(chan usage.Record, 32)}
-			usage.RegisterNamedPlugin("task6-patch-failure", capture)
+			usage.RegisterNamedConsumer("task6-patch-failure", capture)
 			req := cliproxyexecutor.Request{Model: "grok-4.3", Payload: []byte(`{"model":"grok-4.3","input":[{"type":"message","role":"user","content":"history"},{"type":"compaction_trigger"}]}`)}
 			if tc.emptyInput {
 				req.Payload = []byte(`{"model":"grok-4.3","input":[{"type":"compaction_trigger"}]}`)

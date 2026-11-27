@@ -66,7 +66,7 @@ func TestIssue7017LiveOwnQuotaKeepsFloorOverTransient(t *testing.T) {
 
 type issue7017SafeHeaderError struct{ retryAfter string }
 
-func (e issue7017SafeHeaderError) Error() string { return "plugin failure" }
+func (e issue7017SafeHeaderError) Error() string { return "consumer failure" }
 
 func (e issue7017SafeHeaderError) SafeResponseHeaders() http.Header {
 	return http.Header{"Retry-After": []string{e.retryAfter}}

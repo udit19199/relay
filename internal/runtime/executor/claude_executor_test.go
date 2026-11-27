@@ -8324,7 +8324,7 @@ func TestClaudeExecutor_CallerScopeMetadataReproducesOAuthMCPToolAliases(t *test
 	for range streamRes.Chunks {
 	}
 
-	// 2. Plugin replay stream request on background context (no gin.Context) with CallerScope metadata.
+	// 2. Consumer replay stream request on background context (no gin.Context) with CallerScope metadata.
 	replayStreamRes, errReplayStream := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
 		Model:   "claude-sonnet-4-5",
 		Payload: payload,
@@ -8341,7 +8341,7 @@ func TestClaudeExecutor_CallerScopeMetadataReproducesOAuthMCPToolAliases(t *test
 	for range replayStreamRes.Chunks {
 	}
 
-	// 3. Plugin replay non-stream Execute on background context with CallerScope metadata.
+	// 3. Consumer replay non-stream Execute on background context with CallerScope metadata.
 	if _, errExec := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
 		Model:   "claude-sonnet-4-5",
 		Payload: payload,
@@ -8354,7 +8354,7 @@ func TestClaudeExecutor_CallerScopeMetadataReproducesOAuthMCPToolAliases(t *test
 		t.Fatalf("replay Execute() error = %v", errExec)
 	}
 
-	// 4. Plugin replay countTokensUpstream on background context with CallerScope metadata.
+	// 4. Consumer replay countTokensUpstream on background context with CallerScope metadata.
 	if _, errCount := executor.countTokensUpstream(context.Background(), auth, cliproxyexecutor.Request{
 		Model:   "claude-sonnet-4-5",
 		Payload: payload,

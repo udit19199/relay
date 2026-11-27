@@ -30,8 +30,8 @@ func TestHasNativeOpenAICompatExecutorConfig(t *testing.T) {
 		},
 		{
 			name:        "inline base url",
-			auth:        &coreauth.Auth{Provider: "plugin-provider", Attributes: map[string]string{"base_url": "https://compat.example.com/v1"}},
-			providerKey: "plugin-provider",
+			auth:        &coreauth.Auth{Provider: "custom-provider", Attributes: map[string]string{"base_url": "https://compat.example.com/v1"}},
+			providerKey: "custom-provider",
 			want:        true,
 		},
 		{
@@ -41,9 +41,9 @@ func TestHasNativeOpenAICompatExecutorConfig(t *testing.T) {
 			want:        true,
 		},
 		{
-			name:        "plain plugin auth",
-			auth:        &coreauth.Auth{Provider: "plugin-provider", Attributes: map[string]string{"api_key": "test"}},
-			providerKey: "plugin-provider",
+			name:        "plain custom auth",
+			auth:        &coreauth.Auth{Provider: "custom-provider", Attributes: map[string]string{"api_key": "test"}},
+			providerKey: "custom-provider",
 			want:        false,
 		},
 	}

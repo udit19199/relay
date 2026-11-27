@@ -135,7 +135,7 @@ func TestRecordAPIRequestAsyncCapturePolicySurvivesGinContextReuse(t *testing.T)
 	cancel()
 	callbackCtx := context.WithoutCancel(socketCtx)
 
-	// A completed socket can leave asynchronous plugin callbacks holding the
+	// A completed socket can leave asynchronous consumer callbacks holding the
 	// same Gin pointer that is now serving an unrelated HTTP request.
 	ginCtx.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
 	RecordAPIRequest(parent, &config.Config{}, UpstreamRequestLog{Body: []byte("new-http-request")})

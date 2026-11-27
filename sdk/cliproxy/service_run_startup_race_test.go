@@ -160,7 +160,6 @@ func TestServiceRun_WatcherReloadConcurrentWithStartupModelRegistration_Issue658
 					_ = cfg.AuthDir
 				}
 			},
-			setPluginAuthParser: func(parser PluginAuthParser) {},
 		}, nil
 	}
 

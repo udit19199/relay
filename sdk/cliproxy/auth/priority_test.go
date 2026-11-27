@@ -16,7 +16,7 @@ func TestApplyAuthPriorityMetadataClearsUntrustedFileMarker(t *testing.T) {
 			t.Errorf("source %v kept untrusted file priority marker", metadata)
 		}
 		if auth.Attributes["priority"] != "7" || auth.Metadata["priority"] != float64(7) {
-			t.Errorf("source %v changed plugin priority %q/%v", metadata, auth.Attributes["priority"], auth.Metadata["priority"])
+			t.Errorf("source %v changed consumer priority %q/%v", metadata, auth.Attributes["priority"], auth.Metadata["priority"])
 		}
 	}
 }

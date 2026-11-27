@@ -125,7 +125,7 @@ func TestIsNativeAccessProvider(t *testing.T) {
 		{"config-api-key", true},
 		{"CONFIG-API-KEY", true},
 		{"  config-inline  ", true},
-		{"custom-plugin", false},
+		{"custom-consumer", false},
 		{"realtime-client-secret", false},
 		{"", false},
 	}
@@ -152,19 +152,19 @@ func TestRecordNativeKeyFields(t *testing.T) {
 	}
 }
 
-type captureUsagePlugin struct {
+type captureUsageConsumer struct {
 	records chan Record
 }
 
-func (p *captureUsagePlugin) HandleUsage(_ context.Context, record Record) {
+func (p *captureUsageConsumer) HandleUsage(_ context.Context, record Record) {
 	p.records <- record
 }
 
 func TestManagerPublishBackfillsContextAuthFields(t *testing.T) {
 	mgr := NewManager(10)
 	t.Cleanup(mgr.Stop)
-	plugin := &captureUsagePlugin{records: make(chan Record, 1)}
-	mgr.Register(plugin)
+	consumer := &captureUsageConsumer{records: make(chan Record, 1)}
+	mgr.Register(consumer)
 
 	ctx := WithAPIKey(context.Background(), "sk-ctx-key")
 	ctx = WithAccessProvider(ctx, "config-inline")
@@ -175,7 +175,7 @@ func TestManagerPublishBackfillsContextAuthFields(t *testing.T) {
 	})
 
 	select {
-	case got := <-plugin.records:
+	case got := <-consumer.records:
 		if got.APIKey != "sk-ctx-key" {
 			t.Fatalf("got.APIKey = %q, want sk-ctx-key", got.APIKey)
 		}
@@ -190,11 +190,11 @@ func TestManagerPublishBackfillsContextAuthFields(t *testing.T) {
 	}
 }
 
-type notifyUsagePlugin struct {
+type notifyUsageConsumer struct {
 	delivered chan struct{}
 }
 
-func (p *notifyUsagePlugin) HandleUsage(_ context.Context, _ Record) {
+func (p *notifyUsageConsumer) HandleUsage(_ context.Context, _ Record) {
 	p.delivered <- struct{}{}
 }
 
@@ -227,13 +227,13 @@ func TestManagerReleasesConsumedQueueItemReferencesWhenIdle(t *testing.T) {
 	mgr := NewManager(10)
 	t.Cleanup(mgr.Stop)
 
-	plugin := &notifyUsagePlugin{delivered: make(chan struct{}, 1)}
-	mgr.Register(plugin)
+	consumer := &notifyUsageConsumer{delivered: make(chan struct{}, 1)}
+	mgr.Register(consumer)
 
 	ctxWeak, detailWeak, headerWeak := publishConsumableRecord(mgr)
 
 	select {
-	case <-plugin.delivered:
+	case <-consumer.delivered:
 	case <-time.After(time.Second):
 		t.Fatal("timed out waiting for usage record dispatch")
 	}

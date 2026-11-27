@@ -55,9 +55,9 @@ func TestCodexExecutorExecutePublishesMainUsageBeforeImageUsage(t *testing.T) {
 
 				alias := t.Name()
 				capture := &codexResponseModelUsageCapture{alias: alias, records: make(chan coreusage.Record, 4)}
-				coreusage.RegisterNamedPlugin(t.Name(), capture)
+				coreusage.RegisterNamedConsumer(t.Name(), capture)
 				t.Cleanup(func() {
-					coreusage.RegisterNamedPlugin(t.Name(), codexResponseModelNoopUsagePlugin{})
+					coreusage.RegisterNamedConsumer(t.Name(), codexResponseModelNoopUsageConsumer{})
 				})
 				ctx := coreusage.WithRequestedModelAlias(context.Background(), alias)
 				executor := NewCodexExecutor(&config.Config{})
@@ -123,9 +123,9 @@ func TestCodexExecutorExecuteRecordsFinalizedPayloadOverrideReasoningEffort(t *t
 
 	alias := t.Name()
 	capture := &codexResponseModelUsageCapture{alias: alias, records: make(chan coreusage.Record, 4)}
-	coreusage.RegisterNamedPlugin(t.Name(), capture)
+	coreusage.RegisterNamedConsumer(t.Name(), capture)
 	t.Cleanup(func() {
-		coreusage.RegisterNamedPlugin(t.Name(), codexResponseModelNoopUsagePlugin{})
+		coreusage.RegisterNamedConsumer(t.Name(), codexResponseModelNoopUsageConsumer{})
 	})
 
 	ctx := coreusage.WithRequestedModelAlias(context.Background(), alias)
@@ -181,9 +181,9 @@ func TestCodexExecutorExecuteStreamRecordsFinalizedPayloadOverrideReasoningEffor
 
 	alias := t.Name()
 	capture := &codexResponseModelUsageCapture{alias: alias, records: make(chan coreusage.Record, 4)}
-	coreusage.RegisterNamedPlugin(t.Name(), capture)
+	coreusage.RegisterNamedConsumer(t.Name(), capture)
 	t.Cleanup(func() {
-		coreusage.RegisterNamedPlugin(t.Name(), codexResponseModelNoopUsagePlugin{})
+		coreusage.RegisterNamedConsumer(t.Name(), codexResponseModelNoopUsageConsumer{})
 	})
 
 	ctx := coreusage.WithRequestedModelAlias(context.Background(), alias)
@@ -238,9 +238,9 @@ func TestCodexExecutorExecuteCompactRecordsFinalizedPayloadOverrideReasoningEffo
 
 	alias := t.Name()
 	capture := &codexResponseModelUsageCapture{alias: alias, records: make(chan coreusage.Record, 4)}
-	coreusage.RegisterNamedPlugin(t.Name(), capture)
+	coreusage.RegisterNamedConsumer(t.Name(), capture)
 	t.Cleanup(func() {
-		coreusage.RegisterNamedPlugin(t.Name(), codexResponseModelNoopUsagePlugin{})
+		coreusage.RegisterNamedConsumer(t.Name(), codexResponseModelNoopUsageConsumer{})
 	})
 
 	ctx := coreusage.WithRequestedModelAlias(context.Background(), alias)

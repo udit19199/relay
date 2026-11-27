@@ -99,36 +99,3 @@ func TestTranslateRequestPairWithAPIKeyModelCompatibilityCountsTranslations(t *t
 		}
 	}
 }
-
-func TestCompatibilityRequestPairInvokesPluginOncePerInput(t *testing.T) {
-	hooks := &pairRequestPluginHooks{}
-	sdktranslator.SetPluginHooks(hooks)
-	t.Cleanup(func() { sdktranslator.SetPluginHooks(nil) })
-	payload := []byte(`{"model":"test","input":"hello"}`)
-	for _, stream := range []bool{false, true} {
-		for _, compat := range []bool{false, true} {
-			for _, distinct := range []bool{false, true} {
-				hooks.calls = 0
-				request := payload
-				wantCalls := int64(1)
-				if distinct {
-					request = []byte(`{"model":"test","input":"changed"}`)
-					wantCalls = 2
-				}
-				base, work := TranslateRequestPairWithAPIKeyModelCompatibility(context.Background(), nil, &config.Config{}, sdktranslator.FormatOpenAIResponse, sdktranslator.FormatOpenAI, "test", payload, request, stream, compat)
-				if hooks.calls != wantCalls {
-					t.Fatalf("stream=%v compat=%v distinct=%v: plugin calls = %d, want %d", stream, compat, distinct, hooks.calls, wantCalls)
-				}
-				if bytes.Equal(base, work) == distinct {
-					t.Fatal("plugin results do not match input identity")
-				}
-				baselineBefore := bytes.Clone(base)
-				inputBefore := bytes.Clone(request)
-				work[0] = 'X'
-				if !bytes.Equal(base, baselineBefore) || !bytes.Equal(request, inputBefore) {
-					t.Fatal("working buffer aliases the baseline or input")
-				}
-			}
-		}
-	}
-}

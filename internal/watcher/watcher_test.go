@@ -20,7 +20,6 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/watcher/synthesizer"
 	sdkAuth "github.com/router-for-me/CLIProxyAPI/v8/sdk/auth"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 	"gopkg.in/yaml.v3"
 )
 
@@ -434,9 +433,9 @@ func TestAuthFileEventsDoNotInvokeSnapshotCoreAuths(t *testing.T) {
 
 	origSnapshot := snapshotCoreAuthsFunc
 	var snapshotCalls int32
-	snapshotCoreAuthsFunc = func(cfg *config.Config, authDir string, parser synthesizer.PluginAuthParser) ([]*coreauth.Auth, map[string]struct{}) {
+	snapshotCoreAuthsFunc = func(cfg *config.Config, authDir string) ([]*coreauth.Auth, map[string]struct{}) {
 		atomic.AddInt32(&snapshotCalls, 1)
-		return origSnapshot(cfg, authDir, parser)
+		return origSnapshot(cfg, authDir)
 	}
 	defer func() { snapshotCoreAuthsFunc = origSnapshot }()
 
@@ -2061,102 +2060,6 @@ func TestSetConfigUpdatesAuthDir(t *testing.T) {
 	}
 	if len(fileSnapshot) != 1 || fileSnapshot[0].ID != "cred-b.json" {
 		t.Fatalf("expected SnapshotAuthFile ID=cred-b.json, got %+v", fileSnapshot)
-	}
-}
-
-type blockingAuthDirSwitchParser struct {
-	blockPath string
-	entered   chan struct{}
-	release   chan struct{}
-	once      sync.Once
-}
-
-func (p *blockingAuthDirSwitchParser) ParseAuth(_ context.Context, req pluginapi.AuthParseRequest) (*coreauth.Auth, bool, error) {
-	if filepath.Clean(req.Path) == filepath.Clean(p.blockPath) {
-		p.once.Do(func() {
-			close(p.entered)
-		})
-		<-p.release
-	}
-	return nil, false, nil
-}
-
-func TestAddOrUpdateClientDiscardsStaleDirEventAcrossAuthDirSwitch(t *testing.T) {
-	tmpDir := t.TempDir()
-	dirA := filepath.Join(tmpDir, "auth-a")
-	dirB := filepath.Join(tmpDir, "auth-b")
-	if errMkdirA := os.MkdirAll(dirA, 0o755); errMkdirA != nil {
-		t.Fatalf("failed to create auth dir A: %v", errMkdirA)
-	}
-	if errMkdirB := os.MkdirAll(dirB, 0o755); errMkdirB != nil {
-		t.Fatalf("failed to create auth dir B: %v", errMkdirB)
-	}
-
-	lateAPath := filepath.Join(dirA, "late-a.json")
-	if errWriteLateA := os.WriteFile(lateAPath, []byte(`{"type":"codex","email":"late-a@example.com"}`), 0o600); errWriteLateA != nil {
-		t.Fatalf("failed to write late-a.json: %v", errWriteLateA)
-	}
-	credBPath := filepath.Join(dirB, "cred-b.json")
-	if errWriteB := os.WriteFile(credBPath, []byte(`{"type":"codex","email":"b@example.com"}`), 0o600); errWriteB != nil {
-		t.Fatalf("failed to write cred-b.json: %v", errWriteB)
-	}
-
-	parser := &blockingAuthDirSwitchParser{
-		blockPath: lateAPath,
-		entered:   make(chan struct{}),
-		release:   make(chan struct{}),
-	}
-
-	queue := make(chan AuthUpdate, 16)
-	w := &Watcher{
-		authDir:          dirA,
-		lastAuthHashes:   make(map[string]string),
-		fileAuthsByPath:  make(map[string]map[string]*coreauth.Auth),
-		pluginAuthParser: parser,
-	}
-	w.SetConfig(&config.Config{AuthDir: dirA})
-	w.SetAuthUpdateQueue(queue)
-	defer w.stopDispatch()
-
-	done := make(chan struct{})
-	go func() {
-		w.addOrUpdateClientLocked(lateAPath)
-		close(done)
-	}()
-
-	select {
-	case <-parser.entered:
-	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for addOrUpdateClientLocked to reach synthesis")
-	}
-
-	// Switch auth-dir to dirB while the dirA event is paused mid-synthesis.
-	w.SetConfig(&config.Config{AuthDir: dirB})
-	w.refreshAuthState(false)
-
-	select {
-	case update := <-queue:
-		if update.Action != AuthUpdateActionAdd || update.ID != "cred-b.json" {
-			t.Fatalf("expected add update for cred-b.json, got %+v", update)
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for cred-b.json update")
-	}
-
-	close(parser.release)
-	select {
-	case <-done:
-	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for paused addOrUpdateClientLocked to finish")
-	}
-
-	w.clientsMutex.RLock()
-	currentCount := len(w.currentAuths)
-	_, hasCredB := w.currentAuths["cred-b.json"]
-	_, hasLateA := w.lastAuthHashes[w.normalizeAuthPath(lateAPath)]
-	w.clientsMutex.RUnlock()
-	if currentCount != 1 || !hasCredB || hasLateA {
-		t.Fatalf("stale dirA event polluted state after switch: currentCount=%d, hasCredB=%v, hasLateA=%v", currentCount, hasCredB, hasLateA)
 	}
 }
 

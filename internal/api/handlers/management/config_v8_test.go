@@ -282,7 +282,6 @@ func TestV8MigrationReloadSnapshotMatchesDisk(t *testing.T) {
 	}{
 		{"legacy", "/v0/management/debug", "/v0/management/debug", `{"value":true}`, func(h *Handler) gin.HandlerFunc { return h.PutDebug }, false},
 		{"v8 logs", "/v8/management/config/*path", "/v8/management/config/observability/logs/debug", `true`, func(h *Handler) gin.HandlerFunc { return h.ConfigV8 }, true},
-		{"v8 plugin", "/v8/management/config/*path", "/v8/management/config/plugins/configs/test-plugin/enabled", `false`, func(h *Handler) gin.HandlerFunc { return h.ConfigV8 }, true},
 		{"v8 config", "/v8/management/config", "/v8/management/config", `{"observability":{"logs":{"debug":true}}}`, func(h *Handler) gin.HandlerFunc { return h.ConfigV8 }, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -397,7 +396,7 @@ func TestConfigV8DeleteLastField(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			file := filepath.Join(t.TempDir(), "config.yaml")
-			raw := tc.raw + "port: 8317\napi-keys: [client]\nplugins: {configs: {sample: {enabled: false, options: {}}}}\n"
+			raw := tc.raw + "port: 8317\napi-keys: [client]\n"
 			if err := os.WriteFile(file, []byte(raw), 0600); err != nil {
 				t.Fatal(err)
 			}
@@ -435,9 +434,6 @@ func TestConfigV8DeleteLastField(t *testing.T) {
 			}
 			if configV8Node(doc.Content[0], strings.Split(tc.path, "/")) != nil {
 				t.Fatal("save reintroduced the deleted field")
-			}
-			if options := configV8Node(doc.Content[0], []string{"plugins", "configs", "sample", "options"}); options == nil || options.Kind != yaml.MappingNode || len(options.Content) != 0 {
-				t.Fatal("delete removed an unrelated explicit empty mapping")
 			}
 			for _, method := range []string{http.MethodGet, http.MethodDelete} {
 				w = httptest.NewRecorder()
@@ -635,13 +631,6 @@ routing:
   retry:
     request-retry: 3
     max-retry-interval: 30
-plugins:
-  configs:
-    sample:
-      enabled: false
-      options: {} # Keep empty mapping
-      custom-null: null # Keep explicit null
-      custom-tree: {unknown: [one, {two: 2}]}
 `
 	if err := os.WriteFile(file, []byte(raw), 0600); err != nil {
 		t.Fatal(err)
@@ -732,30 +721,12 @@ plugins:
 	if !reflect.DeepEqual(expectedValue, actualValue) {
 		t.Fatal("DELETE changed unrelated document fields or their presence")
 	}
-	pluginPath := []string{"plugins", "configs", "sample"}
-	var beforePlugin, afterPlugin any
-	if err = configV8Node(original, pluginPath).Decode(&beforePlugin); err != nil {
-		t.Fatal(err)
-	}
-	if err = configV8Node(root, pluginPath).Decode(&afterPlugin); err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(beforePlugin, afterPlugin) {
-		t.Fatal("opaque plugin settings changed")
-	}
-	for _, comment := range []string{"# Keep document comment", "# Keep empty mapping", "# Keep explicit null", "# Keep new sibling"} {
+	for _, comment := range []string{"# Keep document comment", "# Keep new sibling"} {
 		if !strings.Contains(string(data), comment) {
 			t.Fatalf("lost comment %s", comment)
 		}
 	}
-	for _, tc := range []struct{ name, body string }{{"options", "{}"}, {"custom-null", "null"}} {
-		path := "plugins/configs/sample/" + tc.name
-		request(http.MethodGet, path, http.StatusOK, tc.body)
-		request(http.MethodDelete, path, http.StatusOK, "")
-		checkReload()
-		request(http.MethodGet, path, http.StatusNotFound, "")
-		request(http.MethodDelete, path, http.StatusNotFound, "")
-	}
+
 }
 
 func TestConfigV8SaveNormalizesCollectionStylesToBlockYAML(t *testing.T) {

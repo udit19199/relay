@@ -159,8 +159,8 @@ func TestSanitizedToolNameMap(t *testing.T) {
 }
 
 func TestSanitizedFunctionNameMapDisambiguatesCollisions(t *testing.T) {
-	first := "mcp__plugin_cloudflare_cloudflare-builds__workers_builds_get_build"
-	second := "mcp__plugin_cloudflare_cloudflare-builds__workers_builds_get_build_logs"
+	first := "mcp__consumer_cloudflare_cloudflare-builds__workers_builds_get_build"
+	second := "mcp__consumer_cloudflare_cloudflare-builds__workers_builds_get_build_logs"
 	raw := []byte(`{"tools":[
 		{"name":"` + first + `"},
 		{"name":"` + first + `"},

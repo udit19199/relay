@@ -65,9 +65,9 @@ func TestOpenAICompatExecutor_ImageStreamChunkBoundaryObservability(t *testing.T
 
 			alias := fmt.Sprintf("openai-compat-image-stream-test-%d", i)
 			capture := &multiProviderUsageCapture{alias: alias, records: make(chan coreusage.Record, 4)}
-			coreusage.RegisterNamedPlugin(t.Name(), capture)
+			coreusage.RegisterNamedConsumer(t.Name(), capture)
 			t.Cleanup(func() {
-				coreusage.RegisterNamedPlugin(t.Name(), multiProviderNoopUsagePlugin{})
+				coreusage.RegisterNamedConsumer(t.Name(), multiProviderNoopUsageConsumer{})
 			})
 
 			executor := NewOpenAICompatExecutor("openai-compatibility", &config.Config{
@@ -200,9 +200,9 @@ func TestOpenAICompatImageStreamAccountsLargeCompletedEvents(t *testing.T) {
 
 			alias := t.Name()
 			capture := &multiProviderUsageCapture{alias: alias, records: make(chan coreusage.Record, 4)}
-			coreusage.RegisterNamedPlugin(t.Name(), capture)
+			coreusage.RegisterNamedConsumer(t.Name(), capture)
 			t.Cleanup(func() {
-				coreusage.RegisterNamedPlugin(t.Name(), multiProviderNoopUsagePlugin{})
+				coreusage.RegisterNamedConsumer(t.Name(), multiProviderNoopUsageConsumer{})
 			})
 			exec := NewOpenAICompatExecutor("openai-compatibility", &config.Config{})
 			auth := &cliproxyauth.Auth{
@@ -253,9 +253,9 @@ func TestOpenAICompatAndCodexImageStreamReadFailurePreservesObservedUsage(t *tes
 
 			alias := t.Name()
 			capture := &multiProviderUsageCapture{alias: alias, records: make(chan coreusage.Record, 4)}
-			coreusage.RegisterNamedPlugin(t.Name(), capture)
+			coreusage.RegisterNamedConsumer(t.Name(), capture)
 			t.Cleanup(func() {
-				coreusage.RegisterNamedPlugin(t.Name(), multiProviderNoopUsagePlugin{})
+				coreusage.RegisterNamedConsumer(t.Name(), multiProviderNoopUsageConsumer{})
 			})
 			ctx := coreusage.WithRequestedModelAlias(context.Background(), alias)
 			req := cliproxyexecutor.Request{
@@ -351,9 +351,9 @@ func TestOpenAICompatMultipartImageEditExtractsRequestedImageDetails(t *testing.
 
 			alias := t.Name()
 			capture := &multiProviderUsageCapture{alias: alias, records: make(chan coreusage.Record, 4)}
-			coreusage.RegisterNamedPlugin(t.Name(), capture)
+			coreusage.RegisterNamedConsumer(t.Name(), capture)
 			t.Cleanup(func() {
-				coreusage.RegisterNamedPlugin(t.Name(), multiProviderNoopUsagePlugin{})
+				coreusage.RegisterNamedConsumer(t.Name(), multiProviderNoopUsageConsumer{})
 			})
 			ctx := coreusage.WithRequestedModelAlias(context.Background(), alias)
 			exec := NewOpenAICompatExecutor("openai-compatibility", &config.Config{})
@@ -409,9 +409,9 @@ func TestOpenAICompatMultilineSSEAndXAIOutputItemDoneUsage(t *testing.T) {
 
 		alias := t.Name()
 		capture := &multiProviderUsageCapture{alias: alias, records: make(chan coreusage.Record, 4)}
-		coreusage.RegisterNamedPlugin(t.Name(), capture)
+		coreusage.RegisterNamedConsumer(t.Name(), capture)
 		t.Cleanup(func() {
-			coreusage.RegisterNamedPlugin(t.Name(), multiProviderNoopUsagePlugin{})
+			coreusage.RegisterNamedConsumer(t.Name(), multiProviderNoopUsageConsumer{})
 		})
 		ctx := coreusage.WithRequestedModelAlias(context.Background(), alias)
 		exec := NewOpenAICompatExecutor("openai-compatibility", &config.Config{})
@@ -460,9 +460,9 @@ func TestOpenAICompatMultilineSSEAndXAIOutputItemDoneUsage(t *testing.T) {
 
 				alias := t.Name()
 				capture := &multiProviderUsageCapture{alias: alias, records: make(chan coreusage.Record, 4)}
-				coreusage.RegisterNamedPlugin(t.Name(), capture)
+				coreusage.RegisterNamedConsumer(t.Name(), capture)
 				t.Cleanup(func() {
-					coreusage.RegisterNamedPlugin(t.Name(), multiProviderNoopUsagePlugin{})
+					coreusage.RegisterNamedConsumer(t.Name(), multiProviderNoopUsageConsumer{})
 				})
 				ctx := coreusage.WithRequestedModelAlias(context.Background(), alias)
 				exec := NewXAIExecutor(&config.Config{})

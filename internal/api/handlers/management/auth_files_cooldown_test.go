@@ -135,11 +135,8 @@ func TestListAuthFilesCooldownsCredentialKindsAndFilters(t *testing.T) {
 	if errWrite := os.WriteFile(path, []byte(`{"type":"codex"}`), 0o600); errWrite != nil {
 		t.Fatal(errWrite)
 	}
-	for _, id := range []string{"file", "virtual", "runtime"} {
+	for _, id := range []string{"file", "runtime"} {
 		auth := &coreauth.Auth{ID: id, Index: "index-" + id, FileName: "shared.json", Provider: "codex", Status: coreauth.StatusActive, Attributes: map[string]string{"path": path}}
-		if id == "virtual" {
-			coreauth.MarkPluginVirtualAuth(auth, path, 0)
-		}
 		if id == "runtime" {
 			auth.Attributes = map[string]string{"runtime_only": "true"}
 		}
@@ -147,7 +144,7 @@ func TestListAuthFilesCooldownsCredentialKindsAndFilters(t *testing.T) {
 	}
 	h := NewHandlerWithoutConfigFilePath(cfg, manager)
 	payload := requestAuthFilesCooldowns(t, h, "?name=shared.json")
-	if len(payload.Files) != 3 {
+	if len(payload.Files) != 2 {
 		t.Fatalf("files = %+v", payload.Files)
 	}
 	for _, file := range payload.Files {

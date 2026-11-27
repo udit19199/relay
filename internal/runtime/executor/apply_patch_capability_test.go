@@ -10,7 +10,7 @@ import (
 func TestApplyPatchActualExecutors(t *testing.T) {
 	cfg := &config.Config{}
 	for _, exec := range []coreauth.ProviderExecutor{
-		NewOpenAICompatExecutor("arbitrary-plugin-provider", cfg), NewClaudeExecutor(cfg),
+		NewOpenAICompatExecutor("arbitrary-consumer-provider", cfg), NewClaudeExecutor(cfg),
 		NewDevinExecutor(cfg),
 		NewCodexExecutor(cfg), NewCodexWebsocketsExecutor(cfg), NewCodexAutoExecutor(cfg),
 		NewXAIExecutor(cfg), NewXAIWebsocketsExecutor(cfg), NewXAIAutoExecutor(cfg), NewMetaExecutor(cfg),

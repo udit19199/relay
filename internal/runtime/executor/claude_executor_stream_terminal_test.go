@@ -20,11 +20,11 @@ import (
 	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
 )
 
-type captureClaudeUsagePlugin struct {
+type captureClaudeUsageConsumer struct {
 	records chan usage.Record
 }
 
-func (p *captureClaudeUsagePlugin) HandleUsage(_ context.Context, record usage.Record) {
+func (p *captureClaudeUsageConsumer) HandleUsage(_ context.Context, record usage.Record) {
 	if p == nil || record.Provider != "claude" {
 		return
 	}
@@ -34,9 +34,9 @@ func (p *captureClaudeUsagePlugin) HandleUsage(_ context.Context, record usage.R
 	}
 }
 
-type noopClaudeUsagePlugin struct{}
+type noopClaudeUsageConsumer struct{}
 
-func (noopClaudeUsagePlugin) HandleUsage(context.Context, usage.Record) {}
+func (noopClaudeUsageConsumer) HandleUsage(context.Context, usage.Record) {}
 
 func TestClaudeExecutor_ExecuteStream_Translated_ClientDisconnectAfterTerminalEventIsNotFailed(t *testing.T) {
 	const streamData = "event: message_start\n" +
@@ -71,13 +71,13 @@ func TestClaudeExecutor_ExecuteStream_Translated_ClientDisconnectAfterTerminalEv
 		server.Close()
 	}()
 
-	pluginName := "test-claude-translated-disconnect"
-	plugin := &captureClaudeUsagePlugin{
+	consumerName := "test-claude-translated-disconnect"
+	consumer := &captureClaudeUsageConsumer{
 		records: make(chan usage.Record, 4),
 	}
-	usage.RegisterNamedPlugin(pluginName, plugin)
+	usage.RegisterNamedConsumer(consumerName, consumer)
 	t.Cleanup(func() {
-		usage.RegisterNamedPlugin(pluginName, noopClaudeUsagePlugin{})
+		usage.RegisterNamedConsumer(consumerName, noopClaudeUsageConsumer{})
 	})
 
 	exec := NewClaudeExecutor(&config.Config{})
@@ -121,7 +121,7 @@ func TestClaudeExecutor_ExecuteStream_Translated_ClientDisconnectAfterTerminalEv
 	}
 
 	select {
-	case record := <-plugin.records:
+	case record := <-consumer.records:
 		if record.Failed {
 			t.Fatalf("expected usage record to not be marked failed, but got failed=true, fail status: %d body: %s", record.Fail.StatusCode, record.Fail.Body)
 		}
@@ -167,13 +167,13 @@ func TestClaudeExecutor_ExecuteStream_Passthrough_ClientDisconnectAfterTerminalE
 		server.Close()
 	}()
 
-	pluginName := "test-claude-passthrough-disconnect"
-	plugin := &captureClaudeUsagePlugin{
+	consumerName := "test-claude-passthrough-disconnect"
+	consumer := &captureClaudeUsageConsumer{
 		records: make(chan usage.Record, 4),
 	}
-	usage.RegisterNamedPlugin(pluginName, plugin)
+	usage.RegisterNamedConsumer(consumerName, consumer)
 	t.Cleanup(func() {
-		usage.RegisterNamedPlugin(pluginName, noopClaudeUsagePlugin{})
+		usage.RegisterNamedConsumer(consumerName, noopClaudeUsageConsumer{})
 	})
 
 	exec := NewClaudeExecutor(&config.Config{})
@@ -215,7 +215,7 @@ func TestClaudeExecutor_ExecuteStream_Passthrough_ClientDisconnectAfterTerminalE
 	}
 
 	select {
-	case record := <-plugin.records:
+	case record := <-consumer.records:
 		if record.Failed {
 			t.Fatalf("expected usage record to not be marked failed in passthrough, but got failed=true, fail status: %d body: %s", record.Fail.StatusCode, record.Fail.Body)
 		}

@@ -17,7 +17,6 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/logging"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
 	runtimeexecutor "github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/api/handlers"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 )
@@ -101,12 +100,6 @@ func TestResponsesSteeringFullDuplexIntegration(t *testing.T) {
 			registry.GetGlobalRegistry().RegisterClient(authID, "codex", []*registry.ModelInfo{{ID: "steering-test-model"}})
 			defer registry.GetGlobalRegistry().UnregisterClient(authID)
 			base := handlers.NewBaseAPIHandlers(&cfg.SDKConfig, manager)
-			base.SetModelRouterHost(&websocketLoggingRouter{
-				record: func(ctx context.Context, _ string, body []byte) {
-					// Model-router host HTTP calls share the duplex connection lifetime.
-					helps.RecordAPIRequest(ctx, cfg, helps.UpstreamRequestLog{URL: "https://router.invalid/route", Body: body})
-				},
-			})
 			h := NewOpenAIResponsesAPIHandler(base)
 			router := gin.New()
 			deferredCount := make(chan int, 1)

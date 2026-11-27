@@ -3537,11 +3537,11 @@ func TestXAIExecutorExecuteImagesUsesImagesEndpointAndPublishesUsage(t *testing.
 		_, _ = w.Write([]byte(`{"created":123,"data":[{"b64_json":"AA=="}],"usage":{"cost_in_usd_ticks":250000}}`))
 	}))
 	defer server.Close()
-	plugin := &captureXAIUsagePlugin{
+	consumer := &captureXAIUsageConsumer{
 		model:   requestedModel,
 		records: make(chan usage.Record, 2),
 	}
-	usage.RegisterPlugin(plugin)
+	usage.RegisterConsumer(consumer)
 
 	exec := NewXAIExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{
@@ -3588,7 +3588,7 @@ func TestXAIExecutorExecuteImagesUsesImagesEndpointAndPublishesUsage(t *testing.
 		t.Fatalf("payload = %s", string(resp.Payload))
 	}
 
-	record := waitForXAIUsageRecord(t, plugin.records)
+	record := waitForXAIUsageRecord(t, consumer.records)
 	if record.Model != requestedModel {
 		t.Fatalf("model = %q, want %q", record.Model, requestedModel)
 	}
@@ -3599,7 +3599,7 @@ func TestXAIExecutorExecuteImagesUsesImagesEndpointAndPublishesUsage(t *testing.
 		t.Fatalf("detail = %+v, want zero token usage and ImageCount=1", record.Detail)
 	}
 	assertXAIUsageRecordTTFT(t, record.TTFT)
-	assertNoAdditionalXAIUsageRecord(t, plugin.records)
+	assertNoAdditionalXAIUsageRecord(t, consumer.records)
 }
 
 func TestXAIExecutorExecuteImagesPublishesFailureUsage(t *testing.T) {
@@ -3612,11 +3612,11 @@ func TestXAIExecutorExecuteImagesPublishesFailureUsage(t *testing.T) {
 	}))
 	defer server.Close()
 
-	plugin := &captureXAIUsagePlugin{
+	consumer := &captureXAIUsageConsumer{
 		model:   requestedModel,
 		records: make(chan usage.Record, 2),
 	}
-	usage.RegisterPlugin(plugin)
+	usage.RegisterConsumer(consumer)
 
 	exec := NewXAIExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{
@@ -3638,7 +3638,7 @@ func TestXAIExecutorExecuteImagesPublishesFailureUsage(t *testing.T) {
 		t.Fatal("Execute() error = nil, want non-nil")
 	}
 
-	record := waitForXAIUsageRecord(t, plugin.records)
+	record := waitForXAIUsageRecord(t, consumer.records)
 	if record.Model != requestedModel {
 		t.Fatalf("model = %q, want %q", record.Model, requestedModel)
 	}
@@ -3648,17 +3648,17 @@ func TestXAIExecutorExecuteImagesPublishesFailureUsage(t *testing.T) {
 	if record.Fail.StatusCode != http.StatusTooManyRequests {
 		t.Fatalf("failure status = %d, want %d", record.Fail.StatusCode, http.StatusTooManyRequests)
 	}
-	assertNoAdditionalXAIUsageRecord(t, plugin.records)
+	assertNoAdditionalXAIUsageRecord(t, consumer.records)
 }
 
 func TestXAIExecutorExecuteImagesPublishesRequestBuildFailureUsage(t *testing.T) {
 	const requestedModel = "grok-imagine-image-fallback"
 
-	plugin := &captureXAIUsagePlugin{
+	consumer := &captureXAIUsageConsumer{
 		model:   requestedModel,
 		records: make(chan usage.Record, 2),
 	}
-	usage.RegisterPlugin(plugin)
+	usage.RegisterConsumer(consumer)
 
 	exec := NewXAIExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{
@@ -3679,22 +3679,22 @@ func TestXAIExecutorExecuteImagesPublishesRequestBuildFailureUsage(t *testing.T)
 		t.Fatal("Execute() error = nil, want non-nil")
 	}
 
-	record := waitForXAIUsageRecord(t, plugin.records)
+	record := waitForXAIUsageRecord(t, consumer.records)
 	if record.Model != requestedModel {
 		t.Fatalf("model = %q, want %q", record.Model, requestedModel)
 	}
 	if !record.Failed {
 		t.Fatal("failed = false, want true")
 	}
-	assertNoAdditionalXAIUsageRecord(t, plugin.records)
+	assertNoAdditionalXAIUsageRecord(t, consumer.records)
 }
 
-type captureXAIUsagePlugin struct {
+type captureXAIUsageConsumer struct {
 	model   string
 	records chan usage.Record
 }
 
-func (p *captureXAIUsagePlugin) HandleUsage(_ context.Context, record usage.Record) {
+func (p *captureXAIUsageConsumer) HandleUsage(_ context.Context, record usage.Record) {
 	if p == nil || record.Provider != "xai" || record.Model != p.model {
 		return
 	}
@@ -4108,11 +4108,11 @@ func TestXAIExecutorExecuteVideosCreate(t *testing.T) {
 	}))
 	defer server.Close()
 
-	plugin := &captureXAIUsagePlugin{
+	consumer := &captureXAIUsageConsumer{
 		model:   requestedModel,
 		records: make(chan usage.Record, 2),
 	}
-	usage.RegisterPlugin(plugin)
+	usage.RegisterConsumer(consumer)
 
 	exec := NewXAIExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{
@@ -4153,7 +4153,7 @@ func TestXAIExecutorExecuteVideosCreate(t *testing.T) {
 		t.Fatalf("payload = %s", string(resp.Payload))
 	}
 
-	record := waitForXAIUsageRecord(t, plugin.records)
+	record := waitForXAIUsageRecord(t, consumer.records)
 	if record.Model != requestedModel {
 		t.Fatalf("model = %q, want %q", record.Model, requestedModel)
 	}
@@ -4164,7 +4164,7 @@ func TestXAIExecutorExecuteVideosCreate(t *testing.T) {
 		t.Fatalf("detail = %+v, want zero token usage on async video creation", record.Detail)
 	}
 	assertXAIUsageRecordTTFT(t, record.TTFT)
-	assertNoAdditionalXAIUsageRecord(t, plugin.records)
+	assertNoAdditionalXAIUsageRecord(t, consumer.records)
 }
 
 func TestXAIExecutorExecuteVideosPublishesFailureUsage(t *testing.T) {
@@ -4177,11 +4177,11 @@ func TestXAIExecutorExecuteVideosPublishesFailureUsage(t *testing.T) {
 	}))
 	defer server.Close()
 
-	plugin := &captureXAIUsagePlugin{
+	consumer := &captureXAIUsageConsumer{
 		model:   requestedModel,
 		records: make(chan usage.Record, 2),
 	}
-	usage.RegisterPlugin(plugin)
+	usage.RegisterConsumer(consumer)
 
 	exec := NewXAIExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{
@@ -4200,7 +4200,7 @@ func TestXAIExecutorExecuteVideosPublishesFailureUsage(t *testing.T) {
 		t.Fatal("Execute() error = nil, want non-nil")
 	}
 
-	record := waitForXAIUsageRecord(t, plugin.records)
+	record := waitForXAIUsageRecord(t, consumer.records)
 	if record.Model != requestedModel {
 		t.Fatalf("model = %q, want %q", record.Model, requestedModel)
 	}
@@ -4210,17 +4210,17 @@ func TestXAIExecutorExecuteVideosPublishesFailureUsage(t *testing.T) {
 	if record.Fail.StatusCode != http.StatusTooManyRequests {
 		t.Fatalf("failure status = %d, want %d", record.Fail.StatusCode, http.StatusTooManyRequests)
 	}
-	assertNoAdditionalXAIUsageRecord(t, plugin.records)
+	assertNoAdditionalXAIUsageRecord(t, consumer.records)
 }
 
 func TestXAIExecutorExecuteVideosPublishesRequestBuildFailureUsage(t *testing.T) {
 	const requestedModel = "grok-imagine-video-fallback"
 
-	plugin := &captureXAIUsagePlugin{
+	consumer := &captureXAIUsageConsumer{
 		model:   requestedModel,
 		records: make(chan usage.Record, 2),
 	}
-	usage.RegisterPlugin(plugin)
+	usage.RegisterConsumer(consumer)
 
 	exec := NewXAIExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{
@@ -4238,14 +4238,14 @@ func TestXAIExecutorExecuteVideosPublishesRequestBuildFailureUsage(t *testing.T)
 		t.Fatal("Execute() error = nil, want non-nil")
 	}
 
-	record := waitForXAIUsageRecord(t, plugin.records)
+	record := waitForXAIUsageRecord(t, consumer.records)
 	if record.Model != requestedModel {
 		t.Fatalf("model = %q, want %q", record.Model, requestedModel)
 	}
 	if !record.Failed {
 		t.Fatal("failed = false, want true")
 	}
-	assertNoAdditionalXAIUsageRecord(t, plugin.records)
+	assertNoAdditionalXAIUsageRecord(t, consumer.records)
 }
 
 func TestXAIExecutorExecuteVideosRetrieve(t *testing.T) {
@@ -8062,8 +8062,8 @@ func TestXAIWebsocketUsagePreservesFilteredSearch(t *testing.T) {
 	defer server.Close()
 	alias := t.Name()
 	capture := &multiProviderUsageCapture{alias: alias, records: make(chan usage.Record, 4)}
-	usage.RegisterNamedPlugin(t.Name(), capture)
-	t.Cleanup(func() { usage.RegisterNamedPlugin(t.Name(), multiProviderNoopUsagePlugin{}) })
+	usage.RegisterNamedConsumer(t.Name(), capture)
+	t.Cleanup(func() { usage.RegisterNamedConsumer(t.Name(), multiProviderNoopUsageConsumer{}) })
 	ctx := usage.WithRequestedModelAlias(cliproxyexecutor.WithDownstreamWebsocket(context.Background()), alias)
 	exec := NewXAIWebsocketsExecutor(&config.Config{})
 	auth := &cliproxyauth.Auth{Provider: "xai", Attributes: map[string]string{"base_url": server.URL, "websockets": "true"}, Metadata: map[string]any{"access_token": "test"}}

@@ -344,7 +344,7 @@ func TestRequestCodexTokenLoginDoesNotRaceConfigV8Save(t *testing.T) {
 		t.Fatal("timed out waiting for post-auth persist hook")
 	}
 	waitForOAuthSessionDone(t, state)
-	_, status, _, _, completed, ok := GetOAuthSessionDetails(state)
+	_, status, completed, ok := GetOAuthSessionDetails(state)
 	if !ok || !completed || status != "" {
 		t.Fatalf("expected completed codex session without error, got ok=%v completed=%v status=%q", ok, completed, status)
 	}

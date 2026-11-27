@@ -274,7 +274,7 @@ func task6CaptureFailureUsage(t *testing.T, id string) func() {
 func task6CaptureFailureUsageWithCheck(t *testing.T, id string, check func(usage.Record)) func() {
 	t.Helper()
 	capture := &task6UsageCapture{id: id, records: make(chan usage.Record, 32)}
-	usage.RegisterNamedPlugin("task6-patch-failure", capture)
+	usage.RegisterNamedConsumer("task6-patch-failure", capture)
 	return func() {
 		usage.PublishRecord(context.Background(), usage.Record{RequestID: id + "-barrier"})
 		count := 0
@@ -502,7 +502,7 @@ func task6DrainUsage(t *testing.T) {
 	t.Helper()
 	id := "task6-drain-" + t.Name()
 	capture := &task6UsageCapture{id: id, records: make(chan usage.Record, 1)}
-	usage.RegisterNamedPlugin("task6-patch-failure", capture)
+	usage.RegisterNamedConsumer("task6-patch-failure", capture)
 	usage.PublishRecord(context.Background(), usage.Record{RequestID: id + "-barrier"})
 	select {
 	case <-capture.records:

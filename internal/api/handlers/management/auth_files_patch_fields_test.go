@@ -586,39 +586,6 @@ func TestNormalizeAuthFilePatchFieldsCanonicalizesLegacyRoots(t *testing.T) {
 	}
 }
 
-func TestSetSourceAuthFileDisabledNormalizesLegacyMetadata(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "legacy.json")
-	if errWrite := os.WriteFile(path, []byte(`{"type":"codex","request-retry":2,"disable-cooling":true}`), 0o600); errWrite != nil {
-		t.Fatalf("write legacy auth file: %v", errWrite)
-	}
-
-	if errDisable := setSourceAuthFileDisabled(path, true); errDisable != nil {
-		t.Fatalf("setSourceAuthFileDisabled() error = %v", errDisable)
-	}
-	persistedData, errRead := os.ReadFile(path)
-	if errRead != nil {
-		t.Fatalf("read persisted auth file: %v", errRead)
-	}
-	var persisted map[string]any
-	if errUnmarshal := json.Unmarshal(persistedData, &persisted); errUnmarshal != nil {
-		t.Fatalf("decode persisted auth file: %v", errUnmarshal)
-	}
-	if got := persisted["request_retry"]; got != float64(2) {
-		t.Fatalf("persisted request_retry = %#v, want 2", got)
-	}
-	if got := persisted["disable_cooling"]; got != true {
-		t.Fatalf("persisted disable_cooling = %#v, want true", got)
-	}
-	if got := persisted["disabled"]; got != true {
-		t.Fatalf("persisted disabled = %#v, want true", got)
-	}
-	for _, legacy := range []string{"request-retry", "disable-cooling"} {
-		if _, exists := persisted[legacy]; exists {
-			t.Fatalf("persisted metadata retained %q: %#v", legacy, persisted)
-		}
-	}
-}
-
 func TestPatchAuthFileFields_SyncsPlanTypeAndInvokesHook(t *testing.T) {
 	t.Setenv("MANAGEMENT_PASSWORD", "")
 

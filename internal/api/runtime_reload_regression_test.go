@@ -11,7 +11,6 @@ import (
 
 func TestHandlerRuntimeReloadConcurrentWithModelLists(t *testing.T) {
 	server := newTestServer(t)
-	host := &mockModelListInterceptorHost{}
 	start := make(chan struct{})
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -19,9 +18,7 @@ func TestHandlerRuntimeReloadConcurrentWithModelLists(t *testing.T) {
 		defer wg.Done()
 		<-start
 		for i := 0; i < 500; i++ {
-			server.handlers.SetPluginHost(host)
 			server.handlers.UpdateClients(&config.SDKConfig{RequestLog: i%2 == 0})
-			server.handlers.SetPluginHost(nil)
 		}
 	}()
 	go func() {

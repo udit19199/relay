@@ -81,9 +81,9 @@ func TestMetaExecutorTTFT(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			alias := t.Name()
 			capture := &multiProviderUsageCapture{alias: alias, records: make(chan coreusage.Record, 4)}
-			coreusage.RegisterNamedPlugin(alias, capture)
+			coreusage.RegisterNamedConsumer(alias, capture)
 			t.Cleanup(func() {
-				coreusage.RegisterNamedPlugin(alias, multiProviderNoopUsagePlugin{})
+				coreusage.RegisterNamedConsumer(alias, multiProviderNoopUsageConsumer{})
 			})
 
 			var forwarded strings.Builder

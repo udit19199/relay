@@ -14,7 +14,7 @@ import (
 	coreusage "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/usage"
 )
 
-func TestUsageQueuePluginPayloadIncludesStableFieldsAndSuccess(t *testing.T) {
+func TestUsageQueueConsumerPayloadIncludesStableFieldsAndSuccess(t *testing.T) {
 	withEnabledQueue(t, func() {
 		ctx := internallogging.WithRequestID(context.Background(), "ctx-request-id")
 		ctx = internallogging.WithEndpoint(ctx, "POST /v1/chat/completions")
@@ -30,8 +30,8 @@ func TestUsageQueuePluginPayloadIncludesStableFieldsAndSuccess(t *testing.T) {
 		responseHeaders.Add("X-Upstream-Request-Id", "upstream-req-1")
 		responseHeaders.Add("Retry-After", "30")
 
-		plugin := &usageQueuePlugin{}
-		plugin.HandleUsage(ctx, coreusage.Record{
+		consumer := &usageQueueConsumer{}
+		consumer.HandleUsage(ctx, coreusage.Record{
 			Provider:             "openai",
 			ExecutorType:         "XAIExecutor",
 			Model:                "gpt-5.4",
@@ -90,7 +90,7 @@ func TestUsageQueuePluginPayloadIncludesStableFieldsAndSuccess(t *testing.T) {
 	})
 }
 
-func TestUsageQueuePluginNormalizesDirectSDKUsageByProvider(t *testing.T) {
+func TestUsageQueueConsumerNormalizesDirectSDKUsageByProvider(t *testing.T) {
 	tests := []struct {
 		provider  string
 		wantTotal int
@@ -103,7 +103,7 @@ func TestUsageQueuePluginNormalizesDirectSDKUsageByProvider(t *testing.T) {
 				ctx := internallogging.WithResponseStatusHolder(context.Background())
 				internallogging.SetResponseStatus(ctx, http.StatusOK)
 
-				(&usageQueuePlugin{}).HandleUsage(ctx, coreusage.Record{
+				(&usageQueueConsumer{}).HandleUsage(ctx, coreusage.Record{
 					Provider: tt.provider,
 					Model:    "direct-sdk-model",
 					Detail: coreusage.Detail{
@@ -121,12 +121,12 @@ func TestUsageQueuePluginNormalizesDirectSDKUsageByProvider(t *testing.T) {
 	}
 }
 
-func TestUsageQueuePluginPayloadIncludesGenerateFalse(t *testing.T) {
+func TestUsageQueueConsumerPayloadIncludesGenerateFalse(t *testing.T) {
 	withEnabledQueue(t, func() {
 		ctx := internallogging.WithResponseStatusHolder(context.Background())
 		internallogging.SetResponseStatus(ctx, http.StatusOK)
 
-		(&usageQueuePlugin{}).HandleUsage(ctx, coreusage.Record{
+		(&usageQueueConsumer{}).HandleUsage(ctx, coreusage.Record{
 			Provider: "openai",
 			Model:    "gpt-5.4",
 			Generate: coreusage.GenerateFlag(false),
@@ -141,13 +141,13 @@ func TestUsageQueuePluginPayloadIncludesGenerateFalse(t *testing.T) {
 	})
 }
 
-func TestUsageQueuePluginPayloadDefaultsGenerateTrueWhenOmitted(t *testing.T) {
+func TestUsageQueueConsumerPayloadDefaultsGenerateTrueWhenOmitted(t *testing.T) {
 	withEnabledQueue(t, func() {
 		ctx := internallogging.WithResponseStatusHolder(context.Background())
 		internallogging.SetResponseStatus(ctx, http.StatusOK)
 
 		// Legacy callers construct usage.Record without Generate; omission must publish as true.
-		(&usageQueuePlugin{}).HandleUsage(ctx, coreusage.Record{
+		(&usageQueueConsumer{}).HandleUsage(ctx, coreusage.Record{
 			Provider: "openai",
 			Model:    "gpt-5.4",
 			Detail: coreusage.Detail{
@@ -161,14 +161,14 @@ func TestUsageQueuePluginPayloadDefaultsGenerateTrueWhenOmitted(t *testing.T) {
 	})
 }
 
-func TestUsageQueuePluginPublishesStreamFlag(t *testing.T) {
+func TestUsageQueueConsumerPublishesStreamFlag(t *testing.T) {
 	for _, stream := range []bool{true, false} {
 		t.Run(map[bool]string{true: "stream_true", false: "stream_false"}[stream], func(t *testing.T) {
 			withEnabledQueue(t, func() {
 				ctx := internallogging.WithResponseStatusHolder(context.Background())
 				internallogging.SetResponseStatus(ctx, http.StatusOK)
 
-				(&usageQueuePlugin{}).HandleUsage(ctx, coreusage.Record{
+				(&usageQueueConsumer{}).HandleUsage(ctx, coreusage.Record{
 					Provider: "openai",
 					Model:    "gpt-5.4",
 					Stream:   stream,
@@ -185,12 +185,12 @@ func TestUsageQueuePluginPublishesStreamFlag(t *testing.T) {
 	}
 }
 
-func TestUsageQueuePluginPreservesLegacyCachedOnlyUsage(t *testing.T) {
+func TestUsageQueueConsumerPreservesLegacyCachedOnlyUsage(t *testing.T) {
 	withEnabledQueue(t, func() {
 		ctx := internallogging.WithResponseStatusHolder(context.Background())
 		internallogging.SetResponseStatus(ctx, http.StatusOK)
 
-		(&usageQueuePlugin{}).HandleUsage(ctx, coreusage.Record{
+		(&usageQueueConsumer{}).HandleUsage(ctx, coreusage.Record{
 			Provider: "openai",
 			Model:    "gpt-5.4",
 			Detail: coreusage.Detail{
@@ -207,13 +207,13 @@ func TestUsageQueuePluginPreservesLegacyCachedOnlyUsage(t *testing.T) {
 	})
 }
 
-func TestUsageQueuePluginEmitsSingleCanonicalAutoTier(t *testing.T) {
+func TestUsageQueueConsumerEmitsSingleCanonicalAutoTier(t *testing.T) {
 	withEnabledQueue(t, func() {
 		ctx := coreusage.WithServiceTier(context.Background(), coreusage.AutoServiceTier)
 		ctx = internallogging.WithResponseStatusHolder(ctx)
 		internallogging.SetResponseStatus(ctx, http.StatusOK)
 
-		(&usageQueuePlugin{}).HandleUsage(ctx, coreusage.Record{
+		(&usageQueueConsumer{}).HandleUsage(ctx, coreusage.Record{
 			Provider: "openai",
 			Model:    "gpt-5.4",
 			Detail: coreusage.Detail{
@@ -229,12 +229,12 @@ func TestUsageQueuePluginEmitsSingleCanonicalAutoTier(t *testing.T) {
 	})
 }
 
-func TestUsageQueuePluginAcceptsDeprecatedRequestTierRecordField(t *testing.T) {
+func TestUsageQueueConsumerAcceptsDeprecatedRequestTierRecordField(t *testing.T) {
 	withEnabledQueue(t, func() {
 		ctx := internallogging.WithResponseStatusHolder(context.Background())
 		internallogging.SetResponseStatus(ctx, http.StatusOK)
 
-		(&usageQueuePlugin{}).HandleUsage(ctx, coreusage.Record{
+		(&usageQueueConsumer{}).HandleUsage(ctx, coreusage.Record{
 			Provider:           "openai",
 			Model:              "gpt-5.4",
 			RequestServiceTier: "priority",
@@ -247,7 +247,7 @@ func TestUsageQueuePluginAcceptsDeprecatedRequestTierRecordField(t *testing.T) {
 	})
 }
 
-func TestUsageQueuePluginAsyncUsesRecordResponseHeaders(t *testing.T) {
+func TestUsageQueueConsumerAsyncUsesRecordResponseHeaders(t *testing.T) {
 	withEnabledQueue(t, func() {
 		ctx := internallogging.WithRequestID(context.Background(), "ctx-request-id")
 		ctx = internallogging.WithEndpoint(ctx, "POST /v1/chat/completions")
@@ -266,7 +266,7 @@ func TestUsageQueuePluginAsyncUsesRecordResponseHeaders(t *testing.T) {
 			nextHeaders.Set("X-Upstream-Request-Id", "upstream-req-2")
 			internallogging.SetResponseHeaders(ctx, nextHeaders)
 		}))
-		mgr.Register(&usageQueuePlugin{})
+		mgr.Register(&usageQueueConsumer{})
 
 		mgr.Publish(ctx, coreusage.Record{
 			Provider:    "openai",
@@ -291,15 +291,15 @@ func TestUsageQueuePluginAsyncUsesRecordResponseHeaders(t *testing.T) {
 	})
 }
 
-func TestUsageQueuePluginPayloadIncludesStableFieldsAndFailureAndGinRequestID(t *testing.T) {
+func TestUsageQueueConsumerPayloadIncludesStableFieldsAndFailureAndGinRequestID(t *testing.T) {
 	withEnabledQueue(t, func() {
 		ctx := internallogging.WithRequestID(context.Background(), "gin-request-id")
 		ctx = internallogging.WithEndpoint(ctx, "GET /v1/responses")
 		ctx = internallogging.WithResponseStatusHolder(ctx)
 		internallogging.SetResponseStatus(ctx, http.StatusInternalServerError)
 
-		plugin := &usageQueuePlugin{}
-		plugin.HandleUsage(ctx, coreusage.Record{
+		consumer := &usageQueueConsumer{}
+		consumer.HandleUsage(ctx, coreusage.Record{
 			Provider:    "openai",
 			Model:       "gpt-5.4-mini",
 			Alias:       "client-mini",
@@ -333,7 +333,7 @@ func TestUsageQueuePluginPayloadIncludesStableFieldsAndFailureAndGinRequestID(t 
 	})
 }
 
-func TestUsageQueuePluginAsyncIgnoresRecycledGinContext(t *testing.T) {
+func TestUsageQueueConsumerAsyncIgnoresRecycledGinContext(t *testing.T) {
 	withEnabledQueue(t, func() {
 		ginCtx := newTestGinContext(t, http.MethodPost, "/v1/chat/completions", http.StatusOK)
 		ctx := context.WithValue(context.Background(), "gin", ginCtx)
@@ -349,7 +349,7 @@ func TestUsageQueuePluginAsyncIgnoresRecycledGinContext(t *testing.T) {
 			ginCtx.Request = httptest.NewRequest(http.MethodGet, "http://example.com/v1/responses", nil)
 			ginCtx.Status(http.StatusOK)
 		}))
-		mgr.Register(&usageQueuePlugin{})
+		mgr.Register(&usageQueueConsumer{})
 
 		mgr.Publish(ctx, coreusage.Record{
 			Provider:    "openai",
@@ -592,7 +592,7 @@ func requireHeaderField(t *testing.T, payload map[string]json.RawMessage, field,
 	}
 }
 
-func TestUsageQueuePluginPayloadIncludesExplicitSessionHierarchy(t *testing.T) {
+func TestUsageQueueConsumerPayloadIncludesExplicitSessionHierarchy(t *testing.T) {
 	withEnabledQueue(t, func() {
 		ctx := internallogging.WithRequestID(context.Background(), "ctx-session-req-1")
 		ctx = internallogging.WithEndpoint(ctx, "POST /v1/chat/completions")
@@ -604,8 +604,8 @@ func TestUsageQueuePluginPayloadIncludesExplicitSessionHierarchy(t *testing.T) {
 		ctx = internallogging.WithResponseStatusHolder(ctx)
 		internallogging.SetResponseStatus(ctx, http.StatusOK)
 
-		plugin := &usageQueuePlugin{}
-		plugin.HandleUsage(ctx, coreusage.Record{
+		consumer := &usageQueueConsumer{}
+		consumer.HandleUsage(ctx, coreusage.Record{
 			Provider:        "openai",
 			Model:           "gpt-5.6-sol",
 			APIKey:          "test-key",
@@ -630,15 +630,15 @@ func TestUsageQueuePluginPayloadIncludesExplicitSessionHierarchy(t *testing.T) {
 	})
 }
 
-func TestUsageQueuePluginPayloadNormalizesPrefixedNativeUUID(t *testing.T) {
+func TestUsageQueueConsumerPayloadNormalizesPrefixedNativeUUID(t *testing.T) {
 	withEnabledQueue(t, func() {
 		ctx := internallogging.WithRequestID(context.Background(), "ctx-native-uuid-1")
 		ctx = internallogging.WithEndpoint(ctx, "POST /v1/chat/completions")
 		ctx = internallogging.WithResponseStatusHolder(ctx)
 		internallogging.SetResponseStatus(ctx, http.StatusOK)
 
-		plugin := &usageQueuePlugin{}
-		plugin.HandleUsage(ctx, coreusage.Record{
+		consumer := &usageQueueConsumer{}
+		consumer.HandleUsage(ctx, coreusage.Record{
 			Provider:        "codex",
 			Model:           "gpt-5.6-sol",
 			APIKey:          "test-key",
@@ -654,15 +654,15 @@ func TestUsageQueuePluginPayloadNormalizesPrefixedNativeUUID(t *testing.T) {
 	})
 }
 
-func TestUsageQueuePluginPayloadPreventsSelfReferentialLoop(t *testing.T) {
+func TestUsageQueueConsumerPayloadPreventsSelfReferentialLoop(t *testing.T) {
 	withEnabledQueue(t, func() {
 		ctx := internallogging.WithRequestID(context.Background(), "ctx-loop-req-1")
 		ctx = internallogging.WithEndpoint(ctx, "POST /v1/chat/completions")
 		ctx = internallogging.WithResponseStatusHolder(ctx)
 		internallogging.SetResponseStatus(ctx, http.StatusOK)
 
-		plugin := &usageQueuePlugin{}
-		plugin.HandleUsage(ctx, coreusage.Record{
+		consumer := &usageQueueConsumer{}
+		consumer.HandleUsage(ctx, coreusage.Record{
 			Provider:        "openai",
 			Model:           "gpt-5.6-sol",
 			APIKey:          "test-key",
@@ -682,7 +682,7 @@ func TestUsageQueuePluginPayloadPreventsSelfReferentialLoop(t *testing.T) {
 	})
 }
 
-func TestUsageQueuePluginPayloadSameOriginFallback(t *testing.T) {
+func TestUsageQueueConsumerPayloadSameOriginFallback(t *testing.T) {
 	withEnabledQueue(t, func() {
 		ctx := internallogging.WithRequestID(context.Background(), "ctx-same-origin-1")
 		ctx = internallogging.WithEndpoint(ctx, "POST /v1/chat/completions")
@@ -693,10 +693,10 @@ func TestUsageQueuePluginPayloadSameOriginFallback(t *testing.T) {
 		ctx = internallogging.WithResponseStatusHolder(ctx)
 		internallogging.SetResponseStatus(ctx, http.StatusOK)
 
-		plugin := &usageQueuePlugin{}
+		consumer := &usageQueueConsumer{}
 		// Record explicitly defines an independent root session without parent.
 		// It should NOT pick up old-parent from context.
-		plugin.HandleUsage(ctx, coreusage.Record{
+		consumer.HandleUsage(ctx, coreusage.Record{
 			Provider:        "openai",
 			Model:           "gpt-5.6-sol",
 			APIKey:          "test-key",
@@ -715,7 +715,7 @@ func TestUsageQueuePluginPayloadSameOriginFallback(t *testing.T) {
 	})
 }
 
-func TestUsageQueuePlugin_SchemeB_ExecutionIDAndTraceID(t *testing.T) {
+func TestUsageQueueConsumer_SchemeB_ExecutionIDAndTraceID(t *testing.T) {
 	prevEnabled := Enabled()
 	prevUsageEnabled := UsageStatisticsEnabled()
 	SetEnabled(true)
@@ -725,11 +725,11 @@ func TestUsageQueuePlugin_SchemeB_ExecutionIDAndTraceID(t *testing.T) {
 		SetUsageStatisticsEnabled(prevUsageEnabled)
 	})
 
-	plugin := &usageQueuePlugin{}
+	consumer := &usageQueueConsumer{}
 	ctx := internallogging.WithRequestID(context.Background(), "000000ab")
 	execUUID := "12345678-1234-4234-8234-123456789abc"
 
-	plugin.HandleUsage(ctx, coreusage.Record{
+	consumer.HandleUsage(ctx, coreusage.Record{
 		RequestID: execUUID,
 		TraceID:   "000000ab",
 		Provider:  "openai",
@@ -750,7 +750,7 @@ func TestUsageQueuePlugin_SchemeB_ExecutionIDAndTraceID(t *testing.T) {
 	requireStringField(t, payload, "trace_id", "000000ab")
 }
 
-func TestUsageQueuePlugin_SchemeB_StrictLegacyRequestIDPreservation(t *testing.T) {
+func TestUsageQueueConsumer_SchemeB_StrictLegacyRequestIDPreservation(t *testing.T) {
 	prevEnabled := Enabled()
 	prevUsageEnabled := UsageStatisticsEnabled()
 	SetEnabled(true)
@@ -760,11 +760,11 @@ func TestUsageQueuePlugin_SchemeB_StrictLegacyRequestIDPreservation(t *testing.T
 		SetUsageStatisticsEnabled(prevUsageEnabled)
 	})
 
-	plugin := &usageQueuePlugin{}
+	consumer := &usageQueueConsumer{}
 	ctx := internallogging.WithRequestID(context.Background(), "legacy-log-id")
 	execUUID := "12345678-1234-4234-8234-123456789abc"
 
-	plugin.HandleUsage(ctx, coreusage.Record{
+	consumer.HandleUsage(ctx, coreusage.Record{
 		RequestID: execUUID,
 		TraceID:   "custom-trace-id",
 		Provider:  "openai",
@@ -783,7 +783,7 @@ func TestUsageQueuePlugin_SchemeB_StrictLegacyRequestIDPreservation(t *testing.T
 	requireStringField(t, payload, "trace_id", "custom-trace-id")
 }
 
-func TestUsageQueuePluginPayloadDistinguishesNativeKey(t *testing.T) {
+func TestUsageQueueConsumerPayloadDistinguishesNativeKey(t *testing.T) {
 	withEnabledQueue(t, func() {
 		t.Run("native_key", func(t *testing.T) {
 			gin.SetMode(gin.TestMode)
@@ -795,8 +795,8 @@ func TestUsageQueuePluginPayloadDistinguishesNativeKey(t *testing.T) {
 			ctx := context.WithValue(context.Background(), "gin", ginCtx)
 			ctx = internallogging.WithRequestID(ctx, "req-native-1")
 
-			plugin := &usageQueuePlugin{}
-			plugin.HandleUsage(ctx, coreusage.Record{
+			consumer := &usageQueueConsumer{}
+			consumer.HandleUsage(ctx, coreusage.Record{
 				Provider: "openai",
 				Model:    "gpt-5.4",
 				APIKey:   "sk-native-key-123",
@@ -818,8 +818,8 @@ func TestUsageQueuePluginPayloadDistinguishesNativeKey(t *testing.T) {
 			ctx := context.WithValue(context.Background(), "gin", ginCtx)
 			ctx = internallogging.WithRequestID(ctx, "req-plugin-1")
 
-			plugin := &usageQueuePlugin{}
-			plugin.HandleUsage(ctx, coreusage.Record{
+			consumer := &usageQueueConsumer{}
+			consumer.HandleUsage(ctx, coreusage.Record{
 				Provider: "openai",
 				Model:    "gpt-5.4",
 				APIKey:   "plugin-principal-456",
@@ -834,8 +834,8 @@ func TestUsageQueuePluginPayloadDistinguishesNativeKey(t *testing.T) {
 		t.Run("record_explicit_native", func(t *testing.T) {
 			ctx := internallogging.WithRequestID(context.Background(), "req-explicit-1")
 
-			plugin := &usageQueuePlugin{}
-			plugin.HandleUsage(ctx, coreusage.Record{
+			consumer := &usageQueueConsumer{}
+			consumer.HandleUsage(ctx, coreusage.Record{
 				Provider:       "openai",
 				Model:          "gpt-5.4",
 				APIKey:         "sk-explicit-native",
@@ -852,8 +852,8 @@ func TestUsageQueuePluginPayloadDistinguishesNativeKey(t *testing.T) {
 		t.Run("unauthenticated", func(t *testing.T) {
 			ctx := internallogging.WithRequestID(context.Background(), "req-unauth-1")
 
-			plugin := &usageQueuePlugin{}
-			plugin.HandleUsage(ctx, coreusage.Record{
+			consumer := &usageQueueConsumer{}
+			consumer.HandleUsage(ctx, coreusage.Record{
 				Provider: "openai",
 				Model:    "gpt-5.4",
 			})
@@ -865,13 +865,13 @@ func TestUsageQueuePluginPayloadDistinguishesNativeKey(t *testing.T) {
 	})
 }
 
-func TestUsageQueuePluginEmitsFailCode(t *testing.T) {
+func TestUsageQueueConsumerEmitsFailCode(t *testing.T) {
 	withEnabledQueue(t, func() {
 		ginCtx := newTestGinContext(t, http.MethodPost, "/v1/chat/completions", http.StatusOK)
 		ctx := context.WithValue(context.Background(), "gin", ginCtx)
 
-		plugin := &usageQueuePlugin{}
-		plugin.HandleUsage(ctx, coreusage.Record{
+		consumer := &usageQueueConsumer{}
+		consumer.HandleUsage(ctx, coreusage.Record{
 			Provider:    "gemini",
 			Model:       "gemini-3.1-pro-preview",
 			AuthIndex:   "0",
@@ -907,15 +907,15 @@ func TestUsageQueuePluginEmitsFailCode(t *testing.T) {
 	})
 }
 
-func TestUsageQueuePluginPublishesAnthropicStructuredUsageDetails(t *testing.T) {
+func TestUsageQueueConsumerPublishesAnthropicStructuredUsageDetails(t *testing.T) {
 	withEnabledQueue(t, func() {
 		ctx := internallogging.WithRequestID(context.Background(), "claude-req-1")
 		ctx = internallogging.WithEndpoint(ctx, "POST /v1/messages")
 		ctx = internallogging.WithResponseStatusHolder(ctx)
 		internallogging.SetResponseStatus(ctx, http.StatusOK)
 
-		plugin := &usageQueuePlugin{}
-		plugin.HandleUsage(ctx, coreusage.Record{
+		consumer := &usageQueueConsumer{}
+		consumer.HandleUsage(ctx, coreusage.Record{
 			Provider:            "claude",
 			ExecutorType:        "ClaudeExecutor",
 			Model:               "claude-opus-5-5",

@@ -36,7 +36,7 @@ type bodyReadingAccessProvider struct {
 }
 
 func (p *bodyReadingAccessProvider) Identifier() string {
-	return "plugin:test:body-auth"
+	return "test:body-auth"
 }
 
 func (p *bodyReadingAccessProvider) Authenticate(_ context.Context, r *http.Request) (*sdkaccess.Result, *sdkaccess.AuthError) {
@@ -215,15 +215,15 @@ access:
 		}
 	})
 
-	t.Run("unauthenticated chunked body with plugin auth fallback is bounded and returns 413", func(t *testing.T) {
-		cfgPluginAuth := parseTestServerConfigYAML(t, `config-version: 8
+	t.Run("unauthenticated chunked body with access provider fallback is bounded and returns 413", func(t *testing.T) {
+		cfgAccessAuth := parseTestServerConfigYAML(t, `config-version: 8
 server:
   max-request-body-bytes: 64
 access:
   api-keys:
     - test-key
 `)
-		srv := newTestServerWithConfig(t, cfgPluginAuth)
+		srv := newTestServerWithConfig(t, cfgAccessAuth)
 		fallbackProvider := &bodyReadingAccessProvider{}
 		providers := append(srv.accessManager.Providers(), fallbackProvider)
 		srv.accessManager.SetProviders(providers)
@@ -406,7 +406,7 @@ access:
 			method string
 			path   string
 		}{
-			{http.MethodPost, "/v8/management/plugins/store/demo/install"},
+			{http.MethodPost, "/v8/management/routing/cooldown/reset"},
 			{http.MethodPut, "/v8/management/config"},
 		} {
 			reqMgmt := httptest.NewRequest(endpoint.method, endpoint.path, io.NopCloser(strings.NewReader(`{"version":"`+strings.Repeat("v", 128)+`"}`)))

@@ -134,12 +134,12 @@ func TestPayloadBarrierClaudeDoesNotReplayFiltersOrReinjectIdentity(t *testing.T
 	}
 }
 
-type captureEffectiveServiceTierPlugin struct {
+type captureEffectiveServiceTierConsumer struct {
 	authID  string
 	records chan usage.Record
 }
 
-func (p *captureEffectiveServiceTierPlugin) HandleUsage(_ context.Context, record usage.Record) {
+func (p *captureEffectiveServiceTierConsumer) HandleUsage(_ context.Context, record usage.Record) {
 	if p == nil || record.AuthID != p.authID {
 		return
 	}
@@ -172,11 +172,11 @@ func TestPayloadBarrierEffectiveServiceTierUsageAfterOverride(t *testing.T) {
 		for _, stream := range []bool{false, true} {
 			t.Run(map[bool]string{false: "execute", true: "stream"}[stream], func(t *testing.T) {
 				authID := t.Name()
-				plugin := &captureEffectiveServiceTierPlugin{
+				consumer := &captureEffectiveServiceTierConsumer{
 					authID:  authID,
 					records: make(chan usage.Record, 1),
 				}
-				usage.RegisterPlugin(plugin)
+				usage.RegisterConsumer(consumer)
 
 				auth := codexOAuthTestAuth(server.URL)
 				auth.ID = authID
@@ -207,7 +207,7 @@ func TestPayloadBarrierEffectiveServiceTierUsageAfterOverride(t *testing.T) {
 				if captured.serviceTier.String() != "priority" {
 					t.Fatalf("upstream body service_tier = %q, want priority", captured.serviceTier.String())
 				}
-				record := <-plugin.records
+				record := <-consumer.records
 				if record.ServiceTier != "auto" || record.EffectiveServiceTier != "priority" || record.ResponseServiceTier != "default" {
 					t.Fatalf("usage tiers = requested:%q effective:%q response:%q, want auto/priority/default", record.ServiceTier, record.EffectiveServiceTier, record.ResponseServiceTier)
 				}
@@ -234,11 +234,11 @@ func TestPayloadBarrierEffectiveServiceTierUsageAfterOverride(t *testing.T) {
 		for _, stream := range []bool{false, true} {
 			t.Run(map[bool]string{false: "execute", true: "stream"}[stream], func(t *testing.T) {
 				authID := t.Name()
-				plugin := &captureEffectiveServiceTierPlugin{
+				consumer := &captureEffectiveServiceTierConsumer{
 					authID:  authID,
 					records: make(chan usage.Record, 1),
 				}
-				usage.RegisterPlugin(plugin)
+				usage.RegisterConsumer(consumer)
 
 				auth := &cliproxyauth.Auth{
 					ID:         authID,
@@ -269,7 +269,7 @@ func TestPayloadBarrierEffectiveServiceTierUsageAfterOverride(t *testing.T) {
 					t.Fatalf("Execute error: %v", errExec)
 				}
 
-				record := <-plugin.records
+				record := <-consumer.records
 				if record.ServiceTier != "auto" || record.EffectiveServiceTier != "priority" || record.ResponseServiceTier != "default" {
 					t.Fatalf("usage tiers = requested:%q effective:%q response:%q, want auto/priority/default", record.ServiceTier, record.EffectiveServiceTier, record.ResponseServiceTier)
 				}
@@ -299,11 +299,11 @@ func TestPayloadBarrierEffectiveServiceTierUsageAfterOverride(t *testing.T) {
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				authID := t.Name()
-				plugin := &captureEffectiveServiceTierPlugin{
+				consumer := &captureEffectiveServiceTierConsumer{
 					authID:  authID,
 					records: make(chan usage.Record, 1),
 				}
-				usage.RegisterPlugin(plugin)
+				usage.RegisterConsumer(consumer)
 
 				auth := &cliproxyauth.Auth{
 					ID:         authID,
@@ -321,7 +321,7 @@ func TestPayloadBarrierEffectiveServiceTierUsageAfterOverride(t *testing.T) {
 				if errExec != nil {
 					t.Fatalf("Execute error: %v", errExec)
 				}
-				record := <-plugin.records
+				record := <-consumer.records
 				if record.ServiceTier != "auto" || record.EffectiveServiceTier != tc.wantEff {
 					t.Fatalf("usage tiers = requested:%q effective:%q, want auto/%q", record.ServiceTier, record.EffectiveServiceTier, tc.wantEff)
 				}
@@ -351,11 +351,11 @@ func TestPayloadBarrierEffectiveServiceTierUsageAfterOverride(t *testing.T) {
 		for _, stream := range []bool{false, true} {
 			t.Run(map[bool]string{false: "execute", true: "stream"}[stream], func(t *testing.T) {
 				authID := t.Name()
-				plugin := &captureEffectiveServiceTierPlugin{
+				consumer := &captureEffectiveServiceTierConsumer{
 					authID:  authID,
 					records: make(chan usage.Record, 1),
 				}
-				usage.RegisterPlugin(plugin)
+				usage.RegisterConsumer(consumer)
 
 				auth := &cliproxyauth.Auth{
 					ID:         authID,
@@ -383,7 +383,7 @@ func TestPayloadBarrierEffectiveServiceTierUsageAfterOverride(t *testing.T) {
 				} else if _, errExec := executor.Execute(ctx, auth, req, opts); errExec != nil {
 					t.Fatalf("Execute error: %v", errExec)
 				}
-				record := <-plugin.records
+				record := <-consumer.records
 				if record.ServiceTier != "auto" || record.EffectiveServiceTier != "" {
 					t.Fatalf("usage tiers = requested:%q effective:%q, want auto/empty", record.ServiceTier, record.EffectiveServiceTier)
 				}

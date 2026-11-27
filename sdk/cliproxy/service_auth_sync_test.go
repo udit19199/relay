@@ -193,7 +193,7 @@ func TestAuthIDMatches(t *testing.T) {
 	}{
 		{name: "identical", snapshotID: "account.json", id: "account.json", wantExact: true, wantFolded: true},
 		{name: "windows_store_case", snapshotID: "account.json", id: "Account.json", wantFolded: true},
-		{name: "case_sensitive_plugin_ids", snapshotID: "plugin:Account", id: "plugin:account", wantFolded: true},
+		{name: "case_sensitive_consumer_ids", snapshotID: "consumer:Account", id: "consumer:account", wantFolded: true},
 		{name: "different_ids", snapshotID: "account.json", id: "other.json"},
 	} {
 		for _, foldCase := range []bool{false, true} {
@@ -334,64 +334,6 @@ func TestHandleAuthUpdates_FileDeleteOrdering(t *testing.T) {
 	}
 }
 
-func TestHandleAuthUpdates_FileDeleteRecreatedSubset(t *testing.T) {
-	ctx := coreauth.WithSkipPersist(context.Background())
-	path := filepath.Join(t.TempDir(), "accounts.json")
-	write := func(data string) {
-		t.Helper()
-		if errWriteFile := os.WriteFile(path, []byte(data), 0o600); errWriteFile != nil {
-			t.Fatal(errWriteFile)
-		}
-	}
-	write(`{"type":"plugin","ids":["a","b"]}`)
-	manager := coreauth.NewManager(nil, nil, nil)
-	reg := GlobalModelRegistry()
-	auths := make([]*coreauth.Auth, 0, 2)
-	deletes := make([]watcher.AuthUpdate, 0, 2)
-	for index, id := range []string{"codex-recreated-subset-a", "codex-recreated-subset-b"} {
-		reg.UnregisterClient(id)
-		t.Cleanup(func() { reg.UnregisterClient(id) })
-		auth := &coreauth.Auth{ID: id, Provider: "codex", Status: coreauth.StatusActive, Attributes: map[string]string{coreauth.AttributePath: path}}
-		coreauth.MarkPluginVirtualAuth(auth, path, index)
-		auths = append(auths, auth)
-		deletion := watcher.AuthUpdate{Action: watcher.AuthUpdateActionDelete, ID: id}
-		deletion.SetFileRemoval(true)
-		deletion.SetRevision(2)
-		deletes = append(deletes, deletion)
-	}
-	service := &Service{
-		cfg:         &config.Config{},
-		coreManager: manager,
-		watcher: &WatcherWrapper{snapshotAuthFile: func(snapshotPath string) ([]*coreauth.Auth, error) {
-			if snapshotPath != path {
-				t.Fatalf("snapshot path=%q, want %q", snapshotPath, path)
-			}
-			// The re-created source file contains only B, independent of watcher state.
-			return []*coreauth.Auth{auths[1].Clone()}, nil
-		}},
-	}
-	for _, auth := range auths {
-		addition := watcher.AuthUpdate{Action: watcher.AuthUpdateActionAdd, ID: auth.ID, Auth: auth}
-		addition.SetRevision(1)
-		service.handleAuthUpdate(ctx, addition)
-		if len(reg.GetModelsForClient(auth.ID)) == 0 {
-			t.Fatalf("expected initial models for %s", auth.ID)
-		}
-	}
-	if errRemove := os.Remove(path); errRemove != nil {
-		t.Fatal(errRemove)
-	}
-	write(`{"type":"plugin","ids":["b"]}`)
-	// Do not deliver the create event: the delayed deletes must reconcile IDs themselves.
-	service.handleAuthUpdates(ctx, deletes)
-	if _, present := manager.GetByID(auths[0].ID); present || len(reg.GetModelsForClient(auths[0].ID)) != 0 {
-		t.Fatal("auth A, absent from the re-created file, must be removed with its models")
-	}
-	if _, present := manager.GetByID(auths[1].ID); !present || len(reg.GetModelsForClient(auths[1].ID)) == 0 {
-		t.Fatal("auth B must remain present with its models")
-	}
-}
-
 func TestHandleAuthUpdates_FileDeleteSnapshotUncertain(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
@@ -440,7 +382,6 @@ func TestHandleAuthUpdates_FileDeleteScope(t *testing.T) {
 	}{
 		{name: "file_path", attributes: map[string]string{coreauth.AttributePath: "file"}, wantPresent: true},
 		{name: "file_source", attributes: map[string]string{coreauth.AttributeSource: "file"}, wantPresent: true},
-		{name: "plugin_virtual_unmarked", attributes: map[string]string{coreauth.AttributePath: "file", coreauth.AttributePluginVirtual: "true"}, unmarked: true},
 		{name: "file_unmarked", attributes: map[string]string{coreauth.AttributePath: "file"}, unmarked: true},
 		{name: "runtime_only", attributes: map[string]string{coreauth.AttributePath: "file", coreauth.AttributeRuntimeOnly: "true"}},
 		{name: "config", attributes: map[string]string{coreauth.AttributePath: "file", coreauth.AttributeSource: "config:codex[0]"}},

@@ -1,7 +1,6 @@
 package synthesizer
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -10,7 +9,6 @@ import (
 
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 )
 
 func mustSynthesizeAuthFile(t *testing.T, ctx *SynthesisContext, fullPath string, raw string) []*coreauth.Auth {
@@ -94,15 +92,6 @@ func TestSynthesizeAuthFileKeepsCredentialWithInvalidExcludedModels(t *testing.T
 		}
 	}
 
-	pluginCtx := *ctx
-	pluginCtx.PluginAuthParser = multiAuthParserFunc(func(context.Context, pluginapi.AuthParseRequest) ([]*coreauth.Auth, bool, error) {
-		return []*coreauth.Auth{{ID: "plugin.json", Provider: "acme"}}, true, nil
-	})
-	pluginAuths := mustSynthesizeAuthFile(t, &pluginCtx, filepath.Join(authDir, "plugin.json"), `{"type":"acme","excluded_models":["a",false]}`)
-	if len(pluginAuths) != 1 || pluginAuths[0].Attributes["excluded_models"] != "a" {
-		t.Fatalf("plugin auths = %+v, want one auth keeping the valid rule", pluginAuths)
-	}
-
 	// A directory scan keeps both credentials.
 	if errWrite := os.WriteFile(badPath, []byte(`{"type":"claude","email":"bad@example.test","excluded_models":123}`), 0o600); errWrite != nil {
 		t.Fatalf("write bad auth file: %v", errWrite)
@@ -118,40 +107,6 @@ func TestSynthesizeAuthFileKeepsCredentialWithInvalidExcludedModels(t *testing.T
 	auths := mustSynthesizeAuthFile(t, ctx, filepath.Join(authDir, "legacy.json"), `{"type":"claude","email":"legacy@example.test","excluded_models":"Model-A,model-b"}`)
 	if len(auths) != 1 || auths[0].Attributes["excluded_models"] != "model-a,model-b" {
 		t.Fatalf("legacy string auths = %+v, want comma string split into two rules", auths)
-	}
-}
-
-func TestSynthesizeAuthFileKeepsPluginExcludedModelsWithoutFileRules(t *testing.T) {
-	authDir := t.TempDir()
-	ctx := &SynthesisContext{
-		Config:  &config.Config{},
-		AuthDir: authDir,
-		Now:     time.Date(2026, time.October, 10, 12, 0, 0, 0, time.UTC),
-		PluginAuthParser: multiAuthParserFunc(func(context.Context, pluginapi.AuthParseRequest) ([]*coreauth.Auth, bool, error) {
-			return []*coreauth.Auth{{ID: "plugin.json", Provider: "acme", Attributes: map[string]string{
-				"excluded_models": "plugin-model", "excluded_models_hash": "plugin-hash",
-			}}}, true, nil
-		}),
-	}
-	path := filepath.Join(authDir, "plugin.json")
-
-	for _, tc := range []struct {
-		raw      string
-		wantRule string
-	}{
-		// Without file rules, the plugin-provided attributes stay as returned by the parser.
-		{raw: `{"type":"acme"}`, wantRule: "plugin-model"},
-		{raw: `{"type":"acme","excluded_models":[]}`, wantRule: "plugin-model"},
-		// File rules replace the plugin-provided list.
-		{raw: `{"type":"acme","excluded_models":["File-Model"]}`, wantRule: "file-model"},
-	} {
-		auths := mustSynthesizeAuthFile(t, ctx, path, tc.raw)
-		if len(auths) != 1 {
-			t.Fatalf("%s: len(auths) = %d, want 1", tc.raw, len(auths))
-		}
-		if got := auths[0].Attributes["excluded_models"]; got != tc.wantRule {
-			t.Fatalf("%s: excluded_models = %q, want %q", tc.raw, got, tc.wantRule)
-		}
 	}
 }
 

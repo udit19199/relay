@@ -989,9 +989,9 @@ func TestMetaExecutor_ExecuteNonStreamMultiEventSSE_RecordsModelAndWarnsOnSubsti
 
 	const alias = "meta-multi-event-sse-test"
 	capture := &multiProviderUsageCapture{alias: alias, records: make(chan coreusage.Record, 4)}
-	coreusage.RegisterNamedPlugin(t.Name(), capture)
+	coreusage.RegisterNamedConsumer(t.Name(), capture)
 	t.Cleanup(func() {
-		coreusage.RegisterNamedPlugin(t.Name(), multiProviderNoopUsagePlugin{})
+		coreusage.RegisterNamedConsumer(t.Name(), multiProviderNoopUsageConsumer{})
 	})
 
 	hook := new(logtest.Hook)

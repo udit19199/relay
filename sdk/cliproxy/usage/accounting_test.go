@@ -128,14 +128,14 @@ func TestEnsureTokenBreakdownForProviderUsesKnownSemantics(t *testing.T) {
 }
 
 func TestEnsureTokenBreakdownForUnknownProviderDoesNotGuessReasoning(t *testing.T) {
-	detail := EnsureTokenBreakdownForProvider(Detail{InputTokens: 100, OutputTokens: 30, ReasoningTokens: 12}, "plugin-provider", "")
+	detail := EnsureTokenBreakdownForProvider(Detail{InputTokens: 100, OutputTokens: 30, ReasoningTokens: 12}, "consumer-provider", "")
 	if detail.TotalTokens != 130 || detail.TokenBreakdown.Quality != TokenAccountingQualityUnclassified || detail.TokenBreakdown.UnclassifiedTokens != 130 {
 		t.Fatalf("detail = %+v", detail)
 	}
 }
 
 func TestEnsureTokenBreakdownForUnknownProviderPreservesAuxiliaryOnlyUsage(t *testing.T) {
-	detail := EnsureTokenBreakdownForProvider(Detail{ReasoningTokens: 12, CacheReadTokens: 7}, "plugin-provider", "")
+	detail := EnsureTokenBreakdownForProvider(Detail{ReasoningTokens: 12, CacheReadTokens: 7}, "consumer-provider", "")
 	if detail.TotalTokens != 19 || detail.TokenBreakdown.Quality != TokenAccountingQualityUnclassified || detail.TokenBreakdown.UnclassifiedTokens != 19 {
 		t.Fatalf("detail = %+v", detail)
 	}

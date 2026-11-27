@@ -4345,7 +4345,7 @@ func (e *stub429CooldownExecutor) Calls() []string {
 
 func TestManager_Issue7360_Shape1_MixedCaseAliasAndLowercaseModelIDShareCooldown(t *testing.T) {
 	const (
-		provider       = "deepseek-plugin"
+		provider       = "deepseek-consumer"
 		mixedCaseModel = "DeepSeek-V4.1-flash-sg"
 		lowerCaseModel = "deepseek-v4.1-flash-sg"
 		aliasModel     = "DeepSeek V4.1 flash"
@@ -4410,7 +4410,7 @@ func TestManager_Issue7360_Shape1_MixedCaseAliasAndLowercaseModelIDShareCooldown
 
 func TestManager_Issue7360_Shape2_CooldownRecordedBeforeAliasMappingMigratesToTarget(t *testing.T) {
 	const (
-		provider       = "deepseek-plugin"
+		provider       = "deepseek-consumer"
 		lowerCaseModel = "deepseek-v4.1-flash-sg"
 		aliasModel     = "DeepSeek V4.1 flash"
 	)

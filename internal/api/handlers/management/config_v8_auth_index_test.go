@@ -361,15 +361,9 @@ api-keys:
 		t.Fatalf("codex key 1 auth_index = %q, want %q", got, wantExplicitEmptyIndex)
 	}
 
-	// 10. Plugin options and headers retaining auth_index outside of credential level
-	pluginYAML := `config-version: 8
+	// 10. Headers retain auth_index outside of credential level
+	headerYAML := `config-version: 8
 port: 8317
-plugins:
-  configs:
-    custom-plugin:
-      enabled: true
-      options:
-        auth_index: keep-this-plugin-field
 api-keys:
   codex:
     - name: codex-group
@@ -381,55 +375,52 @@ api-keys:
           headers:
             auth_index: keep-key-header
 `
-	pluginPath := filepath.Join(dir, "plugin-config.yaml")
-	if errWrite := os.WriteFile(pluginPath, []byte(pluginYAML), 0600); errWrite != nil {
+	headerPath := filepath.Join(dir, "header-config.yaml")
+	if errWrite := os.WriteFile(headerPath, []byte(headerYAML), 0600); errWrite != nil {
 		t.Fatal(errWrite)
 	}
-	pluginCfg, errLoadPlugin := config.LoadConfig(pluginPath)
-	if errLoadPlugin != nil {
-		t.Fatal(errLoadPlugin)
+	headerCfg, errLoadHeader := config.LoadConfig(headerPath)
+	if errLoadHeader != nil {
+		t.Fatal(errLoadHeader)
 	}
-	hPlugin := &Handler{cfg: pluginCfg, configFilePath: pluginPath}
-	routerPlugin := gin.New()
-	routerPlugin.GET("/v8/management/config/*path", hPlugin.ConfigV8)
-	routerPlugin.PUT("/v8/management/config/*path", hPlugin.ConfigV8)
+	hHeader := &Handler{cfg: headerCfg, configFilePath: headerPath}
+	routerHeader := gin.New()
+	routerHeader.GET("/v8/management/config/*path", hHeader.ConfigV8)
+	routerHeader.PUT("/v8/management/config/*path", hHeader.ConfigV8)
 
 	// Fetch codex keys with auth_index injected
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/v8/management/config/api-keys/codex", nil)
-	routerPlugin.ServeHTTP(rec, req)
+	routerHeader.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
-		t.Fatalf("GET codex with plugin: status=%d body=%s", rec.Code, rec.Body.String())
+		t.Fatalf("GET codex with custom headers: status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	var pluginCodexGroups []map[string]any
-	if errDecode := json.Unmarshal(rec.Body.Bytes(), &pluginCodexGroups); errDecode != nil {
+	var headerCodexGroups []map[string]any
+	if errDecode := json.Unmarshal(rec.Body.Bytes(), &headerCodexGroups); errDecode != nil {
 		t.Fatal(errDecode)
 	}
 
 	// PUT codex keys back (round-trip with auth_index)
-	codexBytes, _ := json.Marshal(pluginCodexGroups)
+	codexBytes, _ := json.Marshal(headerCodexGroups)
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodPut, "/v8/management/config/api-keys/codex", strings.NewReader(string(codexBytes)))
 	req.Header.Set("Content-Type", "application/json")
-	routerPlugin.ServeHTTP(rec, req)
+	routerHeader.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("PUT codex: status=%d body=%s", rec.Code, rec.Body.String())
 	}
 
-	// Read saved config on disk: plugin option auth_index and headers auth_index MUST be intact!
-	savedPluginData, errRead := os.ReadFile(pluginPath)
+	// Read saved config on disk: consumer option auth_index and headers auth_index MUST be intact!
+	savedHeaderData, errRead := os.ReadFile(headerPath)
 	if errRead != nil {
 		t.Fatal(errRead)
 	}
-	savedPluginStr := string(savedPluginData)
-	if !strings.Contains(savedPluginStr, "keep-this-plugin-field") {
-		t.Fatalf("plugin option auth_index was stripped! saved config:\n%s", savedPluginStr)
+	savedHeaderStr := string(savedHeaderData)
+	if !strings.Contains(savedHeaderStr, "keep-group-header") {
+		t.Fatalf("group header auth_index was stripped! saved config:\n%s", savedHeaderStr)
 	}
-	if !strings.Contains(savedPluginStr, "keep-group-header") {
-		t.Fatalf("group header auth_index was stripped! saved config:\n%s", savedPluginStr)
-	}
-	if !strings.Contains(savedPluginStr, "keep-key-header") {
-		t.Fatalf("key header auth_index was stripped! saved config:\n%s", savedPluginStr)
+	if !strings.Contains(savedHeaderStr, "keep-key-header") {
+		t.Fatalf("key header auth_index was stripped! saved config:\n%s", savedHeaderStr)
 	}
 
 	// 12. Unnormalized prefix (prefix: /team/) matches live credential with normalized prefix

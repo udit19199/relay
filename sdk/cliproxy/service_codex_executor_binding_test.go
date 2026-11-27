@@ -9,9 +9,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	internalconfig "github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/pluginhost"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor"
-	sdkAuth "github.com/router-for-me/CLIProxyAPI/v8/sdk/auth"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/config"
@@ -138,12 +136,7 @@ func TestEnsureExecutorsForAuth_XAIReplacesExecutorAfterConfigUpdate(t *testing.
 	service := &Service{
 		cfg:         &config.Config{},
 		coreManager: coreauth.NewManager(nil, nil, nil),
-		pluginHost:  pluginhost.New(),
 	}
-	t.Cleanup(func() {
-		sdkAuth.RegisterPluginAuthParser(nil)
-		sdktranslator.SetPluginHooks(nil)
-	})
 	auth := &coreauth.Auth{
 		ID:       "xai-auth-config-update",
 		Provider: "xai",
@@ -218,12 +211,7 @@ func TestApplyWatcherConfigUpdate_PreservesExistingWebsocketConnections(t *testi
 			service := &Service{
 				cfg:         initialCfg,
 				coreManager: manager,
-				pluginHost:  pluginhost.New(),
 			}
-			t.Cleanup(func() {
-				sdkAuth.RegisterPluginAuthParser(nil)
-				sdktranslator.SetPluginHooks(nil)
-			})
 
 			auth := &coreauth.Auth{
 				ID:       tt.provider + "-ws-hot-reload-auth",

@@ -103,7 +103,7 @@ func (p *patchCanceledEOFCapture) HandleUsage(_ context.Context, record usage.Re
 
 func TestApplyPatchCanceledEOFStillRecordsFailure(t *testing.T) {
 	capture := &patchCanceledEOFCapture{records: make(chan usage.Record, 1)}
-	usage.RegisterNamedPlugin("task6-canceled-eof", capture)
+	usage.RegisterNamedConsumer("task6-canceled-eof", capture)
 	var param any
 	original := []byte(`{"tools":[{"type":"custom","name":"apply_patch"}]}`)
 	InitializeApplyPatchStream(context.Background(), sdktranslator.FormatClaude, sdktranslator.FormatOpenAIResponse, "m", original, original, &param)

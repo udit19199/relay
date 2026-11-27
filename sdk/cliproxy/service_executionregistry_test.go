@@ -96,9 +96,9 @@ func TestServiceSkipsStaleLocalConfigRuntimeApply(t *testing.T) {
 
 func TestServiceAppliesSameValueNewestSelectorCommit(t *testing.T) {
 	manager := coreauth.NewManager(nil, &coreauth.RoundRobinSelector{}, nil)
-	manager.RegisterExecutor(serviceTestPluginExecutor{})
+	manager.RegisterExecutor(serviceTestCustomExecutor{})
 	for _, id := range []string{"auth-b", "auth-a"} {
-		if _, errRegister := manager.Register(context.Background(), &coreauth.Auth{ID: id, Provider: "plugin-provider", Status: coreauth.StatusActive}); errRegister != nil {
+		if _, errRegister := manager.Register(context.Background(), &coreauth.Auth{ID: id, Provider: "consumer-provider", Status: coreauth.StatusActive}); errRegister != nil {
 			t.Fatalf("Register(%s) error = %v", id, errRegister)
 		}
 	}
@@ -114,7 +114,7 @@ func TestServiceAppliesSameValueNewestSelectorCommit(t *testing.T) {
 	}
 
 	for range 2 {
-		selected, errSelect := manager.SelectAuth(context.Background(), "plugin-provider", "", cliproxyexecutor.Options{})
+		selected, errSelect := manager.SelectAuth(context.Background(), "consumer-provider", "", cliproxyexecutor.Options{})
 		if errSelect != nil {
 			t.Fatalf("SelectAuth() error = %v", errSelect)
 		}
