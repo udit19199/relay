@@ -134,7 +134,7 @@ func (s *Service) applyConfigUpdateWithAuthSynthesis(ctx context.Context, newCfg
 }
 
 // commitConfigUpdate applies only in-memory configuration state. Runtime work that
-// may block on plugins, storage, or networking is deliberately deferred. Catalog
+// may block on storage or networking is deliberately deferred. Catalog
 // source generations change here so an older commit cannot restart stale readers.
 func (s *Service) commitConfigUpdate(newCfg *config.Config) configCommit {
 	if s == nil {
@@ -250,6 +250,10 @@ func (s *Service) applyConfigRuntime(ctx context.Context, commit configCommit, s
 	}
 	if errContext := ctx.Err(); errContext != nil {
 		return false
+	}
+	if s.coreManager != nil {
+		s.registerModelsForAuthBatch(registrationCtx, s.coreManager.List())
+		s.coreManager.RefreshSchedulerAll()
 	}
 	return ctx.Err() == nil
 }

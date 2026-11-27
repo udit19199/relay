@@ -165,6 +165,10 @@ func (s *Service) Run(ctx context.Context) error {
 	}
 	log.Info("file watcher started for config and auth directory changes")
 	s.configRuntimeMu.Lock()
+	if s.coreManager != nil {
+		s.registerModelsForAuthBatch(ctx, s.coreManager.List())
+		s.coreManager.RefreshSchedulerAll()
+	}
 	s.configRuntimeMu.Unlock()
 
 	s.registerModelRefreshCallback()
