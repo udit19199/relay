@@ -18,11 +18,11 @@ Go 1.26+ proxy server providing OpenAI/Claude/Codex compatible APIs with OAuth a
 ## Commands
 ```bash
 gofmt -w . # Format (required after Go changes)
-go build -o cli-proxy-api ./cmd/server # Build
+go build -trimpath -ldflags "-s -w" -o cli-proxy-api ./cmd/server # Build
 go run ./cmd/server # Run dev server
 go test ./... # Run all tests
 go test -v -run TestName ./path/to/pkg # Run single test
-go build -o test-output ./cmd/server && rm test-output # Verify compile (REQUIRED after changes)
+go build -trimpath -ldflags "-s -w" -o test-output ./cmd/server && rm test-output # Verify compile (REQUIRED after changes)
 ```
 - Common flags: `--config <path>`, `--local-model`, `--no-browser`, `--oauth-callback-port <port>`
 

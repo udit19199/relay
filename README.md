@@ -119,7 +119,7 @@ per line, and exits non-zero on failure. `relay help` lists every flag.
 
    ```bash
    git clone https://github.com/udit19199/relay.git ~/.relay-src 2>/dev/null || git -C ~/.relay-src pull
-   mkdir -p ~/.local/bin && cd ~/.relay-src && go build -o ~/.local/bin/relay ./cmd/server
+   mkdir -p ~/.local/bin && cd ~/.relay-src && go build -trimpath -ldflags "-s -w" -o ~/.local/bin/relay ./cmd/server
    ```
 
 3. Run `~/.local/bin/relay setup --json`. It creates `~/.relay` with a config
