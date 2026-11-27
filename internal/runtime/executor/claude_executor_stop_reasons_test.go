@@ -11,10 +11,10 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 // pause_turn end to end through the executor with the web search result cache:
@@ -53,14 +53,14 @@ func TestClaudeExecutorPauseTurnContinuationRestoresFinishedSearchAndKeepsPaused
 			defer server.Close()
 
 			executor := NewClaudeExecutor(enabledClaudeWebSearchCacheConfig())
-			auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "key-pause", "base_url": server.URL}}
+			auth := &coreauth.Auth{Attributes: map[string]string{"api_key": "key-pause", "base_url": server.URL}}
 			run := func(input string) ojson.Result {
 				payload := []byte(`{"model":"claude-opus-5-5","stream":` + map[bool]string{false: "false", true: "true"}[stream] + `,"tools":[{"type":"web_search"}],"input":[` + input + `]}`)
-				req := cliproxyexecutor.Request{Model: "claude-opus-5-5", Payload: payload}
-				opts := cliproxyexecutor.Options{
-					SourceFormat: sdktranslator.FormatOpenAIResponse, ResponseFormat: sdktranslator.FormatOpenAIResponse,
+				req := coreexecutor.Request{Model: "claude-opus-5-5", Payload: payload}
+				opts := coreexecutor.Options{
+					SourceFormat: translatorreg.FormatOpenAIResponse, ResponseFormat: translatorreg.FormatOpenAIResponse,
 					Stream: stream, OriginalRequest: payload,
-					Metadata: map[string]any{cliproxyexecutor.ExecutionSessionMetadataKey: "session-pause"},
+					Metadata: map[string]any{coreexecutor.ExecutionSessionMetadataKey: "session-pause"},
 				}
 				if !stream {
 					resp, errExecute := executor.Execute(context.Background(), auth, req, opts)
@@ -139,11 +139,11 @@ func TestClaudeExecutorChatContextWindowExceededMapsToLength(t *testing.T) {
 	}))
 	defer server.Close()
 
-	auth := &cliproxyauth.Auth{ID: "ctx-window", Attributes: map[string]string{"api_key": "sk-ant-test", "base_url": server.URL}}
+	auth := &coreauth.Auth{ID: "ctx-window", Attributes: map[string]string{"api_key": "sk-ant-test", "base_url": server.URL}}
 	payload := []byte(`{"model":"claude-opus-5-5","messages":[{"role":"user","content":"hello"}]}`)
-	resp, errExecute := NewClaudeExecutor(&config.Config{}).Execute(context.Background(), auth, cliproxyexecutor.Request{
+	resp, errExecute := NewClaudeExecutor(&config.Config{}).Execute(context.Background(), auth, coreexecutor.Request{
 		Model: "claude-opus-5-5", Payload: payload,
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAI, OriginalRequest: payload})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAI, OriginalRequest: payload})
 	if errExecute != nil {
 		t.Fatalf("Execute err = %v, want nil", errExecute)
 	}
@@ -170,11 +170,11 @@ func TestClaudeExecutorChatRefusalStaysSuccessful(t *testing.T) {
 	}))
 	defer server.Close()
 
-	auth := &cliproxyauth.Auth{ID: "refusal", Attributes: map[string]string{"api_key": "sk-ant-test", "base_url": server.URL}}
+	auth := &coreauth.Auth{ID: "refusal", Attributes: map[string]string{"api_key": "sk-ant-test", "base_url": server.URL}}
 	payload := []byte(`{"model":"claude-opus-5-5","messages":[{"role":"user","content":"hello"}]}`)
-	resp, errExecute := NewClaudeExecutor(&config.Config{}).Execute(context.Background(), auth, cliproxyexecutor.Request{
+	resp, errExecute := NewClaudeExecutor(&config.Config{}).Execute(context.Background(), auth, coreexecutor.Request{
 		Model: "claude-opus-5-5", Payload: payload,
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAI, OriginalRequest: payload})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAI, OriginalRequest: payload})
 	if errExecute != nil {
 		t.Fatal(errExecute)
 	}
@@ -202,11 +202,11 @@ func TestClaudeExecutorExecuteReturnsBadRequestOnPolicyRefusal(t *testing.T) {
 	}))
 	defer server.Close()
 
-	auth := &cliproxyauth.Auth{ID: "cyber-refusal", Attributes: map[string]string{"api_key": "sk-ant-test", "base_url": server.URL}}
+	auth := &coreauth.Auth{ID: "cyber-refusal", Attributes: map[string]string{"api_key": "sk-ant-test", "base_url": server.URL}}
 	payload := []byte(`{"model":"claude-sonnet-5-5","stream":false,"messages":[{"role":"user","content":"test"}]}`)
-	_, errExecute := NewClaudeExecutor(&config.Config{}).Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, errExecute := NewClaudeExecutor(&config.Config{}).Execute(context.Background(), auth, coreexecutor.Request{
 		Model: "claude-sonnet-5-5", Payload: payload,
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude, OriginalRequest: payload})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude, OriginalRequest: payload})
 	if errExecute == nil {
 		t.Fatal("expected policy refusal error, got nil")
 	}
@@ -231,32 +231,32 @@ func TestClaudeExecutorStreamSparseStopDetailsPreservesMessageStop(t *testing.T)
 
 	for _, tc := range []struct {
 		name           string
-		sourceFormat   sdktranslator.Format
-		responseFormat sdktranslator.Format
+		sourceFormat   translatorreg.Format
+		responseFormat translatorreg.Format
 		payload        string
 		wantStopMarker string
 	}{
 		{
 			name:           "passthrough_claude",
-			sourceFormat:   sdktranslator.FormatClaude,
-			responseFormat: sdktranslator.FormatClaude,
+			sourceFormat:   translatorreg.FormatClaude,
+			responseFormat: translatorreg.FormatClaude,
 			payload:        `{"model":"claude-sonnet-5-5","stream":true,"messages":[{"role":"user","content":"test"}]}`,
 			wantStopMarker: "message_stop",
 		},
 		{
 			name:           "translated_openai",
-			sourceFormat:   sdktranslator.FormatOpenAI,
-			responseFormat: sdktranslator.FormatOpenAI,
+			sourceFormat:   translatorreg.FormatOpenAI,
+			responseFormat: translatorreg.FormatOpenAI,
 			payload:        `{"model":"claude-sonnet-5-5","stream":true,"messages":[{"role":"user","content":"test"}]}`,
 			wantStopMarker: "content_filter",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			auth := &cliproxyauth.Auth{ID: "sparse-refusal-" + tc.name, Attributes: map[string]string{"api_key": "sk-ant-test", "base_url": server.URL}}
-			result, errStream := NewClaudeExecutor(&config.Config{}).ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+			auth := &coreauth.Auth{ID: "sparse-refusal-" + tc.name, Attributes: map[string]string{"api_key": "sk-ant-test", "base_url": server.URL}}
+			result, errStream := NewClaudeExecutor(&config.Config{}).ExecuteStream(context.Background(), auth, coreexecutor.Request{
 				Model:   "claude-sonnet-5-5",
 				Payload: []byte(tc.payload),
-			}, cliproxyexecutor.Options{
+			}, coreexecutor.Options{
 				SourceFormat:    tc.sourceFormat,
 				ResponseFormat:  tc.responseFormat,
 				Stream:          true,

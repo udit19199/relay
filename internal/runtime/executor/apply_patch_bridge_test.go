@@ -16,14 +16,13 @@ import (
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/api/handlers"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/api/handlers/openai"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdkconfig "github.com/router-for-me/CLIProxyAPI/v8/sdk/config"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/api/handlers"
+	"github.com/udit19199/relay/internal/api/handlers/openai"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/registry"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 	"google.golang.org/protobuf/encoding/protowire"
 )
 
@@ -142,20 +141,20 @@ func applyPatchTestWireField(data []byte, target protowire.Number) []byte {
 }
 
 // Use a real downstream socket, not ResponseRecorder, to prove flush reaches a client.
-func newApplyPatchTestGateway(t *testing.T, exec cliproxyauth.ProviderExecutor, auth *cliproxyauth.Auth) *httptest.Server {
+func newApplyPatchTestGateway(t *testing.T, exec coreauth.ProviderExecutor, auth *coreauth.Auth) *httptest.Server {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
-	manager := cliproxyauth.NewManager(nil, nil, nil)
+	manager := coreauth.NewManager(nil, nil, nil)
 	manager.RegisterExecutor(exec)
-	auth.Status = cliproxyauth.StatusActive
+	auth.Status = coreauth.StatusActive
 	if _, errRegister := manager.Register(t.Context(), auth); errRegister != nil {
 		t.Fatal(errRegister)
 	}
 	registry.GetGlobalRegistry().RegisterClient(auth.ID, exec.Identifier(), []*registry.ModelInfo{{ID: "test"}})
 	t.Cleanup(func() { registry.GetGlobalRegistry().UnregisterClient(auth.ID) })
-	base := handlers.NewBaseAPIHandlers(&sdkconfig.SDKConfig{
-		Client: sdkconfig.ClientConfig{
-			Codex: sdkconfig.CodexClientConfig{EnableApplyPatch: true},
+	base := handlers.NewBaseAPIHandlers(&config.SDKConfig{
+		Client: config.ClientConfig{
+			Codex: config.CodexClientConfig{EnableApplyPatch: true},
 		},
 	}, manager)
 	router := gin.New()
@@ -214,7 +213,7 @@ func TestApplyPatchBridgeLiveHTTPPreviewMatrix(t *testing.T) {
 			} else if tc.provider == "devin" {
 				exec = NewDevinExecutor(&config.Config{})
 			}
-			auth := &cliproxyauth.Auth{ID: t.Name(), Provider: exec.Identifier(), Attributes: map[string]string{"api_key": "test", "base_url": upstream.URL}}
+			auth := &coreauth.Auth{ID: t.Name(), Provider: exec.Identifier(), Attributes: map[string]string{"api_key": "test", "base_url": upstream.URL}}
 			if tc.provider == "claude-oauth" {
 				auth.Attributes["api_key"] = "sk-ant-oat-test"
 				auth.Metadata = map[string]any{"account_uuid": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
@@ -362,7 +361,7 @@ func (s *applyPatchTestLifecycle) assert(t *testing.T) {
 	}
 }
 
-func newApplyPatchCompatTestExecutor(t *testing.T, reply string) (*OpenAICompatExecutor, *cliproxyauth.Auth, <-chan []byte) {
+func newApplyPatchCompatTestExecutor(t *testing.T, reply string) (*OpenAICompatExecutor, *coreauth.Auth, <-chan []byte) {
 	t.Helper()
 	bodies := make(chan []byte, 4)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -380,7 +379,7 @@ func newApplyPatchCompatTestExecutor(t *testing.T, reply string) (*OpenAICompatE
 		_, _ = io.WriteString(w, reply)
 	}))
 	t.Cleanup(server.Close)
-	return NewOpenAICompatExecutor("custom-compat", &config.Config{}), &cliproxyauth.Auth{Provider: "custom-compat", Attributes: map[string]string{"base_url": server.URL + "/v1", "api_key": "test"}}, bodies
+	return NewOpenAICompatExecutor("custom-compat", &config.Config{}), &coreauth.Auth{Provider: "custom-compat", Attributes: map[string]string{"base_url": server.URL + "/v1", "api_key": "test"}}, bodies
 }
 
 func applyPatchTestChatReply(arguments string) string {
@@ -392,7 +391,7 @@ func TestApplyPatchBridgeInvalidArgumentsReturnsBadGateway(t *testing.T) {
 		t.Run(args, func(t *testing.T) {
 			exec, auth, _ := newApplyPatchCompatTestExecutor(t, applyPatchTestChatReply(args))
 			payload := applyPatchTestRequest()
-			response, errExecute := exec.Execute(t.Context(), auth, cliproxyexecutor.Request{Model: "test", Payload: payload}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse, OriginalRequest: payload})
+			response, errExecute := exec.Execute(t.Context(), auth, coreexecutor.Request{Model: "test", Payload: payload}, coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse, OriginalRequest: payload})
 			var status interface{ StatusCode() int }
 			if errExecute == nil || !errors.As(errExecute, &status) || status.StatusCode() != http.StatusBadGateway || len(response.Payload) != 0 {
 				t.Fatalf("expected empty gateway error, got %s %v", response.Payload, errExecute)
@@ -405,7 +404,7 @@ func TestApplyPatchBridgeInvalidArgumentsReturnsBadGateway(t *testing.T) {
 func TestApplyPatchBridgeHistoryRoundTrip(t *testing.T) {
 	exec, auth, bodies := newApplyPatchCompatTestExecutor(t, applyPatchTestChatReply(applyPatchTestPartial+applyPatchTestRemainder))
 	payload := applyPatchTestRequest()
-	response, errExecute := exec.Execute(t.Context(), auth, cliproxyexecutor.Request{Model: "test", Payload: payload}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse, OriginalRequest: payload})
+	response, errExecute := exec.Execute(t.Context(), auth, coreexecutor.Request{Model: "test", Payload: payload}, coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse, OriginalRequest: payload})
 	if errExecute != nil {
 		t.Fatal(errExecute)
 	}
@@ -418,7 +417,7 @@ func TestApplyPatchBridgeHistoryRoundTrip(t *testing.T) {
 	if errSetRawBytes != nil {
 		t.Fatal(errSetRawBytes)
 	}
-	_, errExecute = exec.Execute(t.Context(), auth, cliproxyexecutor.Request{Model: "test", Payload: next}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse, OriginalRequest: next})
+	_, errExecute = exec.Execute(t.Context(), auth, coreexecutor.Request{Model: "test", Payload: next}, coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse, OriginalRequest: next})
 	if errExecute != nil {
 		t.Fatal(errExecute)
 	}
@@ -436,7 +435,7 @@ func TestApplyPatchBridgeTruncatedStreamDoesNotComplete(t *testing.T) {
 	first, _ := applyPatchTestFrames("chat", "apply_patch")
 	exec, auth, _ := newApplyPatchCompatTestExecutor(t, first)
 	payload := applyPatchTestRequest()
-	result, errExecuteStream := exec.ExecuteStream(t.Context(), auth, cliproxyexecutor.Request{Model: "test", Payload: payload}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse, OriginalRequest: payload, Stream: true})
+	result, errExecuteStream := exec.ExecuteStream(t.Context(), auth, coreexecutor.Request{Model: "test", Payload: payload}, coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse, OriginalRequest: payload, Stream: true})
 	if errExecuteStream != nil {
 		t.Fatal(errExecuteStream)
 	}
@@ -444,15 +443,15 @@ func TestApplyPatchBridgeTruncatedStreamDoesNotComplete(t *testing.T) {
 }
 
 func TestApplyPatchBridgeOrdinaryFunctionControl(t *testing.T) {
-	for _, source := range []sdktranslator.Format{sdktranslator.FormatOpenAI, sdktranslator.FormatOpenAIResponse} {
+	for _, source := range []translatorreg.Format{translatorreg.FormatOpenAI, translatorreg.FormatOpenAIResponse} {
 		t.Run(source.String(), func(t *testing.T) {
 			args := `{"input":"RAW_SECRET","extra":7}`
 			exec, auth, bodies := newApplyPatchCompatTestExecutor(t, applyPatchTestChatReply(args))
 			payload := []byte(`{"model":"test","messages":[{"role":"user","content":"edit"}],"tools":[{"type":"function","function":{"name":"apply_patch","parameters":{"type":"object","properties":{"input":{"type":"string"},"extra":{"type":"integer"}}}}}]}`)
-			if source == sdktranslator.FormatOpenAIResponse {
+			if source == translatorreg.FormatOpenAIResponse {
 				payload = []byte(`{"model":"test","input":"edit","tools":[{"type":"function","name":"apply_patch","parameters":{"type":"object","properties":{"input":{"type":"string"},"extra":{"type":"integer"}}}}]}`)
 			}
-			response, errExecute := exec.Execute(t.Context(), auth, cliproxyexecutor.Request{Model: "test", Payload: payload}, cliproxyexecutor.Options{SourceFormat: source, OriginalRequest: payload})
+			response, errExecute := exec.Execute(t.Context(), auth, coreexecutor.Request{Model: "test", Payload: payload}, coreexecutor.Options{SourceFormat: source, OriginalRequest: payload})
 			if errExecute != nil {
 				t.Fatal(errExecute)
 			}
@@ -461,7 +460,7 @@ func TestApplyPatchBridgeOrdinaryFunctionControl(t *testing.T) {
 				t.Fatalf("ordinary function schema changed: %s", body)
 			}
 			path := "choices.0.message.tool_calls.0.function.arguments"
-			if source == sdktranslator.FormatOpenAIResponse {
+			if source == translatorreg.FormatOpenAIResponse {
 				path = `output.#(type=="function_call").arguments`
 			}
 			arguments := ojson.GetBytes(response.Payload, path).String()
@@ -472,7 +471,7 @@ func TestApplyPatchBridgeOrdinaryFunctionControl(t *testing.T) {
 	}
 }
 
-func applyPatchTestPreviewChunks(t *testing.T, chunks <-chan cliproxyexecutor.StreamChunk, unblock func()) []byte {
+func applyPatchTestPreviewChunks(t *testing.T, chunks <-chan coreexecutor.StreamChunk, unblock func()) []byte {
 	t.Helper()
 	var lifecycle applyPatchTestLifecycle
 	var output []byte
@@ -549,7 +548,7 @@ func TestApplyPatchBridgeLiveWebsocketPreview(t *testing.T) {
 			}))
 			defer server.Close()
 			defer unblock()
-			var exec cliproxyauth.ProviderExecutor
+			var exec coreauth.ProviderExecutor
 			if native {
 				codex := NewCodexWebsocketsExecutor(&config.Config{Codex: config.CodexConfig{DisableCodexCloaking: true}})
 				codex.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
@@ -559,15 +558,15 @@ func TestApplyPatchBridgeLiveWebsocketPreview(t *testing.T) {
 				xai.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
 				exec = xai
 			}
-			ctx, cancel := context.WithCancel(cliproxyexecutor.WithDownstreamWebsocket(t.Context()))
+			ctx, cancel := context.WithCancel(coreexecutor.WithDownstreamWebsocket(t.Context()))
 			defer cancel()
 			payload := applyPatchTestRequest()
-			auth := &cliproxyauth.Auth{ID: t.Name(), Provider: exec.Identifier(), Attributes: map[string]string{"api_key": "test", "base_url": server.URL, "websockets": "true"}}
+			auth := &coreauth.Auth{ID: t.Name(), Provider: exec.Identifier(), Attributes: map[string]string{"api_key": "test", "base_url": server.URL, "websockets": "true"}}
 			model := "grok-4"
 			if native {
 				model = "gpt-5.6-sol"
 			}
-			result, errExecuteStream := exec.ExecuteStream(ctx, auth, cliproxyexecutor.Request{Model: model, Payload: payload}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse, OriginalRequest: payload, Stream: true, Headers: http.Header{codexResponsesLiteHeader: {"true"}}})
+			result, errExecuteStream := exec.ExecuteStream(ctx, auth, coreexecutor.Request{Model: model, Payload: payload}, coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse, OriginalRequest: payload, Stream: true, Headers: http.Header{codexResponsesLiteHeader: {"true"}}})
 			if errExecuteStream != nil {
 				t.Fatal(errExecuteStream)
 			}
@@ -590,16 +589,16 @@ func TestApplyPatchBridgeLiveWebsocketPreview(t *testing.T) {
 }
 
 func TestApplyPatchBridgeOrdinaryFunctionStreamControl(t *testing.T) {
-	for _, source := range []sdktranslator.Format{sdktranslator.FormatOpenAI, sdktranslator.FormatOpenAIResponse} {
+	for _, source := range []translatorreg.Format{translatorreg.FormatOpenAI, translatorreg.FormatOpenAIResponse} {
 		t.Run(source.String(), func(t *testing.T) {
 			args := `{"input":"RAW_SECRET","extra":7}`
 			reply := strings.ReplaceAll(task6ProviderFixture("custom-compat", "stream", "apply_patch"), fmt.Sprintf("%q", `{"input":7,"secret":"RAW_SECRET"}`), fmt.Sprintf("%q", args))
 			exec, auth, bodies := newApplyPatchCompatTestExecutor(t, reply)
 			payload := []byte(`{"messages":[{"role":"user","content":"edit"}],"tools":[{"type":"function","function":{"name":"apply_patch","parameters":{"type":"object","properties":{"extra":{"type":"integer"}}}}}]}`)
-			if source == sdktranslator.FormatOpenAIResponse {
+			if source == translatorreg.FormatOpenAIResponse {
 				payload = []byte(`{"input":"edit","tools":[{"type":"function","name":"apply_patch","parameters":{"type":"object","properties":{"extra":{"type":"integer"}}}}]}`)
 			}
-			result, errExecuteStream := exec.ExecuteStream(t.Context(), auth, cliproxyexecutor.Request{Model: "test", Payload: payload}, cliproxyexecutor.Options{SourceFormat: source, OriginalRequest: payload, Stream: true})
+			result, errExecuteStream := exec.ExecuteStream(t.Context(), auth, coreexecutor.Request{Model: "test", Payload: payload}, coreexecutor.Options{SourceFormat: source, OriginalRequest: payload, Stream: true})
 			if errExecuteStream != nil {
 				t.Fatal(errExecuteStream)
 			}
@@ -613,7 +612,7 @@ func TestApplyPatchBridgeOrdinaryFunctionStreamControl(t *testing.T) {
 				}
 				for _, raw := range applyPatchTestPayloads(chunk.Payload) {
 					event := ojson.ParseBytes(raw)
-					if source == sdktranslator.FormatOpenAI {
+					if source == translatorreg.FormatOpenAI {
 						arguments.WriteString(event.Get("choices.0.delta.tool_calls.0.function.arguments").String())
 					} else if event.Get("type").String() == "response.function_call_arguments.delta" {
 						arguments.WriteString(event.Get("delta").String())
@@ -634,7 +633,7 @@ func TestApplyPatchBridgeInvalidStreamArguments(t *testing.T) {
 			reply := strings.ReplaceAll(task6ProviderFixture("custom-compat", "stream", "apply_patch"), fmt.Sprintf("%q", `{"input":7,"secret":"RAW_SECRET"}`), fmt.Sprintf("%q", args))
 			exec, auth, _ := newApplyPatchCompatTestExecutor(t, reply)
 			payload := applyPatchTestRequest()
-			result, errExecuteStream := exec.ExecuteStream(t.Context(), auth, cliproxyexecutor.Request{Model: "test", Payload: payload}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse, OriginalRequest: payload, Stream: true})
+			result, errExecuteStream := exec.ExecuteStream(t.Context(), auth, coreexecutor.Request{Model: "test", Payload: payload}, coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse, OriginalRequest: payload, Stream: true})
 			if errExecuteStream != nil {
 				t.Fatal(errExecuteStream)
 			}

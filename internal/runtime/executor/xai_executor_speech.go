@@ -8,10 +8,10 @@ import (
 	"strings"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
 	log "github.com/sirupsen/logrus"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 // xaiSpeechRequestError marks upstream speech failures caused by the request itself,
@@ -78,7 +78,7 @@ func xaiSpeechStatusErr(code int, body []byte) error {
 	return err
 }
 
-func (e *XAIExecutor) executeSpeech(ctx context.Context, auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (resp cliproxyexecutor.Response, err error) {
+func (e *XAIExecutor) executeSpeech(ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) (resp coreexecutor.Response, err error) {
 	model := strings.TrimSpace(ojson.GetBytesNoCopy(req.Payload, "model").String())
 	if model == "" {
 		model = strings.TrimSpace(req.Model)
@@ -132,5 +132,5 @@ func (e *XAIExecutor) executeSpeech(ctx context.Context, auth *cliproxyauth.Auth
 	}
 
 	reporter.Publish(ctx, helps.ParseOpenAIUsage(data))
-	return cliproxyexecutor.Response{Payload: data, Headers: httpResp.Header.Clone()}, nil
+	return coreexecutor.Response{Payload: data, Headers: httpResp.Header.Clone()}, nil
 }

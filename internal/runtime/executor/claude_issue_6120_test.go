@@ -8,10 +8,10 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 // TestClaudeExecutor_DirectMessagesOAuthDefaultsToCloak_Issue6120 verifies Option A for Issue #6120:
@@ -56,11 +56,11 @@ func TestClaudeExecutor_DirectMessagesOAuthDefaultsToCloak_Issue6120(t *testing.
 	authWithURL := directClaudeOAuthAuth()
 	authWithURL.Attributes["base_url"] = "https://api.anthropic.com"
 
-	_, errExec := NewClaudeExecutor(&config.Config{}).Execute(execCtx, authWithURL, cliproxyexecutor.Request{
+	_, errExec := NewClaudeExecutor(&config.Config{}).Execute(execCtx, authWithURL, coreexecutor.Request{
 		Model:   "claude-opus-5-5",
 		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatClaude,
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FormatClaude,
 		Headers:      incoming,
 	})
 	if errExec != nil {
@@ -110,11 +110,11 @@ func TestClaudeExecutor_DirectMessagesOAuthDefaultsToCloakStream_Issue6120(t *te
 	authWithURL.Attributes["base_url"] = "https://api.anthropic.com"
 	payload := []byte(`{"model":"claude-opus-5-5","system":[{"type":"text","text":"caller system"}],"messages":[{"role":"user","content":"hello"}]}`)
 
-	streamResp, errStream := NewClaudeExecutor(&config.Config{}).ExecuteStream(execCtx, authWithURL, cliproxyexecutor.Request{
+	streamResp, errStream := NewClaudeExecutor(&config.Config{}).ExecuteStream(execCtx, authWithURL, coreexecutor.Request{
 		Model:   "claude-opus-5-5",
 		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatClaude,
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FormatClaude,
 		Headers:      incoming,
 	})
 	if errStream != nil {

@@ -14,15 +14,15 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/claude"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/codex"
-	metaauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/meta"
-	xaiauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/xai"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	log "github.com/sirupsen/logrus"
+	"github.com/udit19199/relay/internal/auth/claude"
+	"github.com/udit19199/relay/internal/auth/codex"
+	metaauth "github.com/udit19199/relay/internal/auth/meta"
+	xaiauth "github.com/udit19199/relay/internal/auth/xai"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/misc"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	"github.com/udit19199/relay/internal/util"
 )
 
 type codexOAuthService interface {
@@ -395,10 +395,6 @@ func (h *Handler) RequestCodexToken(c *gin.Context) {
 		respPayload["target_auth_id"] = sessionTarget.AuthID
 	}
 	c.JSON(200, respPayload)
-}
-
-func matchesOAuthRecoveryTarget(target oauthRecoveryTarget, email, accountID, candidateFileName string) bool {
-	return matchesOAuthRecoveryTargetWithOrg(target, email, accountID, "", candidateFileName)
 }
 
 func matchesOAuthRecoveryTargetWithOrg(target oauthRecoveryTarget, email, accountID, organizationID, candidateFileName string) bool {

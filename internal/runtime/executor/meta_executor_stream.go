@@ -10,13 +10,13 @@ import (
 	"strings"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
 	log "github.com/sirupsen/logrus"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
-func (e *MetaExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (_ *cliproxyexecutor.StreamResult, err error) {
+func (e *MetaExecutor) ExecuteStream(ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) (_ *coreexecutor.StreamResult, err error) {
 	ctx = helps.EnsureSessionContext(ctx, opts, req.Payload)
 	if opts.Alt == "responses/compact" {
 		return nil, statusErr{code: http.StatusNotImplemented, msg: "/responses/compact not supported"}
@@ -77,7 +77,7 @@ func (e *MetaExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.Aut
 		return nil, wrapMetaUpstreamError(httpResp.StatusCode, data)
 	}
 
-	out := make(chan cliproxyexecutor.StreamChunk)
+	out := make(chan coreexecutor.StreamChunk)
 	go func() {
 		defer close(out)
 		defer func() {
@@ -106,7 +106,7 @@ func (e *MetaExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.Aut
 			helps.RecordApplyPatchStreamFailureWithUsage(ctx, param, reporter, &streamUsage, statusErr{code: http.StatusBadGateway, msg: helps.ApplyPatchUpstreamErrorMessage})
 			for i := range chunks {
 				select {
-				case out <- cliproxyexecutor.StreamChunk{Payload: chunks[i]}:
+				case out <- coreexecutor.StreamChunk{Payload: chunks[i]}:
 				case <-ctx.Done():
 					return false
 				}
@@ -118,7 +118,7 @@ func (e *MetaExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.Aut
 				errBridge = statusErr{code: http.StatusBadGateway, msg: helps.ApplyPatchUpstreamErrorMessage}
 				streamUsage.PublishFailure(ctx, reporter, errBridge)
 				select {
-				case out <- cliproxyexecutor.StreamChunk{Err: errBridge}:
+				case out <- coreexecutor.StreamChunk{Err: errBridge}:
 				case <-ctx.Done():
 				}
 				return false
@@ -204,7 +204,7 @@ func (e *MetaExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.Aut
 				helps.RecordAPIResponseError(ctx, e.cfg, errEvent)
 				reporter.PublishFailure(ctx, errEvent)
 				select {
-				case out <- cliproxyexecutor.StreamChunk{Err: errEvent}:
+				case out <- coreexecutor.StreamChunk{Err: errEvent}:
 				case <-ctx.Done():
 				}
 				return
@@ -244,7 +244,7 @@ func (e *MetaExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.Aut
 		for _, event := range finishEvents {
 			for _, chunk := range helps.TranslateStreamWithClaudeInputTokens(ctx, prepared.to, prepared.responseFormat, req.Model, prepared.originalPayload, prepared.body, event, &param, claudeInputTokens) {
 				select {
-				case out <- cliproxyexecutor.StreamChunk{Payload: chunk}:
+				case out <- coreexecutor.StreamChunk{Payload: chunk}:
 				case <-ctx.Done():
 					return
 				}
@@ -254,7 +254,7 @@ func (e *MetaExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.Aut
 			errFinish = statusErr{code: http.StatusBadGateway, msg: helps.ApplyPatchUpstreamErrorMessage}
 			streamUsage.PublishFailure(ctx, reporter, errFinish)
 			select {
-			case out <- cliproxyexecutor.StreamChunk{Err: errFinish}:
+			case out <- coreexecutor.StreamChunk{Err: errFinish}:
 			case <-ctx.Done():
 			}
 			return
@@ -266,10 +266,10 @@ func (e *MetaExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.Aut
 			helps.RecordAPIResponseError(ctx, e.cfg, errScan)
 			reporter.PublishFailure(ctx, errScan)
 			select {
-			case out <- cliproxyexecutor.StreamChunk{Err: errScan}:
+			case out <- coreexecutor.StreamChunk{Err: errScan}:
 			case <-ctx.Done():
 			}
 		}
 	}()
-	return &cliproxyexecutor.StreamResult{Headers: httpResp.Header.Clone(), Chunks: out}, nil
+	return &coreexecutor.StreamResult{Headers: httpResp.Header.Clone(), Chunks: out}, nil
 }

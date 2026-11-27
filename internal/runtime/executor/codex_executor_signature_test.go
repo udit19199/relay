@@ -9,11 +9,11 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/registry"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func validCodexReasoningEncryptedContentForTest() string {
@@ -25,8 +25,8 @@ func validCodexReasoningEncryptedContentForTest() string {
 	return base64.RawURLEncoding.EncodeToString(payload)
 }
 
-func newCodexSignatureTestAuth(serverURL string) *cliproxyauth.Auth {
-	return &cliproxyauth.Auth{Attributes: map[string]string{
+func newCodexSignatureTestAuth(serverURL string) *coreauth.Auth {
+	return &coreauth.Auth{Attributes: map[string]string{
 		"base_url": serverURL,
 		"api_key":  "test",
 	}}
@@ -47,7 +47,7 @@ func TestCodexExecutorDropsInvalidReasoningEncryptedContentFromFinalRequest(t *t
 	defer server.Close()
 
 	executor := NewCodexExecutor(&config.Config{})
-	_, err := executor.Execute(context.Background(), newCodexSignatureTestAuth(server.URL), cliproxyexecutor.Request{
+	_, err := executor.Execute(context.Background(), newCodexSignatureTestAuth(server.URL), coreexecutor.Request{
 		Model: "gpt-5.4",
 		Payload: []byte(`{"model":"gpt-5.4","input":[` +
 			`{"id":"rs_bad","type":"reasoning","encrypted_content":"gAAAAABqFTIa\u2026abc","summary":[]},` +
@@ -55,8 +55,8 @@ func TestCodexExecutorDropsInvalidReasoningEncryptedContentFromFinalRequest(t *t
 			`{"id":"rs_good","type":"reasoning","encrypted_content":"` + validEncryptedContent + `","summary":[]},` +
 			`{"role":"user","content":"hello","encrypted_content":"leave-message-alone"}` +
 			`]}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-response"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-response"),
 		Stream:       false,
 	})
 	if err != nil {
@@ -97,11 +97,11 @@ func TestCodexExecutorExecuteStreamDropsInvalidReasoningEncryptedContentFromFina
 	defer server.Close()
 
 	executor := NewCodexExecutor(&config.Config{})
-	result, err := executor.ExecuteStream(context.Background(), newCodexSignatureTestAuth(server.URL), cliproxyexecutor.Request{
+	result, err := executor.ExecuteStream(context.Background(), newCodexSignatureTestAuth(server.URL), coreexecutor.Request{
 		Model:   "gpt-5.4",
 		Payload: []byte(`{"model":"gpt-5.4","stream":true,"input":[{"id":"rs_bad","type":"reasoning","encrypted_content":"bad","summary":[]}]}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-response"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-response"),
 		Stream:       true,
 	})
 	if err != nil {
@@ -128,11 +128,11 @@ func TestCodexExecutorCompactDropsInvalidReasoningEncryptedContentFromFinalReque
 	defer server.Close()
 
 	executor := NewCodexExecutor(&config.Config{})
-	_, err := executor.Execute(context.Background(), newCodexSignatureTestAuth(server.URL), cliproxyexecutor.Request{
+	_, err := executor.Execute(context.Background(), newCodexSignatureTestAuth(server.URL), coreexecutor.Request{
 		Model:   "gpt-5.4",
 		Payload: []byte(`{"model":"gpt-5.4","input":[{"id":"rs_bad","type":"reasoning","encrypted_content":"bad","summary":[]}]}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-response"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-response"),
 		Alt:          "responses/compact",
 		Stream:       false,
 	})
@@ -173,7 +173,7 @@ func TestCodexExecutorPreservesReasoningTextForCompatModelInResponsesRequest(t *
 		},
 	}
 	executor := NewCodexExecutor(cfg)
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"base_url": server.URL,
@@ -187,11 +187,11 @@ func TestCodexExecutorPreservesReasoningTextForCompatModelInResponsesRequest(t *
 		`{"id":"output_1","type":"function_call_output","call_id":"call_1","output":"tool result"}` +
 		`]}`)
 
-	_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "deepseek-v4.1-flash",
 		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-response"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-response"),
 		Stream:       false,
 	})
 	if err != nil {
@@ -240,7 +240,7 @@ func TestCodexExecutorExecuteStreamPreservesReasoningTextForCompatModelInRespons
 		},
 	}
 	executor := NewCodexExecutor(cfg)
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"base_url": server.URL,
@@ -253,11 +253,11 @@ func TestCodexExecutorExecuteStreamPreservesReasoningTextForCompatModelInRespons
 		`{"id":"call_1","type":"function_call","name":"tool_1","arguments":"{}"}` +
 		`]}`)
 
-	streamResult, err := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	streamResult, err := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "deepseek-v4.1-flash",
 		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-response"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-response"),
 		Stream:       true,
 	})
 	if err != nil {
@@ -308,7 +308,7 @@ func TestCodexExecutorCompactPreservesReasoningTextForCompatModelInResponsesRequ
 		},
 	}
 	executor := NewCodexExecutor(cfg)
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"base_url": server.URL,
@@ -321,11 +321,11 @@ func TestCodexExecutorCompactPreservesReasoningTextForCompatModelInResponsesRequ
 		`{"id":"call_1","type":"function_call","name":"tool_1","arguments":"{}"}` +
 		`]}`)
 
-	_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "deepseek-v4.1-flash",
 		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-response"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-response"),
 		Alt:          "responses/compact",
 		Stream:       false,
 	})
@@ -375,7 +375,7 @@ func TestCodexExecutorHonorsAuthoritativeResolvedModelInfoIsCompatFalse(t *testi
 		},
 	}
 	executor := NewCodexExecutor(cfg)
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"base_url": server.URL,
@@ -387,14 +387,14 @@ func TestCodexExecutorHonorsAuthoritativeResolvedModelInfoIsCompatFalse(t *testi
 		`{"id":"rs_native","type":"reasoning","summary":[],"content":[{"type":"reasoning_text","text":"should be promoted and cleared"}]}` +
 		`]}`)
 
-	_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "gpt-5.4",
 		Payload: payload,
 		Metadata: map[string]any{
 			"cliproxy.resolved_api_key_model_info": &registry.ModelInfo{IsCompat: false},
 		},
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-response"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-response"),
 		Stream:       false,
 	})
 	if err != nil {
@@ -444,16 +444,16 @@ func TestCodexExecutorDisambiguatesConfigIndex(t *testing.T) {
 	executor := NewCodexExecutor(cfg)
 
 	// Auth pointing to index 1 (IsCompat: true)
-	authCompat := &cliproxyauth.Auth{
+	authCompat := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
-			cliproxyauth.AttributeAuthKind:    cliproxyauth.AuthKindAPIKey,
-			cliproxyauth.AttributeConfigIndex: "1",
-			"base_url":                        server.URL,
-			"api_key":                         "shared-key",
+			coreauth.AttributeAuthKind:    coreauth.AuthKindAPIKey,
+			coreauth.AttributeConfigIndex: "1",
+			"base_url":                    server.URL,
+			"api_key":                     "shared-key",
 		},
 		Metadata: map[string]any{
-			"auth_source": cliproxyauth.AuthSourceConfig,
+			"auth_source": coreauth.AuthSourceConfig,
 		},
 	}
 
@@ -461,11 +461,11 @@ func TestCodexExecutorDisambiguatesConfigIndex(t *testing.T) {
 		`{"id":"rs_1","type":"reasoning","summary":[],"content":[{"type":"reasoning_text","text":"keep me"}]}` +
 		`]}`)
 
-	_, err := executor.Execute(context.Background(), authCompat, cliproxyexecutor.Request{
+	_, err := executor.Execute(context.Background(), authCompat, coreexecutor.Request{
 		Model:   "model-a",
 		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-response"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-response"),
 		Stream:       false,
 	})
 	if err != nil {

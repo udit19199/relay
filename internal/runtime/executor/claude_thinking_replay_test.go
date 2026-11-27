@@ -10,51 +10,51 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	internalcache "github.com/router-for-me/CLIProxyAPI/v8/internal/cache"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	internalcache "github.com/udit19199/relay/internal/cache"
+	"github.com/udit19199/relay/internal/registry"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 const claudeReplayResolvedModelInfoKey = "cliproxy.resolved_api_key_model_info"
 
-func claudeReplayTestAuth(baseURL string) *cliproxyauth.Auth {
-	return &cliproxyauth.Auth{
+func claudeReplayTestAuth(baseURL string) *coreauth.Auth {
+	return &coreauth.Auth{
 		ID:       "claude-replay-auth",
 		Provider: "claude",
 		Attributes: map[string]string{
-			cliproxyauth.AttributeAPIKey:   "key-claude-replay",
-			cliproxyauth.AttributeAuthKind: cliproxyauth.AuthKindAPIKey,
-			"base_url":                     baseURL,
+			coreauth.AttributeAPIKey:   "key-claude-replay",
+			coreauth.AttributeAuthKind: coreauth.AuthKindAPIKey,
+			"base_url":                 baseURL,
 		},
 	}
 }
 
-func claudeReplayTestRequest(payload []byte, sessionID string, isCompat bool, source sdktranslator.Format) (cliproxyexecutor.Request, cliproxyexecutor.Options) {
-	return cliproxyexecutor.Request{
+func claudeReplayTestRequest(payload []byte, sessionID string, isCompat bool, source translatorreg.Format) (coreexecutor.Request, coreexecutor.Options) {
+	return coreexecutor.Request{
 			Model:   "claude-synthetic-4772",
 			Payload: payload,
 			Metadata: map[string]any{
 				claudeReplayResolvedModelInfoKey: &registry.ModelInfo{IsCompat: isCompat},
 			},
-		}, cliproxyexecutor.Options{
+		}, coreexecutor.Options{
 			SourceFormat: source,
 			Metadata: map[string]any{
-				cliproxyexecutor.ExecutionSessionMetadataKey: sessionID,
+				coreexecutor.ExecutionSessionMetadataKey: sessionID,
 			},
 		}
 }
 
 func TestClaudeThinkingReplayEnabledRequiresCompatClaudeAPIKey(t *testing.T) {
-	baseRequest, baseOptions := claudeReplayTestRequest([]byte(`{"messages":[]}`), "scope", true, sdktranslator.FormatClaude)
+	baseRequest, baseOptions := claudeReplayTestRequest([]byte(`{"messages":[]}`), "scope", true, translatorreg.FormatClaude)
 	baseAuth := claudeReplayTestAuth("http://127.0.0.1")
 
 	tests := []struct {
 		name       string
-		auth       *cliproxyauth.Auth
-		request    cliproxyexecutor.Request
-		options    cliproxyexecutor.Options
+		auth       *coreauth.Auth
+		request    coreexecutor.Request
+		options    coreexecutor.Options
 		wantEnable bool
 	}{
 		{
@@ -67,8 +67,8 @@ func TestClaudeThinkingReplayEnabledRequiresCompatClaudeAPIKey(t *testing.T) {
 		{
 			name: "non compat model",
 			auth: baseAuth,
-			request: func() cliproxyexecutor.Request {
-				request, _ := claudeReplayTestRequest([]byte(`{"messages":[]}`), "scope-non-compat", false, sdktranslator.FormatClaude)
+			request: func() coreexecutor.Request {
+				request, _ := claudeReplayTestRequest([]byte(`{"messages":[]}`), "scope-non-compat", false, translatorreg.FormatClaude)
 				return request
 			}(),
 			options:    baseOptions,
@@ -76,10 +76,10 @@ func TestClaudeThinkingReplayEnabledRequiresCompatClaudeAPIKey(t *testing.T) {
 		},
 		{
 			name: "OAuth credential",
-			auth: func() *cliproxyauth.Auth {
+			auth: func() *coreauth.Auth {
 				auth := baseAuth.Clone()
-				auth.Attributes[cliproxyauth.AttributeAuthKind] = cliproxyauth.AuthKindOAuth
-				auth.Attributes[cliproxyauth.AttributeAPIKey] = "sk-ant-oat-replay"
+				auth.Attributes[coreauth.AttributeAuthKind] = coreauth.AuthKindOAuth
+				auth.Attributes[coreauth.AttributeAPIKey] = "sk-ant-oat-replay"
 				return auth
 			}(),
 			request:    baseRequest,
@@ -88,7 +88,7 @@ func TestClaudeThinkingReplayEnabledRequiresCompatClaudeAPIKey(t *testing.T) {
 		},
 		{
 			name: "other provider",
-			auth: func() *cliproxyauth.Auth {
+			auth: func() *coreauth.Auth {
 				auth := baseAuth.Clone()
 				auth.Provider = "meta"
 				return auth
@@ -101,9 +101,9 @@ func TestClaudeThinkingReplayEnabledRequiresCompatClaudeAPIKey(t *testing.T) {
 			name:    "OpenAI source format",
 			auth:    baseAuth,
 			request: baseRequest,
-			options: func() cliproxyexecutor.Options {
+			options: func() coreexecutor.Options {
 				options := baseOptions
-				options.SourceFormat = sdktranslator.FormatOpenAI
+				options.SourceFormat = translatorreg.FormatOpenAI
 				return options
 			}(),
 			wantEnable: false,
@@ -149,13 +149,13 @@ func TestClaudeExecutorCompatThinkingReplayRestoresOmittedBlock(t *testing.T) {
 	executor := NewClaudeExecutor(nil)
 	auth := claudeReplayTestAuth(server.URL)
 	firstPayload := []byte(`{"messages":[{"role":"user","content":"inspect"}]}`)
-	firstRequest, firstOptions := claudeReplayTestRequest(firstPayload, "nonstream-replay", true, sdktranslator.FormatClaude)
+	firstRequest, firstOptions := claudeReplayTestRequest(firstPayload, "nonstream-replay", true, translatorreg.FormatClaude)
 	if _, errExecute := executor.Execute(context.Background(), auth, firstRequest, firstOptions); errExecute != nil {
 		t.Fatalf("first Execute() error = %v", errExecute)
 	}
 
 	secondPayload := []byte(`{"messages":[{"role":"user","content":"inspect"},{"role":"assistant","content":[{"type":"tool_use","id":"toolu_1","name":"Read","input":{"path":"README.md"}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"ok"}]}]}`)
-	secondRequest, secondOptions := claudeReplayTestRequest(secondPayload, "nonstream-replay", true, sdktranslator.FormatClaude)
+	secondRequest, secondOptions := claudeReplayTestRequest(secondPayload, "nonstream-replay", true, translatorreg.FormatClaude)
 	if _, errExecute := executor.Execute(context.Background(), auth, secondRequest, secondOptions); errExecute != nil {
 		t.Fatalf("second Execute() error = %v", errExecute)
 	}
@@ -208,7 +208,7 @@ func TestClaudeExecutorCompatThinkingReplayRestoresOmittedBlockInStream(t *testi
 	executor := NewClaudeExecutor(nil)
 	auth := claudeReplayTestAuth(server.URL)
 	firstPayload := []byte(`{"messages":[{"role":"user","content":"inspect"}]}`)
-	firstRequest, firstOptions := claudeReplayTestRequest(firstPayload, "stream-replay", true, sdktranslator.FormatClaude)
+	firstRequest, firstOptions := claudeReplayTestRequest(firstPayload, "stream-replay", true, translatorreg.FormatClaude)
 	firstResult, errExecute := executor.ExecuteStream(context.Background(), auth, firstRequest, firstOptions)
 	if errExecute != nil {
 		t.Fatalf("first ExecuteStream() error = %v", errExecute)
@@ -220,7 +220,7 @@ func TestClaudeExecutorCompatThinkingReplayRestoresOmittedBlockInStream(t *testi
 	}
 
 	secondPayload := []byte(`{"messages":[{"role":"user","content":"inspect"},{"role":"assistant","content":[{"type":"tool_use","id":"toolu_1","name":"Read","input":{"path":"README.md"}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"ok"}]}]}`)
-	secondRequest, secondOptions := claudeReplayTestRequest(secondPayload, "stream-replay", true, sdktranslator.FormatClaude)
+	secondRequest, secondOptions := claudeReplayTestRequest(secondPayload, "stream-replay", true, translatorreg.FormatClaude)
 	secondResult, errExecute := executor.ExecuteStream(context.Background(), auth, secondRequest, secondOptions)
 	if errExecute != nil {
 		t.Fatalf("second ExecuteStream() error = %v", errExecute)
@@ -285,13 +285,13 @@ func TestClaudeExecutorCompatThinkingReplayClearsAfterUpstreamBadRequest(t *test
 
 	executor := NewClaudeExecutor(nil)
 	auth := claudeReplayTestAuth(server.URL)
-	firstRequest, firstOptions := claudeReplayTestRequest([]byte(`{"messages":[{"role":"user","content":"inspect"}]}`), "bad-request-replay", true, sdktranslator.FormatClaude)
+	firstRequest, firstOptions := claudeReplayTestRequest([]byte(`{"messages":[{"role":"user","content":"inspect"}]}`), "bad-request-replay", true, translatorreg.FormatClaude)
 	if _, errExecute := executor.Execute(context.Background(), auth, firstRequest, firstOptions); errExecute != nil {
 		t.Fatalf("first Execute() error = %v", errExecute)
 	}
 
 	secondPayload := []byte(`{"messages":[{"role":"user","content":"inspect"},{"role":"assistant","content":[{"type":"tool_use","id":"toolu-1","name":"Read","input":{"path":"README.md"}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu-1","content":"ok"}]}]}`)
-	secondRequest, secondOptions := claudeReplayTestRequest(secondPayload, "bad-request-replay", true, sdktranslator.FormatClaude)
+	secondRequest, secondOptions := claudeReplayTestRequest(secondPayload, "bad-request-replay", true, translatorreg.FormatClaude)
 	if _, errExecute := executor.Execute(context.Background(), auth, secondRequest, secondOptions); errExecute == nil {
 		t.Fatal("second Execute() error = nil, want upstream bad request")
 	}
@@ -335,19 +335,19 @@ func TestClaudeExecutorCompatThinkingReplayRestoresMultipleOmittedBlocks(t *test
 
 	executor := NewClaudeExecutor(nil)
 	auth := claudeReplayTestAuth(server.URL)
-	firstRequest, firstOptions := claudeReplayTestRequest([]byte(`{"messages":[{"role":"user","content":"inspect"}]}`), "multi-turn-replay", true, sdktranslator.FormatClaude)
+	firstRequest, firstOptions := claudeReplayTestRequest([]byte(`{"messages":[{"role":"user","content":"inspect"}]}`), "multi-turn-replay", true, translatorreg.FormatClaude)
 	if _, errExecute := executor.Execute(context.Background(), auth, firstRequest, firstOptions); errExecute != nil {
 		t.Fatalf("first Execute() error = %v", errExecute)
 	}
 
 	secondPayload := []byte(`{"messages":[{"role":"user","content":"inspect"},{"role":"assistant","content":[{"type":"tool_use","id":"toolu-1","name":"Read","input":{"path":"one"}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu-1","content":"one result"}]}]}`)
-	secondRequest, secondOptions := claudeReplayTestRequest(secondPayload, "multi-turn-replay", true, sdktranslator.FormatClaude)
+	secondRequest, secondOptions := claudeReplayTestRequest(secondPayload, "multi-turn-replay", true, translatorreg.FormatClaude)
 	if _, errExecute := executor.Execute(context.Background(), auth, secondRequest, secondOptions); errExecute != nil {
 		t.Fatalf("second Execute() error = %v", errExecute)
 	}
 
 	thirdPayload := []byte(`{"messages":[{"role":"user","content":"inspect"},{"role":"assistant","content":[{"type":"tool_use","id":"toolu-1","name":"Read","input":{"path":"one"}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu-1","content":"one result"}]},{"role":"assistant","content":[{"type":"tool_use","id":"toolu-2","name":"Read","input":{"path":"two"}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu-2","content":"two result"}]}]}`)
-	thirdRequest, thirdOptions := claudeReplayTestRequest(thirdPayload, "multi-turn-replay", true, sdktranslator.FormatClaude)
+	thirdRequest, thirdOptions := claudeReplayTestRequest(thirdPayload, "multi-turn-replay", true, translatorreg.FormatClaude)
 	if _, errExecute := executor.Execute(context.Background(), auth, thirdRequest, thirdOptions); errExecute != nil {
 		t.Fatalf("third Execute() error = %v", errExecute)
 	}

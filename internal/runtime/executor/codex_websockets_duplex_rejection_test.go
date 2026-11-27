@@ -13,11 +13,11 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gorilla/websocket"
-	internalcache "github.com/router-for-me/CLIProxyAPI/v8/internal/cache"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	auth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	core "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	translator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	internalcache "github.com/udit19199/relay/internal/cache"
+	"github.com/udit19199/relay/internal/config"
+	auth "github.com/udit19199/relay/internal/service/auth"
+	core "github.com/udit19199/relay/internal/service/executor"
+	translator "github.com/udit19199/relay/internal/translator/registry"
 )
 
 // The server waits for all explicit creates before rejecting one. This makes

@@ -1,10 +1,9 @@
 package util
 
 import (
+	"github.com/MoeForge/moego/ojson"
 	"strings"
 	"unicode"
-
-	"github.com/MoeForge/moego/ojson"
 )
 
 const claudeCodeAttributionSystemPrefix = "x-anthropic-billing-header:"

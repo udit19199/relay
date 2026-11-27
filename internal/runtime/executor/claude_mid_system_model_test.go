@@ -10,10 +10,10 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gin-gonic/gin"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 // midSystemLegacyPayload is a caller body pairing a legacy model with a
@@ -87,9 +87,9 @@ func httptest_NewRequest() *http.Request {
 	return req
 }
 
-func midSystemAuth() *cliproxyauth.Auth {
+func midSystemAuth() *coreauth.Auth {
 	// No base_url, so the executor keeps Anthropic's first-party origin.
-	return &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "key-123", "cloak_mode": "always"}}
+	return &coreauth.Auth{Attributes: map[string]string{"api_key": "key-123", "cloak_mode": "always"}}
 }
 
 func midSystemConfig() *config.Config {
@@ -141,17 +141,17 @@ func TestClaudeExecutor_LegacyMidSystemMessageRejectedOnEveryUpstreamPath(t *tes
 
 func sendMidSystemExecute(t *testing.T, ex *ClaudeExecutor, ctx context.Context, model string) error {
 	t.Helper()
-	_, err := ex.Execute(ctx, midSystemAuth(), cliproxyexecutor.Request{
+	_, err := ex.Execute(ctx, midSystemAuth(), coreexecutor.Request{
 		Model: model, Payload: midSystemLegacyPayload(model),
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude})
 	return err
 }
 
 func sendMidSystemStream(t *testing.T, ex *ClaudeExecutor, ctx context.Context, model string) error {
 	t.Helper()
-	result, err := ex.ExecuteStream(ctx, midSystemAuth(), cliproxyexecutor.Request{
+	result, err := ex.ExecuteStream(ctx, midSystemAuth(), coreexecutor.Request{
 		Model: model, Payload: midSystemLegacyPayload(model),
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude})
 	if err != nil {
 		return err
 	}
@@ -165,9 +165,9 @@ func sendMidSystemStream(t *testing.T, ex *ClaudeExecutor, ctx context.Context, 
 
 func sendMidSystemCountTokens(t *testing.T, ex *ClaudeExecutor, ctx context.Context, model string) error {
 	t.Helper()
-	_, err := ex.CountTokens(ctx, midSystemAuth(), cliproxyexecutor.Request{
+	_, err := ex.CountTokens(ctx, midSystemAuth(), coreexecutor.Request{
 		Model: model, Payload: midSystemLegacyPayload(model),
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude})
 	return err
 }
 
@@ -183,9 +183,9 @@ func TestClaudeExecutor_PayloadOverrideCannotSmuggleLegacyMidSystemMessage(t *te
 
 	// The caller addresses a model that accepts the turn; only the payload rule
 	// selects the otherwise incompatible pairing.
-	_, err := ex.Execute(upstream.context(t, nil), midSystemAuth(), cliproxyexecutor.Request{
+	_, err := ex.Execute(upstream.context(t, nil), midSystemAuth(), coreexecutor.Request{
 		Model: "claude-sonnet-5", Payload: midSystemLegacyPayload("claude-sonnet-5"),
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude})
 	assertMidSystemRejected(t, err, upstream)
 }
 
@@ -205,9 +205,9 @@ func TestClaudeExecutor_PayloadOverrideDoesNotClaimMatchingCallerTurn(t *testing
 		`"messages":[{"role":"user","content":[{"type":"text","text":"hi"}]},` +
 		`{"role":"system","content":[{"type":"text","text":"Same rule"}]}]}`)
 
-	_, err := ex.Execute(upstream.context(t, nil), midSystemAuth(), cliproxyexecutor.Request{
+	_, err := ex.Execute(upstream.context(t, nil), midSystemAuth(), coreexecutor.Request{
 		Model: "claude-sonnet-5", Payload: payload,
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude})
 	assertMidSystemRejected(t, err, upstream)
 }
 
@@ -221,15 +221,15 @@ func TestClaudeExecutor_PayloadOverrideDoesNotRerunSystemPlacement(t *testing.T)
 		send func(t *testing.T, ex *ClaudeExecutor, ctx context.Context, payload []byte) error
 	}{
 		{name: "execute", send: func(t *testing.T, ex *ClaudeExecutor, ctx context.Context, payload []byte) error {
-			_, err := ex.Execute(ctx, midSystemAuth(), cliproxyexecutor.Request{
+			_, err := ex.Execute(ctx, midSystemAuth(), coreexecutor.Request{
 				Model: "claude-sonnet-5", Payload: payload,
-			}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude})
+			}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude})
 			return err
 		}},
 		{name: "execute stream", send: func(t *testing.T, ex *ClaudeExecutor, ctx context.Context, payload []byte) error {
-			result, err := ex.ExecuteStream(ctx, midSystemAuth(), cliproxyexecutor.Request{
+			result, err := ex.ExecuteStream(ctx, midSystemAuth(), coreexecutor.Request{
 				Model: "claude-sonnet-5", Payload: payload,
-			}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude})
+			}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude})
 			if err != nil {
 				return err
 			}
@@ -269,10 +269,10 @@ func TestClaudeExecutor_ConfirmedNativeLegacyMidSystemMessageForwarded(t *testin
 	ex := NewClaudeExecutor(midSystemConfig())
 	headers := claudeNativeHelperHeaders("claude-code-20250219,"+claudeNativeHelperCoreBetas, "gzip, deflate, br, zstd")
 
-	if _, err := ex.Execute(upstream.context(t, headers), midSystemAuth(), cliproxyexecutor.Request{
+	if _, err := ex.Execute(upstream.context(t, headers), midSystemAuth(), coreexecutor.Request{
 		Model:   "claude-haiku-4-5-20251001",
 		Payload: midSystemLegacyPayload("claude-haiku-4-5-20251001"),
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude, Headers: headers}); err != nil {
+	}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude, Headers: headers}); err != nil {
 		t.Fatalf("Execute() error = %v, want the native body forwarded", err)
 	}
 	if !upstream.called {
@@ -291,14 +291,14 @@ func TestClaudeExecutor_LegacyMidSystemMessageForwardedToThirdPartyGateway(t *te
 	ex := NewClaudeExecutor(&config.Config{ClaudeKey: []config.ClaudeKey{{
 		APIKey: "key-123", BaseURL: "https://gateway.example",
 	}}})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"api_key": "key-123", "base_url": "https://gateway.example",
 	}}
 
-	if _, err := ex.Execute(upstream.context(t, nil), auth, cliproxyexecutor.Request{
+	if _, err := ex.Execute(upstream.context(t, nil), auth, coreexecutor.Request{
 		Model:   "claude-haiku-4-5-20251001",
 		Payload: midSystemLegacyPayload("claude-haiku-4-5-20251001"),
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude}); err != nil {
+	}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude}); err != nil {
 		t.Fatalf("Execute() error = %v, want a third-party gateway to decide for itself", err)
 	}
 	if !upstream.called {
@@ -313,9 +313,9 @@ func TestClaudeExecutor_SupportedModelMidSystemMessageForwarded(t *testing.T) {
 		t.Run(model, func(t *testing.T) {
 			upstream := &midSystemUpstream{}
 			ex := NewClaudeExecutor(midSystemConfig())
-			if _, err := ex.Execute(upstream.context(t, nil), midSystemAuth(), cliproxyexecutor.Request{
+			if _, err := ex.Execute(upstream.context(t, nil), midSystemAuth(), coreexecutor.Request{
 				Model: model, Payload: midSystemLegacyPayload(model),
-			}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude}); err != nil {
+			}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude}); err != nil {
 				t.Fatalf("Execute() error = %v, want the request forwarded", err)
 			}
 			if !upstream.called {
@@ -333,10 +333,10 @@ func TestClaudeExecutor_LegacyMidSystemMessageOptInStillRebuilds(t *testing.T) {
 	auth := midSystemAuth()
 	auth.Attributes["rebuild_mid_system_message"] = "true"
 
-	if _, err := ex.Execute(upstream.context(t, nil), auth, cliproxyexecutor.Request{
+	if _, err := ex.Execute(upstream.context(t, nil), auth, coreexecutor.Request{
 		Model:   "claude-haiku-4-5-20251001",
 		Payload: midSystemLegacyPayload("claude-haiku-4-5-20251001"),
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude}); err != nil {
+	}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude}); err != nil {
 		t.Fatalf("Execute() error = %v, want the opt-in rebuild to rescue the request", err)
 	}
 	if !upstream.called {
@@ -356,25 +356,25 @@ func TestTranslatedRequestNeverPairsLegacyModelWithMidSystemMessage(t *testing.T
 	const legacyModel = "claude-haiku-4-5-20251001"
 	for _, test := range []struct {
 		name    string
-		format  sdktranslator.Format
+		format  translatorreg.Format
 		payload string
 	}{
-		{name: "openai chat with a mid conversation system message", format: sdktranslator.FormatOpenAI,
+		{name: "openai chat with a mid conversation system message", format: translatorreg.FormatOpenAI,
 			payload: `{"model":"` + legacyModel + `","messages":[{"role":"system","content":"Top rule"},{"role":"user","content":"hi"},{"role":"system","content":"Mid rule"},{"role":"assistant","content":"ok"},{"role":"user","content":"go"}]}`},
-		{name: "openai chat ending on a system message", format: sdktranslator.FormatOpenAI,
+		{name: "openai chat ending on a system message", format: translatorreg.FormatOpenAI,
 			payload: `{"model":"` + legacyModel + `","messages":[{"role":"user","content":"hi"},{"role":"system","content":"Mid rule"}]}`},
-		{name: "openai responses with instructions", format: sdktranslator.FormatOpenAIResponse,
+		{name: "openai responses with instructions", format: translatorreg.FormatOpenAIResponse,
 			payload: `{"model":"` + legacyModel + `","instructions":"Top rule","input":[{"role":"user","content":[{"type":"input_text","text":"hi"}]}]}`},
-		{name: "interactions with a system instruction", format: sdktranslator.FormatInteractions,
+		{name: "interactions with a system instruction", format: translatorreg.FormatInteractions,
 			payload: `{"model":"` + legacyModel + `","system_instruction":"Top rule","input":[{"type":"user_input","content":[{"type":"text","text":"hi"}]}]}`},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			upstream := &midSystemUpstream{}
 			ex := NewClaudeExecutor(midSystemConfig())
 
-			if _, err := ex.Execute(upstream.context(t, nil), midSystemAuth(), cliproxyexecutor.Request{
+			if _, err := ex.Execute(upstream.context(t, nil), midSystemAuth(), coreexecutor.Request{
 				Model: legacyModel, Payload: []byte(test.payload),
-			}, cliproxyexecutor.Options{SourceFormat: test.format}); err != nil {
+			}, coreexecutor.Options{SourceFormat: test.format}); err != nil {
 				t.Fatalf("Execute() error = %v, want the translated request forwarded", err)
 			}
 			if !upstream.called {

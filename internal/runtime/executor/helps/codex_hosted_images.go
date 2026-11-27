@@ -6,11 +6,11 @@ import (
 	"strings"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/thinking"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/registry"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	"github.com/udit19199/relay/internal/thinking"
+	"github.com/udit19199/relay/internal/util"
 )
 
 const codexResponsesLiteHeaderName = "X-OpenAI-Internal-Codex-Responses-Lite"
@@ -39,7 +39,7 @@ func CodexResponsesLiteRequestDoc(doc *ojson.Doc, headers http.Header) bool {
 // CodexResponsesLiteRequestForAuthDoc reports whether the request uses the
 // Codex Responses-Lite protocol after resolving client_metadata, client
 // headers, credential header: attributes, and models.json override_header.
-func CodexResponsesLiteRequestForAuthDoc(doc *ojson.Doc, modelName string, auth *cliproxyauth.Auth, headers http.Header) bool {
+func CodexResponsesLiteRequestForAuthDoc(doc *ojson.Doc, modelName string, auth *coreauth.Auth, headers http.Header) bool {
 	if CodexResponsesLiteRequestDoc(doc, nil) {
 		return true
 	}
@@ -117,7 +117,7 @@ func ValidateCodexHostedImageGenerationDoc(doc *ojson.Doc, upstreamHeaders http.
 	if !codexRequestForcesImageGenerationDoc(doc) {
 		return nil
 	}
-	return cliproxyauth.NewRequestScopedError("Hosted image_generation cannot be forced on this Codex Responses-Lite route. Use /v1/images/generations or /v1/images/edits instead.", http.StatusBadRequest)
+	return coreauth.NewRequestScopedError("Hosted image_generation cannot be forced on this Codex Responses-Lite route. Use /v1/images/generations or /v1/images/edits instead.", http.StatusBadRequest)
 }
 
 func codexCollectDeclaredToolsDoc(doc *ojson.Doc) []ojson.Result {

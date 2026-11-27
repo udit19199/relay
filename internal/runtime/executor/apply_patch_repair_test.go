@@ -17,13 +17,13 @@ import (
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	codexresponses "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/codex/openai/responses"
-	translatorcommon "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/common"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/usage"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	"github.com/udit19199/relay/internal/service/usage"
+	codexresponses "github.com/udit19199/relay/internal/translator/codex/openai/responses"
+	translatorcommon "github.com/udit19199/relay/internal/translator/common"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 // task6RepairSource completes tool input without implicitly completing the response.
@@ -58,7 +58,7 @@ func task6RepairSSE(events [][]byte) string {
 	return body.String()
 }
 
-func task6RepairExecutor(provider string) cliproxyauth.ProviderExecutor {
+func task6RepairExecutor(provider string) coreauth.ProviderExecutor {
 	switch provider {
 	case "meta":
 		return NewMetaExecutor(&config.Config{})
@@ -81,9 +81,9 @@ func TestApplyPatchRepairResponsesSourceTerminalHTTP(t *testing.T) {
 				}))
 				defer server.Close()
 				exec := task6RepairExecutor(provider)
-				auth := &cliproxyauth.Auth{ID: t.Name(), Provider: provider, Attributes: map[string]string{"api_key": "test", "base_url": server.URL}}
-				req := cliproxyexecutor.Request{Model: "grok-4", Payload: []byte(task6PatchRequest)}
-				opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse}
+				auth := &coreauth.Auth{ID: t.Name(), Provider: provider, Attributes: map[string]string{"api_key": "test", "base_url": server.URL}}
+				req := coreexecutor.Request{Model: "grok-4", Payload: []byte(task6PatchRequest)}
+				opts := coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse}
 				if !strings.HasPrefix(mode, "response.") {
 					checkUsage := task6CaptureFailureUsage(t, auth.ID)
 					stream, errExecuteStream := exec.ExecuteStream(t.Context(), auth, req, opts)
@@ -130,7 +130,7 @@ func task6RepairChunkType(payload []byte) string {
 	return ojson.GetBytes(payload, "type").String()
 }
 
-func task6RepairReadStream(t *testing.T, stream *cliproxyexecutor.StreamResult, failure bool) {
+func task6RepairReadStream(t *testing.T, stream *coreexecutor.StreamResult, failure bool) {
 	t.Helper()
 	failed, cleanErrors, completed := 0, 0, 0
 	validPatch := false
@@ -189,7 +189,7 @@ func TestApplyPatchRepairXAIWebsocketSourceTerminal(t *testing.T) {
 				defer server.Close()
 				exec := NewXAIWebsocketsExecutor(&config.Config{})
 				exec.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
-				auth := &cliproxyauth.Auth{ID: t.Name(), Provider: "xai", Attributes: map[string]string{"api_key": "test", "base_url": server.URL}}
+				auth := &coreauth.Auth{ID: t.Name(), Provider: "xai", Attributes: map[string]string{"api_key": "test", "base_url": server.URL}}
 				failure := !strings.HasPrefix(mode, "response.")
 				if failure {
 					checkUsage := task6CaptureFailureUsage(t, auth.ID)
@@ -197,9 +197,9 @@ func TestApplyPatchRepairXAIWebsocketSourceTerminal(t *testing.T) {
 				}
 				ctx := t.Context()
 				if raw {
-					ctx = cliproxyexecutor.WithDownstreamWebsocket(ctx)
+					ctx = coreexecutor.WithDownstreamWebsocket(ctx)
 				}
-				stream, errExecuteStream := exec.ExecuteStream(ctx, auth, cliproxyexecutor.Request{Model: "grok-4", Payload: []byte(task6PatchRequest)}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse})
+				stream, errExecuteStream := exec.ExecuteStream(ctx, auth, coreexecutor.Request{Model: "grok-4", Payload: []byte(task6PatchRequest)}, coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse})
 				if errExecuteStream != nil {
 					t.Fatal(errExecuteStream)
 				}
@@ -254,7 +254,7 @@ func TestApplyPatchRepairXAIWebsocketPersistentFailureRetry(t *testing.T) {
 				t.Run(fmt.Sprintf("%s/raw=%v/detach=%v", branch, raw, detach), func(t *testing.T) {
 					if strings.HasPrefix(branch, "translator") {
 						// Inject only the optional translator failure; retain the real executor/socket.
-						sdktranslator.Register(sdktranslator.FormatOpenAIResponse, sdktranslator.FormatCodex, nil, sdktranslator.ResponseTransform{Stream: func(ctx context.Context, model string, original, effective, event []byte, param *any) [][]byte {
+						translatorreg.Register(translatorreg.FormatOpenAIResponse, translatorreg.FormatCodex, nil, translatorreg.ResponseTransform{Stream: func(ctx context.Context, model string, original, effective, event []byte, param *any) [][]byte {
 							payload := bytes.TrimSpace(bytes.TrimPrefix(event, []byte("data: ")))
 							if ojson.GetBytes(payload, "type").String() == "repair.invalid" || (ojson.GetBytes(payload, "type").String() == "response.completed" && ojson.GetBytes(payload, "response.id").String() == "repair-invalid") {
 								state := &translatorcommon.ApplyPatchErrorState{}
@@ -264,7 +264,7 @@ func TestApplyPatchRepairXAIWebsocketPersistentFailureRetry(t *testing.T) {
 							}
 							return codexresponses.ConvertCodexResponseToOpenAIResponses(ctx, model, original, effective, event, param)
 						}})
-						defer sdktranslator.Register(sdktranslator.FormatOpenAIResponse, sdktranslator.FormatCodex, nil, sdktranslator.ResponseTransform{Stream: codexresponses.ConvertCodexResponseToOpenAIResponses, NonStream: codexresponses.ConvertCodexResponseToOpenAIResponsesNonStream})
+						defer translatorreg.Register(translatorreg.FormatOpenAIResponse, translatorreg.FormatCodex, nil, translatorreg.ResponseTransform{Stream: codexresponses.ConvertCodexResponseToOpenAIResponses, NonStream: codexresponses.ConvertCodexResponseToOpenAIResponsesNonStream})
 					}
 					oldClosed := make(chan struct{})
 					freshRequest := make(chan struct{})
@@ -329,15 +329,15 @@ func TestApplyPatchRepairXAIWebsocketPersistentFailureRetry(t *testing.T) {
 					ctx, cancel := context.WithCancel(t.Context())
 					defer cancel()
 					if raw {
-						ctx = cliproxyexecutor.WithDownstreamWebsocket(ctx)
+						ctx = coreexecutor.WithDownstreamWebsocket(ctx)
 					}
-					auth := &cliproxyauth.Auth{ID: t.Name(), Provider: "xai", Attributes: map[string]string{"api_key": "test", "base_url": server.URL}}
-					req := cliproxyexecutor.Request{Model: "grok-4", Payload: []byte(task6PatchRequest)}
+					auth := &coreauth.Auth{ID: t.Name(), Provider: "xai", Attributes: map[string]string{"api_key": "test", "base_url": server.URL}}
+					req := coreexecutor.Request{Model: "grok-4", Payload: []byte(task6PatchRequest)}
 					if branch == "translator-warmup" {
 						req.Payload = []byte(`{"generate":false,"input":"patch","tools":[{"type":"custom","name":"apply_patch"}]}`)
 					}
 					oldLifecycle := &task6RepairLifecycle{ended: make(chan string, 1)}
-					opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse, Metadata: map[string]any{cliproxyexecutor.ExecutionSessionMetadataKey: sessionID}, ExecutionLifecycle: oldLifecycle}
+					opts := coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse, Metadata: map[string]any{coreexecutor.ExecutionSessionMetadataKey: sessionID}, ExecutionLifecycle: oldLifecycle}
 					checkUsage := task6CaptureFailureUsage(t, auth.ID)
 					first, errExecuteStream := exec.ExecuteStream(ctx, auth, req, opts)
 					if errExecuteStream != nil {
@@ -370,7 +370,7 @@ func TestApplyPatchRepairXAIWebsocketPersistentFailureRetry(t *testing.T) {
 					}
 					// Retry starts while the first attempt is blocked delivering its clean error.
 					type attempt struct {
-						stream *cliproxyexecutor.StreamResult
+						stream *coreexecutor.StreamResult
 						err    error
 					}
 					secondResult := make(chan attempt, 1)
@@ -439,7 +439,7 @@ func TestApplyPatchRepairGatewayInitializesGinTestMode(t *testing.T) {
 	}))
 	defer server.Close()
 	exec := NewOpenAICompatExecutor("custom-compat", &config.Config{})
-	auth := &cliproxyauth.Auth{ID: t.Name(), Provider: exec.Identifier(), Attributes: map[string]string{"api_key": "test", "base_url": server.URL}}
+	auth := &coreauth.Auth{ID: t.Name(), Provider: exec.Identifier(), Attributes: map[string]string{"api_key": "test", "base_url": server.URL}}
 	result := task6Gateway(t, exec, auth, false)
 	if result.Code != http.StatusBadGateway {
 		t.Fatalf("expected fixture error path, got %d", result.Code)
@@ -458,9 +458,9 @@ func TestApplyPatchRepairResponsesSourceTerminalNonStream(t *testing.T) {
 				}))
 				defer server.Close()
 				exec := task6RepairExecutor(provider)
-				auth := &cliproxyauth.Auth{ID: t.Name(), Provider: provider, Attributes: map[string]string{"api_key": "test", "base_url": server.URL}}
+				auth := &coreauth.Auth{ID: t.Name(), Provider: provider, Attributes: map[string]string{"api_key": "test", "base_url": server.URL}}
 				checkUsage := task6CaptureFailureUsage(t, auth.ID)
-				response, errExecute := exec.Execute(t.Context(), auth, cliproxyexecutor.Request{Model: "grok-4", Payload: []byte(task6PatchRequest)}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse})
+				response, errExecute := exec.Execute(t.Context(), auth, coreexecutor.Request{Model: "grok-4", Payload: []byte(task6PatchRequest)}, coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse})
 				if len(response.Payload) != 0 {
 					t.Errorf("failed source returned payload: %s", response.Payload)
 				}
@@ -515,25 +515,25 @@ func TestApplyPatchRepairXAIWebsocketCompactionUsage(t *testing.T) {
 			exec := NewXAIWebsocketsExecutor(&config.Config{})
 			exec.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
 			exec.idStore = &xaiWebsocketIDStateStore{sessions: make(map[string]*xaiWebsocketIDState)}
-			auth := &cliproxyauth.Auth{ID: t.Name(), Provider: "xai", Attributes: map[string]string{"api_key": "test", "base_url": server.URL}}
+			auth := &coreauth.Auth{ID: t.Name(), Provider: "xai", Attributes: map[string]string{"api_key": "test", "base_url": server.URL}}
 			capture := &task6UsageCapture{id: auth.ID, records: make(chan usage.Record, 32)}
 			usage.RegisterNamedConsumer("task6-patch-failure", capture)
-			req := cliproxyexecutor.Request{Model: "grok-4.3", Payload: []byte(`{"model":"grok-4.3","input":[{"type":"message","role":"user","content":"history"},{"type":"compaction_trigger"}]}`)}
+			req := coreexecutor.Request{Model: "grok-4.3", Payload: []byte(`{"model":"grok-4.3","input":[{"type":"message","role":"user","content":"history"},{"type":"compaction_trigger"}]}`)}
 			if tc.emptyInput {
 				req.Payload = []byte(`{"model":"grok-4.3","input":[{"type":"compaction_trigger"}]}`)
 			}
-			opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse, ResponseFormat: sdktranslator.FormatOpenAIResponse, Stream: true, Metadata: map[string]any{cliproxyexecutor.ExecutionSessionMetadataKey: t.Name()}}
+			opts := coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse, ResponseFormat: translatorreg.FormatOpenAIResponse, Stream: true, Metadata: map[string]any{coreexecutor.ExecutionSessionMetadataKey: t.Name()}}
 			var errExecute error
 			if tc.passthrough {
 				opts.Alt = "responses/compact"
 				opts.Stream = false
-				var response cliproxyexecutor.Response
+				var response coreexecutor.Response
 				response, errExecute = exec.XAIExecutor.Execute(t.Context(), auth, req, opts)
 				if output := ojson.GetBytes(response.Payload, "output"); !output.IsArray() || len(output.Array()) != 0 {
 					t.Errorf("ordinary HTTP compact output changed: %s", response.Payload)
 				}
 			} else {
-				result, errExecuteStream := exec.ExecuteStream(cliproxyexecutor.WithDownstreamWebsocket(t.Context()), auth, req, opts)
+				result, errExecuteStream := exec.ExecuteStream(coreexecutor.WithDownstreamWebsocket(t.Context()), auth, req, opts)
 				errExecute = errExecuteStream
 				if result == nil && tc.wantStatus == 0 {
 					t.Error("valid compact response returned no stream")
@@ -603,8 +603,8 @@ func TestApplyPatchRepairOrdinaryEmptyHTTPPassthrough(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 			defer server.Close()
 			exec := task6RepairExecutor(provider)
-			auth := &cliproxyauth.Auth{Provider: provider, Attributes: map[string]string{"api_key": "test", "base_url": server.URL}}
-			_, errExecute := exec.Execute(t.Context(), auth, cliproxyexecutor.Request{Model: "grok-4", Payload: []byte(`{"input":"ordinary","tools":[{"type":"function","name":"apply_patch"}]}`)}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse})
+			auth := &coreauth.Auth{Provider: provider, Attributes: map[string]string{"api_key": "test", "base_url": server.URL}}
+			_, errExecute := exec.Execute(t.Context(), auth, coreexecutor.Request{Model: "grok-4", Payload: []byte(`{"input":"ordinary","tools":[{"type":"function","name":"apply_patch"}]}`)}, coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse})
 			if status, okStatus := errExecute.(interface{ StatusCode() int }); !okStatus || status.StatusCode() != http.StatusRequestTimeout {
 				t.Fatalf("ordinary disconnect changed: %v", errExecute)
 			}

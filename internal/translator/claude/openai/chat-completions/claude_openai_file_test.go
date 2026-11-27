@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	translatorcommon "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/common"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	translatorcommon "github.com/udit19199/relay/internal/translator/common"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestConvertOpenAIRequestToClaude_FileParts(t *testing.T) {
@@ -33,8 +33,8 @@ func TestConvertOpenAIRequestToClaude_FileParts(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			payload := `{"model":"claude-sonnet-4","messages":[` + tc.prefix + `{"role":"user","content":[` + tc.content + `]}]}`
-			got := sdktranslator.TranslateRequestEnvelope(context.Background(), sdktranslator.FormatOpenAI, sdktranslator.FormatClaude,
-				sdktranslator.RequestEnvelope{Format: sdktranslator.FormatOpenAI, Model: "claude-sonnet-4", Body: []byte(payload)})
+			got := translatorreg.TranslateRequestEnvelope(context.Background(), translatorreg.FormatOpenAI, translatorreg.FormatClaude,
+				translatorreg.RequestEnvelope{Format: translatorreg.FormatOpenAI, Model: "claude-sonnet-4", Body: []byte(payload)})
 
 			var part *translatorcommon.UnsupportedPartError
 			if tc.wantErr != "" {

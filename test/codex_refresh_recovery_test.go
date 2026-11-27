@@ -12,13 +12,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	runtimeexecutor "github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor"
-	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/translator"
-	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/registry"
+	runtimeexecutor "github.com/udit19199/relay/internal/runtime/executor"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	_ "github.com/udit19199/relay/internal/translator"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 type codexRecoveryTransport struct {
@@ -119,18 +119,18 @@ func TestCodexSIWCRecoveryPreservesRequestPartition(t *testing.T) {
 			if !recovered.RequiresSignIn || recovered.RefreshError == nil {
 				t.Fatal("the unresolved or rejected SIWC grant lost its recovery requirement")
 			}
-			request := cliproxyexecutor.Request{Model: model, Payload: []byte(`{"model":"gpt-5.4","input":"hello"}`)}
+			request := coreexecutor.Request{Model: model, Payload: []byte(`{"model":"gpt-5.4","input":"hello"}`)}
 			assertSIWCBlocked := func() {
 				t.Helper()
-				_, errExecute := manager.Execute(context.Background(), []string{"codex"}, request, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse})
+				_, errExecute := manager.Execute(context.Background(), []string{"codex"}, request, coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse})
 				var authErr *coreauth.Error
 				if !errors.As(errExecute, &authErr) || authErr.Code != "auth_unavailable" {
 					t.Fatalf("unusable SIWC credential reached execution: %v", errExecute)
 				}
 			}
 			assertSIWCBlocked()
-			_, errNative := manager.Execute(context.Background(), []string{"codex"}, request, cliproxyexecutor.Options{
-				SourceFormat: sdktranslator.FormatOpenAIResponse,
+			_, errNative := manager.Execute(context.Background(), []string{"codex"}, request, coreexecutor.Options{
+				SourceFormat: translatorreg.FormatOpenAIResponse,
 				Headers:      http.Header{"User-Agent": {"codex_cli_rs/1.0.0"}},
 			})
 			if (errNative == nil) != tc.nativeAllowed {

@@ -1,11 +1,10 @@
 package helps
 
 import (
+	"github.com/MoeForge/moego/ojson"
+	"github.com/udit19199/relay/internal/config"
 	"net/http"
 	"testing"
-
-	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
 )
 
 func TestApplyPayloadConfigWithRoot_DisableImageGeneration_RemovesToolsEntry(t *testing.T) {

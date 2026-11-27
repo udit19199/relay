@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 func TestClaudeOAuthToolAliasRestoresContinuationWithoutDeclarations(t *testing.T) {
@@ -56,7 +56,7 @@ func TestClaudeOAuthToolAliasMissingContinuationStateIsRequestScopedNotFound(t *
 	if !okStatus || statusErr.StatusCode() != 404 {
 		t.Fatalf("continuation error status = %v, want 404", errPrepare)
 	}
-	requestErr, okRequest := errPrepare.(cliproxyexecutor.RequestScopedError)
+	requestErr, okRequest := errPrepare.(coreexecutor.RequestScopedError)
 	if !okRequest || !requestErr.IsRequestScoped() {
 		t.Fatalf("continuation error is not request-scoped: %T", errPrepare)
 	}
@@ -423,7 +423,7 @@ func TestReverseRemapOAuthToolNamesRejectsUnsafeMangledAliases(t *testing.T) {
 			if errReverse == nil || !strings.Contains(errReverse.Error(), test.wantError) {
 				t.Fatalf("reverseRemapOAuthToolNames() error = %v, want %q", errReverse, test.wantError)
 			}
-			var requestErr cliproxyexecutor.RequestScopedError
+			var requestErr coreexecutor.RequestScopedError
 			if !errors.As(errReverse, &requestErr) || !requestErr.IsRequestScoped() {
 				t.Fatalf("reverseRemapOAuthToolNames() error = %T %v, want request-scoped", errReverse, errReverse)
 			}
@@ -679,7 +679,7 @@ func TestReverseRemapOAuthToolNamesFailsOpenOnTrailingMarkup(t *testing.T) {
 }
 
 func TestClaudeMCPAliasRestoreErrorStaysRequestScoped(t *testing.T) {
-	var requestErr cliproxyexecutor.RequestScopedError = claudeMCPAliasRestoreError{fmt.Errorf("probe")}
+	var requestErr coreexecutor.RequestScopedError = claudeMCPAliasRestoreError{fmt.Errorf("probe")}
 	if !requestErr.IsRequestScoped() {
 		t.Fatal("claudeMCPAliasRestoreError.IsRequestScoped() = false, want true")
 	}

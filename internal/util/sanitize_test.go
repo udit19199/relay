@@ -1,9 +1,8 @@
 package util
 
 import (
-	"testing"
-
 	"github.com/MoeForge/moego/ojson"
+	"testing"
 )
 
 func TestSanitizeClaudeFunctionName(t *testing.T) {

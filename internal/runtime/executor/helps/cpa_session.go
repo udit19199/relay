@@ -3,15 +3,15 @@ package helps
 import (
 	"context"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/logging"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
+	"github.com/udit19199/relay/internal/logging"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	"github.com/udit19199/relay/internal/util"
 )
 
 // EnsureSessionContext ensures that ctx carries the internal session identity
 // for $CPA-SESSION-ID expansion in custom headers.
-func EnsureSessionContext(ctx context.Context, opts cliproxyexecutor.Options, payload []byte) context.Context {
+func EnsureSessionContext(ctx context.Context, opts coreexecutor.Options, payload []byte) context.Context {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -28,7 +28,7 @@ func EnsureSessionContext(ctx context.Context, opts cliproxyexecutor.Options, pa
 	if len(evalPayload) == 0 {
 		evalPayload = payload
 	}
-	canonical := cliproxyauth.CanonicalSessionID(opts.Headers, evalPayload, opts.Metadata)
+	canonical := coreauth.CanonicalSessionID(opts.Headers, evalPayload, opts.Metadata)
 	if canonical != "" {
 		return util.WithSessionID(ctx, canonical)
 	}

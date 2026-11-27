@@ -6,11 +6,11 @@ import (
 	"sync"
 
 	"github.com/MoeForge/moego/ojson"
-	claudeauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/claude"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	log "github.com/sirupsen/logrus"
+	claudeauth "github.com/udit19199/relay/internal/auth/claude"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 const (
@@ -60,7 +60,7 @@ func normalizeClaudeFingerprintProfile(raw string) string {
 	return profile
 }
 
-func claudeFingerprintProfileFromAuth(auth *cliproxyauth.Auth) string {
+func claudeFingerprintProfileFromAuth(auth *coreauth.Auth) string {
 	if auth == nil {
 		return claudeFingerprintProfileDefault
 	}
@@ -78,7 +78,7 @@ func claudeFingerprintProfileFromAuth(auth *cliproxyauth.Auth) string {
 	return claudeFingerprintProfileDefault
 }
 
-func claudeFingerprintProfileFromConfig(cfg *config.Config, auth *cliproxyauth.Auth) string {
+func claudeFingerprintProfileFromConfig(cfg *config.Config, auth *coreauth.Auth) string {
 	if profile := claudeFingerprintProfileFromAuth(auth); profile != claudeFingerprintProfileDefault {
 		return profile
 	}
@@ -93,7 +93,7 @@ func claudeFingerprintProfileFromConfig(cfg *config.Config, auth *cliproxyauth.A
 // behavior. It is deliberately independent of the upstream origin: the wire
 // profile follows the credential, while the one origin-sensitive decision (CCH
 // signing) is resolved separately by claudeCCHSigningEnabled.
-func resolveClaudeFingerprintPolicy(cfg *config.Config, auth *cliproxyauth.Auth, apiKey string) claudeFingerprintPolicy {
+func resolveClaudeFingerprintPolicy(cfg *config.Config, auth *coreauth.Auth, apiKey string) claudeFingerprintPolicy {
 	// Keep actual Claude OAuth lifecycle authority separate from the broader
 	// request fingerprint policy used by API keys and delegated providers.
 	authIsOAuth := isClaudeOAuthToken(apiKey)
@@ -118,25 +118,7 @@ func resolveClaudeFingerprintPolicy(cfg *config.Config, auth *cliproxyauth.Auth,
 	}
 }
 
-// applyClaudeCLIIdentity applies the Claude Code CLI credential identity to the
-// upstream Messages body. It is the single implementation behind both the
-// streaming and the non-streaming request paths; keep it that way.
-//
-// ApplyCLIIdentity and ProfileClaudeCodeCLI are the same predicate, so
-// sessionID has already been resolved by ClaudeAgentSessionUUIDForRequest,
-// which always returns a UUID. Do not add a second session source here: a
-// per-apiKey cached ID would silently break agent-conversation continuity.
-//
-// API keys seed the synthesized identity from the key itself.
-func applyClaudeCLIIdentity(body []byte, auth *cliproxyauth.Auth, apiKey, upstreamURL, sessionID string, synthesize bool) ([]byte, error) {
-	doc := ojson.NewDoc(body)
-	if errApply := applyClaudeCLIIdentityDoc(doc, auth, apiKey, upstreamURL, sessionID, synthesize); errApply != nil {
-		return nil, errApply
-	}
-	return doc.Bytes(), nil
-}
-
-func applyClaudeCLIIdentityDoc(doc *ojson.Doc, auth *cliproxyauth.Auth, apiKey, upstreamURL, sessionID string, synthesize bool) error {
+func applyClaudeCLIIdentityDoc(doc *ojson.Doc, auth *coreauth.Auth, apiKey, upstreamURL, sessionID string, synthesize bool) error {
 	identitySeed := apiKey
 	identityAuth, errIdentity := helps.PrepareClaudeCLIFingerprintAuth(auth, identitySeed, synthesize)
 	if errIdentity != nil {

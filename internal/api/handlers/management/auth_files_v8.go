@@ -11,10 +11,10 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/clienterror"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/proxyutil"
+	"github.com/udit19199/relay/internal/clienterror"
+	"github.com/udit19199/relay/internal/proxyutil"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	"github.com/udit19199/relay/internal/util"
 )
 
 const (

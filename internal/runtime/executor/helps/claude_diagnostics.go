@@ -14,7 +14,7 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/google/uuid"
-	kvstore "github.com/router-for-me/CLIProxyAPI/v8/internal/kvstore"
+	kvstore "github.com/udit19199/relay/internal/kvstore"
 )
 
 const (
@@ -892,18 +892,6 @@ func ClaudeSubagentRequests1h(headers http.Header, body []byte) bool {
 	return strings.Contains(betas, "extended-cache-ttl-2025-04-11")
 }
 
-// StripClaudeBillingTags removes cc_prev_req and cc_prompt_id from the billing header in body.
-func StripClaudeBillingTags(body []byte) []byte {
-	if len(body) == 0 {
-		return body
-	}
-	doc := ojson.NewDoc(body)
-	if !StripClaudeBillingTagsDoc(doc) {
-		return body
-	}
-	return doc.Bytes()
-}
-
 // StripClaudeBillingTagsDoc removes cc_prev_req and cc_prompt_id from the billing header in doc in place.
 func StripClaudeBillingTagsDoc(doc *ojson.Doc) bool {
 	if doc == nil || doc.Len() == 0 {
@@ -923,18 +911,6 @@ func StripClaudeBillingTagsDoc(doc *ojson.Doc) bool {
 		return doc.Set("system.0.text", cleaned) == nil
 	}
 	return false
-}
-
-// InjectClaudeBillingTags appends cc_prev_req and cc_prompt_id to the billing header in body if present.
-func InjectClaudeBillingTags(body []byte, prevReq, promptID string) []byte {
-	if len(body) == 0 {
-		return body
-	}
-	doc := ojson.NewDoc(body)
-	if !InjectClaudeBillingTagsDoc(doc, prevReq, promptID) {
-		return body
-	}
-	return doc.Bytes()
 }
 
 // InjectClaudeBillingTagsDoc appends cc_prev_req and cc_prompt_id to the billing header in doc in place.

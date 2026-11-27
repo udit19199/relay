@@ -9,14 +9,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
-func codexSearchDualPartitionAuth() *cliproxyauth.Auth {
-	return &cliproxyauth.Auth{
+func codexSearchDualPartitionAuth() *coreauth.Auth {
+	return &coreauth.Auth{
 		ID:       "codex-dual-partition",
 		Provider: "codex",
 		Metadata: map[string]any{
@@ -44,7 +44,7 @@ func TestCodexAlphaSearchUsesOriginalOAuthAtTransport(t *testing.T) {
 		}
 	})
 	executor := NewCodexExecutor(&config.Config{})
-	manager := cliproxyauth.NewManager(nil, nil, nil)
+	manager := coreauth.NewManager(nil, nil, nil)
 	manager.RegisterExecutor(executor)
 
 	var requests []*http.Request
@@ -82,10 +82,10 @@ func TestCodexAlphaSearchUsesOriginalOAuthAtTransport(t *testing.T) {
 		t.Errorf("final transport Authorization = %q, want Bearer original-oauth-token", got)
 	}
 
-	_, errExecute := executor.Execute(ctx, auth, cliproxyexecutor.Request{
+	_, errExecute := executor.Execute(ctx, auth, coreexecutor.Request{
 		Model:   "gpt-6.1-sol",
 		Payload: []byte(`{"model":"gpt-6.1-sol","input":[]}`),
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse})
 	if errExecute != nil {
 		t.Fatalf("Responses Execute after Search: %v", errExecute)
 	}
@@ -106,32 +106,32 @@ func TestCodexAlphaSearchUsesOriginalOAuthAtTransport(t *testing.T) {
 func TestCodexAlphaSearchCredentialPartitionBoundaries(t *testing.T) {
 	for _, testCase := range []struct {
 		name      string
-		configure func(*cliproxyauth.Auth)
+		configure func(*coreauth.Auth)
 		wantError bool
 	}{
 		{
 			name: "missing_original_oauth",
-			configure: func(auth *cliproxyauth.Auth) {
+			configure: func(auth *coreauth.Auth) {
 				delete(auth.Metadata, "access_token")
 			},
 			wantError: true,
 		},
 		{
 			name: "blank_original_oauth",
-			configure: func(auth *cliproxyauth.Auth) {
+			configure: func(auth *coreauth.Auth) {
 				auth.Metadata["access_token"] = " \t "
 			},
 			wantError: true,
 		},
 		{
 			name: "missing_nested_siwc",
-			configure: func(auth *cliproxyauth.Auth) {
+			configure: func(auth *coreauth.Auth) {
 				delete(auth.Metadata, "siwc")
 			},
 		},
 		{
 			name: "missing_nested_siwc_access_token",
-			configure: func(auth *cliproxyauth.Auth) {
+			configure: func(auth *coreauth.Auth) {
 				delete(auth.Metadata["siwc"].(map[string]any), "access_token")
 			},
 		},
@@ -145,7 +145,7 @@ func TestCodexAlphaSearchCredentialPartitionBoundaries(t *testing.T) {
 					t.Error("Search mutated the shared auth")
 				}
 			})
-			manager := cliproxyauth.NewManager(nil, nil, nil)
+			manager := coreauth.NewManager(nil, nil, nil)
 			manager.RegisterExecutor(NewCodexExecutor(&config.Config{}))
 			var requests []*http.Request
 			ctx := context.WithValue(t.Context(), "cliproxy.roundtripper", roundTripperFunc(func(req *http.Request) (*http.Response, error) {
@@ -231,7 +231,7 @@ func TestCodexAlphaSearchCredentialSelectionScope(t *testing.T) {
 		{
 			name:        "api_key",
 			disableSIWC: true,
-			attributes:  map[string]string{cliproxyauth.AttributeAPIKey: "api-key-token"},
+			attributes:  map[string]string{coreauth.AttributeAPIKey: "api-key-token"},
 			wantBearer:  "Bearer api-key-token",
 		},
 		{
@@ -265,7 +265,7 @@ func TestCodexAlphaSearchCredentialSelectionScope(t *testing.T) {
 			if targetURL == "" {
 				targetURL = "https://chatgpt.com/backend-api/codex/alpha/search"
 			}
-			manager := cliproxyauth.NewManager(nil, nil, nil)
+			manager := coreauth.NewManager(nil, nil, nil)
 			manager.RegisterExecutor(NewCodexExecutor(&config.Config{}))
 			var requests []*http.Request
 			ctx := context.WithValue(t.Context(), "cliproxy.roundtripper", roundTripperFunc(func(req *http.Request) (*http.Response, error) {

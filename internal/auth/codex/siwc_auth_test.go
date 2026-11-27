@@ -6,16 +6,16 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
-	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/misc"
 	"golang.org/x/sync/singleflight"
+	"os"
+	"path/filepath"
+	"sync"
 )
 
 func TestGenerateSIWCAuthURL(t *testing.T) {

@@ -10,12 +10,12 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gorilla/websocket"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/registry"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestCodexExecutorExecuteResponsesLiteHeaderDoesNotInjectImageGenerationTool(t *testing.T) {
@@ -32,7 +32,7 @@ func TestCodexExecutorExecuteResponsesLiteHeaderDoesNotInjectImageGenerationTool
 	defer server.Close()
 
 	executor := NewCodexExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"api_key":   "test",
@@ -43,11 +43,11 @@ func TestCodexExecutorExecuteResponsesLiteHeaderDoesNotInjectImageGenerationTool
 	headers := make(http.Header)
 	headers.Set("X-OpenAI-Internal-Codex-Responses-Lite", "true")
 
-	_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "gpt-5.6-sol",
 		Payload: []byte(`{"model":"gpt-5.6-sol","input":"hello"}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-response"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-response"),
 		Headers:      headers,
 	})
 	if err != nil {
@@ -76,7 +76,7 @@ func TestCodexExecutorExecuteStreamResponsesLiteHeaderForcesParallelToolCallsFal
 	defer server.Close()
 
 	executor := NewCodexExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"api_key":   "test",
@@ -87,11 +87,11 @@ func TestCodexExecutorExecuteStreamResponsesLiteHeaderForcesParallelToolCallsFal
 	headers := make(http.Header)
 	headers.Set(codexResponsesLiteHeader, "true")
 
-	result, errExecute := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	result, errExecute := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "gpt-5.6-luna",
 		Payload: []byte(`{"model":"gpt-5.6-luna","input":"hello"}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-response"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-response"),
 		Headers:      headers,
 	})
 	if errExecute != nil {
@@ -293,7 +293,7 @@ func TestEnsureImageGenerationTool_GPT53CodexSparkDoesNotInjectTool(t *testing.T
 
 func TestEnsureImageGenerationTool_FreeCodexAuthDoesNotInjectTool(t *testing.T) {
 	body := []byte(`{"model":"gpt-5.4","input":"draw a cat"}`)
-	freeAuth := &cliproxyauth.Auth{
+	freeAuth := &coreauth.Auth{
 		Provider:   "codex",
 		Attributes: map[string]string{"plan_type": "free"},
 	}
@@ -388,7 +388,7 @@ func TestCodexExecutorStandardResponsesInjectsImageGenerationWithoutReasoningAnd
 			for _, tc := range []struct {
 				name            string
 				model           string
-				sourceFmt       sdktranslator.Format
+				sourceFmt       translatorreg.Format
 				payload         string
 				reqMetadata     map[string]any
 				reqHeaders      http.Header
@@ -403,7 +403,7 @@ func TestCodexExecutorStandardResponsesInjectsImageGenerationWithoutReasoningAnd
 				{
 					name:       "standard_responses_with_function_tool_no_reasoning",
 					model:      "gpt-6-astra",
-					sourceFmt:  sdktranslator.FormatOpenAIResponse,
+					sourceFmt:  translatorreg.FormatOpenAIResponse,
 					payload:    `{"model":"gpt-6-astra","input":"Generate a photorealistic image of a mountain lake at sunset.","tools":[{"type":"function","name":"get_weather","description":"Get current weather","parameters":{"type":"object","properties":{"city":{"type":"string"}}}}]}`,
 					wantTools:  2,
 					wantImgIdx: "tools.1.type",
@@ -411,7 +411,7 @@ func TestCodexExecutorStandardResponsesInjectsImageGenerationWithoutReasoningAnd
 				{
 					name:       "standard_responses_bare_no_reasoning",
 					model:      "gpt-6-astra",
-					sourceFmt:  sdktranslator.FormatOpenAIResponse,
+					sourceFmt:  translatorreg.FormatOpenAIResponse,
 					payload:    `{"model":"gpt-6-astra","input":"Generate a photorealistic image of a mountain lake at sunset."}`,
 					wantTools:  1,
 					wantImgIdx: "tools.0.type",
@@ -419,28 +419,28 @@ func TestCodexExecutorStandardResponsesInjectsImageGenerationWithoutReasoningAnd
 				{
 					name:      "standard_responses_with_reasoning_effort",
 					model:     "gpt-6-astra",
-					sourceFmt: sdktranslator.FormatOpenAIResponse,
+					sourceFmt: translatorreg.FormatOpenAIResponse,
 					payload:   `{"model":"gpt-6-astra","reasoning":{"effort":"medium"},"input":"Generate a photorealistic image of a mountain lake at sunset."}`,
 					wantTools: 0,
 				},
 				{
 					name:      "standard_responses_with_model_thinking_suffix",
 					model:     "gpt-6-astra(medium)",
-					sourceFmt: sdktranslator.FormatOpenAIResponse,
+					sourceFmt: translatorreg.FormatOpenAIResponse,
 					payload:   `{"model":"gpt-6-astra(medium)","input":"Generate a photorealistic image of a mountain lake at sunset."}`,
 					wantTools: 0,
 				},
 				{
 					name:      "openai_chat_completions_defaults_reasoning_effort",
 					model:     "gpt-6-astra",
-					sourceFmt: sdktranslator.FormatOpenAI,
+					sourceFmt: translatorreg.FormatOpenAI,
 					payload:   `{"model":"gpt-6-astra","messages":[{"role":"user","content":"Generate a photorealistic image of a mountain lake at sunset."}]}`,
 					wantTools: 0,
 				},
 				{
 					name:      "payload_default_sets_reasoning_effort_skips_auto_injection",
 					model:     "gpt-6-astra",
-					sourceFmt: sdktranslator.FormatOpenAIResponse,
+					sourceFmt: translatorreg.FormatOpenAIResponse,
 					payload:   `{"model":"gpt-6-astra","input":"hello"}`,
 					cfg: config.Config{
 						Payload: config.PayloadConfig{
@@ -458,7 +458,7 @@ func TestCodexExecutorStandardResponsesInjectsImageGenerationWithoutReasoningAnd
 				{
 					name:      "payload_override_sets_reasoning_effort_with_function_tool_skips_auto_injection",
 					model:     "gpt-6-astra",
-					sourceFmt: sdktranslator.FormatOpenAIResponse,
+					sourceFmt: translatorreg.FormatOpenAIResponse,
 					payload:   `{"model":"gpt-6-astra","input":"hello","tools":[{"type":"function","name":"get_weather","description":"Get current weather","parameters":{"type":"object","properties":{"city":{"type":"string"}}}}]}`,
 					cfg: config.Config{
 						Payload: config.PayloadConfig{
@@ -478,7 +478,7 @@ func TestCodexExecutorStandardResponsesInjectsImageGenerationWithoutReasoningAnd
 				{
 					name:      "payload_conditional_exist_tools_sets_reasoning_effort_skips_auto_injection",
 					model:     "gpt-6-astra",
-					sourceFmt: sdktranslator.FormatOpenAIResponse,
+					sourceFmt: translatorreg.FormatOpenAIResponse,
 					payload:   `{"model":"gpt-6-astra","input":"hello"}`,
 					cfg: config.Config{
 						Payload: config.PayloadConfig{
@@ -496,9 +496,9 @@ func TestCodexExecutorStandardResponsesInjectsImageGenerationWithoutReasoningAnd
 				{
 					name:        "payload_conditional_exist_prompt_cache_key_sets_reasoning_effort_skips_auto_injection",
 					model:       "gpt-6-astra",
-					sourceFmt:   sdktranslator.FormatOpenAIResponse,
+					sourceFmt:   translatorreg.FormatOpenAIResponse,
 					payload:     `{"model":"gpt-6-astra","input":"hello"}`,
-					reqMetadata: map[string]any{cliproxyexecutor.ExecutionSessionMetadataKey: "sess-prompt-cache-7384"},
+					reqMetadata: map[string]any{coreexecutor.ExecutionSessionMetadataKey: "sess-prompt-cache-7384"},
 					cfg: config.Config{
 						Payload: config.PayloadConfig{
 							Override: []config.PayloadRule{
@@ -515,7 +515,7 @@ func TestCodexExecutorStandardResponsesInjectsImageGenerationWithoutReasoningAnd
 				{
 					name:      "payload_override_switches_to_lite_model_with_reasoning_skips_auto_injection",
 					model:     "gpt-5.4",
-					sourceFmt: sdktranslator.FormatOpenAIResponse,
+					sourceFmt: translatorreg.FormatOpenAIResponse,
 					payload:   `{"model":"gpt-5.4","reasoning":{"effort":"medium"},"input":"hello"}`,
 					cfg: config.Config{
 						Payload: config.PayloadConfig{
@@ -533,7 +533,7 @@ func TestCodexExecutorStandardResponsesInjectsImageGenerationWithoutReasoningAnd
 				{
 					name:            "model_override_header_enables_responses_lite_skips_auto_injection",
 					model:           "gpt-6-astra",
-					sourceFmt:       sdktranslator.FormatOpenAIResponse,
+					sourceFmt:       translatorreg.FormatOpenAIResponse,
 					payload:         `{"model":"gpt-6-astra","input":"hello"}`,
 					overrideHeaders: map[string]string{codexResponsesLiteHeader: "true"},
 					wantTools:       0,
@@ -541,7 +541,7 @@ func TestCodexExecutorStandardResponsesInjectsImageGenerationWithoutReasoningAnd
 				{
 					name:      "payload_override_sets_reasoning_effort_and_tool_choice_auto_skips_auto_injection",
 					model:     "gpt-6-astra",
-					sourceFmt: sdktranslator.FormatOpenAIResponse,
+					sourceFmt: translatorreg.FormatOpenAIResponse,
 					payload:   `{"model":"gpt-6-astra","input":"hello"}`,
 					cfg: config.Config{
 						Payload: config.PayloadConfig{
@@ -562,7 +562,7 @@ func TestCodexExecutorStandardResponsesInjectsImageGenerationWithoutReasoningAnd
 				{
 					name:       "client_lite_header_overridden_false_by_auth_with_payload_rule_keeps_auto_injection",
 					model:      "gpt-6-astra",
-					sourceFmt:  sdktranslator.FormatOpenAIResponse,
+					sourceFmt:  translatorreg.FormatOpenAIResponse,
 					payload:    `{"model":"gpt-6-astra","input":"hello"}`,
 					reqHeaders: http.Header{codexResponsesLiteHeader: []string{"true"}},
 					authAttrs:  map[string]string{"header:" + codexResponsesLiteHeader: "false"},
@@ -582,7 +582,7 @@ func TestCodexExecutorStandardResponsesInjectsImageGenerationWithoutReasoningAnd
 				{
 					name:      "payload_default_image_tool_choice_overridden_to_auto_with_reasoning_skips_auto_injection",
 					model:     "gpt-6-astra",
-					sourceFmt: sdktranslator.FormatOpenAIResponse,
+					sourceFmt: translatorreg.FormatOpenAIResponse,
 					payload:   `{"model":"gpt-6-astra","input":"hello"}`,
 					cfg: config.Config{
 						Payload: config.PayloadConfig{
@@ -609,7 +609,7 @@ func TestCodexExecutorStandardResponsesInjectsImageGenerationWithoutReasoningAnd
 				{
 					name:            "auth_lite_header_true_overridden_false_by_initial_model_then_switched_to_model_without_override_skips_auto_injection",
 					model:           "gpt-6-astra",
-					sourceFmt:       sdktranslator.FormatOpenAIResponse,
+					sourceFmt:       translatorreg.FormatOpenAIResponse,
 					payload:         `{"model":"gpt-6-astra","input":"hello"}`,
 					authAttrs:       map[string]string{"header:" + codexResponsesLiteHeader: "true"},
 					overrideHeaders: map[string]string{codexResponsesLiteHeader: "false"},
@@ -628,7 +628,7 @@ func TestCodexExecutorStandardResponsesInjectsImageGenerationWithoutReasoningAnd
 				{
 					name:      "payload_override_function_tool_then_filter_deletes_it_with_reasoning_skips_auto_injection",
 					model:     "gpt-6-astra",
-					sourceFmt: sdktranslator.FormatOpenAIResponse,
+					sourceFmt: translatorreg.FormatOpenAIResponse,
 					payload:   `{"model":"gpt-6-astra","input":"hello","tools":[{"type":"function","name":"get_weather","description":"Get current weather","parameters":{"type":"object"}}]}`,
 					cfg: config.Config{
 						Payload: config.PayloadConfig{
@@ -655,7 +655,7 @@ func TestCodexExecutorStandardResponsesInjectsImageGenerationWithoutReasoningAnd
 				{
 					name:      "payload_override_image_tool_then_filter_deletes_earlier_tool_with_reasoning_keeps_configured_image_tool",
 					model:     "gpt-6-astra",
-					sourceFmt: sdktranslator.FormatOpenAIResponse,
+					sourceFmt: translatorreg.FormatOpenAIResponse,
 					payload:   `{"model":"gpt-6-astra","input":"hello","tools":[{"type":"function","name":"get_weather","description":"Get current weather","parameters":{"type":"object"}}]}`,
 					cfg: config.Config{
 						Payload: config.PayloadConfig{
@@ -683,7 +683,7 @@ func TestCodexExecutorStandardResponsesInjectsImageGenerationWithoutReasoningAnd
 				{
 					name:      "payload_override_raw_escaped_configuration_update_reasoning_skips_auto_injection",
 					model:     "gpt-6-astra",
-					sourceFmt: sdktranslator.FormatOpenAIResponse,
+					sourceFmt: translatorreg.FormatOpenAIResponse,
 					payload:   `{"model":"gpt-6-astra","input":"hello"}`,
 					cfg: config.Config{
 						Payload: config.PayloadConfig{
@@ -738,7 +738,7 @@ func TestCodexExecutorStandardResponsesInjectsImageGenerationWithoutReasoningAnd
 					defer server.Close()
 
 					cfg := tc.cfg
-					var exec cliproxyauth.ProviderExecutor = NewCodexExecutor(&cfg)
+					var exec coreauth.ProviderExecutor = NewCodexExecutor(&cfg)
 					if transport == "websocket" {
 						exec = NewCodexWebsocketsExecutor(&cfg)
 					}
@@ -759,7 +759,7 @@ func TestCodexExecutorStandardResponsesInjectsImageGenerationWithoutReasoningAnd
 					for k, v := range tc.authAttrs {
 						attrs[k] = v
 					}
-					auth := &cliproxyauth.Auth{
+					auth := &coreauth.Auth{
 						ID:         t.Name(),
 						Provider:   "codex",
 						Attributes: attrs,
@@ -768,7 +768,7 @@ func TestCodexExecutorStandardResponsesInjectsImageGenerationWithoutReasoningAnd
 							"account_id":   "acct-1",
 						},
 					}
-					req := cliproxyexecutor.Request{
+					req := coreexecutor.Request{
 						Model:    tc.model,
 						Payload:  []byte(tc.payload),
 						Metadata: tc.reqMetadata,
@@ -783,18 +783,18 @@ func TestCodexExecutorStandardResponsesInjectsImageGenerationWithoutReasoningAnd
 							}
 						}
 					}
-					opts := cliproxyexecutor.Options{
+					opts := coreexecutor.Options{
 						SourceFormat: tc.sourceFmt,
 						Stream:       stream,
 						Headers:      headers,
 						Metadata: map[string]any{
-							cliproxyexecutor.FinalizedResponseFormatCallbackMetadataKey: func(string) { finalized++ },
+							coreexecutor.FinalizedResponseFormatCallbackMetadataKey: func(string) { finalized++ },
 						},
 					}
 					evalsBefore := helps.PayloadConfigEvaluationCount()
 					var errExec error
 					if stream {
-						var res *cliproxyexecutor.StreamResult
+						var res *coreexecutor.StreamResult
 						res, errExec = exec.ExecuteStream(context.Background(), auth, req, opts)
 						if res != nil {
 							for chunk := range res.Chunks {
@@ -891,11 +891,11 @@ func TestCodexExecutorHostedImageGenerationSIWCAndAPIKeyPreserveUpstreamModelAnd
 					defer server.Close()
 
 					cfg := &config.Config{}
-					var exec cliproxyauth.ProviderExecutor = NewCodexExecutor(cfg)
+					var exec coreauth.ProviderExecutor = NewCodexExecutor(cfg)
 					if transport == "websocket" {
 						exec = NewCodexWebsocketsExecutor(cfg)
 					}
-					auth := &cliproxyauth.Auth{
+					auth := &coreauth.Auth{
 						ID:       t.Name(),
 						Provider: "codex",
 						Attributes: map[string]string{
@@ -918,12 +918,12 @@ func TestCodexExecutorHostedImageGenerationSIWCAndAPIKeyPreserveUpstreamModelAnd
 					}
 
 					payload := []byte(`{"model":"gpt-6-astra","reasoning":{"effort":"medium"},"input":"画一只小猫咪。","stream":true,"tools":[{"type":"image_generation","output_format":"png","complexity":"high"}],"tool_choice":{"type":"image_generation"}}`)
-					req := cliproxyexecutor.Request{
+					req := coreexecutor.Request{
 						Model:   "gpt-6-astra",
 						Payload: payload,
 					}
-					opts := cliproxyexecutor.Options{
-						SourceFormat: sdktranslator.FormatOpenAIResponse,
+					opts := coreexecutor.Options{
+						SourceFormat: translatorreg.FormatOpenAIResponse,
 						Stream:       stream,
 						Headers:      http.Header{"User-Agent": []string{"curl/8.7.1"}},
 					}
@@ -1007,11 +1007,11 @@ func TestCodexExecutorHostedImageGenerationPassthroughPreservesModelAndToolParam
 						DisableImageGeneration: config.DisableImageGenerationPassthrough,
 					},
 				}
-				var exec cliproxyauth.ProviderExecutor = NewCodexExecutor(cfg)
+				var exec coreauth.ProviderExecutor = NewCodexExecutor(cfg)
 				if transport == "websocket" {
 					exec = NewCodexWebsocketsExecutor(cfg)
 				}
-				auth := &cliproxyauth.Auth{
+				auth := &coreauth.Auth{
 					ID:       t.Name(),
 					Provider: "codex",
 					Attributes: map[string]string{
@@ -1024,12 +1024,12 @@ func TestCodexExecutorHostedImageGenerationPassthroughPreservesModelAndToolParam
 					},
 				}
 				payload := []byte(`{"model":"gpt-6-astra","reasoning":{"effort":"max"},"input":"画一只小猫咪。","stream":true,"tools":[{"type":"image_generation","output_format":"png","complexity":"high"}],"tool_choice":{"type":"image_generation"}}`)
-				req := cliproxyexecutor.Request{
+				req := coreexecutor.Request{
 					Model:   "gpt-6-astra",
 					Payload: payload,
 				}
-				opts := cliproxyexecutor.Options{
-					SourceFormat: sdktranslator.FormatOpenAIResponse,
+				opts := coreexecutor.Options{
+					SourceFormat: translatorreg.FormatOpenAIResponse,
 					Stream:       stream,
 				}
 				if stream {
@@ -1114,11 +1114,11 @@ func TestCodexExecutorOptionalImageGenerationPreservesChatModelAndGuidesOnAutoTr
 				defer server.Close()
 
 				cfg := &config.Config{}
-				var exec cliproxyauth.ProviderExecutor = NewCodexExecutor(cfg)
+				var exec coreauth.ProviderExecutor = NewCodexExecutor(cfg)
 				if transport == "websocket" {
 					exec = NewCodexWebsocketsExecutor(cfg)
 				}
-				auth := &cliproxyauth.Auth{
+				auth := &coreauth.Auth{
 					ID:       t.Name(),
 					Provider: "codex",
 					Attributes: map[string]string{
@@ -1130,12 +1130,12 @@ func TestCodexExecutorOptionalImageGenerationPreservesChatModelAndGuidesOnAutoTr
 						"account_id":   "acct-1",
 					},
 				}
-				req := cliproxyexecutor.Request{
+				req := coreexecutor.Request{
 					Model:   "gpt-6-astra",
 					Payload: []byte(`{"model":"gpt-6-astra","reasoning":{"effort":"medium"},"input":"Hello","stream":true,"tools":[{"type":"image_generation","output_format":"png","complexity":"high"}],"tool_choice":"auto"}`),
 				}
-				opts := cliproxyexecutor.Options{
-					SourceFormat: sdktranslator.FormatOpenAIResponse,
+				opts := coreexecutor.Options{
+					SourceFormat: translatorreg.FormatOpenAIResponse,
 					Stream:       stream,
 				}
 				if stream {

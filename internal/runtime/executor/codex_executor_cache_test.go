@@ -10,10 +10,10 @@ import (
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestCodexExecutorCacheHelper_OpenAIChatCompletions_StablePromptCacheKeyFromAPIKey(t *testing.T) {
@@ -24,13 +24,13 @@ func TestCodexExecutorCacheHelper_OpenAIChatCompletions_StablePromptCacheKeyFrom
 	ctx := context.WithValue(context.Background(), "gin", ginCtx)
 	executor := &CodexExecutor{}
 	rawJSON := []byte(`{"model":"gpt-5.3-codex","stream":true}`)
-	req := cliproxyexecutor.Request{
+	req := coreexecutor.Request{
 		Model:   "gpt-5.3-codex",
 		Payload: []byte(`{"model":"gpt-5.3-codex"}`),
 	}
 	url := "https://example.com/responses"
 
-	httpReq, _, err := executor.cacheHelper(ctx, sdktranslator.FromString("openai"), url, req, rawJSON, nil)
+	httpReq, _, err := executor.cacheHelper(ctx, translatorreg.FromString("openai"), url, req, rawJSON, nil)
 	if err != nil {
 		t.Fatalf("cacheHelper error: %v", err)
 	}
@@ -55,7 +55,7 @@ func TestCodexExecutorCacheHelper_OpenAIChatCompletions_StablePromptCacheKeyFrom
 		t.Fatalf("Session_id = %q, want empty", gotLegacySession)
 	}
 
-	httpReq2, _, err := executor.cacheHelper(ctx, sdktranslator.FromString("openai"), url, req, rawJSON, nil)
+	httpReq2, _, err := executor.cacheHelper(ctx, translatorreg.FromString("openai"), url, req, rawJSON, nil)
 	if err != nil {
 		t.Fatalf("cacheHelper error (second call): %v", err)
 	}
@@ -73,14 +73,14 @@ func TestCodexExecutorCacheHelper_UsesDerivedSessionUUID(t *testing.T) {
 	t.Parallel()
 
 	executor := &CodexExecutor{}
-	req := cliproxyexecutor.Request{
+	req := coreexecutor.Request{
 		Model:    "gpt-5.4",
 		Payload:  []byte(`{"model":"gpt-5.4","messages":[{"role":"user","content":"hello"}]}`),
-		Metadata: map[string]any{cliproxyexecutor.DerivedSessionIDMetadataKey: "ctx:v1:derived-root"},
+		Metadata: map[string]any{coreexecutor.DerivedSessionIDMetadataKey: "ctx:v1:derived-root"},
 	}
 	expectedKey := helps.DerivedSessionUUID("codex", req.Metadata)
 
-	httpReq, body, err := executor.cacheHelper(context.Background(), sdktranslator.FormatOpenAI, "https://example.com/responses", req, []byte(`{"model":"gpt-5.4","stream":true}`), nil)
+	httpReq, body, err := executor.cacheHelper(context.Background(), translatorreg.FormatOpenAI, "https://example.com/responses", req, []byte(`{"model":"gpt-5.4","stream":true}`), nil)
 	if err != nil {
 		t.Fatalf("cacheHelper error: %v", err)
 	}
@@ -100,7 +100,7 @@ func TestCodexExecutorCacheHelper_ClaudeUsesClaudeCodeSessionID(t *testing.T) {
 	ctx := context.Background()
 	url := "https://example.com/responses"
 	rawJSON := []byte(`{"model":"gpt-5.4","stream":true}`)
-	firstReq := cliproxyexecutor.Request{
+	firstReq := coreexecutor.Request{
 		Model: "gpt-5.4-claude-cache-session",
 		Payload: []byte(`{
 			"model":"gpt-5.4",
@@ -108,7 +108,7 @@ func TestCodexExecutorCacheHelper_ClaudeUsesClaudeCodeSessionID(t *testing.T) {
 			"messages":[{"role":"user","content":[{"type":"text","text":"first"}]}]
 		}`),
 	}
-	secondReq := cliproxyexecutor.Request{
+	secondReq := coreexecutor.Request{
 		Model: "gpt-5.4-claude-cache-session",
 		Payload: []byte(`{
 			"model":"gpt-5.4",
@@ -117,11 +117,11 @@ func TestCodexExecutorCacheHelper_ClaudeUsesClaudeCodeSessionID(t *testing.T) {
 		}`),
 	}
 
-	firstHTTPReq, _, err := executor.cacheHelper(ctx, sdktranslator.FromString("claude"), url, firstReq, rawJSON, nil)
+	firstHTTPReq, _, err := executor.cacheHelper(ctx, translatorreg.FromString("claude"), url, firstReq, rawJSON, nil)
 	if err != nil {
 		t.Fatalf("cacheHelper first error: %v", err)
 	}
-	secondHTTPReq, _, err := executor.cacheHelper(ctx, sdktranslator.FromString("claude"), url, secondReq, rawJSON, nil)
+	secondHTTPReq, _, err := executor.cacheHelper(ctx, translatorreg.FromString("claude"), url, secondReq, rawJSON, nil)
 	if err != nil {
 		t.Fatalf("cacheHelper second error: %v", err)
 	}
@@ -152,12 +152,12 @@ func TestCodexExecutorCacheHelper_ClaudeUsesClaudeCodeSessionID(t *testing.T) {
 
 func TestCodexExecutorCacheHelper_ClaudeRejectsBareUserID(t *testing.T) {
 	executor := &CodexExecutor{}
-	req := cliproxyexecutor.Request{
+	req := coreexecutor.Request{
 		Model:   "gpt-5.4-claude-cache-bare-user",
 		Payload: []byte(`{"model":"gpt-5.4","metadata":{"user_id":"same-user-across-chats"},"messages":[{"role":"user","content":[{"type":"text","text":"first"}]}]}`),
 	}
 
-	httpReq, _, err := executor.cacheHelper(context.Background(), sdktranslator.FromString("claude"), "https://example.com/responses", req, []byte(`{"model":"gpt-5.4","stream":true}`), nil)
+	httpReq, _, err := executor.cacheHelper(context.Background(), translatorreg.FromString("claude"), "https://example.com/responses", req, []byte(`{"model":"gpt-5.4","stream":true}`), nil)
 	if err != nil {
 		t.Fatalf("cacheHelper error: %v", err)
 	}
@@ -179,7 +179,7 @@ func TestCodexExecutorCacheHelper_ClaudeRejectsBareUserID(t *testing.T) {
 
 func TestApplyCodexHeadersUsesAccountHeaderForOAuth(t *testing.T) {
 	httpReq := httptest.NewRequest("POST", "https://example.com/responses", nil)
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Metadata: map[string]any{"account_id": "acct-1"},
 	}
@@ -199,22 +199,22 @@ func TestCodexExecutorCacheHelper_ClaudeUsesSessionHeader(t *testing.T) {
 	ginCtx.Request.Header.Set(helps.ClaudeCodeSessionHeader, "cache-session-header")
 	ctx := context.WithValue(context.Background(), "gin", ginCtx)
 
-	firstReq := cliproxyexecutor.Request{
+	firstReq := coreexecutor.Request{
 		Model:   "gpt-5.4-claude-cache-header",
 		Payload: []byte(`{"model":"gpt-5.4","messages":[{"role":"user","content":[{"type":"text","text":"first"}]}]}`),
 	}
-	secondReq := cliproxyexecutor.Request{
+	secondReq := coreexecutor.Request{
 		Model:   "gpt-5.4-claude-cache-header",
 		Payload: []byte(`{"model":"gpt-5.4","messages":[{"role":"user","content":[{"type":"text","text":"next"}]}]}`),
 	}
 	rawJSON := []byte(`{"model":"gpt-5.4","stream":true}`)
 	url := "https://example.com/responses"
 
-	firstHTTPReq, _, err := executor.cacheHelper(ctx, sdktranslator.FromString("claude"), url, firstReq, rawJSON, nil)
+	firstHTTPReq, _, err := executor.cacheHelper(ctx, translatorreg.FromString("claude"), url, firstReq, rawJSON, nil)
 	if err != nil {
 		t.Fatalf("cacheHelper first error: %v", err)
 	}
-	secondHTTPReq, _, err := executor.cacheHelper(ctx, sdktranslator.FromString("claude"), url, secondReq, rawJSON, nil)
+	secondHTTPReq, _, err := executor.cacheHelper(ctx, translatorreg.FromString("claude"), url, secondReq, rawJSON, nil)
 	if err != nil {
 		t.Fatalf("cacheHelper second error: %v", err)
 	}
@@ -240,7 +240,7 @@ func TestCodexExecutorCacheHelper_ClaudeUsesSessionHeader(t *testing.T) {
 func TestCodexExecutorCacheHelper_ClaudeAgentScopeUsesResolvedModelAcrossHTTPAndWebsocket(t *testing.T) {
 	executor := &CodexExecutor{}
 	url := "https://example.com/responses"
-	req := cliproxyexecutor.Request{
+	req := coreexecutor.Request{
 		Model:   "requested-alias-high",
 		Payload: []byte(`{"model":"requested-alias","messages":[{"role":"user","content":"hello"}]}`),
 	}
@@ -250,7 +250,7 @@ func TestCodexExecutorCacheHelper_ClaudeAgentScopeUsesResolvedModelAcrossHTTPAnd
 	childHeaders.Set(helps.ClaudeCodeAgentHeader, "agent-a")
 	rawJSON := []byte(`{"model":"gpt-5.4","stream":true}`)
 
-	rootRequest, _, errRoot := executor.cacheHelper(context.Background(), sdktranslator.FromString("claude"), url, req, rawJSON, nil, rootHeaders)
+	rootRequest, _, errRoot := executor.cacheHelper(context.Background(), translatorreg.FromString("claude"), url, req, rawJSON, nil, rootHeaders)
 	if errRoot != nil {
 		t.Fatalf("root cacheHelper error: %v", errRoot)
 	}
@@ -260,7 +260,7 @@ func TestCodexExecutorCacheHelper_ClaudeAgentScopeUsesResolvedModelAcrossHTTPAnd
 	}
 	rootKey := ojson.GetBytes(rootBody, "prompt_cache_key").String()
 
-	childRequest, _, errChild := executor.cacheHelper(context.Background(), sdktranslator.FromString("claude"), url, req, rawJSON, nil, childHeaders)
+	childRequest, _, errChild := executor.cacheHelper(context.Background(), translatorreg.FromString("claude"), url, req, rawJSON, nil, childHeaders)
 	if errChild != nil {
 		t.Fatalf("child cacheHelper error: %v", errChild)
 	}
@@ -275,7 +275,7 @@ func TestCodexExecutorCacheHelper_ClaudeAgentScopeUsesResolvedModelAcrossHTTPAnd
 
 	aliasReq := req
 	aliasReq.Model = "another-local-alias-low"
-	aliasRequest, _, errAlias := executor.cacheHelper(context.Background(), sdktranslator.FromString("claude"), url, aliasReq, rawJSON, nil, childHeaders)
+	aliasRequest, _, errAlias := executor.cacheHelper(context.Background(), translatorreg.FromString("claude"), url, aliasReq, rawJSON, nil, childHeaders)
 	if errAlias != nil {
 		t.Fatalf("alias cacheHelper error: %v", errAlias)
 	}
@@ -287,7 +287,7 @@ func TestCodexExecutorCacheHelper_ClaudeAgentScopeUsesResolvedModelAcrossHTTPAnd
 		t.Fatalf("resolved model key fragmented by request alias: first=%q alias=%q", childKey, aliasKey)
 	}
 
-	websocketBody, _, errWebsocket := applyCodexPromptCacheHeadersWithContext(context.Background(), sdktranslator.FromString("claude"), aliasReq, rawJSON, childHeaders)
+	websocketBody, _, errWebsocket := applyCodexPromptCacheHeadersWithContext(context.Background(), translatorreg.FromString("claude"), aliasReq, rawJSON, childHeaders)
 	if errWebsocket != nil {
 		t.Fatalf("websocket prompt cache error: %v", errWebsocket)
 	}

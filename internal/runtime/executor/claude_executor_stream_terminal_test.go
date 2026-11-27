@@ -13,11 +13,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/usage"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	"github.com/udit19199/relay/internal/service/usage"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 type captureClaudeUsageConsumer struct {
@@ -81,7 +81,7 @@ func TestClaudeExecutor_ExecuteStream_Translated_ClientDisconnectAfterTerminalEv
 	})
 
 	exec := NewClaudeExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Attributes: map[string]string{
 			"api_key":  "key-123",
 			"base_url": server.URL,
@@ -92,12 +92,12 @@ func TestClaudeExecutor_ExecuteStream_Translated_ClientDisconnectAfterTerminalEv
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	result, err := exec.ExecuteStream(ctx, auth, cliproxyexecutor.Request{
+	result, err := exec.ExecuteStream(ctx, auth, coreexecutor.Request{
 		Model:   "claude-opus-5",
 		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:   sdktranslator.FormatOpenAIResponse,
-		ResponseFormat: sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:   translatorreg.FormatOpenAIResponse,
+		ResponseFormat: translatorreg.FormatOpenAIResponse,
 	})
 	if err != nil {
 		t.Fatalf("ExecuteStream() error = %v", err)
@@ -177,7 +177,7 @@ func TestClaudeExecutor_ExecuteStream_Passthrough_ClientDisconnectAfterTerminalE
 	})
 
 	exec := NewClaudeExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Attributes: map[string]string{
 			"api_key":  "key-123",
 			"base_url": server.URL,
@@ -188,12 +188,12 @@ func TestClaudeExecutor_ExecuteStream_Passthrough_ClientDisconnectAfterTerminalE
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	result, err := exec.ExecuteStream(ctx, auth, cliproxyexecutor.Request{
+	result, err := exec.ExecuteStream(ctx, auth, coreexecutor.Request{
 		Model:   "claude-opus-5",
 		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:   sdktranslator.FormatClaude,
-		ResponseFormat: sdktranslator.FormatClaude,
+	}, coreexecutor.Options{
+		SourceFormat:   translatorreg.FormatClaude,
+		ResponseFormat: translatorreg.FormatClaude,
 	})
 	if err != nil {
 		t.Fatalf("ExecuteStream() error = %v", err)
@@ -303,7 +303,7 @@ func TestClaudeExecutor_ExecuteStream_DoesNotDrainOrReuseUpstreamConnectionAfter
 	}
 
 	exec := NewClaudeExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Attributes: map[string]string{
 			"api_key":  "key-no-drain",
 			"base_url": server.URL,
@@ -314,12 +314,12 @@ func TestClaudeExecutor_ExecuteStream_DoesNotDrainOrReuseUpstreamConnectionAfter
 	for i := 0; i < 2; i++ {
 		ctx := context.WithValue(context.Background(), "cliproxy.roundtripper", http.RoundTripper(transport))
 		ctx = httptrace.WithClientTrace(ctx, trace)
-		result, err := exec.ExecuteStream(ctx, auth, cliproxyexecutor.Request{
+		result, err := exec.ExecuteStream(ctx, auth, coreexecutor.Request{
 			Model:   "claude-opus-5",
 			Payload: payload,
-		}, cliproxyexecutor.Options{
-			SourceFormat:   sdktranslator.FormatClaude,
-			ResponseFormat: sdktranslator.FormatClaude,
+		}, coreexecutor.Options{
+			SourceFormat:   translatorreg.FormatClaude,
+			ResponseFormat: translatorreg.FormatClaude,
 		})
 		if err != nil {
 			t.Fatalf("round %d ExecuteStream() error = %v", i+1, err)

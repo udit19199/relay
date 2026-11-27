@@ -10,11 +10,11 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 	"google.golang.org/protobuf/encoding/protowire"
 )
 
@@ -182,7 +182,7 @@ func TestDevinExecutor_ResponsesCompactionTriggerAndReplay_Issue7291(t *testing.
 			}},
 		},
 	})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:       "devin-compaction",
 		Provider: "devin",
 		Attributes: map[string]string{
@@ -205,12 +205,12 @@ func TestDevinExecutor_ResponsesCompactionTriggerAndReplay_Issue7291(t *testing.
 		]
 	}`)
 
-	streamResult, errStream := executor.ExecuteStream(ctx, auth, cliproxyexecutor.Request{
+	streamResult, errStream := executor.ExecuteStream(ctx, auth, coreexecutor.Request{
 		Model:   "devin/swe-2",
 		Payload: triggerPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		Stream:          true,
 		OriginalRequest: triggerPayload,
 	})
@@ -244,12 +244,12 @@ func TestDevinExecutor_ResponsesCompactionTriggerAndReplay_Issue7291(t *testing.
 	}
 	devinCompactionAssertSummaryRequest(t, seenBodies[0], "streaming")
 
-	nonStreamResp, errExec := executor.Execute(ctx, auth, cliproxyexecutor.Request{
+	nonStreamResp, errExec := executor.Execute(ctx, auth, coreexecutor.Request{
 		Model:   "devin/swe-2",
 		Payload: triggerPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		OriginalRequest: triggerPayload,
 	})
 	if errExec != nil {
@@ -283,12 +283,12 @@ func TestDevinExecutor_ResponsesCompactionTriggerAndReplay_Issue7291(t *testing.
 		]
 	}`, itemID, capsule))
 
-	replayStream, errReplay := executor.ExecuteStream(ctx, auth, cliproxyexecutor.Request{
+	replayStream, errReplay := executor.ExecuteStream(ctx, auth, coreexecutor.Request{
 		Model:   "devin/swe-2",
 		Payload: replayPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		Stream:          true,
 		OriginalRequest: replayPayload,
 	})
@@ -328,12 +328,12 @@ func TestDevinExecutor_ResponsesCompactionTriggerAndReplay_Issue7291(t *testing.
 		]
 	}`, itemID, capsule))
 
-	secondResp, errSecond := executor.Execute(ctx, auth, cliproxyexecutor.Request{
+	secondResp, errSecond := executor.Execute(ctx, auth, coreexecutor.Request{
 		Model:   "devin/swe-2",
 		Payload: secondTriggerPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		OriginalRequest: secondTriggerPayload,
 	})
 	if errSecond != nil {
@@ -383,12 +383,12 @@ func TestDevinExecutor_ResponsesCompactionTriggerAndReplay_Issue7291(t *testing.
 			}
 		]
 	}`, secondItemID, secondCapsule))
-	if _, errSecondReplay := executor.Execute(ctx, auth, cliproxyexecutor.Request{
+	if _, errSecondReplay := executor.Execute(ctx, auth, coreexecutor.Request{
 		Model:   "devin/swe-2",
 		Payload: secondReplayPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		OriginalRequest: secondReplayPayload,
 	}); errSecondReplay != nil {
 		t.Fatalf("Execute(second capsule replay) error = %v", errSecondReplay)
@@ -404,12 +404,12 @@ func TestDevinExecutor_ResponsesCompactionTriggerAndReplay_Issue7291(t *testing.
 	// OriginalRequest-only trigger: the pipeline may deliver a translated
 	// payload without the trigger while the original Responses request still
 	// carries it; compaction must still be synthesized.
-	origOnlyResp, errOrigOnly := executor.Execute(ctx, auth, cliproxyexecutor.Request{
+	origOnlyResp, errOrigOnly := executor.Execute(ctx, auth, coreexecutor.Request{
 		Model:   "devin/swe-2",
 		Payload: []byte(`{"model":"devin/swe-2"}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		OriginalRequest: triggerPayload,
 	})
 	if errOrigOnly != nil {

@@ -16,12 +16,12 @@ import (
 	"time"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/translator"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/registry"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	_ "github.com/udit19199/relay/internal/translator"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestOpenAICompatExecutorCompactPassthrough(t *testing.T) {
@@ -42,7 +42,7 @@ func TestOpenAICompatExecutorCompactPassthrough(t *testing.T) {
 			SupportPromptCacheKey: true,
 		}},
 	})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "openai-compatibility",
 		Attributes: map[string]string{
 			"base_url":     server.URL + "/v1",
@@ -52,11 +52,11 @@ func TestOpenAICompatExecutorCompactPassthrough(t *testing.T) {
 		},
 	}
 	payload := []byte(`{"model":"gpt-5.1-codex-max","input":[{"role":"user","content":"hi"}]}`)
-	resp, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	resp, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "gpt-5.1-codex-max",
 		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-response"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-response"),
 		Alt:          "responses/compact",
 		Stream:       false,
 	})
@@ -104,16 +104,16 @@ func TestOpenAICompatExecutorPayloadOverrideWinsOverThinkingSuffix(t *testing.T)
 			},
 		},
 	})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"base_url": server.URL + "/v1",
 		"api_key":  "test",
 	}}
 	payload := []byte(`{"model":"custom-openai(high)","messages":[{"role":"user","content":"hi"}]}`)
-	_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "custom-openai(high)",
 		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai"),
 		Stream:       false,
 	})
 	if err != nil {
@@ -167,7 +167,7 @@ func TestOpenAICompatExecutorApplyPromptCacheKey(t *testing.T) {
 			support:     true,
 			from:        "openai",
 			payload:     `{"model":"gpt-5.6","messages":[{"role":"user","content":"hello"}]}`,
-			metadata:    map[string]any{cliproxyexecutor.DerivedSessionIDMetadataKey: "ctx:v1:openai"},
+			metadata:    map[string]any{coreexecutor.DerivedSessionIDMetadataKey: "ctx:v1:openai"},
 			wantPresent: true,
 		},
 		{
@@ -175,7 +175,7 @@ func TestOpenAICompatExecutorApplyPromptCacheKey(t *testing.T) {
 			support:     true,
 			from:        "openai-response",
 			payload:     `{"model":"gpt-5.6","input":"hello"}`,
-			metadata:    map[string]any{cliproxyexecutor.DerivedSessionIDMetadataKey: "ctx:v1:responses"},
+			metadata:    map[string]any{coreexecutor.DerivedSessionIDMetadataKey: "ctx:v1:responses"},
 			wantPresent: true,
 		},
 		{
@@ -183,7 +183,7 @@ func TestOpenAICompatExecutorApplyPromptCacheKey(t *testing.T) {
 			support:     true,
 			from:        "gemini",
 			payload:     `{"model":"gemini-3","contents":[{"role":"user","parts":[{"text":"hello"}]}]}`,
-			metadata:    map[string]any{cliproxyexecutor.DerivedSessionIDMetadataKey: "ctx:v1:gemini"},
+			metadata:    map[string]any{coreexecutor.DerivedSessionIDMetadataKey: "ctx:v1:gemini"},
 			wantPresent: true,
 		},
 		{
@@ -191,7 +191,7 @@ func TestOpenAICompatExecutorApplyPromptCacheKey(t *testing.T) {
 			support:     true,
 			from:        "interactions",
 			payload:     `{"model":"gpt-5.6","input":"hello"}`,
-			metadata:    map[string]any{cliproxyexecutor.DerivedSessionIDMetadataKey: "ctx:v1:interactions"},
+			metadata:    map[string]any{coreexecutor.DerivedSessionIDMetadataKey: "ctx:v1:interactions"},
 			wantPresent: true,
 		},
 		{
@@ -199,7 +199,7 @@ func TestOpenAICompatExecutorApplyPromptCacheKey(t *testing.T) {
 			support:     true,
 			from:        "codex",
 			payload:     `{"model":"gpt-5.6","input":"hello"}`,
-			metadata:    map[string]any{cliproxyexecutor.DerivedSessionIDMetadataKey: "ctx:v1:codex"},
+			metadata:    map[string]any{coreexecutor.DerivedSessionIDMetadataKey: "ctx:v1:codex"},
 			wantPresent: true,
 		},
 		{
@@ -207,7 +207,7 @@ func TestOpenAICompatExecutorApplyPromptCacheKey(t *testing.T) {
 			support:     true,
 			from:        "antigravity",
 			payload:     `{"model":"gpt-5.6","input":"hello"}`,
-			metadata:    map[string]any{cliproxyexecutor.DerivedSessionIDMetadataKey: "ctx:v1:antigravity"},
+			metadata:    map[string]any{coreexecutor.DerivedSessionIDMetadataKey: "ctx:v1:antigravity"},
 			wantPresent: true,
 		},
 	}
@@ -220,7 +220,7 @@ func TestOpenAICompatExecutorApplyPromptCacheKey(t *testing.T) {
 					SupportPromptCacheKey: test.support,
 				}},
 			})
-			auth := &cliproxyauth.Auth{
+			auth := &coreauth.Auth{
 				Provider: "openai-compatibility",
 				Attributes: map[string]string{
 					"compat_name":  "compat",
@@ -230,10 +230,10 @@ func TestOpenAICompatExecutorApplyPromptCacheKey(t *testing.T) {
 			translated, errApply := executor.applyPromptCacheKey(
 				context.Background(),
 				auth,
-				sdktranslator.FromString(test.from),
+				translatorreg.FromString(test.from),
 				"gpt-5.6",
-				cliproxyexecutor.Request{Model: "gpt-5.6", Payload: []byte(test.payload)},
-				cliproxyexecutor.Options{Metadata: test.metadata},
+				coreexecutor.Request{Model: "gpt-5.6", Payload: []byte(test.payload)},
+				coreexecutor.Options{Metadata: test.metadata},
 				[]byte(`{"model":"gpt-5.6","messages":[]}`),
 			)
 			if errApply != nil {
@@ -260,7 +260,7 @@ func TestOpenAICompatExecutorPromptCacheKeyCallerValueWinsPayloadOverride(t *tes
 			SupportPromptCacheKey: true,
 		}},
 	})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "openai-compatibility",
 		Attributes: map[string]string{
 			"compat_name":  "compat",
@@ -288,10 +288,10 @@ func TestOpenAICompatExecutorPromptCacheKeyCallerValueWinsPayloadOverride(t *tes
 			translated, errApply := executor.applyPromptCacheKey(
 				context.Background(),
 				auth,
-				sdktranslator.FromString("openai"),
+				translatorreg.FromString("openai"),
 				"gpt-5.6",
-				cliproxyexecutor.Request{Model: "gpt-5.6", Payload: test.payload},
-				cliproxyexecutor.Options{OriginalRequest: test.originalRequest},
+				coreexecutor.Request{Model: "gpt-5.6", Payload: test.payload},
+				coreexecutor.Options{OriginalRequest: test.originalRequest},
 				[]byte(`{"model":"gpt-5.6","prompt_cache_key":"payload-override"}`),
 			)
 			if errApply != nil {
@@ -311,23 +311,23 @@ func TestOpenAICompatExecutorPromptCacheKeyIsModelAndProtocolScoped(t *testing.T
 			SupportPromptCacheKey: true,
 		}},
 	})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "openai-compatibility",
 		Attributes: map[string]string{
 			"compat_name":  "compat",
 			"provider_key": "compat",
 		},
 	}
-	metadata := map[string]any{cliproxyexecutor.ExecutionSessionMetadataKey: "execution-session"}
+	metadata := map[string]any{coreexecutor.ExecutionSessionMetadataKey: "execution-session"}
 	derive := func(t *testing.T, model string, from string) string {
 		t.Helper()
 		translated, errApply := executor.applyPromptCacheKey(
 			context.Background(),
 			auth,
-			sdktranslator.FromString(from),
+			translatorreg.FromString(from),
 			model,
-			cliproxyexecutor.Request{Model: model, Payload: []byte(`{"messages":[{"role":"user","content":"hello"}]}`)},
-			cliproxyexecutor.Options{Metadata: metadata},
+			coreexecutor.Request{Model: model, Payload: []byte(`{"messages":[{"role":"user","content":"hello"}]}`)},
+			coreexecutor.Options{Metadata: metadata},
 			[]byte(`{"model":"`+model+`","messages":[]}`),
 		)
 		if errApply != nil {
@@ -365,7 +365,7 @@ func TestOpenAICompatExecutorPromptCacheKeyUsesConfigIndex(t *testing.T) {
 		{name: "second config", configIndex: "1", wantPresent: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			auth := &cliproxyauth.Auth{
+			auth := &coreauth.Auth{
 				Provider: "openai-compatibility",
 				Attributes: map[string]string{
 					"compat_name":  "duplicate",
@@ -377,10 +377,10 @@ func TestOpenAICompatExecutorPromptCacheKeyUsesConfigIndex(t *testing.T) {
 			translated, errApply := executor.applyPromptCacheKey(
 				context.Background(),
 				auth,
-				sdktranslator.FromString("claude"),
+				translatorreg.FromString("claude"),
 				"gpt-5.6",
-				cliproxyexecutor.Request{Model: "gpt-5.6", Payload: payload},
-				cliproxyexecutor.Options{},
+				coreexecutor.Request{Model: "gpt-5.6", Payload: payload},
+				coreexecutor.Options{},
 				[]byte(`{"model":"gpt-5.6","messages":[]}`),
 			)
 			if errApply != nil {
@@ -401,7 +401,7 @@ func TestOpenAICompatExecutorPromptCacheKeyIgnoresConfigIndexForNonConfigAuth(t 
 			{Name: "duplicate", SupportPromptCacheKey: true},
 		},
 	})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "openai-compatibility",
 		Attributes: map[string]string{
 			"compat_name":  "duplicate",
@@ -412,10 +412,10 @@ func TestOpenAICompatExecutorPromptCacheKeyIgnoresConfigIndexForNonConfigAuth(t 
 	translated, errApply := executor.applyPromptCacheKey(
 		context.Background(),
 		auth,
-		sdktranslator.FromString("openai"),
+		translatorreg.FromString("openai"),
 		"gpt-5.6",
-		cliproxyexecutor.Request{Model: "gpt-5.6", Payload: []byte(`{"messages":[{"role":"user","content":"hello"}]}`)},
-		cliproxyexecutor.Options{Metadata: map[string]any{cliproxyexecutor.DerivedSessionIDMetadataKey: "ctx:v1:non-config"}},
+		coreexecutor.Request{Model: "gpt-5.6", Payload: []byte(`{"messages":[{"role":"user","content":"hello"}]}`)},
+		coreexecutor.Options{Metadata: map[string]any{coreexecutor.DerivedSessionIDMetadataKey: "ctx:v1:non-config"}},
 		[]byte(`{"model":"gpt-5.6","messages":[]}`),
 	)
 	if errApply != nil {
@@ -441,7 +441,7 @@ func TestOpenAICompatExecutorPromptCacheKeyExecute(t *testing.T) {
 			SupportPromptCacheKey: true,
 		}},
 	})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "openai-compatibility",
 		Attributes: map[string]string{
 			"base_url":     server.URL + "/v1",
@@ -450,12 +450,12 @@ func TestOpenAICompatExecutorPromptCacheKeyExecute(t *testing.T) {
 			"provider_key": "compat",
 		},
 	}
-	_, errExecute := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, errExecute := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "gpt-5.6",
 		Payload: []byte(`{"model":"gpt-5.6","messages":[{"role":"user","content":"hello"}]}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai"),
-		Metadata:     map[string]any{cliproxyexecutor.DerivedSessionIDMetadataKey: "ctx:v1:openai"},
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai"),
+		Metadata:     map[string]any{coreexecutor.DerivedSessionIDMetadataKey: "ctx:v1:openai"},
 	})
 	if errExecute != nil {
 		t.Fatalf("Execute error: %v", errExecute)
@@ -481,7 +481,7 @@ func TestOpenAICompatExecutorPromptCacheKeyExecuteStream(t *testing.T) {
 			SupportPromptCacheKey: true,
 		}},
 	})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "openai-compatibility",
 		Attributes: map[string]string{
 			"base_url":     server.URL + "/v1",
@@ -490,13 +490,13 @@ func TestOpenAICompatExecutorPromptCacheKeyExecuteStream(t *testing.T) {
 			"provider_key": "compat",
 		},
 	}
-	result, errExecute := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	result, errExecute := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "gpt-5.6",
 		Payload: []byte(`{"model":"gpt-5.6","messages":[{"role":"user","content":"hello"}],"stream":true}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai"),
 		Stream:       true,
-		Metadata:     map[string]any{cliproxyexecutor.DerivedSessionIDMetadataKey: "ctx:v1:openai-stream"},
+		Metadata:     map[string]any{coreexecutor.DerivedSessionIDMetadataKey: "ctx:v1:openai-stream"},
 	})
 	if errExecute != nil {
 		t.Fatalf("ExecuteStream error: %v", errExecute)
@@ -527,7 +527,7 @@ func TestOpenAICompatExecutorPromptCacheKeyStreamCompactSkipped(t *testing.T) {
 			SupportPromptCacheKey: true,
 		}},
 	})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "openai-compatibility",
 		Attributes: map[string]string{
 			"base_url":     server.URL + "/v1",
@@ -536,14 +536,14 @@ func TestOpenAICompatExecutorPromptCacheKeyStreamCompactSkipped(t *testing.T) {
 			"provider_key": "compat",
 		},
 	}
-	result, errExecute := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	result, errExecute := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "gpt-5.6",
 		Payload: []byte(`{"model":"gpt-5.6","messages":[{"role":"user","content":"hello"}],"stream":true}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai"),
 		Alt:          "responses/compact",
 		Stream:       true,
-		Metadata:     map[string]any{cliproxyexecutor.DerivedSessionIDMetadataKey: "ctx:v1:compact-stream"},
+		Metadata:     map[string]any{coreexecutor.DerivedSessionIDMetadataKey: "ctx:v1:compact-stream"},
 	})
 	if errExecute != nil {
 		t.Fatalf("ExecuteStream error: %v", errExecute)
@@ -578,7 +578,7 @@ func TestOpenAICompatExecutorImagesGenerationsPassthrough(t *testing.T) {
 			SupportPromptCacheKey: true,
 		}},
 	})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "openai-compatibility",
 		Attributes: map[string]string{
 			"base_url":     server.URL + "/v1",
@@ -587,17 +587,17 @@ func TestOpenAICompatExecutorImagesGenerationsPassthrough(t *testing.T) {
 			"provider_key": "compat",
 		},
 	}
-	resp, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	resp, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "upstream-image",
 		Payload: []byte(`{"model":"compat-image","prompt":"draw"}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-image"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-image"),
 		Stream:       false,
 		Headers: http.Header{
 			"Content-Type": []string{"application/json"},
 		},
 		Metadata: map[string]any{
-			cliproxyexecutor.RequestPathMetadataKey: "/v1/images/generations",
+			coreexecutor.RequestPathMetadataKey: "/v1/images/generations",
 		},
 	})
 	if err != nil {
@@ -639,21 +639,21 @@ func TestOpenAICompatExecutorImagesGenerationsStreamsUpstream(t *testing.T) {
 	defer server.Close()
 
 	executor := NewOpenAICompatExecutor("openai-compatibility", &config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"base_url": server.URL + "/v1",
 		"api_key":  "test",
 	}}
-	streamResult, err := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	streamResult, err := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "upstream-image",
 		Payload: []byte(`{"model":"compat-image","prompt":"draw","stream":true}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-image"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-image"),
 		Stream:       true,
 		Headers: http.Header{
 			"Content-Type": []string{"application/json"},
 		},
 		Metadata: map[string]any{
-			cliproxyexecutor.RequestPathMetadataKey: "/v1/images/generations",
+			coreexecutor.RequestPathMetadataKey: "/v1/images/generations",
 		},
 	})
 	if err != nil {
@@ -738,21 +738,21 @@ func TestOpenAICompatExecutorImagesEditsMultipartRewritesModel(t *testing.T) {
 	defer server.Close()
 
 	executor := NewOpenAICompatExecutor("openai-compatibility", &config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"base_url": server.URL + "/v1",
 		"api_key":  "test",
 	}}
-	_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "upstream-image",
 		Payload: body.Bytes(),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-image"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-image"),
 		Stream:       false,
 		Headers: http.Header{
 			"Content-Type": []string{contentType},
 		},
 		Metadata: map[string]any{
-			cliproxyexecutor.RequestPathMetadataKey: "/v1/images/edits",
+			coreexecutor.RequestPathMetadataKey: "/v1/images/edits",
 		},
 	})
 	if err != nil {
@@ -839,15 +839,15 @@ func TestOpenAICompatExecutorStreamRejectsPlainJSONAfterBlankLines(t *testing.T)
 	defer server.Close()
 
 	executor := NewOpenAICompatExecutor("openai-compatibility", &config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"base_url": server.URL + "/v1",
 		"api_key":  "test",
 	}}
-	result, err := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	result, err := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "openrouter-model",
 		Payload: []byte(`{"model":"openrouter-model","messages":[{"role":"user","content":"hi"}],"stream":true}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai"),
 		Stream:       true,
 	})
 	if err != nil {
@@ -881,15 +881,15 @@ func TestOpenAICompatExecutorStreamSkipsKeepAliveUntilDataLine(t *testing.T) {
 	defer server.Close()
 
 	executor := NewOpenAICompatExecutor("openai-compatibility", &config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"base_url": server.URL + "/v1",
 		"api_key":  "test",
 	}}
-	result, err := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	result, err := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "openrouter-model",
 		Payload: []byte(`{"model":"openrouter-model","messages":[{"role":"user","content":"hi"}],"stream":true}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai"),
 		Stream:       true,
 	})
 	if err != nil {
@@ -916,17 +916,17 @@ func TestOpenAICompatExecutorResponsesStreamFailsOnEOFWithoutDone(t *testing.T) 
 	defer server.Close()
 
 	executor := NewOpenAICompatExecutor("openai-compatibility", &config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"base_url": server.URL + "/v1",
 		"api_key":  "test",
 	}}
 	request := []byte(`{"model":"deepseek-v4-flash","input":"hi","stream":true}`)
-	result, err := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	result, err := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "deepseek-v4-flash",
 		Payload: request,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		OriginalRequest: request,
 		Stream:          true,
 	})
@@ -958,7 +958,7 @@ func TestOpenAICompatExecutorResponsesStreamFailsOnEOFWithoutDone(t *testing.T) 
 	if !strings.Contains(streamErr.Error(), "closed before [DONE]") {
 		t.Fatalf("stream error does not explain the missing terminal marker: %v", streamErr)
 	}
-	truncatedErr, okTruncated := streamErr.(cliproxyexecutor.StreamTruncatedError)
+	truncatedErr, okTruncated := streamErr.(coreexecutor.StreamTruncatedError)
 	if !okTruncated || !truncatedErr.IsStreamTruncated() {
 		t.Fatalf("stream error = %T (%v), want IsStreamTruncated() = true", streamErr, streamErr)
 	}
@@ -1022,7 +1022,7 @@ func TestOpenAICompatMissingDoneDoesNotCooldownPool(t *testing.T) {
 			defer server.Close()
 
 			cfg := &config.Config{}
-			manager := cliproxyauth.NewManager(nil, &cliproxyauth.RoundRobinSelector{}, nil)
+			manager := coreauth.NewManager(nil, &coreauth.RoundRobinSelector{}, nil)
 			manager.SetConfig(cfg)
 			manager.SetRetryConfig(0, 0, 0)
 			manager.RegisterExecutor(NewOpenAICompatExecutor(provider, cfg))
@@ -1031,10 +1031,10 @@ func TestOpenAICompatMissingDoneDoesNotCooldownPool(t *testing.T) {
 				id := fmt.Sprintf("minimax-compat-%s-%d", tc.name, i)
 				registry.GetGlobalRegistry().RegisterClient(id, provider, []*registry.ModelInfo{{ID: model}})
 				t.Cleanup(func() { registry.GetGlobalRegistry().UnregisterClient(id) })
-				_, errRegister := manager.Register(context.Background(), &cliproxyauth.Auth{
+				_, errRegister := manager.Register(context.Background(), &coreauth.Auth{
 					ID:       id,
 					Provider: provider,
-					Status:   cliproxyauth.StatusActive,
+					Status:   coreauth.StatusActive,
 					Attributes: map[string]string{
 						"api_key":      fmt.Sprintf("minimax-key-%d", i),
 						"base_url":     server.URL + "/v1",
@@ -1051,12 +1051,12 @@ func TestOpenAICompatMissingDoneDoesNotCooldownPool(t *testing.T) {
 			var lastObservedErr error
 			for reqIdx := 0; reqIdx < tc.requests; reqIdx++ {
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-				result, errStream := manager.ExecuteStream(ctx, []string{provider}, cliproxyexecutor.Request{
+				result, errStream := manager.ExecuteStream(ctx, []string{provider}, coreexecutor.Request{
 					Model:   model,
 					Payload: requestPayload,
-				}, cliproxyexecutor.Options{
-					SourceFormat:    sdktranslator.FormatOpenAIResponse,
-					ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+				}, coreexecutor.Options{
+					SourceFormat:    translatorreg.FormatOpenAIResponse,
+					ResponseFormat:  translatorreg.FormatOpenAIResponse,
 					OriginalRequest: requestPayload,
 					Stream:          true,
 				})
@@ -1112,17 +1112,17 @@ func TestOpenAICompatExecutorResponsesStreamPreservesUpstreamDataError(t *testin
 			defer server.Close()
 
 			executor := NewOpenAICompatExecutor("openai-compatibility", &config.Config{})
-			auth := &cliproxyauth.Auth{Attributes: map[string]string{
+			auth := &coreauth.Auth{Attributes: map[string]string{
 				"base_url": server.URL + "/v1",
 				"api_key":  "test",
 			}}
 			request := []byte(`{"model":"deepseek-v4-flash","input":"hi","stream":true}`)
-			result, err := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+			result, err := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 				Model:   "deepseek-v4-flash",
 				Payload: request,
-			}, cliproxyexecutor.Options{
-				SourceFormat:    sdktranslator.FormatOpenAIResponse,
-				ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+			}, coreexecutor.Options{
+				SourceFormat:    translatorreg.FormatOpenAIResponse,
+				ResponseFormat:  translatorreg.FormatOpenAIResponse,
 				OriginalRequest: request,
 				Stream:          true,
 			})
@@ -1160,17 +1160,17 @@ func TestOpenAICompatExecutorResponsesStreamPreservesNamedErrorEvent(t *testing.
 	defer server.Close()
 
 	executor := NewOpenAICompatExecutor("openai-compatibility", &config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"base_url": server.URL + "/v1",
 		"api_key":  "test",
 	}}
 	request := []byte(`{"model":"deepseek-v4-flash","input":"hi","stream":true}`)
-	result, err := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	result, err := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "deepseek-v4-flash",
 		Payload: request,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		OriginalRequest: request,
 		Stream:          true,
 	})
@@ -1257,10 +1257,10 @@ func TestOpenAICompatExecutorResponsesStreamHandlesAdditionalErrorShapes(t *test
 			defer server.Close()
 
 			executor := NewOpenAICompatExecutor("openai-compatibility", &config.Config{})
-			auth := &cliproxyauth.Auth{Attributes: map[string]string{"base_url": server.URL + "/v1", "api_key": "test"}}
+			auth := &coreauth.Auth{Attributes: map[string]string{"base_url": server.URL + "/v1", "api_key": "test"}}
 			request := []byte(`{"model":"deepseek-v4-flash","input":"hi","stream":true}`)
-			result, err := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{Model: "deepseek-v4-flash", Payload: request}, cliproxyexecutor.Options{
-				SourceFormat: sdktranslator.FormatOpenAIResponse, ResponseFormat: sdktranslator.FormatOpenAIResponse, OriginalRequest: request, Stream: true,
+			result, err := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{Model: "deepseek-v4-flash", Payload: request}, coreexecutor.Options{
+				SourceFormat: translatorreg.FormatOpenAIResponse, ResponseFormat: translatorreg.FormatOpenAIResponse, OriginalRequest: request, Stream: true,
 			})
 			if err != nil {
 				t.Fatalf("ExecuteStream error: %v", err)
@@ -1303,15 +1303,15 @@ func TestOpenAICompatExecutorStreamDropsChunksAfterDone(t *testing.T) {
 	defer server.Close()
 
 	executor := NewOpenAICompatExecutor("openai-compatibility", &config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"base_url": server.URL + "/v1",
 		"api_key":  "test",
 	}}
-	result, err := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	result, err := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "deepseek-v4-flash-free",
 		Payload: []byte(`{"model":"deepseek-v4-flash-free","messages":[{"role":"user","content":"hi"}],"stream":true}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai"),
 		Stream:       true,
 	})
 	if err != nil {
@@ -1398,7 +1398,7 @@ func TestOpenAICompatExecutor_ResponsesCompactionTriggerAndReplay_Issue7248(t *t
 			}},
 		},
 	})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "openai-compatibility",
 		Attributes: map[string]string{
 			"base_url": server.URL + "/v1",
@@ -1430,12 +1430,12 @@ func TestOpenAICompatExecutor_ResponsesCompactionTriggerAndReplay_Issue7248(t *t
 		]
 	}`)
 
-	streamResult, errStream := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	streamResult, errStream := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "cline-pass/deepseek-v4.1-flash",
 		Payload: triggerPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		Stream:          true,
 		OriginalRequest: triggerPayload,
 	})
@@ -1474,12 +1474,12 @@ func TestOpenAICompatExecutor_ResponsesCompactionTriggerAndReplay_Issue7248(t *t
 		t.Fatalf("expected tools (including additional_tools) to be stripped from summary request, got: %s", firstSeen)
 	}
 
-	nonStreamResp, errExec := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	nonStreamResp, errExec := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "cline-pass/deepseek-v4.1-flash",
 		Payload: triggerPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		OriginalRequest: triggerPayload,
 	})
 	if errExec != nil {
@@ -1500,12 +1500,12 @@ func TestOpenAICompatExecutor_ResponsesCompactionTriggerAndReplay_Issue7248(t *t
 		]
 	}`, outputItems[0].Get("id").String(), capsule))
 
-	contStream, errCont := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	contStream, errCont := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "cline-pass/deepseek-v4.1-flash",
 		Payload: replayPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		Stream:          true,
 		OriginalRequest: replayPayload,
 	})
@@ -1526,12 +1526,12 @@ func TestOpenAICompatExecutor_ResponsesCompactionTriggerAndReplay_Issue7248(t *t
 		t.Fatalf("expected foreign compaction item to be dropped, got: %s", lastSeen)
 	}
 
-	if _, errNonStreamReplay := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	if _, errNonStreamReplay := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "cline-pass/deepseek-v4.1-flash",
 		Payload: replayPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		OriginalRequest: replayPayload,
 	}); errNonStreamReplay != nil {
 		t.Fatalf("Execute(replay) error = %v", errNonStreamReplay)
@@ -1541,24 +1541,24 @@ func TestOpenAICompatExecutor_ResponsesCompactionTriggerAndReplay_Issue7248(t *t
 		t.Fatalf("unexpected non-stream replay upstream body: %s", nonStreamReplaySeen)
 	}
 
-	if _, errCountTokens := executor.CountTokens(context.Background(), auth, cliproxyexecutor.Request{
+	if _, errCountTokens := executor.CountTokens(context.Background(), auth, coreexecutor.Request{
 		Model:   "gpt-4o",
 		Payload: replayPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		OriginalRequest: replayPayload,
 	}); errCountTokens != nil {
 		t.Fatalf("CountTokens(replay) error = %v", errCountTokens)
 	}
 
 	strippedTriggerPayload := []byte(`{"model":"cline-pass/deepseek-v4.1-flash","stream":false,"input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"Remember our synthetic project marker COBALT-731 and reply with ACK."}]}]}`)
-	origOnlyResp, errOrigOnly := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	origOnlyResp, errOrigOnly := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "cline-pass/deepseek-v4.1-flash",
 		Payload: strippedTriggerPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		OriginalRequest: triggerPayload,
 	})
 	if errOrigOnly != nil {
@@ -1576,12 +1576,12 @@ func TestOpenAICompatExecutor_ResponsesCompactionTriggerAndReplay_Issue7248(t *t
 			{"type": "message", "role": "user", "content": [{"type": "input_text", "text": "continue"}]}
 		]
 	}`)
-	_, errCorrupt := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, errCorrupt := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "cline-pass/deepseek-v4.1-flash",
 		Payload: corruptedPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		OriginalRequest: corruptedPayload,
 	})
 	if errCorrupt == nil {
@@ -1598,12 +1598,12 @@ func TestOpenAICompatExecutor_ResponsesCompactionTriggerAndReplay_Issue7248(t *t
 			{"type": "compaction_trigger"}
 		]
 	}`, outputItems[0].Get("id").String(), capsule))
-	secondResp, errSecond := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	secondResp, errSecond := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "cline-pass/deepseek-v4.1-flash",
 		Payload: secondTriggerPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		OriginalRequest: secondTriggerPayload,
 	})
 	if errSecond != nil {
@@ -1628,11 +1628,11 @@ func TestOpenAICompatExecutor_ResponsesCompactionTriggerAndReplay_Issue7248(t *t
 			{"type": "message", "role": "user", "content": [{"type": "input_text", "text": "Compact again."}]}
 		]
 	}`, outputItems[0].Get("id").String(), capsule))
-	if _, errCompactEndpoint := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	if _, errCompactEndpoint := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "cline-pass/deepseek-v4.1-flash",
 		Payload: compactPassthroughPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FormatOpenAIResponse,
 		Alt:          "responses/compact",
 	}); errCompactEndpoint != nil {
 		t.Fatalf("Execute(responses/compact) error = %v", errCompactEndpoint)
@@ -1649,12 +1649,12 @@ func TestOpenAICompatExecutor_ResponsesCompactionTriggerAndReplay_Issue7248(t *t
 	}
 
 	returnIncomplete = true
-	_, errIncExec := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, errIncExec := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "cline-pass/deepseek-v4.1-flash",
 		Payload: triggerPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		OriginalRequest: triggerPayload,
 	})
 	if errIncExec == nil {
@@ -1662,12 +1662,12 @@ func TestOpenAICompatExecutor_ResponsesCompactionTriggerAndReplay_Issue7248(t *t
 	}
 	assertStatusErr(t, errIncExec, http.StatusBadGateway)
 
-	_, errIncStream := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	_, errIncStream := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "cline-pass/deepseek-v4.1-flash",
 		Payload: triggerPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		Stream:          true,
 		OriginalRequest: triggerPayload,
 	})

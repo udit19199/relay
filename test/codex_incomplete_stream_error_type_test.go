@@ -10,13 +10,13 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	runtimeexecutor "github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor"
-	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/translator"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/api/handlers"
-	openaihandlers "github.com/router-for-me/CLIProxyAPI/v8/sdk/api/handlers/openai"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	"github.com/udit19199/relay/internal/api/handlers"
+	openaihandlers "github.com/udit19199/relay/internal/api/handlers/openai"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/registry"
+	runtimeexecutor "github.com/udit19199/relay/internal/runtime/executor"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	_ "github.com/udit19199/relay/internal/translator"
 )
 
 // TestCodexIncompleteStreamIsNotTypedAsInvalidRequest drives the real /v1/responses
@@ -51,7 +51,7 @@ func TestCodexIncompleteStreamIsNotTypedAsInvalidRequest(t *testing.T) {
 	}))
 	defer server.Close()
 
-	manager := cliproxyauth.NewManager(nil, &cliproxyauth.RoundRobinSelector{}, nil)
+	manager := coreauth.NewManager(nil, &coreauth.RoundRobinSelector{}, nil)
 	manager.SetRetryConfig(0, 0, 0)
 	cfg := &config.Config{}
 	manager.RegisterExecutor(runtimeexecutor.NewCodexExecutor(cfg))
@@ -59,8 +59,8 @@ func TestCodexIncompleteStreamIsNotTypedAsInvalidRequest(t *testing.T) {
 	const authID = "codex-incomplete-stream"
 	registry.GetGlobalRegistry().RegisterClient(authID, "codex", []*registry.ModelInfo{{ID: model}})
 	t.Cleanup(func() { registry.GetGlobalRegistry().UnregisterClient(authID) })
-	if _, errRegister := manager.Register(context.Background(), &cliproxyauth.Auth{
-		ID: authID, Provider: "codex", Status: cliproxyauth.StatusActive,
+	if _, errRegister := manager.Register(context.Background(), &coreauth.Auth{
+		ID: authID, Provider: "codex", Status: coreauth.StatusActive,
 		Attributes: map[string]string{"base_url": server.URL, "api_key": "incomplete"},
 		Metadata:   map[string]any{"disable_cooling": true},
 	}); errRegister != nil {

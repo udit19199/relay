@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 // Tests in this file cover issue #6690: Devin daily/weekly usage quota
@@ -66,7 +66,7 @@ func TestDevinQuotaExhaustedError_StreamDailyUsesDailyReset(t *testing.T) {
 }
 
 func TestDevinQuotaExhaustedError_StreamWithoutSignalsStillCredentialScoped(t *testing.T) {
-	auth := &cliproxyauth.Auth{ID: "devin-quota-no-signals", Provider: "devin"}
+	auth := &coreauth.Auth{ID: "devin-quota-no-signals", Provider: "devin"}
 
 	err := devinStreamTrailerError(t, auth, "failed_precondition", "Your weekly usage quota has been exhausted.")
 
@@ -163,7 +163,7 @@ func TestDevinTransientErrors_StayModelScoped(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			auth := &cliproxyauth.Auth{ID: "devin-transient", Provider: "devin"}
+			auth := &coreauth.Auth{ID: "devin-transient", Provider: "devin"}
 			err := devinStreamTrailerError(t, auth, tc.code, tc.message)
 			se, ok := err.(statusErr)
 			if !ok {
@@ -213,8 +213,8 @@ func TestDevinStatusError_HTTP429WeeklyQuotaUsesResetWhenAuthKnown(t *testing.T)
 	}
 }
 
-func devinTestAuthWithQuotaResets(daily, weekly time.Time) *cliproxyauth.Auth {
-	auth := &cliproxyauth.Auth{ID: "devin-quota-auth", Provider: "devin"}
+func devinTestAuthWithQuotaResets(daily, weekly time.Time) *coreauth.Auth {
+	auth := &coreauth.Auth{ID: "devin-quota-auth", Provider: "devin"}
 	auth.Quota.Signals = map[string]string{
 		"daily_quota_remaining_percent":  "0%",
 		"weekly_quota_remaining_percent": "0%",
@@ -228,16 +228,16 @@ func devinTestAuthWithQuotaResets(daily, weekly time.Time) *cliproxyauth.Auth {
 	return auth
 }
 
-func devinStreamTrailerError(t *testing.T, auth *cliproxyauth.Auth, code, message string) error {
+func devinStreamTrailerError(t *testing.T, auth *coreauth.Auth, code, message string) error {
 	t.Helper()
 	trailer := fmt.Sprintf(`{"error":{"code":%q,"message":%q}}`, code, message)
 	var buf bytes.Buffer
 	buf.Write(helps.WrapConnectEnvelopeWithFlag(helps.ConnectFlagEndStream, []byte(trailer)))
 
 	e := &DevinExecutor{}
-	out := make(chan cliproxyexecutor.StreamChunk, 16)
-	opts := cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAI,
+	out := make(chan coreexecutor.StreamChunk, 16)
+	opts := coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAI,
 		OriginalRequest: []byte(`{"model":"devin/claude-opus-5-5","stream":true,"messages":[{"role":"user","content":"hi"}]}`),
 	}
 	go func() {
@@ -245,10 +245,10 @@ func devinStreamTrailerError(t *testing.T, auth *cliproxyauth.Auth, code, messag
 		e.streamDevinFramesForAuth(
 			context.Background(),
 			&buf,
-			cliproxyexecutor.Request{Model: "devin/claude-opus-5-5", Payload: opts.OriginalRequest},
+			coreexecutor.Request{Model: "devin/claude-opus-5-5", Payload: opts.OriginalRequest},
 			opts,
 			"claude-opus-5-5",
-			sdktranslator.FormatOpenAI,
+			translatorreg.FormatOpenAI,
 			nil,
 			out,
 			auth,

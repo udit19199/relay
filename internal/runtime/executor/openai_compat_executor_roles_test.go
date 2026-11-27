@@ -9,10 +9,10 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestOpenAICompatExecutorPreservesResponsesInstructionRoles(t *testing.T) {
@@ -36,8 +36,8 @@ func TestOpenAICompatExecutorPreservesResponsesInstructionRoles(t *testing.T) {
 			}))
 			defer server.Close()
 			executor := NewOpenAICompatExecutor("openai-compatibility", &config.Config{})
-			auth := &cliproxyauth.Auth{Provider: "openai-compatibility", Attributes: map[string]string{"base_url": server.URL + "/v1", "api_key": "test-key"}}
-			request := cliproxyexecutor.Request{
+			auth := &coreauth.Auth{Provider: "openai-compatibility", Attributes: map[string]string{"base_url": server.URL + "/v1", "api_key": "test-key"}}
+			request := coreexecutor.Request{
 				Model: "test-model",
 				Payload: []byte(`{"instructions":"base instructions","input":[
 					{"role":"developer","content":"mode: plan"},
@@ -49,7 +49,7 @@ func TestOpenAICompatExecutorPreservesResponsesInstructionRoles(t *testing.T) {
 					{"role":"user","content":"continue"}
 				],"tools":[{"type":"function","name":"inspect","parameters":{"type":"object","properties":{}}}]}`),
 			}
-			options := cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse, ResponseFormat: sdktranslator.FormatOpenAIResponse, Stream: stream}
+			options := coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse, ResponseFormat: translatorreg.FormatOpenAIResponse, Stream: stream}
 			if stream {
 				result, errStream := executor.ExecuteStream(context.Background(), auth, request, options)
 				if errStream != nil {

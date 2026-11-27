@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/codex"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
+	"github.com/udit19199/relay/internal/auth/codex"
+	"github.com/udit19199/relay/internal/config"
 )
 
 type siwcBindRoundTripper func(*http.Request) (*http.Response, error)

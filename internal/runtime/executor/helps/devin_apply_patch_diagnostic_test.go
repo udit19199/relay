@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	applypatch "github.com/router-for-me/CLIProxyAPI/v8/internal/client/codex/apply-patch"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/translator/common"
+	applypatch "github.com/udit19199/relay/internal/client/codex/apply-patch"
+	"github.com/udit19199/relay/internal/translator/common"
 )
 
 const devinDiagnosticPatchRequest = `{"tools":[{"type":"custom","name":"apply_patch"},{"type":"function","name":"shell"}]}`

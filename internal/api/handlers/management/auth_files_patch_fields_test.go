@@ -15,9 +15,9 @@ import (
 	"testing/synctest"
 
 	"github.com/gin-gonic/gin"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	fileauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/auth"
-	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	fileauth "github.com/udit19199/relay/internal/auth/login"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 func TestSyncAuthFilePriorityAttributeTracksFileSource(t *testing.T) {

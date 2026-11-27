@@ -207,10 +207,3 @@ func (s *Server) isPortAvailable() bool {
 	}()
 	return true
 }
-
-// IsRunning reports whether the server is running.
-func (s *Server) IsRunning() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.running
-}

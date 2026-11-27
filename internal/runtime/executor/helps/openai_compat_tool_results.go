@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/thinking"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/thinking"
 )
 
 const (

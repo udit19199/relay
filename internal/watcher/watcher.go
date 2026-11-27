@@ -11,13 +11,13 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/util"
 	"gopkg.in/yaml.v3"
 
-	sdkAuth "github.com/router-for-me/CLIProxyAPI/v8/sdk/auth"
-	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	log "github.com/sirupsen/logrus"
+	authlogin "github.com/udit19199/relay/internal/auth/login"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 // storePersister captures persistence-capable token store methods used by the watcher.
@@ -139,7 +139,7 @@ func NewWatcher(configPath, authDir string, reloadCallback func(*config.Config))
 		fileAuthsByPath: make(map[string]map[string]*coreauth.Auth),
 	}
 	w.dispatchCond = sync.NewCond(&w.dispatchMu)
-	if store := sdkAuth.GetTokenStore(); store != nil {
+	if store := authlogin.GetTokenStore(); store != nil {
 		if persister, ok := store.(storePersister); ok {
 			w.storePersister = persister
 			log.Debug("persistence-capable token store detected; watcher will propagate persisted changes")

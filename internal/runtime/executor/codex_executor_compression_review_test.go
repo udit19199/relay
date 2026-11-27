@@ -11,8 +11,8 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/klauspost/compress/zstd"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
+	"github.com/udit19199/relay/internal/config"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 func TestCodexImageCompressionRejectedFallback(t *testing.T) {
@@ -64,7 +64,7 @@ func TestCodexImageCompressionRejectedFallback(t *testing.T) {
 					if direct {
 						model = "gpt-image-2"
 					}
-					req := cliproxyexecutor.Request{Model: model, Payload: []byte(`{"model":"` + model + `","prompt":"` + strings.Repeat("a compressible cat ", 400) + `"}`)}
+					req := coreexecutor.Request{Model: model, Payload: []byte(`{"model":"` + model + `","prompt":"` + strings.Repeat("a compressible cat ", 400) + `"}`)}
 					opts := codexOpenAIImageTestOptions(codexImagesGenerationsPath, stream)
 					auth := codexCompressionAuth()
 					// Custom headers must not relabel the plaintext fallback or direct body.

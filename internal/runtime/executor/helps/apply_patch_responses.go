@@ -7,10 +7,10 @@ import (
 	"strings"
 
 	"github.com/MoeForge/moego/ojson"
-	applypatch "github.com/router-for-me/CLIProxyAPI/v8/internal/client/codex/apply-patch"
-	translatorcommon "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/common"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	applypatch "github.com/udit19199/relay/internal/client/codex/apply-patch"
+	translatorcommon "github.com/udit19199/relay/internal/translator/common"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
+	"github.com/udit19199/relay/internal/util"
 )
 
 // NormalizeApplyPatchResponsesRequest opts a non-Codex executor into the patch contract.
@@ -225,8 +225,8 @@ func preferChatFunctionPatchToolsDoc(original []byte, doc *ojson.Doc) bool {
 	return doc.SetRawBytes("tools", translatorcommon.JoinRawArray(tools)) == nil
 }
 
-func NewApplyPatchResponsesState(source sdktranslator.Format, original, declarations []byte) *ApplyPatchResponsesState {
-	if source == sdktranslator.FormatOpenAI {
+func NewApplyPatchResponsesState(source translatorreg.Format, original, declarations []byte) *ApplyPatchResponsesState {
+	if source == translatorreg.FormatOpenAI {
 		declarations = preferChatFunctionPatchTools(original, declarations)
 	}
 	s := &ApplyPatchResponsesState{Bridge: translatorcommon.NewApplyPatchResponsesBridge(declarations), tools: util.CollectResponsesToolWinners(util.ParseGJSONBytesNoCopy(declarations)), dispatchers: map[string]string{}, byDispatcherKey: map[string]*patchDispatcherCall{}}

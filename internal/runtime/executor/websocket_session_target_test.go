@@ -2,13 +2,11 @@ package executor
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -16,11 +14,10 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executionregistry"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 type rejectSecondBindLifecycle struct {
@@ -130,17 +127,17 @@ func TestClearRetryActiveStateClearsOriginalConnection(t *testing.T) {
 func TestWebsocketRetryBindFailureClearsActiveSessionState(t *testing.T) {
 	tests := []struct {
 		name string
-		run  func(t *testing.T, baseURL string) (func(cliproxyexecutor.Options) error, *codexWebsocketSession)
+		run  func(t *testing.T, baseURL string) (func(coreexecutor.Options) error, *codexWebsocketSession)
 	}{
 		{
 			name: "Codex nonstream",
-			run: func(t *testing.T, baseURL string) (func(cliproxyexecutor.Options) error, *codexWebsocketSession) {
+			run: func(t *testing.T, baseURL string) (func(coreexecutor.Options) error, *codexWebsocketSession) {
 				executor := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
 				executor.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
-				auth := &cliproxyauth.Auth{ID: "retry-bind-codex", Provider: "codex", Attributes: map[string]string{"api_key": "test-key", "base_url": baseURL}}
-				req := cliproxyexecutor.Request{Model: "gpt-5-codex", Payload: []byte(`{"model":"gpt-5-codex","input":[{"type":"message","role":"user","content":"hello"}]}`)}
+				auth := &coreauth.Auth{ID: "retry-bind-codex", Provider: "codex", Attributes: map[string]string{"api_key": "test-key", "base_url": baseURL}}
+				req := coreexecutor.Request{Model: "gpt-5-codex", Payload: []byte(`{"model":"gpt-5-codex","input":[{"type":"message","role":"user","content":"hello"}]}`)}
 				primed := false
-				return func(runOpts cliproxyexecutor.Options) error {
+				return func(runOpts coreexecutor.Options) error {
 					if !primed {
 						wsURL := "ws" + strings.TrimPrefix(baseURL, "http") + "/responses"
 						conn, _, _, errEnsure := executor.ensureUpstreamConn(context.Background(), auth, executor.getOrCreateSession("retry-bind"), auth.ID, wsURL, http.Header{})
@@ -159,13 +156,13 @@ func TestWebsocketRetryBindFailureClearsActiveSessionState(t *testing.T) {
 		},
 		{
 			name: "Codex stream",
-			run: func(t *testing.T, baseURL string) (func(cliproxyexecutor.Options) error, *codexWebsocketSession) {
+			run: func(t *testing.T, baseURL string) (func(coreexecutor.Options) error, *codexWebsocketSession) {
 				executor := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
 				executor.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
-				auth := &cliproxyauth.Auth{ID: "retry-bind-codex", Provider: "codex", Attributes: map[string]string{"api_key": "test-key", "base_url": baseURL}}
-				req := cliproxyexecutor.Request{Model: "gpt-5-codex", Payload: []byte(`{"model":"gpt-5-codex","input":[{"type":"message","role":"user","content":"hello"}]}`)}
+				auth := &coreauth.Auth{ID: "retry-bind-codex", Provider: "codex", Attributes: map[string]string{"api_key": "test-key", "base_url": baseURL}}
+				req := coreexecutor.Request{Model: "gpt-5-codex", Payload: []byte(`{"model":"gpt-5-codex","input":[{"type":"message","role":"user","content":"hello"}]}`)}
 				primed := false
-				return func(runOpts cliproxyexecutor.Options) error {
+				return func(runOpts coreexecutor.Options) error {
 					if !primed {
 						wsURL := "ws" + strings.TrimPrefix(baseURL, "http") + "/responses"
 						conn, _, _, errEnsure := executor.ensureUpstreamConn(context.Background(), auth, executor.getOrCreateSession("retry-bind"), auth.ID, wsURL, http.Header{})
@@ -192,13 +189,13 @@ func TestWebsocketRetryBindFailureClearsActiveSessionState(t *testing.T) {
 		},
 		{
 			name: "xAI stream",
-			run: func(t *testing.T, baseURL string) (func(cliproxyexecutor.Options) error, *codexWebsocketSession) {
+			run: func(t *testing.T, baseURL string) (func(coreexecutor.Options) error, *codexWebsocketSession) {
 				executor := NewXAIWebsocketsExecutor(&config.Config{})
 				executor.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
-				auth := &cliproxyauth.Auth{ID: "retry-bind-xai", Provider: "xai", Attributes: map[string]string{"base_url": baseURL, "websockets": "true"}, Metadata: map[string]any{"access_token": "test-token"}}
-				req := cliproxyexecutor.Request{Model: "grok-4", Payload: []byte(`{"model":"grok-4","input":[{"type":"message","role":"user","content":"hello"}]}`)}
+				auth := &coreauth.Auth{ID: "retry-bind-xai", Provider: "xai", Attributes: map[string]string{"base_url": baseURL, "websockets": "true"}, Metadata: map[string]any{"access_token": "test-token"}}
+				req := coreexecutor.Request{Model: "grok-4", Payload: []byte(`{"model":"grok-4","input":[{"type":"message","role":"user","content":"hello"}]}`)}
 				primed := false
-				return func(runOpts cliproxyexecutor.Options) error {
+				return func(runOpts coreexecutor.Options) error {
 					if !primed {
 						wsURL := "ws" + strings.TrimPrefix(baseURL, "http") + "/responses"
 						conn, _, _, errEnsure := executor.ensureUpstreamConn(context.Background(), auth, executor.getOrCreateSession("retry-bind"), auth.ID, wsURL, http.Header{})
@@ -259,7 +256,7 @@ func TestWebsocketRetryBindFailureClearsActiveSessionState(t *testing.T) {
 			defer server.Close()
 
 			lifecycle := &rejectSecondBindLifecycle{}
-			opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse, ResponseFormat: sdktranslator.FormatOpenAIResponse, ExecutionLifecycle: lifecycle, Metadata: map[string]any{cliproxyexecutor.ExecutionSessionMetadataKey: "retry-bind"}}
+			opts := coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse, ResponseFormat: translatorreg.FormatOpenAIResponse, ExecutionLifecycle: lifecycle, Metadata: map[string]any{coreexecutor.ExecutionSessionMetadataKey: "retry-bind"}}
 			run, sess := test.run(t, server.URL)
 			if errRun := run(opts); errRun == nil {
 				t.Fatal("first request error = nil, want retry lifecycle bind rejection")
@@ -292,11 +289,11 @@ func TestWebsocketSessionCloseEndsRetainedLifecycleOnce(t *testing.T) {
 	defer server.Close()
 
 	sess := exec.getOrCreateSession("retained-lifecycle")
-	auth := &cliproxyauth.Auth{ID: "auth-a"}
+	auth := &coreauth.Auth{ID: "auth-a"}
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
 	conn := ensureWebsocketTargetConn(t, exec.ensureUpstreamConn, auth, sess, auth.ID, wsURL)
 	lifecycle := &trackedWebsocketLifecycle{}
-	if errBind := sess.bindExecutionLifecycle(cliproxyexecutor.Options{ExecutionLifecycle: lifecycle}, conn, sess.connCloser, "model-a"); errBind != nil {
+	if errBind := sess.bindExecutionLifecycle(coreexecutor.Options{ExecutionLifecycle: lifecycle}, conn, sess.connCloser, "model-a"); errBind != nil {
 		t.Fatalf("bind execution lifecycle: %v", errBind)
 	}
 
@@ -347,7 +344,7 @@ func TestSessionlessWebsocketSelectionEndAndDirectCloseRaceClosesOnce(t *testing
 	conn, physical := newCloseCountingWebsocketConn(t, wsURL)
 	closer := newWebsocketConnectionCloser(conn)
 	lifecycle := &trackedWebsocketLifecycle{}
-	if errBind := (*codexWebsocketSession)(nil).bindExecutionLifecycle(cliproxyexecutor.Options{ExecutionLifecycle: lifecycle}, conn, closer, "model-a"); errBind != nil {
+	if errBind := (*codexWebsocketSession)(nil).bindExecutionLifecycle(coreexecutor.Options{ExecutionLifecycle: lifecycle}, conn, closer, "model-a"); errBind != nil {
 		t.Fatalf("bind sessionless lifecycle: %v", errBind)
 	}
 
@@ -379,7 +376,7 @@ func TestWebsocketDrainDuringBindClosesOwnedConnectionOnce(t *testing.T) {
 	closer := newWebsocketConnectionCloser(conn)
 	sess := &codexWebsocketSession{conn: conn, connCloser: closer, wsURL: wsURL, authID: "auth-a", readerConn: conn}
 
-	errBind := sess.bindExecutionLifecycle(cliproxyexecutor.Options{ExecutionLifecycle: drainDuringBindWebsocketLifecycle{}}, conn, closer, "model-a")
+	errBind := sess.bindExecutionLifecycle(coreexecutor.Options{ExecutionLifecycle: drainDuringBindWebsocketLifecycle{}}, conn, closer, "model-a")
 	if errBind == nil {
 		t.Fatal("bind execution lifecycle error = nil, want drain error")
 	}
@@ -410,7 +407,7 @@ func TestWebsocketTargetReplacementPhysicallyClosesOwnedConnectionOnce(t *testin
 			serverB, _ := newWebsocketTargetServer(t)
 			defer serverB.Close()
 
-			var ensure func(context.Context, *cliproxyauth.Auth, *codexWebsocketSession, string, string, http.Header) (*websocket.Conn, *websocketConnectionCloser, *http.Response, error)
+			var ensure func(context.Context, *coreauth.Auth, *codexWebsocketSession, string, string, http.Header) (*websocket.Conn, *websocketConnectionCloser, *http.Response, error)
 			var closeSession func(string)
 			var sess *codexWebsocketSession
 			switch test.name {
@@ -440,11 +437,11 @@ func TestWebsocketTargetReplacementPhysicallyClosesOwnedConnectionOnce(t *testin
 			sess.readerConn = connA
 			sess.connMu.Unlock()
 			lifecycle := &trackedWebsocketLifecycle{}
-			if errBind := sess.bindExecutionLifecycle(cliproxyexecutor.Options{ExecutionLifecycle: lifecycle}, connA, sess.connCloser, "model-a"); errBind != nil {
+			if errBind := sess.bindExecutionLifecycle(coreexecutor.Options{ExecutionLifecycle: lifecycle}, connA, sess.connCloser, "model-a"); errBind != nil {
 				t.Fatalf("bind execution lifecycle: %v", errBind)
 			}
 
-			if _, _, _, errEnsure := ensure(context.Background(), &cliproxyauth.Auth{ID: "auth-b"}, sess, "auth-b", wsURLB, nil); errEnsure != nil {
+			if _, _, _, errEnsure := ensure(context.Background(), &coreauth.Auth{ID: "auth-b"}, sess, "auth-b", wsURLB, nil); errEnsure != nil {
 				t.Fatalf("replace websocket target: %v", errEnsure)
 			}
 			if got := physical.closes.Load(); got != 1 {
@@ -466,7 +463,7 @@ func TestWebsocketLifecycleEndThenInvalidateAndCloseAllPhysicallyClosesOnce(t *t
 				exec.store = &codexWebsocketSessionStore{sessions: map[string]*codexWebsocketSession{sess.sessionID: sess}}
 				lifecycle.End("lifecycle_ended")
 				exec.invalidateUpstreamConn(sess, conn, "invalidated", nil)
-				exec.CloseExecutionSession(cliproxyauth.CloseAllExecutionSessionsID)
+				exec.CloseExecutionSession(coreauth.CloseAllExecutionSessionsID)
 			},
 		},
 		{
@@ -476,7 +473,7 @@ func TestWebsocketLifecycleEndThenInvalidateAndCloseAllPhysicallyClosesOnce(t *t
 				exec.store = &codexWebsocketSessionStore{sessions: map[string]*codexWebsocketSession{sess.sessionID: sess}}
 				lifecycle.End("lifecycle_ended")
 				exec.invalidateUpstreamConn(sess, conn, "invalidated", nil)
-				exec.CloseExecutionSession(cliproxyauth.CloseAllExecutionSessionsID)
+				exec.CloseExecutionSession(coreauth.CloseAllExecutionSessionsID)
 			},
 		},
 	}
@@ -489,7 +486,7 @@ func TestWebsocketLifecycleEndThenInvalidateAndCloseAllPhysicallyClosesOnce(t *t
 			conn, physical := newCloseCountingWebsocketConn(t, wsURL)
 			sess := &codexWebsocketSession{sessionID: "counted-lifecycle", conn: conn, connCloser: newWebsocketConnectionCloser(conn), wsURL: wsURL, authID: "auth-a", readerConn: conn}
 			lifecycle := &trackedWebsocketLifecycle{}
-			if errBind := sess.bindExecutionLifecycle(cliproxyexecutor.Options{ExecutionLifecycle: lifecycle}, conn, sess.connCloser, "model-a"); errBind != nil {
+			if errBind := sess.bindExecutionLifecycle(coreexecutor.Options{ExecutionLifecycle: lifecycle}, conn, sess.connCloser, "model-a"); errBind != nil {
 				t.Fatalf("bind execution lifecycle: %v", errBind)
 			}
 
@@ -531,7 +528,7 @@ func testWebsocketExecutorReconnectsWhenSessionTargetChanges(
 	t *testing.T,
 	disconnectChan func(string) <-chan error,
 	getSession func(string) *codexWebsocketSession,
-	ensureConn func(context.Context, *cliproxyauth.Auth, *codexWebsocketSession, string, string, http.Header) (*websocket.Conn, *websocketConnectionCloser, *http.Response, error),
+	ensureConn func(context.Context, *coreauth.Auth, *codexWebsocketSession, string, string, http.Header) (*websocket.Conn, *websocketConnectionCloser, *http.Response, error),
 	closeSession func(string),
 ) {
 	t.Helper()
@@ -549,8 +546,8 @@ func testWebsocketExecutorReconnectsWhenSessionTargetChanges(
 	}
 	defer closeSession(sessionID)
 
-	authA := &cliproxyauth.Auth{ID: "auth-a"}
-	authB := &cliproxyauth.Auth{ID: "auth-b"}
+	authA := &coreauth.Auth{ID: "auth-a"}
+	authB := &coreauth.Auth{ID: "auth-b"}
 	wsURLA := "ws" + strings.TrimPrefix(serverA.URL, "http")
 	wsURLB := "ws" + strings.TrimPrefix(serverB.URL, "http")
 
@@ -593,8 +590,8 @@ func testWebsocketExecutorReconnectsWhenSessionTargetChanges(
 
 func ensureWebsocketTargetConn(
 	t *testing.T,
-	ensureConn func(context.Context, *cliproxyauth.Auth, *codexWebsocketSession, string, string, http.Header) (*websocket.Conn, *websocketConnectionCloser, *http.Response, error),
-	auth *cliproxyauth.Auth,
+	ensureConn func(context.Context, *coreauth.Auth, *codexWebsocketSession, string, string, http.Header) (*websocket.Conn, *websocketConnectionCloser, *http.Response, error),
+	auth *coreauth.Auth,
 	sess *codexWebsocketSession,
 	authID string,
 	wsURL string,
@@ -642,135 +639,4 @@ func newWebsocketTargetServer(t *testing.T) (*httptest.Server, <-chan string) {
 		}
 	}))
 	return server, closed
-}
-
-type registryDrainWebsocketLifecycle struct {
-	scope *executionregistry.Scope
-	ends  atomic.Int32
-}
-
-func (l *registryDrainWebsocketLifecycle) Bind(closeFn func() error) error {
-	return l.scope.Bind(closeFn)
-}
-
-func (l *registryDrainWebsocketLifecycle) End(string) {
-	l.ends.Add(1)
-	l.scope.End("websocket_closed")
-}
-
-func (l *registryDrainWebsocketLifecycle) Retain() {}
-
-type codex426RetryDispatcher struct {
-	calls                    atomic.Int32
-	baseURLs                 []string
-	websockets               []bool
-	releases                 atomic.Int32
-	releasedBeforeSecondRPop atomic.Bool
-}
-
-func (d *codex426RetryDispatcher) HeartbeatOK() bool { return true }
-
-func (d *codex426RetryDispatcher) RPopAuth(_ context.Context, model string, _ string, _ http.Header, _ int) ([]byte, error) {
-	call := int(d.calls.Add(1))
-	if call > len(d.baseURLs) {
-		return nil, fmt.Errorf("unexpected dispatch %d", call)
-	}
-	if call == 2 {
-		d.releasedBeforeSecondRPop.Store(d.releases.Load() == 1)
-	}
-	credentialID := "codex-retry-" + strconv.Itoa(call)
-	attributes := map[string]string{
-		"api_key":  "home-key",
-		"base_url": d.baseURLs[call-1],
-	}
-	if call <= len(d.websockets) && d.websockets[call-1] {
-		attributes["websockets"] = "true"
-	}
-	return json.Marshal(map[string]any{
-		"model":      model,
-		"auth_index": credentialID,
-		"auth": map[string]any{
-			"id":         credentialID,
-			"provider":   "codex",
-			"status":     "active",
-			"attributes": attributes,
-		},
-		"concurrency": map[string]any{
-			"accounted":     true,
-			"credential_id": credentialID,
-			"model":         model,
-		},
-	})
-}
-
-func (*codex426RetryDispatcher) AbortAmbiguousDispatch() {}
-
-func TestWebsocketRegistryDrainClosesAndEndsRetainedSession(t *testing.T) {
-	tests := []struct {
-		name       string
-		getSession func(string) *codexWebsocketSession
-		ensureConn func(context.Context, *cliproxyauth.Auth, *codexWebsocketSession, string, string, http.Header) (*websocket.Conn, *websocketConnectionCloser, *http.Response, error)
-	}{
-		{
-			name: "Codex",
-			getSession: func(sessionID string) *codexWebsocketSession {
-				executor := NewCodexWebsocketsExecutor(&config.Config{})
-				executor.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
-				return executor.getOrCreateSession(sessionID)
-			},
-			ensureConn: func(ctx context.Context, auth *cliproxyauth.Auth, sess *codexWebsocketSession, authID, wsURL string, headers http.Header) (*websocket.Conn, *websocketConnectionCloser, *http.Response, error) {
-				executor := NewCodexWebsocketsExecutor(&config.Config{})
-				return executor.ensureUpstreamConn(ctx, auth, sess, authID, wsURL, headers)
-			},
-		},
-		{
-			name: "xAI shared session",
-			getSession: func(sessionID string) *codexWebsocketSession {
-				executor := NewXAIWebsocketsExecutor(&config.Config{})
-				executor.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
-				return executor.getOrCreateSession(sessionID)
-			},
-			ensureConn: func(ctx context.Context, auth *cliproxyauth.Auth, sess *codexWebsocketSession, authID, wsURL string, headers http.Header) (*websocket.Conn, *websocketConnectionCloser, *http.Response, error) {
-				executor := NewXAIWebsocketsExecutor(&config.Config{})
-				return executor.ensureUpstreamConn(ctx, auth, sess, authID, wsURL, headers)
-			},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			server, closed := newWebsocketTargetServer(t)
-			defer server.Close()
-
-			registry := executionregistry.New()
-			pending, errBegin := registry.BeginDispatch()
-			if errBegin != nil {
-				t.Fatalf("BeginDispatch() error = %v", errBegin)
-			}
-			scope, errInstall := registry.Install(pending, executionregistry.ScopeSpec{Kind: "websocket"})
-			if errInstall != nil {
-				t.Fatalf("Install() error = %v", errInstall)
-			}
-			lifecycle := &registryDrainWebsocketLifecycle{scope: scope}
-			auth := &cliproxyauth.Auth{ID: "auth-a"}
-			wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
-			sess := test.getSession("drain-retained-session")
-			conn := ensureWebsocketTargetConn(t, test.ensureConn, auth, sess, auth.ID, wsURL)
-			if errBind := sess.bindExecutionLifecycle(cliproxyexecutor.Options{ExecutionLifecycle: lifecycle}, conn, sess.connCloser, "model-a"); errBind != nil {
-				t.Fatalf("bind execution lifecycle: %v", errBind)
-			}
-
-			drainCtx, cancelDrain := context.WithTimeout(context.Background(), time.Second)
-			defer cancelDrain()
-			if errDrain := registry.Drain(drainCtx); errDrain != nil {
-				t.Fatalf("Drain() error = %v", errDrain)
-			}
-			if got := lifecycle.ends.Load(); got != 1 {
-				t.Fatalf("lifecycle End calls = %d, want 1", got)
-			}
-			if got := <-closed; got != auth.ID {
-				t.Fatalf("closed server auth = %q, want %q", got, auth.ID)
-			}
-		})
-	}
 }

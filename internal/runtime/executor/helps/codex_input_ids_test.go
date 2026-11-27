@@ -2,10 +2,9 @@ package helps
 
 import (
 	"fmt"
+	"github.com/MoeForge/moego/ojson"
 	"strings"
 	"testing"
-
-	"github.com/MoeForge/moego/ojson"
 )
 
 var benchmarkSanitizeCodexInputItemIDsOutput []byte

@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/MoeForge/moego/ojson"
-	translatorcommon "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/common"
+	translatorcommon "github.com/udit19199/relay/internal/translator/common"
 )
 
 type responsesToolIdentity struct {
@@ -89,14 +89,6 @@ func (idx *responsesToolIndex) avoidAlias(candidate string) string {
 			return variant
 		}
 	}
-}
-
-func (idx *responsesToolIndex) applyIdentity(item []byte, qualifiedName, itemPath string) []byte {
-	name, namespace := strings.TrimSpace(qualifiedName), ""
-	if d, ok := idx.byChat[name]; ok {
-		name, namespace = d.localName, d.namespace
-	}
-	return translatorcommon.SetResponsesToolCallIdentity(item, name, namespace, itemPath)
 }
 
 func (idx *responsesToolIndex) applyIdentityDoc(doc *ojson.Doc, qualifiedName, itemPath string) {

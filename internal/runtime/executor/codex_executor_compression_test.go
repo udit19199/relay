@@ -15,20 +15,20 @@ import (
 	"github.com/MoeForge/moego/ojson"
 	"github.com/andybalholm/brotli"
 	"github.com/klauspost/compress/zstd"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
 	log "github.com/sirupsen/logrus"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func codexCompressionConfig() *config.Config {
 	return &config.Config{Codex: config.CodexConfig{UpstreamRequestCompression: true}}
 }
 
-func codexCompressionAuth() *cliproxyauth.Auth {
-	return &cliproxyauth.Auth{Metadata: map[string]any{"access_token": "test-oauth"}}
+func codexCompressionAuth() *coreauth.Auth {
+	return &coreauth.Auth{Metadata: map[string]any{"access_token": "test-oauth"}}
 }
 
 func codexCompressionPayload() []byte {
@@ -54,7 +54,7 @@ func TestCodexUpstreamCompression_EligibleCompressed(t *testing.T) {
 		t.Run(target, func(t *testing.T) {
 			executor := NewCodexExecutor(codexCompressionConfig())
 			payload := codexCompressionPayload()
-			req, upstreamBody, errCache := executor.cacheHelper(t.Context(), sdktranslator.FormatOpenAIResponse, target, cliproxyexecutor.Request{Payload: payload}, payload, codexCompressionAuth())
+			req, upstreamBody, errCache := executor.cacheHelper(t.Context(), translatorreg.FormatOpenAIResponse, target, coreexecutor.Request{Payload: payload}, payload, codexCompressionAuth())
 			if errCache != nil {
 				t.Fatal(errCache)
 			}
@@ -111,7 +111,7 @@ func TestCodexUpstreamCompression_Gates(t *testing.T) {
 				payload = []byte(`{}`)
 			}
 			executor := NewCodexExecutor(cfg)
-			req, plain, errCache := executor.cacheHelper(t.Context(), sdktranslator.FormatOpenAIResponse, target, cliproxyexecutor.Request{Payload: payload}, payload, auth)
+			req, plain, errCache := executor.cacheHelper(t.Context(), translatorreg.FormatOpenAIResponse, target, coreexecutor.Request{Payload: payload}, payload, auth)
 			if errCache != nil {
 				t.Fatal(errCache)
 			}
@@ -126,7 +126,7 @@ func TestCodexUpstreamCompression_ContentEncodingGuard(t *testing.T) {
 	executor, auth := NewCodexExecutor(codexCompressionConfig()), codexCompressionAuth()
 	auth.Attributes = map[string]string{"header:Content-Encoding": "identity"}
 	payload := codexCompressionPayload()
-	req, _, errCache := executor.cacheHelper(t.Context(), sdktranslator.FormatOpenAIResponse, "https://chatgpt.com/backend-api/codex/responses", cliproxyexecutor.Request{}, payload, auth)
+	req, _, errCache := executor.cacheHelper(t.Context(), translatorreg.FormatOpenAIResponse, "https://chatgpt.com/backend-api/codex/responses", coreexecutor.Request{}, payload, auth)
 	if errCache != nil {
 		t.Fatal(errCache)
 	}
@@ -295,8 +295,8 @@ func TestCodexExecutor_CompressionRejectedFallback(t *testing.T) {
 				cfg := codexCompressionConfig()
 				cfg.Payload.Override = []config.PayloadRule{{Models: []config.PayloadModelRule{{Name: "*"}}, Params: map[string]any{"audit.-1": "once"}}}
 				executor := NewCodexExecutor(cfg)
-				req := cliproxyexecutor.Request{Model: "gpt-5.4", Payload: codexCompressionPayload()}
-				opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse}
+				req := coreexecutor.Request{Model: "gpt-5.4", Payload: codexCompressionPayload()}
+				opts := coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse}
 				if mode == "stream" {
 					result, errStream := executor.ExecuteStream(ctx, codexCompressionAuth(), req, opts)
 					if errStream != nil {
@@ -332,7 +332,7 @@ func TestCodexUpstreamCompression_FinalPayload(t *testing.T) {
 		calls++
 		return finalPayload
 	})
-	req, upstreamBody, errCache := executor.cacheHelper(ctx, sdktranslator.FormatOpenAIResponse, "https://chatgpt.com/backend-api/codex/responses", cliproxyexecutor.Request{}, payload, codexCompressionAuth())
+	req, upstreamBody, errCache := executor.cacheHelper(ctx, translatorreg.FormatOpenAIResponse, "https://chatgpt.com/backend-api/codex/responses", coreexecutor.Request{}, payload, codexCompressionAuth())
 	if errCache != nil {
 		t.Fatal(errCache)
 	}
@@ -460,7 +460,7 @@ func TestCodexExecutor_CompressedImageResponsesDecoded(t *testing.T) {
 					if !direct {
 						auth.Metadata = map[string]any{"use_siwc": true, "siwc": map[string]any{"access_token": "siwc-test"}}
 					}
-					req := cliproxyexecutor.Request{Model: "gpt-image-1.5", Payload: []byte(`{"model":"gpt-image-1.5","prompt":"a cat"}`)}
+					req := coreexecutor.Request{Model: "gpt-image-1.5", Payload: []byte(`{"model":"gpt-image-1.5","prompt":"a cat"}`)}
 					opts := codexOpenAIImageTestOptions(codexImagesGenerationsPath, stream)
 					executor := NewCodexExecutor(&config.Config{})
 					var headers http.Header
@@ -515,7 +515,7 @@ func TestCodexUpstreamCompression_DirectImagePayloadRewrite(t *testing.T) {
 				return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(output))}, nil
 			})
 			ctx := context.WithValue(t.Context(), "cliproxy.roundtripper", transport)
-			req := cliproxyexecutor.Request{Model: "gpt-image-1.5", Payload: []byte(`{"model":"gpt-image-1.5","prompt":"` + strings.Repeat("large prompt ", 400) + `"}`)}
+			req := coreexecutor.Request{Model: "gpt-image-1.5", Payload: []byte(`{"model":"gpt-image-1.5","prompt":"` + strings.Repeat("large prompt ", 400) + `"}`)}
 			opts := codexOpenAIImageTestOptions(codexImagesGenerationsPath, stream)
 			executor := NewCodexExecutor(cfg)
 			if stream {

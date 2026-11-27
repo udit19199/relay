@@ -15,9 +15,9 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 // silentTLSListener accepts one TCP connection, drains the TLS ClientHello,
@@ -81,7 +81,7 @@ func TestClaudeCodeTLSHandshakeTimeoutBoundsSilentPeer(t *testing.T) {
 		if !errors.Is(errDial, context.DeadlineExceeded) {
 			t.Fatalf("DialTLSContext error = %v, want context deadline exceeded", errDial)
 		}
-		if !cliproxyexecutor.IsConfiguredTLSHandshakeTimeoutError(errDial) {
+		if !coreexecutor.IsConfiguredTLSHandshakeTimeoutError(errDial) {
 			t.Fatalf("DialTLSContext error = %q, want typed configured TLS handshake timeout", errDial)
 		}
 	case <-time.After(5 * time.Second):
@@ -187,7 +187,7 @@ func TestUtlsRoundTripperHandshakeTimeoutBoundsSilentPeer(t *testing.T) {
 		if !errors.Is(errConnect, context.DeadlineExceeded) {
 			t.Fatalf("createConnection error = %v, want context deadline exceeded", errConnect)
 		}
-		if !cliproxyexecutor.IsConfiguredTLSHandshakeTimeoutError(errConnect) {
+		if !coreexecutor.IsConfiguredTLSHandshakeTimeoutError(errConnect) {
 			t.Fatalf("createConnection error = %q, want typed configured TLS handshake timeout", errConnect)
 		}
 	case <-time.After(5 * time.Second):
@@ -442,7 +442,7 @@ func TestNewUtlsHTTPClientStampsConfiguredHandshakeBound(t *testing.T) {
 				cfg = &config.Config{}
 				cfg.TLSHandshakeTimeoutSeconds = tt.seconds
 			}
-			client := NewUtlsHTTPClient(ctx, cfg, &cliproxyauth.Auth{}, 0)
+			client := NewUtlsHTTPClient(ctx, cfg, &coreauth.Auth{}, 0)
 			resp, errGet := client.Get("https://api.anthropic.com/v1/messages")
 			if errGet != nil {
 				t.Fatalf("client.Get error = %v", errGet)

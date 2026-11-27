@@ -1,13 +1,12 @@
 package thinking_test
 
 import (
-	"testing"
-
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/thinking"
-	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/thinking/provider/claude"
-	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/thinking/provider/openai"
-	openaiclaude "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/openai/claude"
+	"github.com/udit19199/relay/internal/thinking"
+	_ "github.com/udit19199/relay/internal/thinking/provider/claude"
+	_ "github.com/udit19199/relay/internal/thinking/provider/openai"
+	openaiclaude "github.com/udit19199/relay/internal/translator/openai/claude"
+	"testing"
 )
 
 func TestApplyThinking_ClaudeEnabledWithOutputConfigEffort(t *testing.T) {

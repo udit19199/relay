@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
 	"github.com/tiktoken-go/tokenizer"
+	"github.com/udit19199/relay/internal/util"
 )
 
 // TokenizerForModel returns a tokenizer codec suitable for an OpenAI-style model id.

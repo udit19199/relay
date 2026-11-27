@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 func boolPtr(b bool) *bool {
@@ -28,11 +28,11 @@ func TestCodexV8HistoricalCloakingAliasAffectsBothAuthKinds(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			oauth := &cliproxyauth.Auth{Provider: "codex", Metadata: map[string]any{"access_token": "test-oauth"}}
+			oauth := &coreauth.Auth{Provider: "codex", Metadata: map[string]any{"access_token": "test-oauth"}}
 			if !isCodexCloakingDisabled(cfg, oauth) {
 				t.Fatal("OAuth setting was not applied")
 			}
-			key := &cliproxyauth.Auth{Provider: "codex", Attributes: map[string]string{"api_key": "test-key", "base_url": "https://example.invalid/v1"}}
+			key := &coreauth.Auth{Provider: "codex", Attributes: map[string]string{"api_key": "test-key", "base_url": "https://example.invalid/v1"}}
 			if isCodexCloakingDisabled(cfg, key) != tc.wantAPI {
 				t.Fatal("wrong API-key cloaking policy")
 			}
@@ -57,7 +57,7 @@ func TestCodexPerCredentialDisableCloaking_HTTP_ExplicitTrue(t *testing.T) {
 		},
 	}
 
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"api_key":                "custom-key",
@@ -97,7 +97,7 @@ func TestCodexPerCredentialDisableCloaking_HTTP_ExplicitFalseOverridesGlobalTrue
 		},
 	}
 
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"api_key":                "cloaked-key",
@@ -138,7 +138,7 @@ func TestCodexPerCredentialDisableCloaking_HTTP_FallbackToGlobal(t *testing.T) {
 		},
 	}
 
-	authNil := &cliproxyauth.Auth{
+	authNil := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"api_key":           "key-nil",
@@ -187,7 +187,7 @@ func TestCodexPerCredentialDisableCloaking_WebSocket_ExplicitTrue(t *testing.T) 
 		},
 	}
 
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"api_key":                "custom-key",
@@ -215,7 +215,7 @@ func TestCodexPerCredentialDisableCloaking_WebSocket_ExplicitFalseOverridesGloba
 		},
 	}
 
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"api_key":                "custom-key",
@@ -251,7 +251,7 @@ func TestCodexPerCredentialDisableCloaking_OAuthUnaffectedByAPIKeyOverride(t *te
 	}
 
 	// OAuth credential (does not match codex-api-key)
-	oauthAuth := &cliproxyauth.Auth{
+	oauthAuth := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"auth_kind": "oauth",
@@ -292,7 +292,7 @@ func TestCodexPerCredentialDisableCloaking_ResolvedFromConfigWithoutAttribute(t 
 	}
 
 	// Auth object with only APIKey/BaseURL attributes (no pre-synthesized codex_disable_cloaking attribute)
-	authWithoutAttr := &cliproxyauth.Auth{
+	authWithoutAttr := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"api_key":           "lookup-key",

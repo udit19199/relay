@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	coreusage "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/usage"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreusage "github.com/udit19199/relay/internal/service/usage"
 )
 
 const codexResponseModelTestStream = `event: response.created
@@ -82,7 +82,7 @@ func TestCodexUsageRecordsCarryResponseModelPerModel(t *testing.T) {
 	})
 
 	ctx := coreusage.WithRequestedModelAlias(context.Background(), alias)
-	auth := &cliproxyauth.Auth{ID: "codex-auth-1", Index: "auth-index-7", Provider: "codex"}
+	auth := &coreauth.Auth{ID: "codex-auth-1", Index: "auth-index-7", Provider: "codex"}
 	reporter := helps.NewExecutorUsageReporter(ctx, NewCodexExecutor(&config.Config{}), "gpt-5.4-mini", auth)
 
 	observeCodexTokenEvent(reporter, []byte(`{"type":"response.completed","response":{"model":"gpt-5.4-mini","usage":{"total_tokens":12}}}`))

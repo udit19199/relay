@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	translatorcommon "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/common"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	translatorcommon "github.com/udit19199/relay/internal/translator/common"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 const userTurnUpload = `{"type":"container_upload","file_id":"file-1"}`
@@ -121,8 +121,8 @@ func TestConvertClaudeRequestToInteractions_RealTextBesideWhitespaceAndAnImageSt
 
 func TestClaudeToInteractionsRegistrationCarriesWhitespaceImageRefusal(t *testing.T) {
 	input := []byte(`{"model":"m","messages":[{"role":"user","content":[{"type":"text","text":"  "},{"type":"image","source":{"type":"file","file_id":"f1"}}]}]}`)
-	envelope := sdktranslator.TranslateRequestEnvelope(context.Background(), sdktranslator.FormatClaude, sdktranslator.FormatInteractions, sdktranslator.RequestEnvelope{
-		Format: sdktranslator.FormatClaude,
+	envelope := translatorreg.TranslateRequestEnvelope(context.Background(), translatorreg.FormatClaude, translatorreg.FormatInteractions, translatorreg.RequestEnvelope{
+		Format: translatorreg.FormatClaude,
 		Model:  "m",
 		Body:   input,
 	})

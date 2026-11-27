@@ -1,9 +1,8 @@
 package helps
 
 import (
-	"testing"
-
 	"github.com/MoeForge/moego/ojson"
+	"testing"
 )
 
 func TestSanitizeMetaWebSearchTools_StripsSearchContentTypesFromWebSearch(t *testing.T) {

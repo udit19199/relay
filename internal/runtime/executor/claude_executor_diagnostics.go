@@ -5,11 +5,11 @@ import (
 	"strings"
 
 	"github.com/MoeForge/moego/ojson"
-	claudeauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/claude"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/clienterror"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	claudeauth "github.com/udit19199/relay/internal/auth/claude"
+	"github.com/udit19199/relay/internal/clienterror"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	"github.com/udit19199/relay/internal/util"
 )
 
 type claudeDiagnosticsRequestState struct {
@@ -18,12 +18,12 @@ type claudeDiagnosticsRequestState struct {
 	promptID string
 }
 
-func injectClaudeDiagnostics(body []byte, auth *cliproxyauth.Auth, sessionID string) ([]byte, claudeDiagnosticsRequestState) {
+func injectClaudeDiagnostics(body []byte, auth *coreauth.Auth, sessionID string) ([]byte, claudeDiagnosticsRequestState) {
 	key, sequence, previousMessageID, _, promptID := helps.BeginClaudeContinuity(claudeDiagnosticsCredentialIdentity(auth), sessionID, false, "")
 	return injectClaudeDiagnosticsWithState(body, key, sequence, previousMessageID, promptID)
 }
 
-func injectClaudeDiagnosticsDoc(doc *ojson.Doc, auth *cliproxyauth.Auth, sessionID string) claudeDiagnosticsRequestState {
+func injectClaudeDiagnosticsDoc(doc *ojson.Doc, auth *coreauth.Auth, sessionID string) claudeDiagnosticsRequestState {
 	key, sequence, previousMessageID, _, promptID := helps.BeginClaudeContinuity(claudeDiagnosticsCredentialIdentity(auth), sessionID, false, "")
 	return injectClaudeDiagnosticsWithStateDoc(doc, key, sequence, previousMessageID, promptID)
 }
@@ -92,7 +92,7 @@ func commitClaudeDiagnostics(state claudeDiagnosticsRequestState, messageID stri
 	commitClaudeContinuity(state, messageID, "")
 }
 
-func claudeDiagnosticsCredentialIdentity(auth *cliproxyauth.Auth) string {
+func claudeDiagnosticsCredentialIdentity(auth *coreauth.Auth) string {
 	if auth == nil {
 		return ""
 	}

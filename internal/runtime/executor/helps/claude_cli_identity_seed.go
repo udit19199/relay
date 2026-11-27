@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	claudeauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/claude"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	claudeauth "github.com/udit19199/relay/internal/auth/claude"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 // Stable identity seeds for fingerprint-profile=claude-code-cli on non-OAuth credentials.
@@ -19,11 +19,6 @@ var claudeCLIIdentityNamespace = uuid.MustParse("6ba7b812-9dad-11d1-80b4-00c04fd
 func stableClaudeCLIDeviceID(seed string) string {
 	sum := sha256.Sum256([]byte("cpa-claude-code-cli-device|" + seed))
 	return hex.EncodeToString(sum[:])
-}
-
-// StableClaudeCLIDeviceID returns a deterministic device ID derived from a seed.
-func StableClaudeCLIDeviceID(seed string) string {
-	return stableClaudeCLIDeviceID(seed)
 }
 
 func stableClaudeCLIAccountUUID(seed string) string {
@@ -37,7 +32,7 @@ func StableClaudeCLIAccountUUID(seed string) string {
 
 // ClaudeCLIAuthIdentitySeed returns a stable credential identity that does not
 // rotate with delegated-provider access tokens.
-func ClaudeCLIAuthIdentitySeed(auth *cliproxyauth.Auth) string {
+func ClaudeCLIAuthIdentitySeed(auth *coreauth.Auth) string {
 	if auth != nil {
 		if id := strings.TrimSpace(auth.ID); id != "" {
 			return "auth-id|" + id
@@ -56,7 +51,7 @@ func ClaudeCLIAuthIdentitySeed(auth *cliproxyauth.Auth) string {
 // ApplyClaudeCredentialMetadata. Synthesized API-key / delegated-provider
 // identity is written to a clone so the shared credential metadata map is not
 // mutated on the request path.
-func PrepareClaudeCLIFingerprintAuth(auth *cliproxyauth.Auth, seed string, synthesizeMissing bool) (*cliproxyauth.Auth, error) {
+func PrepareClaudeCLIFingerprintAuth(auth *coreauth.Auth, seed string, synthesizeMissing bool) (*coreauth.Auth, error) {
 	if auth == nil {
 		return nil, fmt.Errorf("auth is nil")
 	}
@@ -78,7 +73,7 @@ func PrepareClaudeCLIFingerprintAuth(auth *cliproxyauth.Auth, seed string, synth
 // When synthesizeMissing is true (fingerprint-profile=claude-code-cli on API keys),
 // missing account_uuid / device pool are filled with stable values derived from seed.
 // Callers that hold a shared Auth must use PrepareClaudeCLIFingerprintAuth instead.
-func EnsureClaudeCLIFingerprintIdentity(auth *cliproxyauth.Auth, seed string, synthesizeMissing bool) error {
+func EnsureClaudeCLIFingerprintIdentity(auth *coreauth.Auth, seed string, synthesizeMissing bool) error {
 	if auth == nil {
 		return fmt.Errorf("auth is nil")
 	}

@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/translator"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	_ "github.com/udit19199/relay/internal/translator"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestEnsureResponsesUsageDetails_NonStreamJSON(t *testing.T) {
@@ -148,8 +148,8 @@ func TestTranslateStreamWithClaudeInputTokens_OpenAICompatTranslation_PatchesRes
 	var param any
 	_ = TranslateStreamWithClaudeInputTokens(
 		ctx,
-		sdktranslator.FormatOpenAI,
-		sdktranslator.FormatOpenAIResponse,
+		translatorreg.FormatOpenAI,
+		translatorreg.FormatOpenAIResponse,
 		"deepseek-v4-flash",
 		reqBody,
 		translatedReq,
@@ -159,8 +159,8 @@ func TestTranslateStreamWithClaudeInputTokens_OpenAICompatTranslation_PatchesRes
 	)
 	chunks2 := TranslateStreamWithClaudeInputTokens(
 		ctx,
-		sdktranslator.FormatOpenAI,
-		sdktranslator.FormatOpenAIResponse,
+		translatorreg.FormatOpenAI,
+		translatorreg.FormatOpenAIResponse,
 		"deepseek-v4-flash",
 		reqBody,
 		translatedReq,
@@ -170,8 +170,8 @@ func TestTranslateStreamWithClaudeInputTokens_OpenAICompatTranslation_PatchesRes
 	)
 	chunks3 := TranslateStreamWithClaudeInputTokens(
 		ctx,
-		sdktranslator.FormatOpenAI,
-		sdktranslator.FormatOpenAIResponse,
+		translatorreg.FormatOpenAI,
+		translatorreg.FormatOpenAIResponse,
 		"deepseek-v4-flash",
 		reqBody,
 		translatedReq,

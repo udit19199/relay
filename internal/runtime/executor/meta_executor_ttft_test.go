@@ -9,11 +9,11 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	coreusage "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/usage"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	coreusage "github.com/udit19199/relay/internal/service/usage"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 type metaTTFTRoundTripFunc func(*http.Request) (*http.Response, error)
@@ -40,7 +40,7 @@ func TestMetaExecutorTTFT(t *testing.T) {
 		name       string
 		event      string
 		content    string
-		format     sdktranslator.Format
+		format     translatorreg.Format
 		terminal   bool
 		nonstream  bool
 		httpStatus int
@@ -51,9 +51,9 @@ func TestMetaExecutorTTFT(t *testing.T) {
 		{name: "text", event: textDelta, content: "hello"},
 		{name: "reasoning_summary", event: "data: {\"type\":\"response.reasoning_summary_text.delta\",\"output_index\":0,\"summary_index\":0,\"delta\":\"thinking\"}\n\n", content: "thinking"},
 		{name: "done_reasoning_summary_responses", event: reasoningSummaryDone, content: "done-only-summary"},
-		{name: "done_reasoning_summary_claude", event: reasoningSummaryDone, content: "done-only-summary", format: sdktranslator.FormatClaude},
+		{name: "done_reasoning_summary_claude", event: reasoningSummaryDone, content: "done-only-summary", format: translatorreg.FormatClaude},
 		{name: "done_reasoning_content_responses", event: reasoningContentDone, content: "done-only-content"},
-		{name: "done_reasoning_content_claude", event: reasoningContentDone, content: "done-only-content", format: sdktranslator.FormatClaude},
+		{name: "done_reasoning_content_claude", event: reasoningContentDone, content: "done-only-content", format: translatorreg.FormatClaude},
 		{
 			name:     "done_reasoning_empty",
 			event:    `data: {"type":"response.output_item.done","output_index":0,"item":{"type":"reasoning","summary":[{"type":"summary_text","text":""}],"content":[]}}` + "\n\n",
@@ -65,7 +65,7 @@ func TestMetaExecutorTTFT(t *testing.T) {
 			wantTTFT: 1100 * time.Millisecond,
 		},
 		{name: "function_arguments", event: "data: {\"type\":\"response.function_call_arguments.delta\",\"output_index\":0,\"delta\":\"{\\\"query\\\":\\\"hello\\\"}\"}\n\n", content: "query"},
-		{name: "chat_downstream", event: textDelta, content: "hello", format: sdktranslator.FormatOpenAI},
+		{name: "chat_downstream", event: textDelta, content: "hello", format: translatorreg.FormatOpenAI},
 		{name: "completed_without_delta", event: completed, content: "hello", terminal: true},
 		{name: "empty_completed", event: emptyCompleted, terminal: true},
 		{name: "empty_incomplete", event: emptyIncomplete, terminal: true},
@@ -141,22 +141,22 @@ func TestMetaExecutorTTFT(t *testing.T) {
 				ctx := context.WithValue(context.Background(), "cliproxy.roundtripper", http.RoundTripper(transport))
 				ctx = coreusage.WithRequestedModelAlias(ctx, alias)
 				executor := NewMetaExecutor(&config.Config{})
-				auth := &cliproxyauth.Auth{Provider: "meta", Attributes: map[string]string{
+				auth := &coreauth.Auth{Provider: "meta", Attributes: map[string]string{
 					"api_key": "test-token", "base_url": "http://example.invalid/v1",
 				}}
 				format := tt.format
 				if format == "" {
-					format = sdktranslator.FormatOpenAIResponse
+					format = translatorreg.FormatOpenAIResponse
 				}
 				payload := []byte(`{"model":"muse-spark-1.3","input":"hello"}`)
-				if format == sdktranslator.FormatOpenAI {
+				if format == translatorreg.FormatOpenAI {
 					payload = []byte(`{"model":"muse-spark-1.3","messages":[{"role":"user","content":"hello"}]}`)
 				}
-				if format == sdktranslator.FormatClaude {
+				if format == translatorreg.FormatClaude {
 					payload = []byte(`{"model":"muse-spark-1.3","max_tokens":64,"messages":[{"role":"user","content":"hello"}]}`)
 				}
-				req := cliproxyexecutor.Request{Model: "muse-spark-1.3", Payload: payload}
-				opts := cliproxyexecutor.Options{SourceFormat: format, Stream: !tt.nonstream}
+				req := coreexecutor.Request{Model: "muse-spark-1.3", Payload: payload}
+				opts := coreexecutor.Options{SourceFormat: format, Stream: !tt.nonstream}
 				if tt.nonstream {
 					resp, errExecute := executor.Execute(ctx, auth, req, opts)
 					if errExecute != nil {

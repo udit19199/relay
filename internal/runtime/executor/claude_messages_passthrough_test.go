@@ -9,19 +9,19 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func directClaudeMessagesContext() context.Context {
 	return context.Background()
 }
 
-func directClaudeOAuthAuth() *cliproxyauth.Auth {
-	return &cliproxyauth.Auth{
+func directClaudeOAuthAuth() *coreauth.Auth {
+	return &coreauth.Auth{
 		Attributes: map[string]string{
 			"api_key": "sk-ant-oat-direct-messages-test",
 		},
@@ -94,8 +94,8 @@ func TestClaudeExecutor_DirectMessagesOfficialUpstreamPreservesCallerShape(t *te
 	auth.Attributes["base_url"] = "https://api.anthropic.com"
 	payload := []byte(`{"model":"claude-opus-5-5","system":[{"type":"text","text":"caller system","cache_control":{"type":"ephemeral"}}],"thinking":{"type":"adaptive","display":"summarized"},"tools":[{"name":"caller_tool","description":"caller tool","input_schema":{"type":"object"}}],"messages":[{"role":"user","content":"hello"}],"max_tokens":32}`)
 
-	_, err := NewClaudeExecutor(&config.Config{}).Execute(ctx, auth, cliproxyexecutor.Request{Model: "claude-opus-5-5", Payload: payload}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatClaude,
+	_, err := NewClaudeExecutor(&config.Config{}).Execute(ctx, auth, coreexecutor.Request{Model: "claude-opus-5-5", Payload: payload}, coreexecutor.Options{
+		SourceFormat: translatorreg.FormatClaude,
 		Headers:      incoming,
 	})
 	if err != nil {
@@ -124,8 +124,8 @@ func TestClaudeExecutor_DirectMessagesOfficialUpstreamPreservesCallerShape(t *te
 	}
 }
 
-func directClaudeAPIKeyAuth() *cliproxyauth.Auth {
-	return &cliproxyauth.Auth{
+func directClaudeAPIKeyAuth() *coreauth.Auth {
+	return &coreauth.Auth{
 		Attributes: map[string]string{
 			"api_key": "sk-ant-api03-direct-messages-test",
 		},
@@ -196,8 +196,8 @@ func TestClaudeExecutor_PreserveCallerFingerprintAlignsSessionIDWithBody(t *test
 	auth.Attributes["base_url"] = "https://api.anthropic.com"
 	payload := []byte(`{"model":"claude-opus-5-5","messages":[{"role":"user","content":"hello"}],"max_tokens":32}`)
 
-	_, err := NewClaudeExecutor(&config.Config{}).Execute(ctx, auth, cliproxyexecutor.Request{Model: "claude-opus-5-5", Payload: payload}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatClaude,
+	_, err := NewClaudeExecutor(&config.Config{}).Execute(ctx, auth, coreexecutor.Request{Model: "claude-opus-5-5", Payload: payload}, coreexecutor.Options{
+		SourceFormat: translatorreg.FormatClaude,
 		Headers:      incoming,
 	})
 	if err != nil {

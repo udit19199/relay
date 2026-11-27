@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
-	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	"github.com/udit19199/relay/internal/misc"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 // Claude Code exposes the account's current subscription usage at this

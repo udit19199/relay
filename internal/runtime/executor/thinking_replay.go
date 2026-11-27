@@ -10,10 +10,10 @@ import (
 	"strings"
 
 	"github.com/MoeForge/moego/ojson"
-	internalcache "github.com/router-for-me/CLIProxyAPI/v8/internal/cache"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
+	internalcache "github.com/udit19199/relay/internal/cache"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	"github.com/udit19199/relay/internal/util"
 )
 
 type thinkingReplayScope struct {
@@ -60,14 +60,6 @@ func thinkingReplayContentIsReplayable(content []byte) bool {
 		}
 	}
 	return hasSignedThinking && hasToolUse
-}
-
-func restoreThinkingReplayContent(body, cachedContent []byte) ([]byte, bool) {
-	doc := ojson.NewDoc(body)
-	if !restoreThinkingReplayContentDoc(doc, cachedContent) {
-		return body, false
-	}
-	return doc.Bytes(), true
 }
 
 func restoreThinkingReplayContentDoc(doc *ojson.Doc, cachedContent []byte) bool {
@@ -376,11 +368,11 @@ func (a *thinkingReplayStreamAccumulator) content() ([]byte, bool) {
 type thinkingReplayContentCacheFunc func(context.Context, thinkingReplayScope, []byte)
 type thinkingReplayContentClearFunc func(context.Context, thinkingReplayScope)
 
-func wrapThinkingReplayStream(ctx context.Context, result *cliproxyexecutor.StreamResult, scope thinkingReplayScope, cacheContent thinkingReplayContentCacheFunc, clearContent thinkingReplayContentClearFunc) *cliproxyexecutor.StreamResult {
+func wrapThinkingReplayStream(ctx context.Context, result *coreexecutor.StreamResult, scope thinkingReplayScope, cacheContent thinkingReplayContentCacheFunc, clearContent thinkingReplayContentClearFunc) *coreexecutor.StreamResult {
 	if result == nil || !scope.valid() {
 		return result
 	}
-	out := make(chan cliproxyexecutor.StreamChunk)
+	out := make(chan coreexecutor.StreamChunk)
 	go func() {
 		defer close(out)
 		accumulator := newThinkingReplayStreamAccumulator()
@@ -408,5 +400,5 @@ func wrapThinkingReplayStream(ctx context.Context, result *cliproxyexecutor.Stre
 			clearContent(ctx, scope)
 		}
 	}()
-	return &cliproxyexecutor.StreamResult{Headers: result.Headers.Clone(), Chunks: out}
+	return &coreexecutor.StreamResult{Headers: result.Headers.Clone(), Chunks: out}
 }

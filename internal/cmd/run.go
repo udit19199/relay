@@ -10,27 +10,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/api"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy"
 	log "github.com/sirupsen/logrus"
+	"github.com/udit19199/relay/internal/api"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/service"
 )
-
-// StartService builds and runs the proxy service using the exported SDK.
-// It creates a new proxy service instance, sets up signal handling for graceful shutdown,
-// and starts the service with the provided configuration.
-//
-// Parameters:
-//   - cfg: The application configuration
-//   - configPath: The path to the configuration file
-//   - localPassword: Optional password accepted for local management requests
-func StartService(cfg *config.Config, configPath string, localPassword string) {
-	StartServiceWithOptions(cfg, configPath, localPassword)
-}
 
 // StartServiceWithOptions builds and runs the proxy service with additional server options.
 func StartServiceWithOptions(cfg *config.Config, configPath string, localPassword string, serverOptions ...api.ServerOption) {
-	builder := cliproxy.NewBuilder().
+	builder := service.NewBuilder().
 		WithConfig(cfg).
 		WithConfigPath(configPath).
 		WithLocalManagementPassword(localPassword)
@@ -61,42 +49,6 @@ func StartServiceWithOptions(cfg *config.Config, configPath string, localPasswor
 	if err != nil && !errors.Is(err, context.Canceled) {
 		log.Errorf("proxy service exited with error: %v", err)
 	}
-}
-
-// StartServiceBackground starts the proxy service in a background goroutine
-// and returns a cancel function for shutdown and a done channel.
-func StartServiceBackground(cfg *config.Config, configPath string, localPassword string) (cancel func(), done <-chan struct{}) {
-	return StartServiceBackgroundWithOptions(cfg, configPath, localPassword)
-}
-
-// StartServiceBackgroundWithOptions starts the proxy service with additional server options.
-func StartServiceBackgroundWithOptions(cfg *config.Config, configPath string, localPassword string, serverOptions ...api.ServerOption) (cancel func(), done <-chan struct{}) {
-	builder := cliproxy.NewBuilder().
-		WithConfig(cfg).
-		WithConfigPath(configPath).
-		WithLocalManagementPassword(localPassword)
-	if len(serverOptions) > 0 {
-		builder = builder.WithServerOptions(serverOptions...)
-	}
-
-	ctx, cancelFn := context.WithCancel(context.Background())
-	doneCh := make(chan struct{})
-
-	service, err := builder.Build()
-	if err != nil {
-		log.Errorf("failed to build proxy service: %v", err)
-		close(doneCh)
-		return cancelFn, doneCh
-	}
-
-	go func() {
-		defer close(doneCh)
-		if err := service.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
-			log.Errorf("proxy service exited with error: %v", err)
-		}
-	}()
-
-	return cancelFn, doneCh
 }
 
 // WaitForCloudDeploy waits indefinitely for shutdown signals in cloud deploy mode

@@ -4,8 +4,8 @@ import (
 	"strings"
 
 	"github.com/MoeForge/moego/ojson"
-	translatorcommon "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/common"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
+	translatorcommon "github.com/udit19199/relay/internal/translator/common"
+	"github.com/udit19199/relay/internal/util"
 )
 
 // ConvertOpenAIResponsesRequestToOpenAIChatCompletions converts OpenAI responses format to OpenAI chat completions format.
@@ -551,10 +551,6 @@ func responsesInputAudioToChatPart(contentItem ojson.Result) ([]byte, bool) {
 		_ = partDoc.Set("input_audio.format", format)
 	}
 	return partDoc.Bytes(), true
-}
-
-func convertResponsesToolChoiceToChatCompletions(toolChoice ojson.Result, inputRawJSON []byte) []byte {
-	return convertResponsesToolChoiceWithIndex(toolChoice, newResponsesToolIndex(util.ParseGJSONBytesNoCopy(inputRawJSON)))
 }
 
 func convertResponsesToolChoiceWithIndex(toolChoice ojson.Result, toolIndex *responsesToolIndex) []byte {

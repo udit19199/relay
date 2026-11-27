@@ -7,28 +7,28 @@ import (
 	"strings"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/thinking"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
 	"github.com/tiktoken-go/tokenizer"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	"github.com/udit19199/relay/internal/thinking"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
+	"github.com/udit19199/relay/internal/util"
 )
 
-func (e *CodexExecutor) CountTokens(ctx context.Context, auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
+func (e *CodexExecutor) CountTokens(ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) (coreexecutor.Response, error) {
 	ctx = helps.WithCodexCommentaryPolicy(ctx, e.cfg)
 	if errExpand := helps.ExpandRecognizedResponsesCompactionCapsules(&req, &opts); errExpand != nil {
-		return cliproxyexecutor.Response{}, statusErr{code: http.StatusBadRequest, msg: errExpand.Error()}
+		return coreexecutor.Response{}, statusErr{code: http.StatusBadRequest, msg: errExpand.Error()}
 	}
 	baseModel := thinking.ParseSuffix(req.Model).ModelName
 
 	from := opts.SourceFormat
-	responseFormat := cliproxyexecutor.ResponseFormatOrSource(opts)
-	to := sdktranslator.FromString("codex")
+	responseFormat := coreexecutor.ResponseFormatOrSource(opts)
+	to := translatorreg.FromString("codex")
 	body, err := helps.TranslateRequestReturningErrorForExecutor(ctx, opts.Headers, e.cfg, e.Identifier(), from, to, baseModel, req.Payload, false, helps.APIKeyModelIsCompat(req))
 	if err != nil {
-		return cliproxyexecutor.Response{}, err
+		return coreexecutor.Response{}, err
 	}
 	originalTranslatedForPayload := append([]byte(nil), body...)
 	if len(opts.OriginalRequest) > 0 {
@@ -37,7 +37,7 @@ func (e *CodexExecutor) CountTokens(ctx context.Context, auth *cliproxyauth.Auth
 
 	doc := ojson.NewDoc(body)
 	if err = helps.ApplyRequestThinkingDoc(doc, req, opts, from.String(), to.String(), e.Identifier()); err != nil {
-		return cliproxyexecutor.Response{}, err
+		return coreexecutor.Response{}, err
 	}
 
 	helps.SetStringIfDifferentDoc(doc, "model", baseModel)
@@ -54,17 +54,17 @@ func (e *CodexExecutor) CountTokens(ctx context.Context, auth *cliproxyauth.Auth
 	body = doc.Bytes()
 	enc, err := tokenizerForCodexModel(baseModel)
 	if err != nil {
-		return cliproxyexecutor.Response{}, fmt.Errorf("codex executor: tokenizer init failed: %w", err)
+		return coreexecutor.Response{}, fmt.Errorf("codex executor: tokenizer init failed: %w", err)
 	}
 
 	count, err := countCodexInputTokens(enc, body)
 	if err != nil {
-		return cliproxyexecutor.Response{}, fmt.Errorf("codex executor: token counting failed: %w", err)
+		return coreexecutor.Response{}, fmt.Errorf("codex executor: token counting failed: %w", err)
 	}
 
 	usageJSON := fmt.Sprintf(`{"response":{"usage":{"input_tokens":%d,"output_tokens":0,"total_tokens":%d}}}`, count, count)
-	translated := sdktranslator.TranslateTokenCount(ctx, to, responseFormat, count, []byte(usageJSON))
-	return cliproxyexecutor.Response{Payload: translated}, nil
+	translated := translatorreg.TranslateTokenCount(ctx, to, responseFormat, count, []byte(usageJSON))
+	return coreexecutor.Response{Payload: translated}, nil
 }
 
 func tokenizerForCodexModel(model string) (tokenizer.Codec, error) {

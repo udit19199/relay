@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	internallogging "github.com/router-for-me/CLIProxyAPI/v8/internal/logging"
+	internallogging "github.com/udit19199/relay/internal/logging"
 )
 
 func TestParseCodexQuotaEventHeadersPreservesActiveLimit(t *testing.T) {

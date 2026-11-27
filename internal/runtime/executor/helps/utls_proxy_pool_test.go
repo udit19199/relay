@@ -9,12 +9,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/http/httptrace"
-	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
 
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	"strconv"
 )
 
 func TestUtlsFallbackProxyConnectionPool(t *testing.T) {
@@ -32,7 +32,7 @@ func TestUtlsFallbackProxyConnectionPool(t *testing.T) {
 			server.Start()
 			defer server.Close()
 			cfg := testConfig()
-			auth := &cliproxyauth.Auth{ProxyURL: "direct"}
+			auth := &coreauth.Auth{ProxyURL: "direct"}
 			if enabled {
 				auth.ProxyConnectionPool = poolEnabled()
 			}
@@ -69,7 +69,7 @@ func TestUtlsAnthropicTransportPoolsPerCredential(t *testing.T) {
 	ResetProxyTransports()
 	t.Cleanup(ResetProxyTransports)
 	cfg := testConfig()
-	anthropicTransport := func(id string, override *cliproxyauth.ProxyConnectionPoolOverride) *http.Transport {
+	anthropicTransport := func(id string, override *coreauth.ProxyConnectionPoolOverride) *http.Transport {
 		t.Helper()
 		client := NewUtlsHTTPClient(context.Background(), cfg, poolAuth(id, override), 0)
 		fallback, ok := client.Transport.(*fallbackRoundTripper)
@@ -96,7 +96,7 @@ func TestUtlsAnthropicTransportPoolsPerCredential(t *testing.T) {
 
 	// Zero bounds disable keep-alives on the fingerprint transport too.
 	zero := 0
-	if transport := anthropicTransport("key-a", &cliproxyauth.ProxyConnectionPoolOverride{MaxIdleConnsPerHost: &zero}); !transport.DisableKeepAlives {
+	if transport := anthropicTransport("key-a", &coreauth.ProxyConnectionPoolOverride{MaxIdleConnsPerHost: &zero}); !transport.DisableKeepAlives {
 		t.Fatal("max-idle-conns-per-host: 0 must disable keep-alives on the Anthropic transport")
 	}
 
@@ -104,7 +104,7 @@ func TestUtlsAnthropicTransportPoolsPerCredential(t *testing.T) {
 	// idle connection pooling disabled, while opted-in credentials enable pooling.
 	plain := func(id string) *http.Transport {
 		t.Helper()
-		client := NewUtlsHTTPClient(context.Background(), cfg, &cliproxyauth.Auth{ID: id}, 0)
+		client := NewUtlsHTTPClient(context.Background(), cfg, &coreauth.Auth{ID: id}, 0)
 		tr, ok := client.Transport.(*fallbackRoundTripper).anthropicRoundTripper().(*http.Transport)
 		if !ok {
 			t.Fatalf("unpooled anthropic transport = %T, want *http.Transport", client.Transport.(*fallbackRoundTripper).anthropicRoundTripper())

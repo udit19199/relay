@@ -14,11 +14,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/clienterror"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/httpwire"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/interfaces"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/logging"
 	log "github.com/sirupsen/logrus"
+	"github.com/udit19199/relay/internal/clienterror"
+	"github.com/udit19199/relay/internal/httpwire"
+	"github.com/udit19199/relay/internal/interfaces"
+	"github.com/udit19199/relay/internal/logging"
 )
 
 const requestBodyOverrideContextKey = "REQUEST_BODY_OVERRIDE"

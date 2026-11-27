@@ -6,10 +6,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"strings"
 	"time"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // HashKeyPart returns the lowercase hex-encoded SHA-256 digest of value.
@@ -97,29 +96,6 @@ func KVGetJSONBestEffort(ctx context.Context, key string, out any) (bool, bool) 
 		return kvMode, false
 	}
 	return kvMode, found
-}
-
-// KVSetJSONBestEffort marshals and stores value in the active KV store, logging and swallowing errors.
-func KVSetJSONBestEffort(ctx context.Context, key string, value any, ttl time.Duration) bool {
-	raw, errMarshal := json.Marshal(value)
-	if errMarshal != nil {
-		log.Errorf("kv best-effort set failed prefix=%s: %v", kvLogPrefix(key), errMarshal)
-		return false
-	}
-	return KVSetBytesBestEffort(ctx, key, raw, ttl)
-}
-
-// KVSetBytesBestEffort stores raw bytes in the active KV store, logging and swallowing errors.
-func KVSetBytesBestEffort(ctx context.Context, key string, value []byte, ttl time.Duration) bool {
-	kvMode, errSet := KVSetBytesRequired(ctx, key, value, ttl)
-	if !kvMode {
-		return false
-	}
-	if errSet != nil {
-		log.Errorf("kv best-effort set failed prefix=%s: %v", kvLogPrefix(key), errSet)
-		return false
-	}
-	return true
 }
 
 // KVSetNXBestEffort conditionally stores value if key does not exist, logging and swallowing errors.

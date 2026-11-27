@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
+	"github.com/udit19199/relay/internal/misc"
 )
 
 // NormalizeOpenAIFileData returns the MIME type and raw base64 payload for OpenAI file content.

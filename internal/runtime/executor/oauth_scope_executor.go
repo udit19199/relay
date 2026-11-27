@@ -1,49 +1,49 @@
 package executor
 
-import cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+import coreauth "github.com/udit19199/relay/internal/service/auth"
 
 // ForAPIKey binds configuration once after credential selection. Value receivers
 // copy executor configuration while preserving shared transport/session stores.
-func (e CodexExecutor) ForAPIKey() cliproxyauth.ProviderExecutor {
+func (e CodexExecutor) ForAPIKey() coreauth.ProviderExecutor {
 	e.cfg = e.cfg.ForAPIKey()
 	return &e
 }
 
-func (e ClaudeExecutor) ForAPIKey() cliproxyauth.ProviderExecutor {
+func (e ClaudeExecutor) ForAPIKey() coreauth.ProviderExecutor {
 	e.cfg = e.cfg.ForAPIKey()
 	return &e
 }
 
-func (e OpenAICompatExecutor) ForAPIKey() cliproxyauth.ProviderExecutor {
+func (e OpenAICompatExecutor) ForAPIKey() coreauth.ProviderExecutor {
 	e.cfg = e.cfg.ForAPIKey()
 	return &e
 }
 
-func (e MetaExecutor) ForAPIKey() cliproxyauth.ProviderExecutor {
+func (e MetaExecutor) ForAPIKey() coreauth.ProviderExecutor {
 	e.cfg = e.cfg.ForAPIKey()
 	return &e
 }
 
-func (e XAIExecutor) ForAPIKey() cliproxyauth.ProviderExecutor {
+func (e XAIExecutor) ForAPIKey() coreauth.ProviderExecutor {
 	e.cfg = e.cfg.ForAPIKey()
 	return &e
 }
 
-func (e CodexWebsocketsExecutor) ForAPIKey() cliproxyauth.ProviderExecutor {
+func (e CodexWebsocketsExecutor) ForAPIKey() coreauth.ProviderExecutor {
 	if e.CodexExecutor != nil {
 		e.CodexExecutor = e.CodexExecutor.ForAPIKey().(*CodexExecutor)
 	}
 	return &e
 }
 
-func (e XAIWebsocketsExecutor) ForAPIKey() cliproxyauth.ProviderExecutor {
+func (e XAIWebsocketsExecutor) ForAPIKey() coreauth.ProviderExecutor {
 	if e.XAIExecutor != nil {
 		e.XAIExecutor = e.XAIExecutor.ForAPIKey().(*XAIExecutor)
 	}
 	return &e
 }
 
-func (e CodexAutoExecutor) ForAPIKey() cliproxyauth.ProviderExecutor {
+func (e CodexAutoExecutor) ForAPIKey() coreauth.ProviderExecutor {
 	if e.httpExec != nil {
 		e.httpExec = e.httpExec.ForAPIKey().(*CodexExecutor)
 	}
@@ -53,7 +53,7 @@ func (e CodexAutoExecutor) ForAPIKey() cliproxyauth.ProviderExecutor {
 	return &e
 }
 
-func (e XAIAutoExecutor) ForAPIKey() cliproxyauth.ProviderExecutor {
+func (e XAIAutoExecutor) ForAPIKey() coreauth.ProviderExecutor {
 	if e.httpExec != nil {
 		e.httpExec = e.httpExec.ForAPIKey().(*XAIExecutor)
 	}

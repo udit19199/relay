@@ -5,9 +5,9 @@ import (
 	"sync"
 	"testing"
 
-	claudeauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/claude"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	claudeauth "github.com/udit19199/relay/internal/auth/claude"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 // A single Auth is shared by every in-flight request that selects the credential,
@@ -16,8 +16,8 @@ import (
 // path unguarded, which these tests would have caught: they drive the exported
 // entry points rather than the helper that was known to be broken.
 
-func newSharedClaudeOAuthAuth(id string) *cliproxyauth.Auth {
-	return &cliproxyauth.Auth{
+func newSharedClaudeOAuthAuth(id string) *coreauth.Auth {
+	return &coreauth.Auth{
 		ID:         id,
 		Attributes: map[string]string{"api_key": "sk-ant-oat-race-probe"},
 		Metadata:   map[string]any{},
@@ -26,7 +26,7 @@ func newSharedClaudeOAuthAuth(id string) *cliproxyauth.Auth {
 
 func TestClaudeExecutorPrepareRequestAuthIsRaceFreeOnSharedCredential(t *testing.T) {
 	executor := NewClaudeExecutor(&config.Config{})
-	executor.oauthProfileFetcher = func(context.Context, *cliproxyauth.Auth, string) (*claudeauth.OAuthProfile, error) {
+	executor.oauthProfileFetcher = func(context.Context, *coreauth.Auth, string) (*claudeauth.OAuthProfile, error) {
 		profile := &claudeauth.OAuthProfile{}
 		profile.Account.UUID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
 		profile.Account.Email = "user@example.com"
@@ -67,7 +67,7 @@ func TestClaudeExecutorPrepareRequestAuthIsRaceFreeOnSharedCredential(t *testing
 // readers against the profile writer at the same time, which is the shape that
 // produced the reported data races.
 func TestClaudeExecutorSharedCredentialMetadataReadersUseOneLock(t *testing.T) {
-	auth := &cliproxyauth.Auth{ID: "claude-race-all-readers", Metadata: map[string]any{
+	auth := &coreauth.Auth{ID: "claude-race-all-readers", Metadata: map[string]any{
 		"access_token":          "sk-ant-oat-race-probe",
 		"cloak_mode":            "always",
 		"cloak_sensitive_words": "secret",
@@ -98,7 +98,7 @@ func TestClaudeExecutorSharedCredentialMetadataReadersUseOneLock(t *testing.T) {
 
 func TestClaudeExecutorSharedCredentialMetadataMixedAccess(t *testing.T) {
 	executor := NewClaudeExecutor(&config.Config{})
-	executor.oauthProfileFetcher = func(context.Context, *cliproxyauth.Auth, string) (*claudeauth.OAuthProfile, error) {
+	executor.oauthProfileFetcher = func(context.Context, *coreauth.Auth, string) (*claudeauth.OAuthProfile, error) {
 		profile := &claudeauth.OAuthProfile{}
 		profile.Account.UUID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
 		return profile, nil

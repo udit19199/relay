@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/MoeForge/moego/ojson"
-	codexauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/codex"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	codexauth "github.com/udit19199/relay/internal/auth/codex"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 func TestCodexExecutorSIWCRetainsRotatedTokensWhenScopeIsOmitted(t *testing.T) {
@@ -57,8 +57,8 @@ func TestCodexExecutorSIWCRetainsRotatedTokensWhenScopeIsOmitted(t *testing.T) {
 	executor := NewCodexExecutor(&config.Config{AuthDir: dir})
 	metadata := initial
 	for wantCycle := 1; wantCycle <= 2; wantCycle++ {
-		auth := &cliproxyauth.Auth{ID: "codex.json", FileName: "codex.json", Provider: "codex", Metadata: metadata}
-		if _, errRefresh := executor.Refresh(cliproxyauth.WithForceRefresh(context.Background()), auth); errRefresh != nil {
+		auth := &coreauth.Auth{ID: "codex.json", FileName: "codex.json", Provider: "codex", Metadata: metadata}
+		if _, errRefresh := executor.Refresh(coreauth.WithForceRefresh(context.Background()), auth); errRefresh != nil {
 			t.Fatalf("renewal %d: %v", wantCycle, errRefresh)
 		}
 		raw, errRead := os.ReadFile(path)
@@ -95,9 +95,9 @@ func TestCodexExecutorSIWCExplicitRefreshHonorsServerWindow(t *testing.T) {
 		t.Run(fmt.Sprintf("force=%t", force), func(t *testing.T) {
 			ctx := context.Background()
 			if force {
-				ctx = cliproxyauth.WithForceRefresh(ctx)
+				ctx = coreauth.WithForceRefresh(ctx)
 			}
-			auth := &cliproxyauth.Auth{Provider: "codex", Metadata: map[string]any{
+			auth := &coreauth.Auth{Provider: "codex", Metadata: map[string]any{
 				"siwc": map[string]any{
 					"access_token": "access", "refresh_token": "refresh", "client_id": "oaiapp_window",
 					"expires_at":          time.Now().Add(-time.Hour).Format(time.RFC3339),

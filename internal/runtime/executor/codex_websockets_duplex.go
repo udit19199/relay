@@ -13,11 +13,11 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gorilla/websocket"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/thinking"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
 	log "github.com/sirupsen/logrus"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	"github.com/udit19199/relay/internal/thinking"
 )
 
 // codexDuplexConnectionError keeps a connection failure from cooling the shared
@@ -35,15 +35,15 @@ func (e *codexDuplexConnectionError) IsRequestScoped() bool { return true }
 // There is no redial, credential selection, local acknowledgement, or replay
 // in this path. Only the upstream can take ownership of a steering submission.
 func (e *CodexWebsocketsExecutor) streamCodexDuplex(
-	ctx context.Context, auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options,
+	ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options,
 	sess *codexWebsocketSession, conn *websocket.Conn, readCh chan codexWebsocketRead,
-	input <-chan cliproxyexecutor.WebsocketInput, initial *codexWebsocketPrepared,
+	input <-chan coreexecutor.WebsocketInput, initial *codexWebsocketPrepared,
 	initialReporter *helps.UsageReporter, headers http.Header, unlock func(),
-) *cliproxyexecutor.StreamResult {
+) *coreexecutor.StreamResult {
 	streamCtx, cancel := context.WithCancel(ctx)
 	// Duplex successors bypass dispatch, including automatic steering responses.
 	followupCtx := ctx
-	out := make(chan cliproxyexecutor.StreamChunk)
+	out := make(chan coreexecutor.StreamChunk)
 	// This first frame was successfully written by ExecuteStream before handoff.
 	log.Infof("codex websockets: request forwarded session=%s auth=%s url=%s event=response.create", sess.sessionID, auth.ID, initial.wsURL)
 	writeErrors := make(chan error, 1)
@@ -144,7 +144,7 @@ func (e *CodexWebsocketsExecutor) streamCodexDuplex(
 			// Reader cleanup joins this writer before closing out. Cancellation must
 			// also release a local error blocked behind a disconnected downstream.
 			select {
-			case out <- cliproxyexecutor.StreamChunk{Payload: payload}:
+			case out <- coreexecutor.StreamChunk{Payload: payload}:
 				consumedPayload = nil
 				return true
 			case <-streamCtx.Done():
@@ -167,14 +167,14 @@ func (e *CodexWebsocketsExecutor) streamCodexDuplex(
 					authPayload = withModel
 				}
 			}
-			errPayload, errAuth := cliproxyexecutor.AuthorizeWebsocketTurn(streamCtx, authPayload)
+			errPayload, errAuth := coreexecutor.AuthorizeWebsocketTurn(streamCtx, authPayload)
 			if errAuth != nil {
 				fail(errAuth)
 				return false, false
 			}
 			if len(errPayload) > 0 {
 				select {
-				case out <- cliproxyexecutor.StreamChunk{Payload: errPayload}:
+				case out <- coreexecutor.StreamChunk{Payload: errPayload}:
 					consumedPayload = nil
 					return false, true
 				case <-streamCtx.Done():
@@ -210,7 +210,7 @@ func (e *CodexWebsocketsExecutor) streamCodexDuplex(
 			}
 			model := strings.TrimSpace(ojson.GetBytesNoCopy(payload, "model").String())
 			if model != "" && model != req.Model && model != boundModel {
-				fail(cliproxyexecutor.NewUpstreamWebsocketReplayRequiredError())
+				fail(coreexecutor.NewUpstreamWebsocketReplayRequiredError())
 				return false
 			}
 			turnHeaders := opts.Headers
@@ -258,7 +258,7 @@ func (e *CodexWebsocketsExecutor) streamCodexDuplex(
 				return false
 			}
 			if prepared.wsURL != initial.wsURL {
-				fail(cliproxyexecutor.NewUpstreamWebsocketReplayRequiredError())
+				fail(coreexecutor.NewUpstreamWebsocketReplayRequiredError())
 				return false
 			}
 			payload = frameCodexWebsocketRequestBody(prepared.clientBody)
@@ -274,7 +274,7 @@ func (e *CodexWebsocketsExecutor) streamCodexDuplex(
 			if prepared.optimizeMultiAgentV2 || prepared.multiAgentV2Conflict {
 				sess.setMultiAgentV2Optimized(conn, prepared.optimizeMultiAgentV2 && !prepared.multiAgentV2Conflict)
 			}
-			if !cliproxyexecutor.WebsocketAuthEnabled(streamCtx, auth.ID) {
+			if !coreexecutor.WebsocketAuthEnabled(streamCtx, auth.ID) {
 				fail(fmt.Errorf("websocket credential is no longer enabled"))
 				return false
 			}
@@ -325,7 +325,7 @@ func (e *CodexWebsocketsExecutor) streamCodexDuplex(
 					fail(message.Err)
 					return
 				}
-				if !cliproxyexecutor.WebsocketAuthEnabled(streamCtx, auth.ID) {
+				if !coreexecutor.WebsocketAuthEnabled(streamCtx, auth.ID) {
 					// A fresh client connection can select an enabled credential. Do not send
 					// this frame on a disabled account or replay it on a different socket.
 					fail(fmt.Errorf("websocket credential is no longer enabled"))
@@ -389,7 +389,7 @@ func (e *CodexWebsocketsExecutor) streamCodexDuplex(
 					// Control frames bypass response.create translations and built-in defaults.
 					// Except for SIWC configuration_update stripping, unknown fields and unsupported
 					// input are left to upstream validation.
-					if !cliproxyexecutor.WebsocketAuthEnabled(streamCtx, auth.ID) {
+					if !coreexecutor.WebsocketAuthEnabled(streamCtx, auth.ID) {
 						fail(fmt.Errorf("websocket credential is no longer enabled"))
 						return
 					}
@@ -438,7 +438,7 @@ func (e *CodexWebsocketsExecutor) streamCodexDuplex(
 			sess.clearActive(conn, readCh)
 			unlock()
 		}()
-		send := func(chunk cliproxyexecutor.StreamChunk) bool {
+		send := func(chunk coreexecutor.StreamChunk) bool {
 			select {
 			case out <- chunk:
 				return true
@@ -463,20 +463,20 @@ func (e *CodexWebsocketsExecutor) streamCodexDuplex(
 				}
 				if ctx.Err() == nil {
 					var connectionErr error = &codexDuplexConnectionError{cause: errRead}
-					if lost := codexWebsocketTurnTransportError(errRead); cliproxyexecutor.IsUpstreamWebsocketTurnError(lost) {
+					if lost := codexWebsocketTurnTransportError(errRead); coreexecutor.IsUpstreamWebsocketTurnError(lost) {
 						// Stop and join the writer first: after that nothing else is sent
 						// upstream and the outcome of every operation is known.
 						cancel()
 						<-writerDone
 						metadataMu.Lock()
 						idle := !firstResponse && !responseActive && len(pending) == 0 && len(unacknowledgedSteers) == 0 && len(acceptedSteers) == 0 && len(pendingCreates) == 0 && len(consumedPayload) == 0
-						turnErr := &cliproxyexecutor.UpstreamWebsocketTurnError{Cause: errRead, Idle: idle}
+						turnErr := &coreexecutor.UpstreamWebsocketTurnError{Cause: errRead, Idle: idle}
 						if firstResponse || responseActive {
 							turnErr.EventID = strings.Clone(ojson.GetBytesNoCopy(current.originalPayload, "event_id").String())
 						}
 						abandon := func(payload []byte, notSent bool) {
 							if eventID := strings.Clone(ojson.GetBytesNoCopy(payload, "event_id").String()); eventID != "" {
-								turnErr.Abandoned = append(turnErr.Abandoned, &cliproxyexecutor.UpstreamWebsocketTurnError{EventID: eventID, NotSent: notSent})
+								turnErr.Abandoned = append(turnErr.Abandoned, &coreexecutor.UpstreamWebsocketTurnError{EventID: eventID, NotSent: notSent})
 							}
 						}
 						for _, prepared := range pending {
@@ -486,7 +486,7 @@ func (e *CodexWebsocketsExecutor) streamCodexDuplex(
 						}
 						for _, steer := range unacknowledgedSteers {
 							if steer.eventID != "" {
-								turnErr.Abandoned = append(turnErr.Abandoned, &cliproxyexecutor.UpstreamWebsocketTurnError{EventID: steer.eventID})
+								turnErr.Abandoned = append(turnErr.Abandoned, &coreexecutor.UpstreamWebsocketTurnError{EventID: steer.eventID})
 							}
 						}
 						acceptedIDs := make([]string, 0, len(acceptedSteers))
@@ -496,7 +496,7 @@ func (e *CodexWebsocketsExecutor) streamCodexDuplex(
 						sort.Strings(acceptedIDs)
 						for _, id := range acceptedIDs {
 							if eventID := acceptedSteers[id].eventID; eventID != "" {
-								turnErr.Abandoned = append(turnErr.Abandoned, &cliproxyexecutor.UpstreamWebsocketTurnError{EventID: eventID})
+								turnErr.Abandoned = append(turnErr.Abandoned, &coreexecutor.UpstreamWebsocketTurnError{EventID: eventID})
 							}
 						}
 						for _, queued := range pendingCreates {
@@ -521,7 +521,7 @@ func (e *CodexWebsocketsExecutor) streamCodexDuplex(
 						}
 					}
 					reporter.PublishFailure(ctx, connectionErr)
-					send(cliproxyexecutor.StreamChunk{Err: connectionErr})
+					send(coreexecutor.StreamChunk{Err: connectionErr})
 				}
 				return
 			}
@@ -546,7 +546,7 @@ func (e *CodexWebsocketsExecutor) streamCodexDuplex(
 						metadataMu.Unlock()
 						connectionErr := &codexDuplexConnectionError{cause: fmt.Errorf("automatic successor has no retained parent settings")}
 						reporter.PublishFailure(ctx, connectionErr)
-						send(cliproxyexecutor.StreamChunk{Err: connectionErr})
+						send(coreexecutor.StreamChunk{Err: connectionErr})
 						return
 					}
 					current = settings
@@ -636,7 +636,7 @@ func (e *CodexWebsocketsExecutor) streamCodexDuplex(
 				}
 				metadataMu.Unlock()
 				wakeWriter()
-				if !send(cliproxyexecutor.StreamChunk{Payload: payload}) {
+				if !send(coreexecutor.StreamChunk{Payload: payload}) {
 					return
 				}
 				continue
@@ -654,8 +654,8 @@ func (e *CodexWebsocketsExecutor) streamCodexDuplex(
 					// The conductor records the original classification without replaying
 					// this already-started stream on another credential.
 					reporter.PublishFailure(ctx, credentialErr)
-					if send(cliproxyexecutor.StreamChunk{Payload: payload}) {
-						send(cliproxyexecutor.StreamChunk{Err: credentialErr})
+					if send(coreexecutor.StreamChunk{Payload: payload}) {
+						send(coreexecutor.StreamChunk{Err: credentialErr})
 					}
 					return
 				}
@@ -688,8 +688,8 @@ func (e *CodexWebsocketsExecutor) streamCodexDuplex(
 					// guessing a scope, replaying input, or cooling the credential.
 					connectionErr := &codexDuplexConnectionError{cause: fmt.Errorf("cannot associate websocket failure with a response or pending create")}
 					reporter.PublishFailure(ctx, connectionErr)
-					if send(cliproxyexecutor.StreamChunk{Payload: payload}) {
-						send(cliproxyexecutor.StreamChunk{Err: connectionErr})
+					if send(coreexecutor.StreamChunk{Payload: payload}) {
+						send(coreexecutor.StreamChunk{Err: connectionErr})
 					}
 					return
 				}
@@ -710,7 +710,7 @@ func (e *CodexWebsocketsExecutor) streamCodexDuplex(
 			if replayErr != nil {
 				helps.RecordAPIWebsocketError(ctx, e.cfg, "replay_clear_error", replayErr)
 				eventReporter.PublishFailure(ctx, replayErr)
-				send(cliproxyexecutor.StreamChunk{Err: replayErr})
+				send(coreexecutor.StreamChunk{Err: replayErr})
 				return
 			}
 			if terminalErr != nil {
@@ -719,7 +719,7 @@ func (e *CodexWebsocketsExecutor) streamCodexDuplex(
 				helps.RecordAPIWebsocketError(ctx, e.cfg, "upstream_error", terminalErr)
 				eventReporter.PublishFailure(ctx, terminalErr)
 				if firstResponse {
-					send(cliproxyexecutor.StreamChunk{Err: terminalErr})
+					send(coreexecutor.StreamChunk{Err: terminalErr})
 					return
 				}
 			}
@@ -765,7 +765,7 @@ func (e *CodexWebsocketsExecutor) streamCodexDuplex(
 				}
 				publishCodexImageToolUsageWithOutputItems(ctx, reporter, current.clientBody, payload, outputItems, outputFallback)
 			}
-			if !send(cliproxyexecutor.StreamChunk{Payload: helps.EnsureResponsesUsageDetails(payload), Incomplete: eventType == "response.incomplete"}) {
+			if !send(coreexecutor.StreamChunk{Payload: helps.EnsureResponsesUsageDetails(payload), Incomplete: eventType == "response.incomplete"}) {
 				return
 			}
 			if establishing {
@@ -775,7 +775,7 @@ func (e *CodexWebsocketsExecutor) streamCodexDuplex(
 			}
 		}
 	}()
-	return &cliproxyexecutor.StreamResult{Headers: headers, Chunks: out}
+	return &coreexecutor.StreamResult{Headers: headers, Chunks: out}
 }
 
 func isCodexTerminalEventType(eventType string) bool {

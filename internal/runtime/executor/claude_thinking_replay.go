@@ -7,23 +7,23 @@ import (
 	"strings"
 
 	"github.com/MoeForge/moego/ojson"
-	internalcache "github.com/router-for-me/CLIProxyAPI/v8/internal/cache"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/thinking"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
 	log "github.com/sirupsen/logrus"
+	internalcache "github.com/udit19199/relay/internal/cache"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	"github.com/udit19199/relay/internal/thinking"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 // claudeThinkingReplayScope reuses the bounded replay state shape shared by replay-capable Claude executors.
 type claudeThinkingReplayScope = thinkingReplayScope
 
-func claudeThinkingReplayEnabled(auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) bool {
-	if auth == nil || !sourceFormatEqual(opts.SourceFormat, sdktranslator.FormatClaude) {
+func claudeThinkingReplayEnabled(auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) bool {
+	if auth == nil || !sourceFormatEqual(opts.SourceFormat, translatorreg.FormatClaude) {
 		return false
 	}
-	if !strings.EqualFold(strings.TrimSpace(auth.Provider), "claude") || auth.AuthKind() != cliproxyauth.AuthKindAPIKey {
+	if !strings.EqualFold(strings.TrimSpace(auth.Provider), "claude") || auth.AuthKind() != coreauth.AuthKindAPIKey {
 		return false
 	}
 	if !helps.APIKeyModelIsCompat(req) {
@@ -34,8 +34,8 @@ func claudeThinkingReplayEnabled(auth *cliproxyauth.Auth, req cliproxyexecutor.R
 }
 
 // A missing session identity intentionally disables replay instead of sharing hidden reasoning across callers.
-func claudeThinkingReplayScopeFromRequest(ctx context.Context, auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) claudeThinkingReplayScope {
-	sessionKey := codexReasoningReplaySessionKey(ctx, sdktranslator.FormatClaude, req, opts, req.Payload)
+func claudeThinkingReplayScopeFromRequest(ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) claudeThinkingReplayScope {
+	sessionKey := codexReasoningReplaySessionKey(ctx, translatorreg.FormatClaude, req, opts, req.Payload)
 	sessionKey = xaiReasoningReplayIsolateSessionKey(ctx, sessionKey)
 	return claudeThinkingReplayScope{
 		modelFamily: claudeThinkingReplayModelFamily(auth, req.Model),
@@ -43,7 +43,7 @@ func claudeThinkingReplayScopeFromRequest(ctx context.Context, auth *cliproxyaut
 	}
 }
 
-func claudeThinkingReplayModelFamily(auth *cliproxyauth.Auth, model string) string {
+func claudeThinkingReplayModelFamily(auth *coreauth.Auth, model string) string {
 	baseModel := thinking.ParseSuffix(strings.TrimSpace(model)).ModelName
 	if baseModel == "" {
 		return ""
@@ -66,7 +66,7 @@ func claudeThinkingReplayModelFamily(auth *cliproxyauth.Auth, model string) stri
 	return "claude:" + hex.EncodeToString(sum[:8]) + ":" + baseModel
 }
 
-func prepareClaudeThinkingReplayRequest(ctx context.Context, auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (cliproxyexecutor.Request, claudeThinkingReplayScope) {
+func prepareClaudeThinkingReplayRequest(ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) (coreexecutor.Request, claudeThinkingReplayScope) {
 	scope := claudeThinkingReplayScopeFromRequest(ctx, auth, req, opts)
 	if !scope.valid() {
 		return req, scope
@@ -141,6 +141,6 @@ func clearClaudeThinkingReplayContent(ctx context.Context, scope claudeThinkingR
 	}
 }
 
-func wrapClaudeThinkingReplayStream(ctx context.Context, result *cliproxyexecutor.StreamResult, scope claudeThinkingReplayScope) *cliproxyexecutor.StreamResult {
+func wrapClaudeThinkingReplayStream(ctx context.Context, result *coreexecutor.StreamResult, scope claudeThinkingReplayScope) *coreexecutor.StreamResult {
 	return wrapThinkingReplayStream(ctx, result, scope, cacheClaudeThinkingReplayContent, clearClaudeThinkingReplayContent)
 }

@@ -16,15 +16,15 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/clienterror"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/logging"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/thinking"
-	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/thinking/provider/codex"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/usage"
+	"github.com/udit19199/relay/internal/clienterror"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/logging"
+	"github.com/udit19199/relay/internal/registry"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	"github.com/udit19199/relay/internal/service/usage"
+	"github.com/udit19199/relay/internal/thinking"
+	_ "github.com/udit19199/relay/internal/thinking/provider/codex"
 )
 
 func TestParseOpenAIUsageChatCompletions(t *testing.T) {
@@ -589,7 +589,7 @@ func TestUsageReporterBuildRecordIncludesLatency(t *testing.T) {
 
 func TestUsageReporterTrackHTTPClientStartsTTFTBeforeRoundTrip(t *testing.T) {
 	delay := 40 * time.Millisecond
-	ctx := cliproxyexecutor.WithUpstreamAttemptTracker(context.Background())
+	ctx := coreexecutor.WithUpstreamAttemptTracker(context.Background())
 	reporter := NewUsageReporter(ctx, "openai", "gpt-5.4", nil)
 	client := reporter.TrackHTTPClient(&http.Client{
 		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
@@ -621,7 +621,7 @@ func TestUsageReporterTrackHTTPClientStartsTTFTBeforeRoundTrip(t *testing.T) {
 	if got := reporter.ttftDuration(); got < delay {
 		t.Fatalf("ttft = %v, want >= %v", got, delay)
 	}
-	if !cliproxyexecutor.UpstreamAttempted(ctx) {
+	if !coreexecutor.UpstreamAttempted(ctx) {
 		t.Fatal("HTTP RoundTrip did not mark an upstream attempt")
 	}
 }
@@ -1215,7 +1215,7 @@ func TestUsageReporterPropagatesSessionHierarchy(t *testing.T) {
 
 func TestUsageReporterPropagatesBaseURL(t *testing.T) {
 	ctx := context.Background()
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:       "auth-base-url-test",
 		Provider: "codex",
 		Attributes: map[string]string{
@@ -1229,7 +1229,7 @@ func TestUsageReporterPropagatesBaseURL(t *testing.T) {
 		t.Fatalf("record.BaseURL = %q, want %q", record.BaseURL, "https://custom.endpoint.example.com/v1")
 	}
 
-	authMeta := &cliproxyauth.Auth{
+	authMeta := &coreauth.Auth{
 		ID:       "auth-meta-base-url-test",
 		Provider: "openai",
 		Metadata: map[string]any{
@@ -1243,7 +1243,7 @@ func TestUsageReporterPropagatesBaseURL(t *testing.T) {
 	}
 
 	// Attribute precedence over metadata
-	authBoth := &cliproxyauth.Auth{
+	authBoth := &coreauth.Auth{
 		ID:       "auth-both-test",
 		Provider: "openai",
 		Attributes: map[string]string{
@@ -1260,7 +1260,7 @@ func TestUsageReporterPropagatesBaseURL(t *testing.T) {
 	}
 
 	// Blank attribute falls back to metadata
-	authBlankAttr := &cliproxyauth.Auth{
+	authBlankAttr := &coreauth.Auth{
 		ID:       "auth-blank-test",
 		Provider: "openai",
 		Attributes: map[string]string{
@@ -1442,14 +1442,14 @@ func TestFailFromErrorsCarriesStreamTruncatedCode(t *testing.T) {
 }
 
 func TestFailFromErrorsCarriesRequestScopedCode(t *testing.T) {
-	errRequest := cliproxyauth.NewRequestScopedError("Use /v1/images/generations for forced image generation.", http.StatusBadRequest)
+	errRequest := coreauth.NewRequestScopedError("Use /v1/images/generations for forced image generation.", http.StatusBadRequest)
 	for _, err := range []error{errRequest, fmt.Errorf("validate payload: %w", errRequest)} {
 		fail := failFromErrors(err)
 		if fail.Code != usage.FailureRequestScopedCode || fail.StatusCode != http.StatusBadRequest {
 			t.Fatalf("request-scoped classification lost during usage reporting: %+v", fail)
 		}
 	}
-	plain := failFromErrors(&cliproxyauth.Error{HTTPStatus: http.StatusBadRequest, Message: "model_not_found"})
+	plain := failFromErrors(&coreauth.Error{HTTPStatus: http.StatusBadRequest, Message: "model_not_found"})
 	if plain.Code != "" {
 		t.Fatalf("upstream model rejection gained request-scoped classification: %+v", plain)
 	}

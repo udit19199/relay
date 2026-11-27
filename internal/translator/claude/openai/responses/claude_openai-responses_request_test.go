@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	sigcompat "github.com/router-for-me/CLIProxyAPI/v8/internal/signature"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
+	sigcompat "github.com/udit19199/relay/internal/signature"
+	"github.com/udit19199/relay/internal/util"
 	"google.golang.org/protobuf/encoding/protowire"
 )
 

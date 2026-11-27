@@ -3,8 +3,8 @@ package executor
 import (
 	"testing"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 // API key credentials are scoped per request with ForAPIKey, which copies the
@@ -14,7 +14,7 @@ import (
 func TestClaudeOAuthToolAliasStoreIsSharedAcrossForAPIKeyCopies(t *testing.T) {
 	createBody := []byte(`{"thread":{"type":"create"}}`)
 	continuationBody := []byte(`{"thread":{"type":"continue","previous_message_id":"msg-shared"}}`)
-	cases := map[string]cliproxyauth.APIKeyConfigExecutor{
+	cases := map[string]coreauth.APIKeyConfigExecutor{
 		"claude": NewClaudeExecutor(&config.Config{}),
 	}
 	for name, registered := range cases {
@@ -36,7 +36,7 @@ func TestClaudeOAuthToolAliasStoreIsSharedAcrossForAPIKeyCopies(t *testing.T) {
 	}
 }
 
-func claudeExecutorForAliasTest(t *testing.T, scoped cliproxyauth.ProviderExecutor) *ClaudeExecutor {
+func claudeExecutorForAliasTest(t *testing.T, scoped coreauth.ProviderExecutor) *ClaudeExecutor {
 	t.Helper()
 	switch executor := scoped.(type) {
 	case *ClaudeExecutor:

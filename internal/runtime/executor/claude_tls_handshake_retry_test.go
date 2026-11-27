@@ -14,11 +14,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/registry"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 // silentConnectProxy reproduces the production failure in Issue #6615: it
@@ -195,13 +195,13 @@ func TestClaudeExecutorManagerRetriesSilentTLSHandshakeThroughConnectProxy(t *te
 	cfg.ProxyURL = proxyURL
 	cfg.TLSHandshakeTimeoutSeconds = 1
 
-	manager := cliproxyauth.NewManager(nil, nil, nil)
+	manager := coreauth.NewManager(nil, nil, nil)
 	manager.SetRetryConfig(3, 0, 0)
 	manager.RegisterExecutor(NewClaudeExecutor(cfg))
 
 	authID := uuid.NewString() + "-silent-tls-handshake"
 	model := "claude-sonnet-4-6"
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:       authID,
 		Provider: "claude",
 		Attributes: map[string]string{
@@ -219,10 +219,10 @@ func TestClaudeExecutorManagerRetriesSilentTLSHandshakeThroughConnectProxy(t *te
 	payload := []byte(`{"model":"claude-sonnet-4-6","messages":[{"role":"user","content":"hello"}],"max_tokens":8}`)
 	executeDone := make(chan error, 1)
 	go func() {
-		_, errExecute := manager.Execute(context.Background(), []string{"claude"}, cliproxyexecutor.Request{
+		_, errExecute := manager.Execute(context.Background(), []string{"claude"}, coreexecutor.Request{
 			Model:   model,
 			Payload: payload,
-		}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude})
+		}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude})
 		executeDone <- errExecute
 	}()
 
@@ -235,7 +235,7 @@ func TestClaudeExecutorManagerRetriesSilentTLSHandshakeThroughConnectProxy(t *te
 	if errExecute == nil {
 		t.Fatal("Execute() error = nil, want final configured TLS handshake timeout")
 	}
-	if !cliproxyexecutor.IsConfiguredTLSHandshakeTimeoutError(errExecute) {
+	if !coreexecutor.IsConfiguredTLSHandshakeTimeoutError(errExecute) {
 		t.Fatalf("Execute() error = %v, want typed configured TLS handshake timeout", errExecute)
 	}
 	if attempts := proxy.attempts.Load(); attempts != 4 {

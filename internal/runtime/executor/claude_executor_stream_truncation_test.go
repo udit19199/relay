@@ -4,18 +4,17 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/usage"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	"github.com/udit19199/relay/internal/service/usage"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 // Upstream closes the SSE stream after a partial message without ever sending
@@ -46,7 +45,7 @@ func TestClaudeExecutorStreamTruncationReportsError(t *testing.T) {
 	})
 
 	exec := NewClaudeExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"api_key":  "key-123",
 		"base_url": server.URL,
 	}}
@@ -54,12 +53,12 @@ func TestClaudeExecutorStreamTruncationReportsError(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	result, err := exec.ExecuteStream(ctx, auth, cliproxyexecutor.Request{
+	result, err := exec.ExecuteStream(ctx, auth, coreexecutor.Request{
 		Model:   "claude-opus-5",
 		Payload: []byte(`{"model":"claude-opus-5","messages":[{"role":"user","content":"hi"}],"stream":true}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat:   sdktranslator.FormatClaude,
-		ResponseFormat: sdktranslator.FormatClaude,
+	}, coreexecutor.Options{
+		SourceFormat:   translatorreg.FormatClaude,
+		ResponseFormat: translatorreg.FormatClaude,
 	})
 	if err != nil {
 		t.Fatalf("ExecuteStream() error = %v", err)
@@ -122,7 +121,7 @@ func TestClaudeExecutorTranslatedStreamTruncationReportsError(t *testing.T) {
 	})
 
 	exec := NewClaudeExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"api_key":  "key-123",
 		"base_url": server.URL,
 	}}
@@ -130,12 +129,12 @@ func TestClaudeExecutorTranslatedStreamTruncationReportsError(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	result, err := exec.ExecuteStream(ctx, auth, cliproxyexecutor.Request{
+	result, err := exec.ExecuteStream(ctx, auth, coreexecutor.Request{
 		Model:   "claude-opus-5",
 		Payload: []byte(`{"model":"claude-opus-5","messages":[{"role":"user","content":"hi"}],"stream":true}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat:   sdktranslator.FormatOpenAI,
-		ResponseFormat: sdktranslator.FormatOpenAI,
+	}, coreexecutor.Options{
+		SourceFormat:   translatorreg.FormatOpenAI,
+		ResponseFormat: translatorreg.FormatOpenAI,
 	})
 	if err != nil {
 		t.Fatalf("ExecuteStream() error = %v", err)
@@ -183,7 +182,7 @@ func TestClaudeExecutorStreamCompleteNoError(t *testing.T) {
 	defer server.Close()
 
 	exec := NewClaudeExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"api_key":  "key-123",
 		"base_url": server.URL,
 	}}
@@ -191,12 +190,12 @@ func TestClaudeExecutorStreamCompleteNoError(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	result, err := exec.ExecuteStream(ctx, auth, cliproxyexecutor.Request{
+	result, err := exec.ExecuteStream(ctx, auth, coreexecutor.Request{
 		Model:   "claude-opus-5",
 		Payload: []byte(`{"model":"claude-opus-5","messages":[{"role":"user","content":"hi"}],"stream":true}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat:   sdktranslator.FormatClaude,
-		ResponseFormat: sdktranslator.FormatClaude,
+	}, coreexecutor.Options{
+		SourceFormat:   translatorreg.FormatClaude,
+		ResponseFormat: translatorreg.FormatClaude,
 	})
 	if err != nil {
 		t.Fatalf("ExecuteStream() error = %v", err)
@@ -216,9 +215,9 @@ func TestOpenAICompatExecutorClaudeEOFBeforeFinishReasonFailsStream(t *testing.T
 	exec, auth, _ := newApplyPatchCompatTestExecutor(t, reply)
 	request := []byte(`{"model":"test","max_tokens":64,"messages":[{"role":"user","content":"hello"}],"stream":true}`)
 
-	result, errExecuteStream := exec.ExecuteStream(t.Context(), auth, cliproxyexecutor.Request{Model: "test", Payload: request}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatClaude,
-		ResponseFormat:  sdktranslator.FormatClaude,
+	result, errExecuteStream := exec.ExecuteStream(t.Context(), auth, coreexecutor.Request{Model: "test", Payload: request}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatClaude,
+		ResponseFormat:  translatorreg.FormatClaude,
 		OriginalRequest: request,
 		Stream:          true,
 	})
@@ -258,9 +257,9 @@ func TestOpenAICompatExecutorClaudeEOFAfterFinishReasonCompletesStream(t *testin
 	exec, auth, _ := newApplyPatchCompatTestExecutor(t, reply)
 	request := []byte(`{"model":"test","max_tokens":64,"messages":[{"role":"user","content":"hello"}],"stream":true}`)
 
-	result, errExecuteStream := exec.ExecuteStream(t.Context(), auth, cliproxyexecutor.Request{Model: "test", Payload: request}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatClaude,
-		ResponseFormat:  sdktranslator.FormatClaude,
+	result, errExecuteStream := exec.ExecuteStream(t.Context(), auth, coreexecutor.Request{Model: "test", Payload: request}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatClaude,
+		ResponseFormat:  translatorreg.FormatClaude,
 		OriginalRequest: request,
 		Stream:          true,
 	})
@@ -309,7 +308,7 @@ func TestClaudeExecutorStreamErrorEventDoesNotCommitContinuityAndMarksFailed(t *
 	})
 
 	exec := NewClaudeExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"api_key":  "key-123",
 		"base_url": server.URL,
 	}}
@@ -317,12 +316,12 @@ func TestClaudeExecutorStreamErrorEventDoesNotCommitContinuityAndMarksFailed(t *
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	result, err := exec.ExecuteStream(ctx, auth, cliproxyexecutor.Request{
+	result, err := exec.ExecuteStream(ctx, auth, coreexecutor.Request{
 		Model:   "claude-opus-5",
 		Payload: []byte(`{"model":"claude-opus-5","messages":[{"role":"user","content":"hi"}],"stream":true}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat:   sdktranslator.FormatClaude,
-		ResponseFormat: sdktranslator.FormatClaude,
+	}, coreexecutor.Options{
+		SourceFormat:   translatorreg.FormatClaude,
+		ResponseFormat: translatorreg.FormatClaude,
 	})
 	if err != nil {
 		t.Fatalf("ExecuteStream() error = %v", err)
@@ -355,28 +354,6 @@ func TestClaudeExecutorStreamErrorEventDoesNotCommitContinuityAndMarksFailed(t *
 	}
 }
 
-type failingTailReader struct {
-	prefix io.Reader
-	err    error
-}
-
-func (r *failingTailReader) Read(p []byte) (int, error) {
-	if r.prefix != nil {
-		n, err := r.prefix.Read(p)
-		if err == io.EOF {
-			r.prefix = nil
-			if n > 0 {
-				return n, nil
-			}
-			return 0, r.err
-		}
-		return n, err
-	}
-	return 0, r.err
-}
-
-func (r *failingTailReader) Close() error { return nil }
-
 func TestClaudeExecutorMultiLineDataMessageStopAndErrorEvents(t *testing.T) {
 	multiLineSuccess := "event: message_start\n" +
 		"data: {\"type\":\"message_start\",\n" +
@@ -396,16 +373,16 @@ func TestClaudeExecutorMultiLineDataMessageStopAndErrorEvents(t *testing.T) {
 	defer server.Close()
 
 	exec := NewClaudeExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"api_key":  "key-123",
 		"base_url": server.URL,
 	}}
-	result, err := exec.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	result, err := exec.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-opus-5",
 		Payload: []byte(`{"model":"claude-opus-5","messages":[{"role":"user","content":"hi"}],"stream":true}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat:   sdktranslator.FormatClaude,
-		ResponseFormat: sdktranslator.FormatClaude,
+	}, coreexecutor.Options{
+		SourceFormat:   translatorreg.FormatClaude,
+		ResponseFormat: translatorreg.FormatClaude,
 	})
 	if err != nil {
 		t.Fatalf("ExecuteStream() error = %v", err)
@@ -433,15 +410,15 @@ func TestClaudeExecutorMultiLineDataMessageStopAndErrorEvents(t *testing.T) {
 	}))
 	defer truncServer.Close()
 
-	truncResult, err := exec.ExecuteStream(context.Background(), &cliproxyauth.Auth{Attributes: map[string]string{
+	truncResult, err := exec.ExecuteStream(context.Background(), &coreauth.Auth{Attributes: map[string]string{
 		"api_key":  "key-123",
 		"base_url": truncServer.URL,
-	}}, cliproxyexecutor.Request{
+	}}, coreexecutor.Request{
 		Model:   "claude-opus-5",
 		Payload: []byte(`{"model":"claude-opus-5","messages":[{"role":"user","content":"hi"}],"stream":true}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat:   sdktranslator.FormatClaude,
-		ResponseFormat: sdktranslator.FormatClaude,
+	}, coreexecutor.Options{
+		SourceFormat:   translatorreg.FormatClaude,
+		ResponseFormat: translatorreg.FormatClaude,
 	})
 	if err != nil {
 		t.Fatalf("ExecuteStream() error = %v", err)
@@ -485,9 +462,9 @@ func TestTranslatedClaudeStreamTruncationPreservesBufferedUsageOnFailure(t *test
 			usage.RegisterNamedConsumer(consumerName, noopClaudeUsageConsumer{})
 		})
 
-		result, err := exec.ExecuteStream(t.Context(), auth, cliproxyexecutor.Request{Model: "test", Payload: request}, cliproxyexecutor.Options{
-			SourceFormat:    sdktranslator.FormatClaude,
-			ResponseFormat:  sdktranslator.FormatClaude,
+		result, err := exec.ExecuteStream(t.Context(), auth, coreexecutor.Request{Model: "test", Payload: request}, coreexecutor.Options{
+			SourceFormat:    translatorreg.FormatClaude,
+			ResponseFormat:  translatorreg.FormatClaude,
 			OriginalRequest: request,
 			Stream:          true,
 		})
@@ -514,10 +491,10 @@ func TestTranslatedClaudeStreamTruncationPreservesBufferedUsageOnFailure(t *test
 func TestClaudeExecutorStreamCancel499RecordsLastPacketUsage(t *testing.T) {
 	for _, mode := range []struct {
 		name   string
-		format sdktranslator.Format
+		format translatorreg.Format
 	}{
-		{name: "passthrough", format: sdktranslator.FormatClaude},
-		{name: "translated", format: sdktranslator.FormatOpenAIResponse},
+		{name: "passthrough", format: translatorreg.FormatClaude},
+		{name: "translated", format: translatorreg.FormatOpenAIResponse},
 	} {
 		t.Run(mode.name, func(t *testing.T) {
 			deltaFlushed := make(chan struct{})
@@ -548,7 +525,7 @@ func TestClaudeExecutorStreamCancel499RecordsLastPacketUsage(t *testing.T) {
 			})
 
 			exec := NewClaudeExecutor(&config.Config{})
-			auth := &cliproxyauth.Auth{Attributes: map[string]string{
+			auth := &coreauth.Auth{Attributes: map[string]string{
 				"api_key":  "key-123",
 				"base_url": server.URL,
 			}}
@@ -556,10 +533,10 @@ func TestClaudeExecutorStreamCancel499RecordsLastPacketUsage(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			result, err := exec.ExecuteStream(ctx, auth, cliproxyexecutor.Request{
+			result, err := exec.ExecuteStream(ctx, auth, coreexecutor.Request{
 				Model:   "claude-opus-5-5",
 				Payload: []byte(`{"model":"claude-opus-5-5","messages":[{"role":"user","content":"hi"}],"stream":true}`),
-			}, cliproxyexecutor.Options{
+			}, coreexecutor.Options{
 				SourceFormat:   mode.format,
 				ResponseFormat: mode.format,
 				Stream:         true,

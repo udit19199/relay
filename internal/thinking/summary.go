@@ -4,8 +4,8 @@ import (
 	"strings"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
+	"github.com/udit19199/relay/internal/registry"
+	"github.com/udit19199/relay/internal/util"
 )
 
 // SummaryMode represents whether the client explicitly requested reasoning summaries.
@@ -178,11 +178,6 @@ func ApplySummaryConfig(body []byte, format string, config SummaryConfig) []byte
 // activate thinking before it can request summaries.
 func ApplySummaryConfigForModel(body []byte, format, model string, config SummaryConfig) []byte {
 	return applySummaryConfigForModel(body, format, model, nil, config)
-}
-
-// ApplySummaryConfigForModelDoc writes canonical summary intent onto doc in place.
-func ApplySummaryConfigForModelDoc(doc *ojson.Doc, format, model string, config SummaryConfig) {
-	_ = applySummaryConfigForProviderDoc(doc, true, format, model, "", nil, config)
 }
 
 // CanRepresentSummaryConfigForModelDoc reports whether ApplySummaryConfigForModelDoc

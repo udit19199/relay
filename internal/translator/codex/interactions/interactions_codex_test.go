@@ -8,7 +8,7 @@ import (
 
 	"github.com/MoeForge/moego/base64"
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
+	"github.com/udit19199/relay/internal/util"
 )
 
 func TestConvertInteractionsRequestToCodexMaxOutputTokens(t *testing.T) {

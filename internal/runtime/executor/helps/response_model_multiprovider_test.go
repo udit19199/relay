@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/usage"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	"github.com/udit19199/relay/internal/service/usage"
 )
 
 type multiProviderTestExecutor struct {
@@ -17,7 +17,7 @@ func (e multiProviderTestExecutor) Identifier() string {
 	return e.id
 }
 
-func newMultiProviderTestReporter(ctx context.Context, provider, model string, auth *cliproxyauth.Auth) *UsageReporter {
+func newMultiProviderTestReporter(ctx context.Context, provider, model string, auth *coreauth.Auth) *UsageReporter {
 	return NewExecutorUsageReporter(ctx, multiProviderTestExecutor{id: provider}, model, auth)
 }
 
@@ -246,7 +246,7 @@ func TestUsageReporterMultiProviderSubstitutionWarning(t *testing.T) {
 	for _, tc := range providers {
 		t.Run(tc.provider, func(t *testing.T) {
 			hook := setupResponseModelLoggerHook(t)
-			auth := &cliproxyauth.Auth{ID: "auth-" + tc.provider}
+			auth := &coreauth.Auth{ID: "auth-" + tc.provider}
 			reporter := newMultiProviderTestReporter(context.Background(), tc.provider, tc.requested, auth)
 
 			reporter.ObserveResponseModel([]byte(tc.streamChunk))

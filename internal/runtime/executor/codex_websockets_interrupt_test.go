@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 func TestInterruptExecutionSessionRequiresActiveRead(t *testing.T) {
@@ -49,7 +49,7 @@ func TestInterruptExecutionSessionRequiresActiveRead(t *testing.T) {
 
 	interrupt := []byte(`{"type":"response.interrupt","response_id":"r1","mode":"discard_partial_items"}`)
 	errIdle := executor.InterruptExecutionSession(context.Background(), sessionID, interrupt)
-	if !errors.Is(errIdle, cliproxyexecutor.ErrNoActiveUpstreamWebsocket) {
+	if !errors.Is(errIdle, coreexecutor.ErrNoActiveUpstreamWebsocket) {
 		t.Fatalf("idle socket error = %v, want ErrNoActiveUpstreamWebsocket", errIdle)
 	}
 	select {

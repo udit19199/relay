@@ -1,9 +1,7 @@
 package helps
 
 import (
-	"bytes"
-
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/usage"
+	"github.com/udit19199/relay/internal/service/usage"
 )
 
 // ObserveMergedStreamUsage updates buffer with merged usage details.
@@ -347,36 +345,4 @@ func detailOutputExcludesReasoning(detail usage.Detail) (bool, bool) {
 		return true, true
 	}
 	return false, false
-}
-
-// IterateStreamLines splits payload by newline and invokes fn for non-empty lines.
-func IterateStreamLines(payload []byte, fn func(line []byte)) {
-	for _, line := range bytes.Split(payload, []byte("\n")) {
-		trimmed := bytes.TrimSpace(line)
-		if len(trimmed) == 0 {
-			continue
-		}
-		fn(trimmed)
-	}
-}
-
-// ExtractStreamJSONPayload extracts SSE data/json payload from a raw line.
-func ExtractStreamJSONPayload(line []byte) []byte {
-	trimmed := bytes.TrimSpace(line)
-	if len(trimmed) == 0 {
-		return nil
-	}
-	if bytes.Equal(trimmed, []byte("[DONE]")) {
-		return nil
-	}
-	if bytes.HasPrefix(trimmed, []byte("event:")) {
-		return nil
-	}
-	if bytes.HasPrefix(trimmed, []byte("data:")) {
-		trimmed = bytes.TrimSpace(bytes.TrimPrefix(trimmed, []byte("data:")))
-	}
-	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("[DONE]")) {
-		return nil
-	}
-	return trimmed
 }

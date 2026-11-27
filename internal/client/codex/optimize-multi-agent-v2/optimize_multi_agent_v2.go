@@ -12,10 +12,10 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gin-gonic/gin"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/registry"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
+	"github.com/udit19199/relay/internal/util"
 )
 
 const (
@@ -91,15 +91,6 @@ func RewriteCodexMultiAgentV2InputDoc(doc *ojson.Doc, ctx context.Context, heade
 	return rewriteCodexAgentMessageInputDoc(doc, optimizeEnabled, compatMode)
 }
 
-// RewriteCodexOrphanDelegationInputForConfig applies RewriteCodexOrphanDelegationInput
-// based on cfg.Codex.OrphanDelegationCompatibility and the X-Openai-Subagent header.
-func RewriteCodexOrphanDelegationInputForConfig(ctx context.Context, headers http.Header, payload []byte, cfg *config.Config) []byte {
-	if cfg == nil || !cfg.Codex.OrphanDelegationCompatibility {
-		return payload
-	}
-	return RewriteCodexOrphanDelegationInput(ctx, headers, payload, true)
-}
-
 // RewriteCodexOrphanDelegationInputForConfigDoc applies RewriteCodexOrphanDelegationInputDoc
 // in place on doc based on cfg.Codex.OrphanDelegationCompatibility and the X-Openai-Subagent header.
 func RewriteCodexOrphanDelegationInputForConfigDoc(doc *ojson.Doc, ctx context.Context, headers http.Header, cfg *config.Config) bool {
@@ -111,8 +102,8 @@ func RewriteCodexOrphanDelegationInputForConfigDoc(doc *ojson.Doc, ctx context.C
 
 // TranslateRequestWithCodexMultiAgentV2 normalizes official Codex multi-agent
 // input before translating it to a non-Codex target protocol.
-func TranslateRequestWithCodexMultiAgentV2(ctx context.Context, headers http.Header, cfg *config.Config, from, to sdktranslator.Format, model string, payload []byte, stream bool) []byte {
-	return TranslateRequestEnvelopeWithCodexMultiAgentV2(ctx, headers, cfg, from, to, sdktranslator.RequestEnvelope{
+func TranslateRequestWithCodexMultiAgentV2(ctx context.Context, headers http.Header, cfg *config.Config, from, to translatorreg.Format, model string, payload []byte, stream bool) []byte {
+	return TranslateRequestEnvelopeWithCodexMultiAgentV2(ctx, headers, cfg, from, to, translatorreg.RequestEnvelope{
 		Format: from,
 		Model:  model,
 		Stream: stream,
@@ -122,11 +113,11 @@ func TranslateRequestWithCodexMultiAgentV2(ctx context.Context, headers http.Hea
 
 // TranslateRequestEnvelopeWithCodexMultiAgentV2 normalizes official Codex
 // multi-agent input while preserving request-scoped translation metadata.
-func TranslateRequestEnvelopeWithCodexMultiAgentV2(ctx context.Context, headers http.Header, cfg *config.Config, from, to sdktranslator.Format, req sdktranslator.RequestEnvelope) sdktranslator.RequestEnvelope {
-	if from == sdktranslator.FormatOpenAIResponse && len(req.Body) > 0 {
+func TranslateRequestEnvelopeWithCodexMultiAgentV2(ctx context.Context, headers http.Header, cfg *config.Config, from, to translatorreg.Format, req translatorreg.RequestEnvelope) translatorreg.RequestEnvelope {
+	if from == translatorreg.FormatOpenAIResponse && len(req.Body) > 0 {
 		doc := ojson.NewDoc(req.Body)
 		changed := RewriteCodexOrphanDelegationInputForConfigDoc(doc, ctx, headers, cfg)
-		if to != sdktranslator.FormatCodex && to != sdktranslator.FormatOpenAIResponse {
+		if to != translatorreg.FormatCodex && to != translatorreg.FormatOpenAIResponse {
 			if RewriteCodexMultiAgentV2InputDoc(doc, ctx, headers, cfg) {
 				changed = true
 			}
@@ -135,7 +126,7 @@ func TranslateRequestEnvelopeWithCodexMultiAgentV2(ctx context.Context, headers 
 			req.Body = doc.Bytes()
 		}
 	}
-	return sdktranslator.TranslateRequestEnvelope(ctx, from, to, req)
+	return translatorreg.TranslateRequestEnvelope(ctx, from, to, req)
 }
 
 // PrepareCodexMultiAgentV2Tools prepares collaboration tool definitions at the
@@ -665,32 +656,10 @@ func rewriteCodexCollaborationToolsDoc(doc *ojson.Doc, messageToolPaths, spawnAg
 	return changed
 }
 
-// HasCodexMultiAgentV2NamespaceConflict reports whether the request defines
-// the reserved optimized namespace, which must remain untouched.
-func HasCodexMultiAgentV2NamespaceConflict(payload []byte) bool {
-	return hasCodexOptimizedCollaborationConflict(payload)
-}
-
 // HasCodexMultiAgentV2NamespaceConflictDoc reports whether doc defines
 // the reserved optimized namespace, which must remain untouched.
 func HasCodexMultiAgentV2NamespaceConflictDoc(doc *ojson.Doc) bool {
 	return hasCodexOptimizedCollaborationConflictDoc(doc)
-}
-
-func hasCodexOptimizedCollaborationConflict(payload []byte) bool {
-	if codexToolsHaveOptimizedCollaborationConflict(util.GetGJSONBytesNoCopy(payload, "tools")) {
-		return true
-	}
-	input := util.GetGJSONBytesNoCopy(payload, "input")
-	if !input.IsArray() {
-		return false
-	}
-	for _, item := range input.Array() {
-		if strings.TrimSpace(item.Get("type").String()) == "additional_tools" && codexToolsHaveOptimizedCollaborationConflict(item.Get("tools")) {
-			return true
-		}
-	}
-	return false
 }
 
 func hasCodexOptimizedCollaborationConflictDoc(doc *ojson.Doc) bool {
@@ -832,17 +801,6 @@ func restoreCodexCollaborationValue(value any) bool {
 	return changed
 }
 
-func rewriteCodexAgentMessageInput(payload []byte, optimizeEnabled bool, compatMode bool) []byte {
-	if len(payload) == 0 {
-		return payload
-	}
-	doc := ojson.NewDoc(payload)
-	if !rewriteCodexAgentMessageInputDoc(doc, optimizeEnabled, compatMode) {
-		return payload
-	}
-	return doc.Bytes()
-}
-
 func rewriteCodexAgentMessageInputDoc(doc *ojson.Doc, optimizeEnabled bool, compatMode bool) bool {
 	if doc == nil {
 		return false
@@ -892,17 +850,6 @@ func rewriteCodexAgentMessageInputDoc(doc *ojson.Doc, optimizeEnabled bool, comp
 		}
 	}
 	return changed
-}
-
-func rewriteCodexAgentMessageContent(payload []byte) []byte {
-	if len(payload) == 0 {
-		return payload
-	}
-	doc := ojson.NewDoc(payload)
-	if !rewriteCodexAgentMessageContentDoc(doc) {
-		return payload
-	}
-	return doc.Bytes()
 }
 
 func rewriteCodexAgentMessageContentDoc(doc *ojson.Doc) bool {

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/interfaces"
 	log "github.com/sirupsen/logrus"
+	"github.com/udit19199/relay/internal/interfaces"
 )
 
 // FileStreamingLogWriter implements StreamingLogWriter for file-based streaming logs.

@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 // The dev golden was produced by running renderToolSearchGolden against the
@@ -132,7 +132,7 @@ func TestToolSearchPinnedContextWinsOverSwitch(t *testing.T) {
 	}
 	translate := func(ctx context.Context) []byte {
 		t.Helper()
-		out := ConvertOpenAIResponsesRequestEnvelopeToClaude(ctx, sdktranslator.RequestEnvelope{Model: "claude-sonnet-4-5", Stream: true, Body: session.Request})
+		out := ConvertOpenAIResponsesRequestEnvelopeToClaude(ctx, translatorreg.RequestEnvelope{Model: "claude-sonnet-4-5", Stream: true, Body: session.Request})
 		if out.Err != nil {
 			t.Fatalf("translate: %v", out.Err)
 		}

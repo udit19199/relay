@@ -19,19 +19,19 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/google/uuid"
-	devinauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/devin"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	internalsignature "github.com/router-for-me/CLIProxyAPI/v8/internal/signature"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/thinking"
-	translatorcommon "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/common"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
 	log "github.com/sirupsen/logrus"
+	devinauth "github.com/udit19199/relay/internal/auth/devin"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/misc"
+	"github.com/udit19199/relay/internal/registry"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	internalsignature "github.com/udit19199/relay/internal/signature"
+	"github.com/udit19199/relay/internal/thinking"
+	translatorcommon "github.com/udit19199/relay/internal/translator/common"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
+	"github.com/udit19199/relay/internal/util"
 )
 
 // DevinExecutor executes requests against the Codeium/Devin Connect-RPC backend.
@@ -90,12 +90,12 @@ func (e *DevinExecutor) Identifier() string {
 }
 
 // RequestToFormat specifies that Devin expects the interactions intermediate format.
-func (e *DevinExecutor) RequestToFormat(_ cliproxyexecutor.Request, _ cliproxyexecutor.Options) sdktranslator.Format {
-	return sdktranslator.FormatInteractions
+func (e *DevinExecutor) RequestToFormat(_ coreexecutor.Request, _ coreexecutor.Options) translatorreg.Format {
+	return translatorreg.FormatInteractions
 }
 
 // PrepareRequest decorates the outgoing HTTP request with Devin Connect-RPC headers.
-func (e *DevinExecutor) PrepareRequest(req *http.Request, auth *cliproxyauth.Auth) error {
+func (e *DevinExecutor) PrepareRequest(req *http.Request, auth *coreauth.Auth) error {
 	if req == nil {
 		return nil
 	}
@@ -125,7 +125,7 @@ func (e *DevinExecutor) PrepareRequest(req *http.Request, auth *cliproxyauth.Aut
 }
 
 // HttpRequest injects Devin credentials into the request and executes it.
-func (e *DevinExecutor) HttpRequest(ctx context.Context, auth *cliproxyauth.Auth, req *http.Request) (*http.Response, error) {
+func (e *DevinExecutor) HttpRequest(ctx context.Context, auth *coreauth.Auth, req *http.Request) (*http.Response, error) {
 	if req == nil {
 		return nil, fmt.Errorf("devin executor: request is nil")
 	}
@@ -141,7 +141,7 @@ func (e *DevinExecutor) HttpRequest(ctx context.Context, auth *cliproxyauth.Auth
 }
 
 // Refresh updates Devin user status, plan, and quota signals.
-func (e *DevinExecutor) Refresh(ctx context.Context, auth *cliproxyauth.Auth) (*cliproxyauth.Auth, error) {
+func (e *DevinExecutor) Refresh(ctx context.Context, auth *coreauth.Auth) (*coreauth.Auth, error) {
 	if auth == nil {
 		return nil, errors.New("devin executor: auth is nil")
 	}
@@ -228,15 +228,15 @@ func (e *DevinExecutor) Refresh(ctx context.Context, auth *cliproxyauth.Auth) (*
 }
 
 // CountTokens provides token counting for Devin requests.
-func (e *DevinExecutor) CountTokens(_ context.Context, _ *cliproxyauth.Auth, req cliproxyexecutor.Request, _ cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
+func (e *DevinExecutor) CountTokens(_ context.Context, _ *coreauth.Auth, req coreexecutor.Request, _ coreexecutor.Options) (coreexecutor.Response, error) {
 	// Devin has no standalone token count endpoint; estimate via length heuristic.
 	promptTokens := int64(len(req.Payload) / 4)
 	out := []byte(fmt.Sprintf(`{"total_tokens":%d,"input_tokens":%d}`, promptTokens, promptTokens))
-	return cliproxyexecutor.Response{Payload: out}, nil
+	return coreexecutor.Response{Payload: out}, nil
 }
 
 // Execute performs non-streaming execution against the Devin backend.
-func (e *DevinExecutor) Execute(ctx context.Context, auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (resp cliproxyexecutor.Response, err error) {
+func (e *DevinExecutor) Execute(ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) (resp coreexecutor.Response, err error) {
 	ctx = helps.EnsureSessionContext(ctx, opts, req.Payload)
 	if errExpand := helps.ExpandResponsesCompactionCapsules(&req, &opts, "devin"); errExpand != nil {
 		return resp, statusErr{code: http.StatusBadRequest, msg: errExpand.Error()}
@@ -318,21 +318,21 @@ func (e *DevinExecutor) Execute(ctx context.Context, auth *cliproxyauth.Auth, re
 		reporter.SetResponseModel(respLog.Usage.ModelName)
 	}
 
-	targetFormat := cliproxyexecutor.ResponseFormatOrSource(opts)
+	targetFormat := coreexecutor.ResponseFormatOrSource(opts)
 	var param any
-	out := sdktranslator.TranslateNonStream(ctx, sdktranslator.FormatInteractions, targetFormat, req.Model, helps.ApplyPatchOriginalRequest(req, opts), req.Payload, interactionsJSON, &param)
+	out := translatorreg.TranslateNonStream(ctx, translatorreg.FormatInteractions, targetFormat, req.Model, helps.ApplyPatchOriginalRequest(req, opts), req.Payload, interactionsJSON, &param)
 	if helps.ApplyPatchTranslationError(param) != nil || len(out) == 0 {
-		return cliproxyexecutor.Response{}, devinApplyPatchStatusError(patchDiagnostics.Render(param, ""))
+		return coreexecutor.Response{}, devinApplyPatchStatusError(patchDiagnostics.Render(param, ""))
 	}
 	reporter.Publish(ctx, helps.ParseInteractionsUsage(interactionsJSON))
-	if targetFormat == sdktranslator.FormatOpenAIResponse {
+	if targetFormat == translatorreg.FormatOpenAIResponse {
 		out = helps.EnsureResponsesUsageDetails(out)
 	}
-	return cliproxyexecutor.Response{Payload: out, Headers: httpResp.Header.Clone()}, nil
+	return coreexecutor.Response{Payload: out, Headers: httpResp.Header.Clone()}, nil
 }
 
 // ExecuteStream performs streaming execution against the Devin backend.
-func (e *DevinExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (_ *cliproxyexecutor.StreamResult, err error) {
+func (e *DevinExecutor) ExecuteStream(ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) (_ *coreexecutor.StreamResult, err error) {
 	ctx = helps.EnsureSessionContext(ctx, opts, req.Payload)
 	if errExpand := helps.ExpandResponsesCompactionCapsules(&req, &opts, "devin"); errExpand != nil {
 		return nil, statusErr{code: http.StatusBadRequest, msg: errExpand.Error()}
@@ -380,8 +380,8 @@ func (e *DevinExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.Au
 		return nil, newDevinStatusErrorForAuth(httpResp.StatusCode, httpResp.Header, errData, auth)
 	}
 
-	out := make(chan cliproxyexecutor.StreamChunk)
-	responseFormat := cliproxyexecutor.ResponseFormatOrSource(opts)
+	out := make(chan coreexecutor.StreamChunk)
+	responseFormat := coreexecutor.ResponseFormatOrSource(opts)
 
 	streamCtx, cancelStream := context.WithCancel(ctx)
 
@@ -402,22 +402,22 @@ func (e *DevinExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.Au
 		e.streamDevinFramesForAuth(streamCtx, httpResp.Body, req, opts, chatModelUID, responseFormat, reporter, out, auth)
 	}()
 
-	return &cliproxyexecutor.StreamResult{
+	return &coreexecutor.StreamResult{
 		Headers: httpResp.Header.Clone(),
 		Chunks:  out,
 	}, nil
 }
 
-func (e *DevinExecutor) prepareDevinHTTPRequest(ctx context.Context, auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (*http.Request, string, []byte, error) {
+func (e *DevinExecutor) prepareDevinHTTPRequest(ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) (*http.Request, string, []byte, error) {
 	apiKey, baseURL, deviceSeed := devinAuthCredentials(auth)
 	if apiKey == "" {
 		return nil, "", nil, fmt.Errorf("devin credentials missing: api_key or session_token required")
 	}
 
 	payload := req.Payload
-	isInteractionsSource := opts.SourceFormat == "" || opts.SourceFormat == sdktranslator.FormatInteractions
+	isInteractionsSource := opts.SourceFormat == "" || opts.SourceFormat == translatorreg.FormatInteractions
 	if !isInteractionsSource {
-		translated := sdktranslator.TranslateRequestEnvelope(ctx, opts.SourceFormat, sdktranslator.FormatInteractions, sdktranslator.RequestEnvelope{
+		translated := translatorreg.TranslateRequestEnvelope(ctx, opts.SourceFormat, translatorreg.FormatInteractions, translatorreg.RequestEnvelope{
 			Format: opts.SourceFormat,
 			Model:  req.Model,
 			Stream: opts.Stream,
@@ -431,7 +431,7 @@ func (e *DevinExecutor) prepareDevinHTTPRequest(ctx context.Context, auth *clipr
 	systemPrompt, prompts, tools, temp, maxTokens, sessionID, cascadeID, thinkingLevel, budgetTokens := parseInteractionsPayload(payload, opts.OriginalRequest)
 	// Translation drops Claude effort directives and keeps only the top-level
 	// effort, which directive-sending clients pin to a cache placeholder.
-	if opts.SourceFormat == sdktranslator.FormatClaude {
+	if opts.SourceFormat == translatorreg.FormatClaude {
 		if directive := thinking.ClaudeEffortDirective(req.Payload); directive != "" {
 			thinkingLevel = directive
 		}
@@ -517,12 +517,12 @@ const maxDevinToolCalls = 128
 func (e *DevinExecutor) streamDevinFrames(
 	ctx context.Context,
 	body io.Reader,
-	req cliproxyexecutor.Request,
-	opts cliproxyexecutor.Options,
+	req coreexecutor.Request,
+	opts coreexecutor.Options,
 	chatModelUID string,
-	responseFormat sdktranslator.Format,
+	responseFormat translatorreg.Format,
 	reporter *helps.UsageReporter,
-	out chan<- cliproxyexecutor.StreamChunk,
+	out chan<- coreexecutor.StreamChunk,
 ) {
 	e.streamDevinFramesForAuth(ctx, body, req, opts, chatModelUID, responseFormat, reporter, out, nil)
 }
@@ -532,13 +532,13 @@ func (e *DevinExecutor) streamDevinFrames(
 func (e *DevinExecutor) streamDevinFramesForAuth(
 	ctx context.Context,
 	body io.Reader,
-	req cliproxyexecutor.Request,
-	opts cliproxyexecutor.Options,
+	req coreexecutor.Request,
+	opts coreexecutor.Options,
 	chatModelUID string,
-	responseFormat sdktranslator.Format,
+	responseFormat translatorreg.Format,
 	reporter *helps.UsageReporter,
-	out chan<- cliproxyexecutor.StreamChunk,
-	auth *cliproxyauth.Auth,
+	out chan<- coreexecutor.StreamChunk,
+	auth *coreauth.Auth,
 ) {
 	if reporter != nil {
 		if chatModelUID != "" {
@@ -576,7 +576,7 @@ func (e *DevinExecutor) streamDevinFramesForAuth(
 	originalReq := helps.ApplyPatchOriginalRequest(req, opts)
 	patchRequested := helps.ApplyPatchRequested(originalReq)
 	var translateParam any
-	helps.InitializeApplyPatchStream(ctx, sdktranslator.FormatInteractions, responseFormat, req.Model, originalReq, req.Payload, &translateParam)
+	helps.InitializeApplyPatchStream(ctx, translatorreg.FormatInteractions, responseFormat, req.Model, originalReq, req.Payload, &translateParam)
 	translationFailed := false
 	patchDiagnostics := helps.NewDevinApplyPatchDiagnostics(originalReq)
 	applyPatchErr := func(reason string) statusErr {
@@ -624,10 +624,10 @@ func (e *DevinExecutor) streamDevinFramesForAuth(
 		}
 		helps.AppendAPIResponseChunk(ctx, e.cfg, append(append([]byte{}, trimmed...), '\n'))
 
-		if responseFormat == sdktranslator.FormatInteractions {
+		if responseFormat == translatorreg.FormatInteractions {
 			frame := []byte(fmt.Sprintf("data: %s\n\n", string(trimmed)))
 			select {
-			case out <- cliproxyexecutor.StreamChunk{Payload: frame}:
+			case out <- coreexecutor.StreamChunk{Payload: frame}:
 				return true
 			case <-ctx.Done():
 				return false
@@ -636,7 +636,7 @@ func (e *DevinExecutor) streamDevinFramesForAuth(
 
 		lines := helps.TranslateStreamWithClaudeInputTokens(
 			ctx,
-			sdktranslator.FormatInteractions,
+			translatorreg.FormatInteractions,
 			responseFormat,
 			req.Model,
 			originalReq,
@@ -653,7 +653,7 @@ func (e *DevinExecutor) streamDevinFramesForAuth(
 		}
 		for _, line := range lines {
 			select {
-			case out <- cliproxyexecutor.StreamChunk{Payload: line}:
+			case out <- coreexecutor.StreamChunk{Payload: line}:
 			case <-ctx.Done():
 				return false
 			}
@@ -670,7 +670,7 @@ func (e *DevinExecutor) streamDevinFramesForAuth(
 			return
 		}
 		select {
-		case out <- cliproxyexecutor.StreamChunk{Err: err}:
+		case out <- coreexecutor.StreamChunk{Err: err}:
 		case <-ctx.Done():
 		}
 	}
@@ -682,7 +682,7 @@ func (e *DevinExecutor) streamDevinFramesForAuth(
 
 	// Keep tools and block-oriented content queued for late or split thought signatures.
 	// OpenAI text can stream independently, but must not overtake queued tools.
-	streamContentEarly := responseFormat == sdktranslator.FormatOpenAI || responseFormat == sdktranslator.FormatOpenAIResponse
+	streamContentEarly := responseFormat == translatorreg.FormatOpenAI || responseFormat == translatorreg.FormatOpenAIResponse
 	var pendingActions []func() bool
 	var deferredThoughtStops []int
 	responseThoughtSignatures := make(map[int]string)
@@ -718,7 +718,7 @@ func (e *DevinExecutor) streamDevinFramesForAuth(
 			if stopIdx < 0 {
 				stopIdx = stepIndex
 			}
-			if responseFormat == sdktranslator.FormatOpenAIResponse {
+			if responseFormat == translatorreg.FormatOpenAIResponse {
 				// Responses items may overlap. Keep reasoning open for late signatures
 				// so output_item.done and response.completed contain the same item.
 				deferredThoughtStops = append(deferredThoughtStops, stopIdx)
@@ -1126,7 +1126,7 @@ func (e *DevinExecutor) streamDevinFramesForAuth(
 			sigDoc := ojson.NewDoc([]byte(`{"event_type":"step.delta","index":0,"delta":{"type":"thought_signature","signature":""}}`))
 			_ = sigDoc.Set("index", targetIdx)
 			sig := string(frameRes.DeltaSignature)
-			if responseFormat == sdktranslator.FormatOpenAIResponse {
+			if responseFormat == translatorreg.FormatOpenAIResponse {
 				// The Responses translator accepts complete signatures, not fragments.
 				responseThoughtSignatures[targetIdx] += sig
 				sig = responseThoughtSignatures[targetIdx]
@@ -1272,15 +1272,15 @@ func (e *DevinExecutor) streamDevinFramesForAuth(
 	}
 
 	// 6. Terminate stream with [DONE]
-	if responseFormat == sdktranslator.FormatInteractions {
+	if responseFormat == translatorreg.FormatInteractions {
 		select {
-		case out <- cliproxyexecutor.StreamChunk{Payload: []byte("data: [DONE]\n\n")}:
+		case out <- coreexecutor.StreamChunk{Payload: []byte("data: [DONE]\n\n")}:
 		case <-ctx.Done():
 		}
 	} else {
 		lines := helps.TranslateStreamWithClaudeInputTokens(
 			ctx,
-			sdktranslator.FormatInteractions,
+			translatorreg.FormatInteractions,
 			responseFormat,
 			req.Model,
 			originalReq,
@@ -1294,7 +1294,7 @@ func (e *DevinExecutor) streamDevinFramesForAuth(
 		}
 		for _, line := range lines {
 			select {
-			case out <- cliproxyexecutor.StreamChunk{Payload: line}:
+			case out <- coreexecutor.StreamChunk{Payload: line}:
 			case <-ctx.Done():
 			}
 		}
@@ -1305,7 +1305,7 @@ func consumeDevinFramesToInteractions(body io.Reader, model, chatModelUID string
 	return consumeDevinFramesToInteractionsForAuth(body, model, chatModelUID, nil, original...)
 }
 
-func consumeDevinFramesToInteractionsForAuth(body io.Reader, model, chatModelUID string, auth *cliproxyauth.Auth, original ...[]byte) ([]byte, *helps.DevinUpstreamResponseLog, error) {
+func consumeDevinFramesToInteractionsForAuth(body io.Reader, model, chatModelUID string, auth *coreauth.Auth, original ...[]byte) ([]byte, *helps.DevinUpstreamResponseLog, error) {
 	interactionID := fmt.Sprintf("interaction_%s", uuid.New().String()[:12])
 	var preToolTextParts []string
 	var postToolTextParts []string
@@ -2749,7 +2749,7 @@ func devinApplyPatchStatusError(diagnostic string) statusErr {
 // #6690) is credential-scoped and, when auth carries a valid observed reset
 // timestamp for that window, retries only after the reset. Transient
 // capacity and generic rate-limit 429s stay model-scoped.
-func devinTrailerStatusError(code int, msg string, auth *cliproxyauth.Auth) statusErr {
+func devinTrailerStatusError(code int, msg string, auth *coreauth.Auth) statusErr {
 	return devinQuotaScopedStatusError(statusErr{code: code, msg: msg}, auth, time.Now())
 }
 
@@ -2757,7 +2757,7 @@ func devinTrailerStatusError(code int, msg string, auth *cliproxyauth.Auth) stat
 // message reports daily/weekly usage quota exhaustion, deriving RetryAfter
 // from the matching observed reset signal. An explicit Retry-After already
 // carried by err is preserved and never overwritten by signal data.
-func devinQuotaScopedStatusError(err statusErr, auth *cliproxyauth.Auth, now time.Time) statusErr {
+func devinQuotaScopedStatusError(err statusErr, auth *coreauth.Auth, now time.Time) statusErr {
 	if err.code != http.StatusTooManyRequests {
 		return err
 	}
@@ -2783,7 +2783,7 @@ func newDevinStatusError(code int, headers http.Header, body []byte) statusErr {
 // newDevinStatusErrorForAuth builds the scheduling view of a direct HTTP
 // (non-trailer) upstream failure. Daily/weekly quota exhaustion becomes
 // credential-scoped and, when auth is known, retries at the observed reset.
-func newDevinStatusErrorForAuth(code int, headers http.Header, body []byte, auth *cliproxyauth.Auth) statusErr {
+func newDevinStatusErrorForAuth(code int, headers http.Header, body []byte, auth *coreauth.Auth) statusErr {
 	err := statusErr{code: code, msg: string(body)}
 	if code == http.StatusTooManyRequests && headers != nil {
 		if raw := strings.TrimSpace(headers.Get("Retry-After")); raw != "" {
@@ -2803,7 +2803,7 @@ func newDevinStatusErrorForAuth(code int, headers http.Header, body []byte, auth
 	return devinQuotaScopedStatusError(err, auth, time.Now())
 }
 
-func devinAuthCredentials(auth *cliproxyauth.Auth) (apiKey string, baseURL string, deviceSeed string) {
+func devinAuthCredentials(auth *coreauth.Auth) (apiKey string, baseURL string, deviceSeed string) {
 	if auth == nil {
 		return "", helps.DevinDefaultBaseURL, ""
 	}
@@ -2840,7 +2840,7 @@ func devinAuthCredentials(auth *cliproxyauth.Auth) (apiKey string, baseURL strin
 	return
 }
 
-func devinAuthLogFields(auth *cliproxyauth.Auth) (authID, authLabel, authType, authValue string) {
+func devinAuthLogFields(auth *coreauth.Auth) (authID, authLabel, authType, authValue string) {
 	if auth == nil {
 		return "", "", "devin", ""
 	}
@@ -2858,11 +2858,11 @@ func devinAuthLogFields(auth *cliproxyauth.Auth) (authID, authLabel, authType, a
 	return
 }
 
-func resolveDevinSessionAndCascadeIDs(ctx context.Context, sessionID, cascadeID string, opts cliproxyexecutor.Options) (string, string) {
+func resolveDevinSessionAndCascadeIDs(ctx context.Context, sessionID, cascadeID string, opts coreexecutor.Options) (string, string) {
 	if sessionID == "" {
 		if ctxSession := util.SessionIDFromContext(ctx); ctxSession != "" {
 			sessionID = ctxSession
-		} else if canon := cliproxyauth.CanonicalSessionID(opts.Headers, opts.OriginalRequest, opts.Metadata); canon != "" {
+		} else if canon := coreauth.CanonicalSessionID(opts.Headers, opts.OriginalRequest, opts.Metadata); canon != "" {
 			sessionID = canon
 		}
 	}

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 // Issue 7017: the Codex upstream rejects per-turn admission with a 429
@@ -21,7 +21,7 @@ func issue7017AssertTransient(t *testing.T, err error, wantHint *time.Duration) 
 	if !errors.As(err, &statusErr) || statusErr.StatusCode() != http.StatusTooManyRequests {
 		t.Fatalf("status = %v, want 429 (err=%v)", statusErr, err)
 	}
-	var transient cliproxyexecutor.TransientRateLimitError
+	var transient coreexecutor.TransientRateLimitError
 	if !errors.As(err, &transient) || transient == nil || !transient.IsTransientRateLimit() {
 		t.Fatalf("turn_rate_limit_exceeded must be transient rate limit, err=%v", err)
 	}

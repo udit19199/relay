@@ -14,9 +14,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	kvstore "github.com/router-for-me/CLIProxyAPI/v8/internal/kvstore"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	"github.com/udit19199/relay/internal/config"
+	kvstore "github.com/udit19199/relay/internal/kvstore"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 const (
@@ -115,14 +115,6 @@ func ResetClaudeDeviceProfileCache() {
 	claudeDeviceProfileCacheMu.Lock()
 	claudeDeviceProfileCache = make(map[string]claudeDeviceProfileCacheEntry)
 	claudeDeviceProfileCacheMu.Unlock()
-}
-
-func MapStainlessOS() string {
-	return mapStainlessOS()
-}
-
-func MapStainlessArch() string {
-	return mapStainlessArch()
 }
 
 func defaultClaudeDeviceProfile(cfg *config.Config) ClaudeDeviceProfile {
@@ -340,7 +332,7 @@ func firstNonEmptyHeader(headers http.Header, name, fallback string) string {
 	return fallback
 }
 
-func claudeDeviceProfileScopeKey(auth *cliproxyauth.Auth, apiKey string) string {
+func claudeDeviceProfileScopeKey(auth *coreauth.Auth, apiKey string) string {
 	switch {
 	case auth != nil && strings.TrimSpace(auth.ID) != "":
 		return "auth:" + strings.TrimSpace(auth.ID)
@@ -369,7 +361,7 @@ func claudeDeviceProfileSubclientScope(profile ClaudeDeviceProfile, configs ...*
 	return "other"
 }
 
-func claudeDeviceProfileScopedKey(auth *cliproxyauth.Auth, apiKey string, profile ClaudeDeviceProfile, configs ...*config.Config) string {
+func claudeDeviceProfileScopedKey(auth *coreauth.Auth, apiKey string, profile ClaudeDeviceProfile, configs ...*config.Config) string {
 	key := claudeDeviceProfileScopeKey(auth, apiKey)
 	if subclient := claudeDeviceProfileSubclientScope(profile, configs...); subclient != "" {
 		key += "|subclient:" + subclient
@@ -377,16 +369,16 @@ func claudeDeviceProfileScopedKey(auth *cliproxyauth.Auth, apiKey string, profil
 	return key
 }
 
-func claudeDeviceProfileCacheKey(auth *cliproxyauth.Auth, apiKey string, profile ClaudeDeviceProfile, configs ...*config.Config) string {
+func claudeDeviceProfileCacheKey(auth *coreauth.Auth, apiKey string, profile ClaudeDeviceProfile, configs ...*config.Config) string {
 	sum := sha256.Sum256([]byte(claudeDeviceProfileScopedKey(auth, apiKey, profile, configs...)))
 	return hex.EncodeToString(sum[:])
 }
 
-func claudeDeviceProfileKVKey(auth *cliproxyauth.Auth, apiKey string, profile ClaudeDeviceProfile, configs ...*config.Config) string {
+func claudeDeviceProfileKVKey(auth *coreauth.Auth, apiKey string, profile ClaudeDeviceProfile, configs ...*config.Config) string {
 	return "cpa:claude:device-profile:" + kvstore.HashKeyPart(claudeDeviceProfileScopedKey(auth, apiKey, profile, configs...))
 }
 
-func claudeDeviceProfileLockKVKey(auth *cliproxyauth.Auth, apiKey string, profile ClaudeDeviceProfile, configs ...*config.Config) string {
+func claudeDeviceProfileLockKVKey(auth *coreauth.Auth, apiKey string, profile ClaudeDeviceProfile, configs ...*config.Config) string {
 	return "cpa:claude:device-profile-lock:" + kvstore.HashKeyPart(claudeDeviceProfileScopedKey(auth, apiKey, profile, configs...))
 }
 
@@ -411,7 +403,7 @@ func purgeExpiredClaudeDeviceProfiles() {
 	claudeDeviceProfileCacheMu.Unlock()
 }
 
-func ResolveClaudeDeviceProfile(auth *cliproxyauth.Auth, apiKey string, headers http.Header, cfg *config.Config) ClaudeDeviceProfile {
+func ResolveClaudeDeviceProfile(auth *coreauth.Auth, apiKey string, headers http.Header, cfg *config.Config) ClaudeDeviceProfile {
 	profile, errProfile := ResolveClaudeDeviceProfileRequired(context.Background(), auth, apiKey, headers, cfg)
 	if errProfile != nil {
 		return defaultClaudeDeviceProfile(cfg)
@@ -420,7 +412,7 @@ func ResolveClaudeDeviceProfile(auth *cliproxyauth.Auth, apiKey string, headers 
 }
 
 // ResolveClaudeDeviceProfileRequired resolves a stable Claude Code device profile for request-time paths.
-func ResolveClaudeDeviceProfileRequired(ctx context.Context, auth *cliproxyauth.Auth, apiKey string, headers http.Header, cfg *config.Config) (ClaudeDeviceProfile, error) {
+func ResolveClaudeDeviceProfileRequired(ctx context.Context, auth *coreauth.Auth, apiKey string, headers http.Header, cfg *config.Config) (ClaudeDeviceProfile, error) {
 	client, kvMode, errClient := currentClaudeDeviceProfileKVClient()
 	if kvMode {
 		if errClient != nil {
@@ -431,7 +423,7 @@ func ResolveClaudeDeviceProfileRequired(ctx context.Context, auth *cliproxyauth.
 	return resolveClaudeDeviceProfileLocal(auth, apiKey, headers, cfg), nil
 }
 
-func resolveClaudeDeviceProfileLocal(auth *cliproxyauth.Auth, apiKey string, headers http.Header, cfg *config.Config) ClaudeDeviceProfile {
+func resolveClaudeDeviceProfileLocal(auth *coreauth.Auth, apiKey string, headers http.Header, cfg *config.Config) ClaudeDeviceProfile {
 	claudeDeviceProfileCacheCleanupOnce.Do(startClaudeDeviceProfileCacheCleanup)
 
 	now := time.Now()
@@ -496,7 +488,7 @@ func resolveClaudeDeviceProfileLocal(auth *cliproxyauth.Auth, apiKey string, hea
 	return baseline
 }
 
-func resolveClaudeDeviceProfileHome(ctx context.Context, client claudeDeviceProfileKVClient, auth *cliproxyauth.Auth, apiKey string, headers http.Header, cfg *config.Config) (ClaudeDeviceProfile, error) {
+func resolveClaudeDeviceProfileHome(ctx context.Context, client claudeDeviceProfileKVClient, auth *coreauth.Auth, apiKey string, headers http.Header, cfg *config.Config) (ClaudeDeviceProfile, error) {
 	baseline := defaultClaudeDeviceProfile(cfg)
 	candidate, hasCandidate := extractClaudeDeviceProfile(headers, cfg)
 	if hasCandidate {

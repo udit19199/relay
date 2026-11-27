@@ -8,38 +8,34 @@ import (
 	"strings"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/thinking"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	"github.com/udit19199/relay/internal/thinking"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 type claudeCompactionSummaryContextKey struct{}
 
 // expandClaudeResponsesCompaction rewrites sealed compaction items into context
 // before translation. Unrecognized capsules fail the request instead of being dropped.
-func expandClaudeResponsesCompaction(req *cliproxyexecutor.Request, opts *cliproxyexecutor.Options) error {
+func expandClaudeResponsesCompaction(req *coreexecutor.Request, opts *coreexecutor.Options) error {
 	return helps.ExpandResponsesCompactionCapsules(req, opts, "claude")
 }
 
-func dropForeignClaudeCompactionItems(payload []byte) []byte {
-	return helps.DropForeignResponsesCompactionItems(payload, "claude")
-}
-
-func claudeResponsesCompactionRequested(req cliproxyexecutor.Request, opts cliproxyexecutor.Options) bool {
+func claudeResponsesCompactionRequested(req coreexecutor.Request, opts coreexecutor.Options) bool {
 	return opts.Alt == "responses/compact" || helps.HasResponsesCompactionTriggerRequest(req, opts)
 }
 
-func claudeCompactionSourcePayload(req cliproxyexecutor.Request, opts cliproxyexecutor.Options) []byte {
+func claudeCompactionSourcePayload(req coreexecutor.Request, opts coreexecutor.Options) []byte {
 	return helps.ResponsesCompactionSourcePayload(req, opts)
 }
 
-func (e *ClaudeExecutor) executeClaudeCompaction(ctx context.Context, auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
-	var resp cliproxyexecutor.Response
+func (e *ClaudeExecutor) executeClaudeCompaction(ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) (coreexecutor.Response, error) {
+	var resp coreexecutor.Response
 	baseModel := thinking.ParseSuffix(req.Model).ModelName
 	summaryPayload := prepareClaudeCompactionSummaryPayload(claudeCompactionSourcePayload(req, opts), baseModel)
-	summaryReq := cliproxyexecutor.Request{
+	summaryReq := coreexecutor.Request{
 		Model:    req.Model,
 		Payload:  summaryPayload,
 		Metadata: req.Metadata,
@@ -48,8 +44,8 @@ func (e *ClaudeExecutor) executeClaudeCompaction(ctx context.Context, auth *clip
 	summaryOpts.Alt = ""
 	summaryOpts.Stream = false
 	summaryOpts.OriginalRequest = nil
-	summaryOpts.SourceFormat = sdktranslator.FormatOpenAIResponse
-	summaryOpts.ResponseFormat = sdktranslator.FormatClaude
+	summaryOpts.SourceFormat = translatorreg.FormatOpenAIResponse
+	summaryOpts.ResponseFormat = translatorreg.FormatClaude
 
 	summaryResp, errSummary := e.Execute(withClaudeCompactionSummary(ctx), auth, summaryReq, summaryOpts)
 	if errSummary != nil {
@@ -67,13 +63,13 @@ func (e *ClaudeExecutor) executeClaudeCompaction(ctx context.Context, auth *clip
 	inputTokens, outputTokens, totalTokens, cachedTokens := claudeCompactionResponsesUsage(summaryResp.Payload)
 	respPayload := helps.BuildResponsesCompactionResponse(baseModel, capsule, inputTokens, outputTokens, totalTokens)
 	respPayload, _ = ojson.SetBytes(respPayload, "usage.input_tokens_details.cached_tokens", cachedTokens)
-	return cliproxyexecutor.Response{
+	return coreexecutor.Response{
 		Payload: respPayload,
 		Headers: summaryResp.Headers,
 	}, nil
 }
 
-func (e *ClaudeExecutor) executeClaudeCompactionStream(ctx context.Context, auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (*cliproxyexecutor.StreamResult, error) {
+func (e *ClaudeExecutor) executeClaudeCompactionStream(ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) (*coreexecutor.StreamResult, error) {
 	baseModel := thinking.ParseSuffix(req.Model).ModelName
 	summaryResp, errSummary := e.executeClaudeCompaction(ctx, auth, req, opts)
 	if errSummary != nil {
@@ -93,9 +89,9 @@ func (e *ClaudeExecutor) executeClaudeCompactionStream(ctx context.Context, auth
 	for i := range chunks {
 		chunks[i] = patchClaudeCompactionStreamUsage(chunks[i], inputTokens, outputTokens, totalTokens, cachedTokens)
 	}
-	out := make(chan cliproxyexecutor.StreamChunk, len(chunks))
+	out := make(chan coreexecutor.StreamChunk, len(chunks))
 	for _, chunk := range chunks {
-		out <- cliproxyexecutor.StreamChunk{Payload: chunk}
+		out <- coreexecutor.StreamChunk{Payload: chunk}
 	}
 	close(out)
 
@@ -104,7 +100,7 @@ func (e *ClaudeExecutor) executeClaudeCompactionStream(ctx context.Context, auth
 		headers = make(http.Header)
 	}
 	headers.Set("Content-Type", "text/event-stream")
-	return &cliproxyexecutor.StreamResult{Headers: headers, Chunks: out}, nil
+	return &coreexecutor.StreamResult{Headers: headers, Chunks: out}, nil
 }
 
 func withClaudeCompactionSummary(ctx context.Context) context.Context {
@@ -138,18 +134,6 @@ func prepareClaudeCompactionSummaryPayload(payload []byte, modelName string) []b
 	return doc.Bytes()
 }
 
-// finalizeClaudeCompactionSummaryBody runs after built-in translation and before
-// user payload rules. Tool history stays structured when definitions exist, and
-// tool_choice none stops the summary turn from calling a tool. History without
-// definitions is flattened so Anthropic does not reject orphan tool blocks.
-func finalizeClaudeCompactionSummaryBody(body []byte) []byte {
-	doc := ojson.NewDoc(body)
-	if !finalizeClaudeCompactionSummaryBodyDoc(doc) {
-		return body
-	}
-	return doc.Bytes()
-}
-
 func finalizeClaudeCompactionSummaryBodyDoc(doc *ojson.Doc) bool {
 	if doc == nil {
 		return false
@@ -160,25 +144,12 @@ func finalizeClaudeCompactionSummaryBodyDoc(doc *ojson.Doc) bool {
 	return flattenClaudeToolBlocksForCompactionDoc(doc)
 }
 
-func claudeBodyHasToolDefinitions(body []byte) bool {
-	tools := ojson.GetBytesNoCopy(body, "tools")
-	return tools.IsArray() && len(tools.Array()) > 0
-}
-
 func claudeDocHasToolDefinitions(doc *ojson.Doc) bool {
 	if doc == nil {
 		return false
 	}
 	tools := doc.Get("tools")
 	return tools.IsArray() && len(tools.Array()) > 0
-}
-
-func flattenClaudeToolBlocksForCompaction(body []byte) []byte {
-	doc := ojson.NewDoc(body)
-	if !flattenClaudeToolBlocksForCompactionDoc(doc) {
-		return body
-	}
-	return doc.Bytes()
 }
 
 func flattenClaudeToolBlocksForCompactionDoc(doc *ojson.Doc) bool {

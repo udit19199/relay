@@ -11,10 +11,10 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gorilla/websocket"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
 	log "github.com/sirupsen/logrus"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 type codexWebsocketSessionStore struct {
@@ -69,7 +69,7 @@ type codexWebsocketSession struct {
 	hasConnCfg                bool
 	multiAgentV2OptimizedConn *websocket.Conn
 	lifecycleBindMu           sync.Mutex
-	lifecycle                 cliproxyexecutor.ExecutionLifecycle
+	lifecycle                 coreexecutor.ExecutionLifecycle
 	lifecycleModel            string
 
 	writeMu sync.Mutex
@@ -349,12 +349,12 @@ func (s *codexWebsocketSession) configureConn(conn *websocket.Conn) {
 	})
 }
 
-func (s *codexWebsocketSession) bindExecutionLifecycle(opts cliproxyexecutor.Options, conn *websocket.Conn, closer *websocketConnectionCloser, model string) error {
+func (s *codexWebsocketSession) bindExecutionLifecycle(opts coreexecutor.Options, conn *websocket.Conn, closer *websocketConnectionCloser, model string) error {
 	if closer == nil {
 		return fmt.Errorf("codex websockets executor: websocket connection closer is nil")
 	}
 	if s == nil {
-		return cliproxyexecutor.BindExecutionResource(opts, closer)
+		return coreexecutor.BindExecutionResource(opts, closer)
 	}
 	lifecycle := opts.ExecutionLifecycle
 	if lifecycle == nil || conn == nil {
@@ -398,7 +398,7 @@ func (s *codexWebsocketSession) bindExecutionLifecycle(opts cliproxyexecutor.Opt
 	return nil
 }
 
-func (s *codexWebsocketSession) closeBoundConnection(conn *websocket.Conn, closer *websocketConnectionCloser, lifecycle cliproxyexecutor.ExecutionLifecycle) error {
+func (s *codexWebsocketSession) closeBoundConnection(conn *websocket.Conn, closer *websocketConnectionCloser, lifecycle coreexecutor.ExecutionLifecycle) error {
 	if s == nil || conn == nil {
 		return nil
 	}
@@ -408,7 +408,7 @@ func (s *codexWebsocketSession) closeBoundConnection(conn *websocket.Conn, close
 	return errClose
 }
 
-func (s *codexWebsocketSession) detachConnection(conn *websocket.Conn, lifecycle cliproxyexecutor.ExecutionLifecycle) *websocketConnectionCloser {
+func (s *codexWebsocketSession) detachConnection(conn *websocket.Conn, lifecycle coreexecutor.ExecutionLifecycle) *websocketConnectionCloser {
 	if s == nil || conn == nil {
 		return nil
 	}
@@ -497,7 +497,7 @@ func websocketSessionTargetMatches(sess *codexWebsocketSession, authID string, w
 		strings.TrimSpace(sess.proxyURL) == strings.TrimSpace(proxyURL)
 }
 
-func codexWebsocketRequestUsesSIWC(ctx context.Context, auth *cliproxyauth.Auth, headers http.Header, explicitUseSIWC ...bool) bool {
+func codexWebsocketRequestUsesSIWC(ctx context.Context, auth *coreauth.Auth, headers http.Header, explicitUseSIWC ...bool) bool {
 	if len(explicitUseSIWC) > 0 {
 		return explicitUseSIWC[0]
 	}
@@ -515,7 +515,7 @@ func codexWebsocketRequestUsesSIWC(ctx context.Context, auth *cliproxyauth.Auth,
 	return codexUseSIWCForRequest(ctx, auth, headers)
 }
 
-func detachMismatchedWebsocketSessionConn(sess *codexWebsocketSession, authID string, wsURL string, proxyURL string, useSIWC ...bool) (*websocket.Conn, *websocketConnectionCloser, string, string, cliproxyexecutor.ExecutionLifecycle) {
+func detachMismatchedWebsocketSessionConn(sess *codexWebsocketSession, authID string, wsURL string, proxyURL string, useSIWC ...bool) (*websocket.Conn, *websocketConnectionCloser, string, string, coreexecutor.ExecutionLifecycle) {
 	if sess == nil {
 		return nil, nil, "", "", nil
 	}
@@ -635,7 +635,7 @@ func (s *codexWebsocketSession) notifyUpstreamDisconnect(err error) {
 	if s == nil {
 		return
 	}
-	if cliproxyexecutor.IsUpstreamWebsocketTurnError(err) {
+	if coreexecutor.IsUpstreamWebsocketTurnError(err) {
 		// The active turn reports it; an idle loss ends no turn and keeps the downstream socket.
 		return
 	}
@@ -651,11 +651,11 @@ func (s *codexWebsocketSession) notifyUpstreamDisconnect(err error) {
 	})
 }
 
-func executionSessionIDFromOptions(opts cliproxyexecutor.Options) string {
+func executionSessionIDFromOptions(opts coreexecutor.Options) string {
 	if len(opts.Metadata) == 0 {
 		return ""
 	}
-	raw, ok := opts.Metadata[cliproxyexecutor.ExecutionSessionMetadataKey]
+	raw, ok := opts.Metadata[coreexecutor.ExecutionSessionMetadataKey]
 	if !ok || raw == nil {
 		return ""
 	}
@@ -705,11 +705,11 @@ func (e *CodexWebsocketsExecutor) UpstreamDisconnectChan(sessionID string) <-cha
 	return sess.upstreamDisconnectCh
 }
 
-func (e *CodexWebsocketsExecutor) ensureUpstreamConn(ctx context.Context, auth *cliproxyauth.Auth, sess *codexWebsocketSession, authID string, wsURL string, headers http.Header) (*websocket.Conn, *websocketConnectionCloser, *http.Response, error) {
+func (e *CodexWebsocketsExecutor) ensureUpstreamConn(ctx context.Context, auth *coreauth.Auth, sess *codexWebsocketSession, authID string, wsURL string, headers http.Header) (*websocket.Conn, *websocketConnectionCloser, *http.Response, error) {
 	return e.ensureUpstreamConnWithSIWC(ctx, auth, sess, authID, wsURL, headers, codexWebsocketRequestUsesSIWC(ctx, auth, headers))
 }
 
-func (e *CodexWebsocketsExecutor) ensureUpstreamConnWithSIWC(ctx context.Context, auth *cliproxyauth.Auth, sess *codexWebsocketSession, authID string, wsURL string, headers http.Header, useSIWC bool) (*websocket.Conn, *websocketConnectionCloser, *http.Response, error) {
+func (e *CodexWebsocketsExecutor) ensureUpstreamConnWithSIWC(ctx context.Context, auth *coreauth.Auth, sess *codexWebsocketSession, authID string, wsURL string, headers http.Header, useSIWC bool) (*websocket.Conn, *websocketConnectionCloser, *http.Response, error) {
 	if sess == nil {
 		conn, closer, resp, err := e.dialCodexWebsocket(ctx, auth, wsURL, headers)
 		if conn != nil {
@@ -747,7 +747,7 @@ func (e *CodexWebsocketsExecutor) ensureUpstreamConnWithSIWC(ctx context.Context
 		logCodexWebsocketConnectedWithReused(sess, sess.sessionID, authID, wsURL, true)
 		return conn, closer, nil, nil
 	}
-	if errLoss := cliproxyexecutor.WebsocketInputLossError(ctx); errLoss != nil {
+	if errLoss := coreexecutor.WebsocketInputLossError(ctx); errLoss != nil {
 		return nil, nil, nil, errLoss
 	}
 
@@ -805,7 +805,7 @@ func (e *CodexWebsocketsExecutor) readUpstreamLoop(sess *codexWebsocketSession, 
 				e.invalidateUpstreamConn(sess, conn, "upstream_disconnected", errRead)
 			}
 			invalidated := false
-			if cliproxyexecutor.IsUpstreamWebsocketTurnError(errRead) {
+			if coreexecutor.IsUpstreamWebsocketTurnError(errRead) {
 				// Drop the dead connection before the turn error is visible, so the next
 				// create reconnects instead of writing to it.
 				invalidate()
@@ -950,8 +950,8 @@ func (e *CodexWebsocketsExecutor) invalidateUpstreamConnWithNotify(sess *codexWe
 	if sess.readerConn == conn {
 		sess.readerConn = nil
 	}
-	if cliproxyexecutor.IsUpstreamWebsocketTurnError(err) {
-		cliproxyexecutor.NotifyWebsocketInputLoss(turnContext)
+	if coreexecutor.IsUpstreamWebsocketTurnError(err) {
+		coreexecutor.NotifyWebsocketInputLoss(turnContext)
 	}
 	sess.connMu.Unlock()
 
@@ -966,7 +966,7 @@ func (e *CodexWebsocketsExecutor) invalidateUpstreamConnWithNotify(sess *codexWe
 		}
 	}
 	if lifecycle != nil {
-		if owner, ok := lifecycle.(interface{ EndWebsocketTurn(context.Context, string) }); ok && cliproxyexecutor.IsUpstreamWebsocketTurnError(err) {
+		if owner, ok := lifecycle.(interface{ EndWebsocketTurn(context.Context, string) }); ok && coreexecutor.IsUpstreamWebsocketTurnError(err) {
 			// The lost turn's attempt must survive to deliver its error to the client.
 			owner.EndWebsocketTurn(turnContext, reason)
 		} else {
@@ -985,7 +985,7 @@ func (e *CodexWebsocketsExecutor) sessionStore() *codexWebsocketSessionStore {
 	return globalCodexWebsocketSessionStore
 }
 
-func (e *CodexWebsocketsExecutor) SharesExecutionSessionsWith(other cliproxyauth.ProviderExecutor) bool {
+func (e *CodexWebsocketsExecutor) SharesExecutionSessionsWith(other coreauth.ProviderExecutor) bool {
 	if e == nil || other == nil {
 		return false
 	}
@@ -1018,7 +1018,7 @@ func (e *CodexWebsocketsExecutor) CloseExecutionSession(sessionID string) {
 	if sessionID == "" {
 		return
 	}
-	if sessionID == cliproxyauth.CloseAllExecutionSessionsID {
+	if sessionID == coreauth.CloseAllExecutionSessionsID {
 		e.closeAllExecutionSessions("executor_shutdown")
 		return
 	}

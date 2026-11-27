@@ -12,8 +12,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/tiktoken-go/tokenizer"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
+	"github.com/udit19199/relay/internal/util"
 )
 
 var (
@@ -24,18 +24,18 @@ var (
 
 // ClaudeInputTokenState tracks the one-time input token update for a translated Claude stream.
 type ClaudeInputTokenState struct {
-	upstreamFormat  sdktranslator.Format
-	responseFormat  sdktranslator.Format
+	upstreamFormat  translatorreg.Format
+	responseFormat  translatorreg.Format
 	originalRequest []byte
 	codec           tokenizer.Codec
 	handled         bool
 }
 
 // NewClaudeInputTokenState creates request-scoped state for translated Claude input token usage.
-func NewClaudeInputTokenState(sourceFormat, upstreamFormat, responseFormat sdktranslator.Format, originalRequest []byte) *ClaudeInputTokenState {
-	enabled := sourceFormat == sdktranslator.FormatClaude &&
-		upstreamFormat != sdktranslator.FormatClaude &&
-		responseFormat == sdktranslator.FormatClaude
+func NewClaudeInputTokenState(sourceFormat, upstreamFormat, responseFormat translatorreg.Format, originalRequest []byte) *ClaudeInputTokenState {
+	enabled := sourceFormat == translatorreg.FormatClaude &&
+		upstreamFormat != translatorreg.FormatClaude &&
+		responseFormat == translatorreg.FormatClaude
 	return &ClaudeInputTokenState{
 		upstreamFormat:  upstreamFormat,
 		responseFormat:  responseFormat,
@@ -47,13 +47,13 @@ func NewClaudeInputTokenState(sourceFormat, upstreamFormat, responseFormat sdktr
 // TranslateStreamWithClaudeInputTokens translates a stream chunk and estimates Claude message_start input usage once.
 func TranslateStreamWithClaudeInputTokens(
 	ctx context.Context,
-	upstreamFormat, responseFormat sdktranslator.Format,
+	upstreamFormat, responseFormat translatorreg.Format,
 	model string,
 	originalRequestRawJSON, requestRawJSON, rawJSON []byte,
 	param *any,
 	state *ClaudeInputTokenState,
 ) [][]byte {
-	chunks := sdktranslator.TranslateStream(
+	chunks := translatorreg.TranslateStream(
 		ctx,
 		upstreamFormat,
 		responseFormat,
@@ -66,7 +66,7 @@ func TranslateStreamWithClaudeInputTokens(
 	if param != nil && ApplyPatchTranslationError(*param) != nil {
 		return chunks
 	}
-	if responseFormat == sdktranslator.FormatOpenAIResponse {
+	if responseFormat == translatorreg.FormatOpenAIResponse {
 		for i, chunk := range chunks {
 			chunks[i] = EnsureResponsesUsageDetails(chunk)
 		}

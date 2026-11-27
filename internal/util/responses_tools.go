@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/MoeForge/moego/ojson"
-	applypatch "github.com/router-for-me/CLIProxyAPI/v8/internal/client/codex/apply-patch"
+	applypatch "github.com/udit19199/relay/internal/client/codex/apply-patch"
 )
 
 // ResponsesToolIdentity represents the resolved identity of a tool in OpenAI Responses format.
@@ -69,13 +69,6 @@ func QualifyResponsesNamespaceToolName(namespaceName, childName string) string {
 		return namespaceName + childName
 	}
 	return namespaceName + "__" + childName
-}
-
-func responsesToolSources(root ojson.Result, includeClientToolSearch bool) []struct {
-	tools    ojson.Result
-	priority int
-} {
-	return responsesToolSourcesFromGetter(root.Get, includeClientToolSearch)
 }
 
 func responsesToolSourcesFromGetter(get func(string) ojson.Result, includeClientToolSearch bool) []struct {

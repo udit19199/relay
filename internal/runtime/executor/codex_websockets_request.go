@@ -8,22 +8,22 @@ import (
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/thinking"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/misc"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	"github.com/udit19199/relay/internal/thinking"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
+	"github.com/udit19199/relay/internal/util"
 )
 
-func applyCodexPromptCacheHeaders(from sdktranslator.Format, req cliproxyexecutor.Request, rawJSON []byte) ([]byte, http.Header) {
+func applyCodexPromptCacheHeaders(from translatorreg.Format, req coreexecutor.Request, rawJSON []byte) ([]byte, http.Header) {
 	body, headers, _ := applyCodexPromptCacheHeadersWithContext(context.Background(), from, req, rawJSON)
 	return body, headers
 }
 
-func applyCodexPromptCacheHeadersWithContext(ctx context.Context, from sdktranslator.Format, req cliproxyexecutor.Request, rawJSON []byte, headerSets ...http.Header) ([]byte, http.Header, error) {
+func applyCodexPromptCacheHeadersWithContext(ctx context.Context, from translatorreg.Format, req coreexecutor.Request, rawJSON []byte, headerSets ...http.Header) ([]byte, http.Header, error) {
 	headers := http.Header{}
 	if len(rawJSON) == 0 {
 		return rawJSON, headers, nil
@@ -36,7 +36,7 @@ func applyCodexPromptCacheHeadersWithContext(ctx context.Context, from sdktransl
 	return doc.Bytes(), headers, nil
 }
 
-func applyCodexPromptCacheHeadersWithContextDoc(ctx context.Context, from sdktranslator.Format, req cliproxyexecutor.Request, doc *ojson.Doc, headerSets ...http.Header) (http.Header, bool, error) {
+func applyCodexPromptCacheHeadersWithContextDoc(ctx context.Context, from translatorreg.Format, req coreexecutor.Request, doc *ojson.Doc, headerSets ...http.Header) (http.Header, bool, error) {
 	headers := http.Header{}
 	if doc == nil || doc.Len() == 0 {
 		return headers, false, nil
@@ -47,7 +47,7 @@ func applyCodexPromptCacheHeadersWithContextDoc(ctx context.Context, from sdktra
 		requestHeaders = headerSets[0]
 	}
 	var cache helps.CodexCache
-	if sourceFormatEqual(from, sdktranslator.FormatClaude) {
+	if sourceFormatEqual(from, translatorreg.FormatClaude) {
 		modelName := strings.TrimSpace(doc.Get("model").String())
 		if modelName == "" {
 			modelName = thinking.ParseSuffix(req.Model).ModelName
@@ -59,7 +59,7 @@ func applyCodexPromptCacheHeadersWithContextDoc(ctx context.Context, from sdktra
 		if ok {
 			cache = cached
 		}
-	} else if sourceFormatEqual(from, sdktranslator.FormatOpenAIResponse) {
+	} else if sourceFormatEqual(from, translatorreg.FormatOpenAIResponse) {
 		if promptCacheKey := ojson.GetBytesNoCopy(req.Payload, "prompt_cache_key"); promptCacheKey.Exists() {
 			cache.ID = strings.Clone(promptCacheKey.String())
 		}
@@ -78,7 +78,7 @@ func applyCodexPromptCacheHeadersWithContextDoc(ctx context.Context, from sdktra
 	return headers, changed, nil
 }
 
-func applyCodexWebsocketHeaders(ctx context.Context, headers http.Header, auth *cliproxyauth.Auth, token string, cfg *config.Config, nativeRequest bool, clientHeaders ...http.Header) http.Header {
+func applyCodexWebsocketHeaders(ctx context.Context, headers http.Header, auth *coreauth.Auth, token string, cfg *config.Config, nativeRequest bool, clientHeaders ...http.Header) http.Header {
 	if headers == nil {
 		headers = http.Header{}
 	}
@@ -214,39 +214,17 @@ func codexSessionHeaderValue(headers http.Header) string {
 	return ""
 }
 
-func codexAuthUsesAPIKey(auth *cliproxyauth.Auth) bool {
+func codexAuthUsesAPIKey(auth *coreauth.Auth) bool {
 	if auth == nil {
 		return false
 	}
-	if auth.AuthKind() == cliproxyauth.AuthKindAPIKey {
+	if auth.AuthKind() == coreauth.AuthKindAPIKey {
 		return true
 	}
 	if auth.Attributes != nil {
 		return strings.TrimSpace(auth.Attributes["api_key"]) != ""
 	}
 	return false
-}
-
-func ensureHeaderCasePreserved(target http.Header, source http.Header, key, configValue, fallbackValue string) {
-	if target == nil {
-		return
-	}
-	if strings.TrimSpace(headerValueCaseInsensitive(target, key)) != "" {
-		return
-	}
-	if source != nil {
-		if val := strings.TrimSpace(headerValueCaseInsensitive(source, key)); val != "" {
-			setHeaderCasePreserved(target, key, val)
-			return
-		}
-	}
-	if val := strings.TrimSpace(configValue); val != "" {
-		setHeaderCasePreserved(target, key, val)
-		return
-	}
-	if val := strings.TrimSpace(fallbackValue); val != "" {
-		setHeaderCasePreserved(target, key, val)
-	}
 }
 
 func setHeaderCasePreserved(headers http.Header, key string, value string) {
@@ -260,47 +238,6 @@ func setHeaderCasePreserved(headers http.Header, key string, value string) {
 	}
 	deleteHeaderCaseInsensitive(headers, key)
 	headers[key] = []string{value}
-}
-
-func setCodexSessionHeaderCasePreserved(headers http.Header, fallbackKey string, value string) {
-	if headers == nil {
-		return
-	}
-	fallbackKey = strings.TrimSpace(fallbackKey)
-	value = strings.TrimSpace(value)
-	if fallbackKey == "" || value == "" {
-		return
-	}
-
-	selectedKey := ""
-	if _, ok := headers[fallbackKey]; ok && codexSessionHeaderKeyUsesUnderscore(fallbackKey) {
-		selectedKey = fallbackKey
-	} else {
-		for existingKey := range headers {
-			if codexSessionHeaderKeyUsesUnderscore(existingKey) {
-				selectedKey = existingKey
-				break
-			}
-		}
-	}
-	if selectedKey == "" {
-		selectedKey = fallbackKey
-	}
-	for existingKey := range headers {
-		if codexSessionHeaderKey(existingKey) && existingKey != selectedKey {
-			delete(headers, existingKey)
-		}
-	}
-	headers[selectedKey] = []string{value}
-}
-
-func codexSessionHeaderKey(key string) bool {
-	normalized := strings.ToLower(strings.TrimSpace(key))
-	return normalized == "session_id" || normalized == "session-id"
-}
-
-func codexSessionHeaderKeyUsesUnderscore(key string) bool {
-	return strings.ToLower(strings.TrimSpace(key)) == "session_id"
 }
 
 func headerValueCaseInsensitive(headers http.Header, key string) string {
@@ -332,7 +269,7 @@ func deleteHeaderCaseInsensitive(headers http.Header, key string) {
 	}
 }
 
-func codexHeaderDefaults(cfg *config.Config, auth *cliproxyauth.Auth) (string, string) {
+func codexHeaderDefaults(cfg *config.Config, auth *coreauth.Auth) (string, string) {
 	if cfg == nil || auth == nil || codexAuthUsesAPIKey(auth) {
 		return "", ""
 	}

@@ -10,10 +10,10 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gorilla/websocket"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 // Check every lifecycle identity, not merely the final snapshot or event counts.
@@ -147,9 +147,9 @@ func TestApplyPatchNamedLateIdentityActualTransports(t *testing.T) {
 						exec, auth := applyPatchIdentityExecutor(t, transport, source)
 						ctx := t.Context()
 						if transport == "ws-raw" {
-							ctx = cliproxyexecutor.WithDownstreamWebsocket(ctx)
+							ctx = coreexecutor.WithDownstreamWebsocket(ctx)
 						}
-						stream, errExecuteStream := exec.ExecuteStream(ctx, auth, cliproxyexecutor.Request{Model: "grok-4", Payload: []byte(task6PatchRequest)}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse})
+						stream, errExecuteStream := exec.ExecuteStream(ctx, auth, coreexecutor.Request{Model: "grok-4", Payload: []byte(task6PatchRequest)}, coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse})
 						if errExecuteStream != nil {
 							t.Fatal(errExecuteStream)
 						}
@@ -176,7 +176,7 @@ func TestApplyPatchNamedLateIdentityActualTransports(t *testing.T) {
 	}
 }
 
-func applyPatchIdentityExecutor(t *testing.T, transport string, source [][]byte) (cliproxyauth.ProviderExecutor, *cliproxyauth.Auth) {
+func applyPatchIdentityExecutor(t *testing.T, transport string, source [][]byte) (coreauth.ProviderExecutor, *coreauth.Auth) {
 	t.Helper()
 	ws := strings.HasPrefix(transport, "ws-")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -211,7 +211,7 @@ func applyPatchIdentityExecutor(t *testing.T, transport string, source [][]byte)
 		wsExec.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
 		exec = wsExec
 	}
-	auth := &cliproxyauth.Auth{ID: t.Name(), Provider: exec.Identifier(), Attributes: map[string]string{"api_key": "test", "base_url": server.URL, "websockets": "true"}}
+	auth := &coreauth.Auth{ID: t.Name(), Provider: exec.Identifier(), Attributes: map[string]string{"api_key": "test", "base_url": server.URL, "websockets": "true"}}
 	return exec, auth
 }
 
@@ -251,9 +251,9 @@ func TestApplyPatchNamedLateIdentityActualFailures(t *testing.T) {
 				defer checkUsage()
 				ctx := t.Context()
 				if transport == "ws-raw" {
-					ctx = cliproxyexecutor.WithDownstreamWebsocket(ctx)
+					ctx = coreexecutor.WithDownstreamWebsocket(ctx)
 				}
-				stream, errExecuteStream := exec.ExecuteStream(ctx, auth, cliproxyexecutor.Request{Model: "grok-4", Payload: []byte(task6PatchRequest)}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse})
+				stream, errExecuteStream := exec.ExecuteStream(ctx, auth, coreexecutor.Request{Model: "grok-4", Payload: []byte(task6PatchRequest)}, coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse})
 				if errExecuteStream != nil {
 					t.Fatal(errExecuteStream)
 				}
@@ -331,9 +331,9 @@ func TestApplyPatchNamedLateIdentityActualInterleaved(t *testing.T) {
 			exec, auth := applyPatchIdentityExecutor(t, transport, source)
 			ctx := t.Context()
 			if transport == "ws-raw" {
-				ctx = cliproxyexecutor.WithDownstreamWebsocket(ctx)
+				ctx = coreexecutor.WithDownstreamWebsocket(ctx)
 			}
-			stream, errExecuteStream := exec.ExecuteStream(ctx, auth, cliproxyexecutor.Request{Model: "grok-4", Payload: []byte(task6PatchRequest)}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse})
+			stream, errExecuteStream := exec.ExecuteStream(ctx, auth, coreexecutor.Request{Model: "grok-4", Payload: []byte(task6PatchRequest)}, coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse})
 			if errExecuteStream != nil {
 				t.Fatal(errExecuteStream)
 			}

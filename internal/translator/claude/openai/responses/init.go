@@ -1,10 +1,10 @@
 package responses
 
 import (
-	. "github.com/router-for-me/CLIProxyAPI/v8/internal/constant"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/interfaces"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/translator/translator"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	. "github.com/udit19199/relay/internal/constant"
+	"github.com/udit19199/relay/internal/interfaces"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
+	"github.com/udit19199/relay/internal/translator/translator"
 )
 
 func init() {
@@ -19,9 +19,9 @@ func init() {
 	)
 	// The envelope form receives the request context, which carries the
 	// upstream.claude.tool-search value the executor pinned for the request.
-	sdktranslator.RegisterRequestEnvelope(
-		sdktranslator.FormatOpenAIResponse,
-		sdktranslator.FormatClaude,
+	translatorreg.RegisterRequestEnvelope(
+		translatorreg.FormatOpenAIResponse,
+		translatorreg.FormatClaude,
 		ConvertOpenAIResponsesRequestEnvelopeToClaude,
 	)
 }

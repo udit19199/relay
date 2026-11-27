@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translator "github.com/udit19199/relay/internal/translator/registry"
 )
 
 type issue6381RoundTripperFunc func(*http.Request) (*http.Response, error)
@@ -52,7 +52,7 @@ func TestOpenAICompatExecutorResponsesEOFAfterFinishReasonCompletesStream(t *tes
 	exec, auth, _ := newApplyPatchCompatTestExecutor(t, reply)
 	request := []byte(`{"model":"test","input":[{"role":"user","content":[{"type":"input_text","text":"hello"}]}],"stream":true}`)
 
-	result, errExecuteStream := exec.ExecuteStream(t.Context(), auth, cliproxyexecutor.Request{Model: "test", Payload: request}, cliproxyexecutor.Options{
+	result, errExecuteStream := exec.ExecuteStream(t.Context(), auth, coreexecutor.Request{Model: "test", Payload: request}, coreexecutor.Options{
 		SourceFormat:    translator.FormatOpenAIResponse,
 		ResponseFormat:  translator.FormatOpenAIResponse,
 		OriginalRequest: request,
@@ -83,7 +83,7 @@ func TestOpenAICompatExecutorResponsesEOFAfterApplyPatchFinishReasonCompletesStr
 	exec, auth, _ := newApplyPatchCompatTestExecutor(t, first+last)
 	request := applyPatchTestRequest()
 
-	result, errExecuteStream := exec.ExecuteStream(t.Context(), auth, cliproxyexecutor.Request{Model: "test", Payload: request}, cliproxyexecutor.Options{
+	result, errExecuteStream := exec.ExecuteStream(t.Context(), auth, coreexecutor.Request{Model: "test", Payload: request}, coreexecutor.Options{
 		SourceFormat:    translator.FormatOpenAIResponse,
 		ResponseFormat:  translator.FormatOpenAIResponse,
 		OriginalRequest: request,
@@ -116,7 +116,7 @@ func TestOpenAICompatExecutorResponsesScannerErrorDoesNotSynthesizeCompletion(t 
 		"",
 	}, "\n")
 	exec := NewOpenAICompatExecutor("custom-compat", &config.Config{})
-	auth := &cliproxyauth.Auth{Provider: "custom-compat", Attributes: map[string]string{"base_url": "http://responses.test/v1", "api_key": "test"}}
+	auth := &coreauth.Auth{Provider: "custom-compat", Attributes: map[string]string{"base_url": "http://responses.test/v1", "api_key": "test"}}
 	ctx := context.WithValue(t.Context(), "cliproxy.roundtripper", issue6381RoundTripperFunc(func(req *http.Request) (*http.Response, error) {
 		return &http.Response{
 			StatusCode: http.StatusOK,
@@ -130,7 +130,7 @@ func TestOpenAICompatExecutorResponsesScannerErrorDoesNotSynthesizeCompletion(t 
 	}))
 	request := []byte(`{"model":"test","input":[{"role":"user","content":[{"type":"input_text","text":"hello"}]}],"stream":true}`)
 
-	result, errExecuteStream := exec.ExecuteStream(ctx, auth, cliproxyexecutor.Request{Model: "test", Payload: request}, cliproxyexecutor.Options{
+	result, errExecuteStream := exec.ExecuteStream(ctx, auth, coreexecutor.Request{Model: "test", Payload: request}, coreexecutor.Options{
 		SourceFormat:    translator.FormatOpenAIResponse,
 		ResponseFormat:  translator.FormatOpenAIResponse,
 		OriginalRequest: request,
@@ -165,7 +165,7 @@ func TestOpenAICompatExecutorResponsesEOFBeforeFinishReasonFailsStream(t *testin
 	exec, auth, _ := newApplyPatchCompatTestExecutor(t, reply)
 	request := []byte(`{"model":"test","input":[{"role":"user","content":[{"type":"input_text","text":"hello"}]}],"stream":true}`)
 
-	result, errExecuteStream := exec.ExecuteStream(t.Context(), auth, cliproxyexecutor.Request{Model: "test", Payload: request}, cliproxyexecutor.Options{
+	result, errExecuteStream := exec.ExecuteStream(t.Context(), auth, coreexecutor.Request{Model: "test", Payload: request}, coreexecutor.Options{
 		SourceFormat:    translator.FormatOpenAIResponse,
 		ResponseFormat:  translator.FormatOpenAIResponse,
 		OriginalRequest: request,

@@ -10,9 +10,9 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 	"google.golang.org/protobuf/encoding/protowire"
 )
 
@@ -23,12 +23,12 @@ func (r devinContentCheckpointReader) Read(p []byte) (int, error) {
 }
 
 func TestDevinStreamEmitsContentBeforeThinkingCloses(t *testing.T) {
-	for _, format := range []sdktranslator.Format{sdktranslator.FormatOpenAI, sdktranslator.FormatOpenAIResponse} {
+	for _, format := range []translatorreg.Format{translatorreg.FormatOpenAI, translatorreg.FormatOpenAIResponse} {
 		t.Run(string(format), func(t *testing.T) {
 			// Each checkpoint runs synchronously when the executor requests the next
 			// frame, after all output for the previous frame has been enqueued.
 			// EOS is unavailable until every pre-EOS assertion has run.
-			out := make(chan cliproxyexecutor.StreamChunk, 64)
+			out := make(chan coreexecutor.StreamChunk, 64)
 			var content []string
 			var thinking strings.Builder
 			drain := func() {
@@ -45,10 +45,10 @@ func TestDevinStreamEmitsContentBeforeThinkingCloses(t *testing.T) {
 						event := ojson.Parse(data)
 						var text string
 						switch format {
-						case sdktranslator.FormatOpenAI:
+						case translatorreg.FormatOpenAI:
 							thinking.WriteString(event.Get("choices.0.delta.reasoning_content").String())
 							text = event.Get("choices.0.delta.content").String()
-						case sdktranslator.FormatOpenAIResponse:
+						case translatorreg.FormatOpenAIResponse:
 							switch event.Get("type").String() {
 							case "response.reasoning_summary_text.delta":
 								thinking.WriteString(event.Get("delta").String())
@@ -95,13 +95,13 @@ func TestDevinStreamEmitsContentBeforeThinkingCloses(t *testing.T) {
 			readers = append(readers, bytes.NewReader(helps.WrapConnectEnvelopeWithFlag(helps.ConnectFlagEndStream, []byte(`{}`))))
 
 			original := []byte(`{"model":"devin/swe-2","stream":true,"messages":[{"role":"user","content":"hi"}]}`)
-			if format == sdktranslator.FormatOpenAIResponse {
+			if format == translatorreg.FormatOpenAIResponse {
 				original = []byte(`{"model":"devin/swe-2","stream":true,"input":"hi"}`)
 			}
-			opts := cliproxyexecutor.Options{SourceFormat: format, OriginalRequest: original}
-			req := cliproxyexecutor.Request{
+			opts := coreexecutor.Options{SourceFormat: format, OriginalRequest: original}
+			req := coreexecutor.Request{
 				Model:   "devin/swe-2",
-				Payload: sdktranslator.TranslateRequest(format, sdktranslator.FormatInteractions, "devin/swe-2", original, true),
+				Payload: translatorreg.TranslateRequest(format, translatorreg.FormatInteractions, "devin/swe-2", original, true),
 			}
 			e := &DevinExecutor{}
 			e.streamDevinFrames(context.Background(), io.MultiReader(readers...), req, opts, "swe-2-high", format, nil, out)
@@ -121,7 +121,7 @@ func devinContentTestFrame(field protowire.Number, text string) []byte {
 	return helps.WrapConnectEnvelope(protowire.AppendString(frame, text))
 }
 
-func devinContentTestEvents(out <-chan cliproxyexecutor.StreamChunk) ([]ojson.Result, []error) {
+func devinContentTestEvents(out <-chan coreexecutor.StreamChunk) ([]ojson.Result, []error) {
 	var events []ojson.Result
 	var errs []error
 	for len(out) > 0 {
@@ -146,7 +146,7 @@ func TestDevinStreamContentLateSignatures(t *testing.T) {
 		payload[i] = byte(i)
 	}
 	signature := base64.URLEncoding.EncodeToString(payload)
-	for _, format := range []sdktranslator.Format{sdktranslator.FormatOpenAI, sdktranslator.FormatOpenAIResponse} {
+	for _, format := range []translatorreg.Format{translatorreg.FormatOpenAI, translatorreg.FormatOpenAIResponse} {
 		for _, split := range []bool{false, true} {
 			for _, ending := range []string{"eos", "trailer_error", "truncated", "read_error"} {
 				name := string(format) + "/late/" + ending
@@ -154,7 +154,7 @@ func TestDevinStreamContentLateSignatures(t *testing.T) {
 					name = string(format) + "/split/" + ending
 				}
 				t.Run(name, func(t *testing.T) {
-					out := make(chan cliproxyexecutor.StreamChunk, 64)
+					out := make(chan coreexecutor.StreamChunk, 64)
 					var prefix bytes.Buffer
 					prefix.Write(devinContentTestFrame(9, "planning"))
 					tailSignature := signature
@@ -174,7 +174,7 @@ func TestDevinStreamContentLateSignatures(t *testing.T) {
 						}
 						var text strings.Builder
 						for _, event := range events {
-							if format == sdktranslator.FormatOpenAI {
+							if format == translatorreg.FormatOpenAI {
 								text.WriteString(event.Get("choices.0.delta.content").String())
 							} else {
 								if event.Get("type").String() == "response.output_text.delta" {
@@ -201,7 +201,7 @@ func TestDevinStreamContentLateSignatures(t *testing.T) {
 						suffix.Write([]byte{0, 0}) // Incomplete frame header causes io.ErrUnexpectedEOF.
 					}
 					e := &DevinExecutor{}
-					e.streamDevinFrames(context.Background(), io.MultiReader(&prefix, checkpoint, &suffix), cliproxyexecutor.Request{Model: "devin/swe-2"}, cliproxyexecutor.Options{SourceFormat: format}, "swe-2-high", format, nil, out)
+					e.streamDevinFrames(context.Background(), io.MultiReader(&prefix, checkpoint, &suffix), coreexecutor.Request{Model: "devin/swe-2"}, coreexecutor.Options{SourceFormat: format}, "swe-2-high", format, nil, out)
 					remaining, errs := devinContentTestEvents(out)
 					events = append(events, remaining...)
 					if !checkpointReached {
@@ -215,7 +215,7 @@ func TestDevinStreamContentLateSignatures(t *testing.T) {
 					doneCount, messageDoneCount, completedCount, failedCount := 0, 0, 0, 0
 					var text strings.Builder
 					for _, event := range events {
-						if format == sdktranslator.FormatOpenAI {
+						if format == translatorreg.FormatOpenAI {
 							text.WriteString(event.Get("choices.0.delta.content").String())
 							if event.Get("error").Exists() {
 								failedCount++
@@ -246,7 +246,7 @@ func TestDevinStreamContentLateSignatures(t *testing.T) {
 					if (failedCount == 1) != wantError || failedCount > 1 {
 						t.Errorf("failure event count = %d, want failure: %v", failedCount, wantError)
 					}
-					if format == sdktranslator.FormatOpenAIResponse {
+					if format == translatorreg.FormatOpenAIResponse {
 						if doneCount != 1 || reasoningDone.Get("encrypted_content").String() != signature {
 							t.Errorf("reasoning done count = %d, item = %s; want full signature %q", doneCount, reasoningDone.Raw, signature)
 						}
@@ -271,7 +271,7 @@ func TestDevinStreamContentLateSignatures(t *testing.T) {
 }
 
 func TestDevinStreamContentDoesNotOvertakeQueuedTool(t *testing.T) {
-	for _, format := range []sdktranslator.Format{sdktranslator.FormatOpenAI, sdktranslator.FormatOpenAIResponse} {
+	for _, format := range []translatorreg.Format{translatorreg.FormatOpenAI, translatorreg.FormatOpenAIResponse} {
 		t.Run(string(format), func(t *testing.T) {
 			var frames bytes.Buffer
 			frames.Write(devinContentTestFrame(9, "planning"))
@@ -282,7 +282,7 @@ func TestDevinStreamContentDoesNotOvertakeQueuedTool(t *testing.T) {
 			}
 			frames.Write(devinContentTestFrame(6, string(tool)))
 			frames.Write(devinContentTestFrame(3, "甲"))
-			out := make(chan cliproxyexecutor.StreamChunk, 64)
+			out := make(chan coreexecutor.StreamChunk, 64)
 			checkpointReached := false
 			checkpoint := devinContentCheckpointReader(func(_ []byte) (int, error) {
 				checkpointReached = true
@@ -301,7 +301,7 @@ func TestDevinStreamContentDoesNotOvertakeQueuedTool(t *testing.T) {
 			tail.Write(devinContentTestFrame(10, "CAQS-late-tool-signature"))
 			tail.Write(helps.WrapConnectEnvelopeWithFlag(helps.ConnectFlagEndStream, []byte(`{}`)))
 			e := &DevinExecutor{}
-			e.streamDevinFrames(context.Background(), io.MultiReader(&frames, checkpoint, &tail), cliproxyexecutor.Request{Model: "devin/swe-2"}, cliproxyexecutor.Options{SourceFormat: format}, "swe-2-high", format, nil, out)
+			e.streamDevinFrames(context.Background(), io.MultiReader(&frames, checkpoint, &tail), coreexecutor.Request{Model: "devin/swe-2"}, coreexecutor.Options{SourceFormat: format}, "swe-2-high", format, nil, out)
 			events, errs := devinContentTestEvents(out)
 			if !checkpointReached || len(errs) > 0 {
 				t.Fatalf("checkpoint = %v, errors = %v", checkpointReached, errs)

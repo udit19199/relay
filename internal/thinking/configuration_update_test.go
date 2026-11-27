@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
+	"github.com/udit19199/relay/internal/registry"
 )
 
 func TestCollapseConfigurationUpdatesBoundaries(t *testing.T) {

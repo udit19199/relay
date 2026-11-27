@@ -1,6 +1,8 @@
 package helps
 
-import "bytes"
+import (
+	"bytes"
+)
 
 // RelaySSEBuffer reassembles SSE frames across arbitrary relay chunk boundaries.
 // Bare JSON relay messages remain whole, including pretty-printed JSON.

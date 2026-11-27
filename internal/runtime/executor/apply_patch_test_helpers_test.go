@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 const testClaudeCAISSample = "CAISqwIKiAEIEBgCKkBHRlRBsNiptQUWfPoOhuQKwi5LnncZVO9bB5jqOs76D7uBtgktML0zqJtNmLHXHHcgD6lk4MQu4QBXzFd1lbC3Mg5jbGF1ZGUtZmFibGUtNTgBQgh0aGlua2luZ1okZDk3NDM5NzUtNGJiMC00OTM2LTllMjgtZDViMGQyMWJkYzQ4EgxCGh+XVFFFeySAjtAaDL/A1LltGu6MMJ+eXSIwsN0oBpDrqLv22UBfkMnTotnIbkvkOyb9xZHgigG6OZVHaI3gThm+maLKmgO5PrFLKlDFYp+YZksy/wKwszJlnLTPzAK+NUlfzagOE1ymtZTXhAYK260XyFYmg/te/C231+Fr/hoX+EJoUBnrn0gD7hqMISOT+TaFEuOXYsN517GfaxgB"
@@ -21,7 +21,7 @@ func assertExecutorPatchOutput(t *testing.T, payload []byte) {
 	}
 }
 
-func assertExecutorPatchStream(t *testing.T, chunks <-chan cliproxyexecutor.StreamChunk, acknowledgeSnapshot ...func()) {
+func assertExecutorPatchStream(t *testing.T, chunks <-chan coreexecutor.StreamChunk, acknowledgeSnapshot ...func()) {
 	t.Helper()
 	acknowledged := len(acknowledgeSnapshot) == 0
 	var delta strings.Builder

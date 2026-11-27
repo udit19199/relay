@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/MoeForge/moego/ojson"
-	translatorcommon "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/common"
+	translatorcommon "github.com/udit19199/relay/internal/translator/common"
 )
 
 func appendCodexWebSearchServerToolUse(output []byte, params *ConvertCodexResponseToClaudeParams, root, item ojson.Result) []byte {
@@ -197,16 +197,4 @@ func appendCodexWebSearchNonStreamBlocks(contentBlocks [][]byte, item ojson.Resu
 	contentBlocks = append(contentBlocks, resultBlockDoc.Bytes())
 	seen[id] = struct{}{}
 	return contentBlocks
-}
-
-func appendCodexWebSearchNonStreamContent(out []byte, item ojson.Result, seen map[string]struct{}) []byte {
-	blocks := appendCodexWebSearchNonStreamBlocks(nil, item, seen)
-	if len(blocks) == 0 {
-		return out
-	}
-	outDoc := ojson.NewDoc(out)
-	for _, block := range blocks {
-		_ = outDoc.SetRawBytes("content.-1", block)
-	}
-	return outDoc.Bytes()
 }

@@ -3,11 +3,10 @@ package translator
 import (
 	"bytes"
 	"context"
+	"github.com/MoeForge/moego/ojson"
+	translatorapi "github.com/udit19199/relay/internal/translator/translator"
 	"strings"
 	"testing"
-
-	"github.com/MoeForge/moego/ojson"
-	translatorapi "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/translator"
 )
 
 var benchmarkResponseTranslationOutput []byte

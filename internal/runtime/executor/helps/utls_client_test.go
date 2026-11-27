@@ -20,7 +20,7 @@ import (
 	"time"
 
 	tls "github.com/refraction-networking/utls"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 type utlsClientRoundTripFunc func(*http.Request) (*http.Response, error)
@@ -363,7 +363,7 @@ func TestClaudeCodeTLSClientHelloCapture(t *testing.T) {
 		t.Skip("CPA_TLS_FP_PROXY is not set")
 	}
 
-	client := NewUtlsHTTPClient(t.Context(), nil, &cliproxyauth.Auth{ProxyURL: proxyURL}, 0)
+	client := NewUtlsHTTPClient(t.Context(), nil, &coreauth.Auth{ProxyURL: proxyURL}, 0)
 	req, errRequest := http.NewRequestWithContext(t.Context(), http.MethodPost, "https://api.anthropic.com/v1/messages", bytes.NewBufferString(`{"model":"claude-opus-4-6","max_tokens":1,"messages":[{"role":"user","content":"x"}]}`))
 	if errRequest != nil {
 		t.Fatal(errRequest)

@@ -11,11 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	coreexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdkconfig "github.com/router-for-me/CLIProxyAPI/v8/sdk/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/proxyutil"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/proxyutil"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 func TestNewProxyAwareHTTPClientRequestProxyOverridesAuthAndGlobal(t *testing.T) {
@@ -24,8 +23,8 @@ func TestNewProxyAwareHTTPClientRequestProxyOverridesAuthAndGlobal(t *testing.T)
 	ctx := coreexecutor.WithRequestProxyURL(context.Background(), "http://request-proxy.example:8081")
 	client := NewProxyAwareHTTPClient(
 		ctx,
-		&config.Config{SDKConfig: sdkconfig.SDKConfig{ProxyURL: "http://global-proxy.example.com:8080"}},
-		&cliproxyauth.Auth{ProxyURL: "http://auth-proxy.example:8080"},
+		&config.Config{SDKConfig: config.SDKConfig{ProxyURL: "http://global-proxy.example.com:8080"}},
+		&coreauth.Auth{ProxyURL: "http://auth-proxy.example:8080"},
 		0,
 	)
 	transport, ok := client.Transport.(*http.Transport)
@@ -47,8 +46,8 @@ func TestNewProxyAwareHTTPClientRequestProxyOverridesAuthAndGlobal(t *testing.T)
 	refreshCtx := coreexecutor.WithoutRequestProxyURL(ctx)
 	refreshClient := NewProxyAwareHTTPClient(
 		refreshCtx,
-		&config.Config{SDKConfig: sdkconfig.SDKConfig{ProxyURL: "http://global-proxy.example.com:8080"}},
-		&cliproxyauth.Auth{ProxyURL: "http://auth-proxy.example:8080"},
+		&config.Config{SDKConfig: config.SDKConfig{ProxyURL: "http://global-proxy.example.com:8080"}},
+		&coreauth.Auth{ProxyURL: "http://auth-proxy.example:8080"},
 		0,
 	)
 	refreshTransport, ok := refreshClient.Transport.(*http.Transport)
@@ -69,8 +68,8 @@ func TestNewProxyAwareHTTPClientDirectBypassesGlobalProxy(t *testing.T) {
 
 	client := NewProxyAwareHTTPClient(
 		context.Background(),
-		&config.Config{SDKConfig: sdkconfig.SDKConfig{ProxyURL: "http://global-proxy.example.com:8080"}},
-		&cliproxyauth.Auth{ProxyURL: "direct"},
+		&config.Config{SDKConfig: config.SDKConfig{ProxyURL: "http://global-proxy.example.com:8080"}},
+		&coreauth.Auth{ProxyURL: "direct"},
 		0,
 	)
 
@@ -145,7 +144,7 @@ func TestProxyConnectionPoolReuse(t *testing.T) {
 			server.Start()
 			defer server.Close()
 			cfg := testConfig()
-			auth := &cliproxyauth.Auth{ProxyURL: "direct"}
+			auth := &coreauth.Auth{ProxyURL: "direct"}
 			if tc.enabled {
 				auth.ProxyConnectionPool = poolEnabled()
 			}
@@ -177,7 +176,7 @@ func TestProxyConnectionPoolSettingsIsolation(t *testing.T) {
 	enabled := true
 	maxIdle := 4
 	cfg := testConfig()
-	auth := poolAuth("settings", &cliproxyauth.ProxyConnectionPoolOverride{Enabled: &enabled, IdleConnTimeout: "15s", MaxIdleConnsPerHost: &maxIdle})
+	auth := poolAuth("settings", &coreauth.ProxyConnectionPoolOverride{Enabled: &enabled, IdleConnTimeout: "15s", MaxIdleConnsPerHost: &maxIdle})
 	defer ResetProxyTransports()
 	first := pooledProxyTransport("direct", cfg, auth)
 	if first == nil || first.IdleConnTimeout != 15*time.Second || first.MaxIdleConnsPerHost != 4 {

@@ -2,10 +2,10 @@ package helps
 
 import (
 	"testing"
-	"time"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/cache"
+	"github.com/udit19199/relay/internal/cache"
+	"time"
 )
 
 const claudeWebSearchTestResults = `[{"type":"web_search_result","url":"https://example.com/a","title":"A","encrypted_content":"enc-a","page_age":null},{"type":"web_search_result","url":"https://example.com/b","title":"B","encrypted_content":"enc-b","page_age":null}]`

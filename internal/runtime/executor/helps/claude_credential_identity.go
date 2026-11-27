@@ -10,11 +10,11 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/google/uuid"
-	claudeauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/claude"
-	kvstore "github.com/router-for-me/CLIProxyAPI/v8/internal/kvstore"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
+	claudeauth "github.com/udit19199/relay/internal/auth/claude"
+	kvstore "github.com/udit19199/relay/internal/kvstore"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	"github.com/udit19199/relay/internal/util"
 )
 
 // ClaudeAgentSessionUUID maps the downstream agent conversation to one stable UUID,
@@ -59,7 +59,7 @@ func ClaudeExecutionMetadataFromContext(ctx context.Context) bool {
 // an internal execution session metadata key.
 func ClaudeRequestHasExecutionMetadata(metadataSets ...map[string]any) bool {
 	for _, metadata := range metadataSets {
-		if val, ok := metadata[cliproxyexecutor.ExecutionSessionMetadataKey].(string); ok && strings.TrimSpace(val) != "" {
+		if val, ok := metadata[coreexecutor.ExecutionSessionMetadataKey].(string); ok && strings.TrimSpace(val) != "" {
 			return true
 		}
 	}
@@ -68,9 +68,9 @@ func ClaudeRequestHasExecutionMetadata(metadataSets ...map[string]any) bool {
 
 func claudeAgentSessionUUID(headers http.Header, originalPayload, translatedPayload []byte, metadataSets ...map[string]any) string {
 	metadata := mergeClaudeSessionMetadata(metadataSets...)
-	identity := cliproxyauth.ExtractSessionID(headers, originalPayload, metadata)
+	identity := coreauth.ExtractSessionID(headers, originalPayload, metadata)
 	if identity == "" && len(translatedPayload) > 0 {
-		identity = cliproxyauth.ExtractSessionID(headers, translatedPayload, metadata)
+		identity = coreauth.ExtractSessionID(headers, translatedPayload, metadata)
 	}
 	if identity == "" {
 		return uuid.NewString()
@@ -128,7 +128,7 @@ var currentClaudeCredentialDevicePoolKVClient = func() (claudeCredentialDevicePo
 
 // EnsureClaudeCredentialDevicePoolRequired initializes a credential pool locally,
 // or coordinates it through Home KV when the selected auth is a remote dispatch clone.
-func EnsureClaudeCredentialDevicePoolRequired(ctx context.Context, auth *cliproxyauth.Auth) ([]string, error) {
+func EnsureClaudeCredentialDevicePoolRequired(ctx context.Context, auth *coreauth.Auth) ([]string, error) {
 	if auth == nil {
 		return nil, fmt.Errorf("ensure Claude credential device pool: auth is nil")
 	}
@@ -214,7 +214,7 @@ func EnsureClaudeCredentialDevicePoolRequired(ctx context.Context, auth *cliprox
 }
 
 // ClaudeCredentialAccountUUID returns the selected upstream credential's account UUID.
-func ClaudeCredentialAccountUUID(auth *cliproxyauth.Auth) string {
+func ClaudeCredentialAccountUUID(auth *coreauth.Auth) string {
 	if auth == nil {
 		return ""
 	}
@@ -739,7 +739,7 @@ func validateClaudeDocMetadataRoot(doc *ojson.Doc) error {
 }
 
 // ApplyClaudeCredentialMetadata rewrites the identity exception shared by native and cloaked OAuth requests.
-func ApplyClaudeCredentialMetadata(payload []byte, auth *cliproxyauth.Auth, sessionID string) ([]byte, string, error) {
+func ApplyClaudeCredentialMetadata(payload []byte, auth *coreauth.Auth, sessionID string) ([]byte, string, error) {
 	doc := ojson.NewDoc(payload)
 	deviceID, errApply := ApplyClaudeCredentialMetadataDoc(doc, auth, sessionID)
 	if errApply != nil {
@@ -749,7 +749,7 @@ func ApplyClaudeCredentialMetadata(payload []byte, auth *cliproxyauth.Auth, sess
 }
 
 // ApplyClaudeCredentialMetadataDoc rewrites the identity exception in place on doc.
-func ApplyClaudeCredentialMetadataDoc(doc *ojson.Doc, auth *cliproxyauth.Auth, sessionID string) (string, error) {
+func ApplyClaudeCredentialMetadataDoc(doc *ojson.Doc, auth *coreauth.Auth, sessionID string) (string, error) {
 	if doc == nil {
 		return "", fmt.Errorf("apply Claude credential metadata: doc is nil")
 	}

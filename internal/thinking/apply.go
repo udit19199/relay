@@ -6,9 +6,9 @@ import (
 	"sync"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
 	log "github.com/sirupsen/logrus"
+	"github.com/udit19199/relay/internal/registry"
+	"github.com/udit19199/relay/internal/util"
 )
 
 var providerAppliersMu sync.RWMutex
@@ -102,16 +102,6 @@ func ApplyThinkingWithSourceAndSummary(body, sourceBody []byte, model, fromForma
 	return applyThinking(body, sourceBody, model, fromFormat, toFormat, providerKey, nil, false, summaryConfig)
 }
 
-// ApplyThinkingWithSourceAndSummaryDoc applies thinking onto doc in place using
-// the original source request.
-func ApplyThinkingWithSourceAndSummaryDoc(doc *ojson.Doc, sourceBody []byte, model, fromFormat, toFormat, providerKey string, summaryConfig SummaryConfig) error {
-	if doc == nil {
-		return nil
-	}
-	_, err := applyThinkingDocCore(doc, doc.Len() > 0, sourceBody, model, fromFormat, toFormat, providerKey, nil, false, summaryConfig)
-	return err
-}
-
 // ApplyThinkingWithFallbackModelInfoAndSummary applies thinking using the global
 // registry first and falls back to fallbackModelInfo when the registry has no
 // entry for the model.
@@ -138,19 +128,6 @@ func ApplyThinkingWithModelInfo(body, sourceBody []byte, model string, fromForma
 		summaryConfig = ExtractSummaryConfig(body, toFormat)
 	}
 	return ApplyThinkingWithModelInfoAndSummary(body, sourceBody, model, fromFormat, toFormat, providerKey, modelInfo, summaryConfig)
-}
-
-// ApplyThinkingWithModelInfoDoc applies thinking onto doc in place with the exact
-// configured model definition.
-func ApplyThinkingWithModelInfoDoc(doc *ojson.Doc, sourceBody []byte, model string, fromFormat string, toFormat string, providerKey string, modelInfo *registry.ModelInfo) error {
-	if doc == nil {
-		return nil
-	}
-	summaryConfig := ExtractSummaryConfig(sourceBody, fromFormat)
-	if len(sourceBody) == 0 {
-		summaryConfig = ExtractSummaryConfigDoc(doc, toFormat)
-	}
-	return ApplyThinkingWithModelInfoAndSummaryDoc(doc, sourceBody, model, fromFormat, toFormat, providerKey, modelInfo, summaryConfig)
 }
 
 // ApplyThinkingWithModelInfoAndSummary applies the exact configured model
@@ -734,12 +711,6 @@ func reasoningEffortFromConfig(config ThinkingConfig) string {
 	}
 }
 
-func extractClaudeConfig(body []byte) ThinkingConfig {
-	return extractClaudeConfigFromGetter(func(path string) ojson.Result {
-		return ojson.GetBytesNoCopy(body, path)
-	})
-}
-
 func extractClaudeConfigFromGetter(get func(string) ojson.Result) ThinkingConfig {
 	thinkingType := get("thinking.type").String()
 	if thinkingType == "disabled" {
@@ -793,12 +764,6 @@ func extractClaudeConfigFromGetter(get func(string) ojson.Result) ThinkingConfig
 	}
 
 	return ThinkingConfig{}
-}
-
-func extractInteractionsConfig(body []byte) ThinkingConfig {
-	return extractInteractionsConfigFromGetter(func(path string) ojson.Result {
-		return ojson.GetBytesNoCopy(body, path)
-	})
 }
 
 func extractInteractionsConfigFromGetter(get func(string) ojson.Result) ThinkingConfig {

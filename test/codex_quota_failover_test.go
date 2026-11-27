@@ -12,13 +12,13 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	runtimeexecutor "github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor"
-	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/translator"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/registry"
+	runtimeexecutor "github.com/udit19199/relay/internal/runtime/executor"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	_ "github.com/udit19199/relay/internal/translator"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestCodexTerminalQuotaCoolsAccountAcrossModels(t *testing.T) {
@@ -69,7 +69,7 @@ func TestCodexTerminalQuotaCoolsAccountAcrossModels(t *testing.T) {
 				}
 			}))
 			defer server.Close()
-			manager := cliproxyauth.NewManager(nil, &cliproxyauth.RoundRobinSelector{}, nil)
+			manager := coreauth.NewManager(nil, &coreauth.RoundRobinSelector{}, nil)
 			manager.SetRetryConfig(0, 0, 0)
 			cfg := &config.Config{}
 			if transport == "sse" {
@@ -85,8 +85,8 @@ func TestCodexTerminalQuotaCoolsAccountAcrossModels(t *testing.T) {
 				}
 				registry.GetGlobalRegistry().RegisterClient(id, "codex", []*registry.ModelInfo{{ID: model}, {ID: siblingModel}})
 				t.Cleanup(func() { registry.GetGlobalRegistry().UnregisterClient(id) })
-				if _, errRegister := manager.Register(context.Background(), &cliproxyauth.Auth{
-					ID: id, Provider: "codex", Status: cliproxyauth.StatusActive,
+				if _, errRegister := manager.Register(context.Background(), &coreauth.Auth{
+					ID: id, Provider: "codex", Status: coreauth.StatusActive,
 					Attributes: map[string]string{"priority": fmt.Sprint(4 - i), "base_url": server.URL, "api_key": key},
 					Metadata:   map[string]any{"disable_cooling": false},
 				}); errRegister != nil {
@@ -95,9 +95,9 @@ func TestCodexTerminalQuotaCoolsAccountAcrossModels(t *testing.T) {
 			}
 			run := func(requestModel string) ([]byte, error) {
 				t.Helper()
-				result, errStream := manager.ExecuteStream(context.Background(), []string{"codex"}, cliproxyexecutor.Request{
+				result, errStream := manager.ExecuteStream(context.Background(), []string{"codex"}, coreexecutor.Request{
 					Model: requestModel, Payload: []byte(fmt.Sprintf(`{"model":%q,"input":"hello"}`, requestModel)),
-				}, cliproxyexecutor.Options{Stream: true, SourceFormat: sdktranslator.FromString("openai-response")})
+				}, coreexecutor.Options{Stream: true, SourceFormat: translatorreg.FromString("openai-response")})
 				if errStream != nil {
 					t.Fatalf("stream must start before the terminal quota error: %v", errStream)
 				}
@@ -203,7 +203,7 @@ func TestCodexModelLevelCoolingPreservesSiblingModel(t *testing.T) {
 				}
 			}))
 			defer server.Close()
-			manager := cliproxyauth.NewManager(nil, &cliproxyauth.RoundRobinSelector{}, nil)
+			manager := coreauth.NewManager(nil, &coreauth.RoundRobinSelector{}, nil)
 			manager.SetRetryConfig(0, 0, 0)
 			cfg, errParse := config.ParseConfigBytes([]byte("codex:\n  model-level-cooling: true\n"))
 			if errParse != nil {
@@ -222,8 +222,8 @@ func TestCodexModelLevelCoolingPreservesSiblingModel(t *testing.T) {
 				}
 				registry.GetGlobalRegistry().RegisterClient(id, "codex", []*registry.ModelInfo{{ID: model}, {ID: siblingModel}})
 				t.Cleanup(func() { registry.GetGlobalRegistry().UnregisterClient(id) })
-				if _, errRegister := manager.Register(context.Background(), &cliproxyauth.Auth{
-					ID: id, Provider: "codex", Status: cliproxyauth.StatusActive,
+				if _, errRegister := manager.Register(context.Background(), &coreauth.Auth{
+					ID: id, Provider: "codex", Status: coreauth.StatusActive,
 					Attributes: map[string]string{"priority": fmt.Sprint(4 - i), "base_url": server.URL, "api_key": key},
 					Metadata:   map[string]any{"disable_cooling": false},
 				}); errRegister != nil {
@@ -232,9 +232,9 @@ func TestCodexModelLevelCoolingPreservesSiblingModel(t *testing.T) {
 			}
 			run := func(requestModel string) ([]byte, error) {
 				t.Helper()
-				result, errStream := manager.ExecuteStream(context.Background(), []string{"codex"}, cliproxyexecutor.Request{
+				result, errStream := manager.ExecuteStream(context.Background(), []string{"codex"}, coreexecutor.Request{
 					Model: requestModel, Payload: []byte(fmt.Sprintf(`{"model":%q,"input":"hello"}`, requestModel)),
-				}, cliproxyexecutor.Options{Stream: true, SourceFormat: sdktranslator.FromString("openai-response")})
+				}, coreexecutor.Options{Stream: true, SourceFormat: translatorreg.FromString("openai-response")})
 				if errStream != nil {
 					t.Fatalf("stream must start before the terminal quota error: %v", errStream)
 				}

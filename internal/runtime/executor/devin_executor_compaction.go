@@ -4,22 +4,22 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/thinking"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	"github.com/udit19199/relay/internal/thinking"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 // executeDevinResponsesCompaction handles Codex remote compaction v2 for the
 // native Devin route. Devin has no native compaction endpoint, so the summary
 // is generated with the same model through the normal Execute path and sealed
 // into a CPA compaction capsule, mirroring the Meta/OpenAI-compat routes.
-func (e *DevinExecutor) executeDevinResponsesCompaction(ctx context.Context, auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
-	var resp cliproxyexecutor.Response
+func (e *DevinExecutor) executeDevinResponsesCompaction(ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) (coreexecutor.Response, error) {
+	var resp coreexecutor.Response
 	baseModel := thinking.ParseSuffix(req.Model).ModelName
 	summaryPayload := helps.PrepareResponsesCompactionSummaryPayload(helps.ResponsesCompactionSourcePayload(req, opts), baseModel)
-	summaryReq := cliproxyexecutor.Request{
+	summaryReq := coreexecutor.Request{
 		Model:    req.Model,
 		Payload:  summaryPayload,
 		Metadata: req.Metadata,
@@ -28,8 +28,8 @@ func (e *DevinExecutor) executeDevinResponsesCompaction(ctx context.Context, aut
 	summaryOpts.Alt = ""
 	summaryOpts.Stream = false
 	summaryOpts.OriginalRequest = nil
-	summaryOpts.SourceFormat = sdktranslator.FormatOpenAIResponse
-	summaryOpts.ResponseFormat = sdktranslator.FormatOpenAIResponse
+	summaryOpts.SourceFormat = translatorreg.FormatOpenAIResponse
+	summaryOpts.ResponseFormat = translatorreg.FormatOpenAIResponse
 
 	summaryResp, errSummary := e.Execute(ctx, auth, summaryReq, summaryOpts)
 	if errSummary != nil {
@@ -39,7 +39,7 @@ func (e *DevinExecutor) executeDevinResponsesCompaction(ctx context.Context, aut
 	if errBuild != nil {
 		return resp, statusErr{code: http.StatusBadGateway, msg: errBuild.Error()}
 	}
-	return cliproxyexecutor.Response{
+	return coreexecutor.Response{
 		Payload: respPayload,
 		Headers: summaryResp.Headers,
 	}, nil
@@ -47,7 +47,7 @@ func (e *DevinExecutor) executeDevinResponsesCompaction(ctx context.Context, aut
 
 // executeDevinResponsesCompactionStream emits the sealed compaction response
 // as the Responses SSE event sequence Codex expects for remote compaction v2.
-func (e *DevinExecutor) executeDevinResponsesCompactionStream(ctx context.Context, auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (*cliproxyexecutor.StreamResult, error) {
+func (e *DevinExecutor) executeDevinResponsesCompactionStream(ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) (*coreexecutor.StreamResult, error) {
 	baseModel := thinking.ParseSuffix(req.Model).ModelName
 	summaryResp, errSummary := e.executeDevinResponsesCompaction(ctx, auth, req, opts)
 	if errSummary != nil {
@@ -57,9 +57,9 @@ func (e *DevinExecutor) executeDevinResponsesCompactionStream(ctx context.Contex
 	if errChunks != nil {
 		return nil, statusErr{code: http.StatusBadGateway, msg: errChunks.Error()}
 	}
-	out := make(chan cliproxyexecutor.StreamChunk, len(chunks))
+	out := make(chan coreexecutor.StreamChunk, len(chunks))
 	for _, chunk := range chunks {
-		out <- cliproxyexecutor.StreamChunk{Payload: chunk}
+		out <- coreexecutor.StreamChunk{Payload: chunk}
 	}
 	close(out)
 
@@ -68,5 +68,5 @@ func (e *DevinExecutor) executeDevinResponsesCompactionStream(ctx context.Contex
 		headers = make(http.Header)
 	}
 	headers.Set("Content-Type", "text/event-stream")
-	return &cliproxyexecutor.StreamResult{Headers: headers, Chunks: out}, nil
+	return &coreexecutor.StreamResult{Headers: headers, Chunks: out}, nil
 }

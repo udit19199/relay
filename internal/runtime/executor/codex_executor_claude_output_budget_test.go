@@ -10,11 +10,11 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gorilla/websocket"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/translator"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	_ "github.com/udit19199/relay/internal/translator"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestCodexClaudeModelSelectionMinimumOutputBudget(t *testing.T) {
@@ -41,11 +41,11 @@ func TestCodexClaudeModelSelectionMinimumOutputBudget(t *testing.T) {
 			t.Cleanup(server.Close)
 
 			executor := NewCodexExecutor(&config.Config{})
-			req := cliproxyexecutor.Request{
+			req := coreexecutor.Request{
 				Model:   "gpt-5.6-sol",
 				Payload: []byte(`{"model":"gpt-5.6-sol","max_tokens":1,"messages":[{"role":"user","content":[{"type":"text","text":"Hi","cache_control":{"type":"ephemeral"}}]}]}`),
 			}
-			opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude, Stream: stream}
+			opts := coreexecutor.Options{SourceFormat: translatorreg.FormatClaude, Stream: stream}
 			if stream {
 				result, errStream := executor.ExecuteStream(context.Background(), codexOAuthTestAuth(server.URL), req, opts)
 				if errStream != nil {
@@ -76,7 +76,7 @@ func TestCodexClaudeOutputBudgetBoundariesAndPayloadRules(t *testing.T) {
 	cases := []struct {
 		name    string
 		field   string
-		from    sdktranslator.Format
+		from    translatorreg.Format
 		payload config.PayloadConfig
 		want    string
 	}{
@@ -101,7 +101,7 @@ func TestCodexClaudeOutputBudgetBoundariesAndPayloadRules(t *testing.T) {
 			name: "final filter wins", field: `,"max_tokens":1`,
 			payload: config.PayloadConfig{Filter: []config.PayloadFilterRule{{Models: modelRule, Params: []string{"max_output_tokens"}}}},
 		},
-		{name: "native responses normalized", field: `,"max_output_tokens":1`, from: sdktranslator.FormatOpenAIResponse, want: "16"},
+		{name: "native responses normalized", field: `,"max_output_tokens":1`, from: translatorreg.FormatOpenAIResponse, want: "16"},
 	}
 	for _, tc := range cases {
 		for _, useWebsocket := range []bool{false, true} {
@@ -147,20 +147,20 @@ func TestCodexClaudeOutputBudgetBoundariesAndPayloadRules(t *testing.T) {
 					t.Cleanup(server.Close)
 
 					cfg := &config.Config{Payload: tc.payload}
-					var executor cliproxyauth.ProviderExecutor = NewCodexExecutor(cfg)
+					var executor coreauth.ProviderExecutor = NewCodexExecutor(cfg)
 					if useWebsocket {
 						executor = NewCodexWebsocketsExecutor(cfg)
 					}
 					from := tc.from
 					if from == "" {
-						from = sdktranslator.FormatClaude
+						from = translatorreg.FormatClaude
 					}
 					payload := `{"model":"gpt-5.6-sol"` + tc.field + `,"messages":[{"role":"user","content":"Hi"}]}`
-					if from == sdktranslator.FormatOpenAIResponse {
+					if from == translatorreg.FormatOpenAIResponse {
 						payload = `{"model":"gpt-5.6-sol"` + tc.field + `,"input":"Hi"}`
 					}
-					req := cliproxyexecutor.Request{Model: "gpt-5.6-sol", Payload: []byte(payload)}
-					opts := cliproxyexecutor.Options{SourceFormat: from, Stream: stream}
+					req := coreexecutor.Request{Model: "gpt-5.6-sol", Payload: []byte(payload)}
+					opts := coreexecutor.Options{SourceFormat: from, Stream: stream}
 					auth := codexOAuthTestAuth(server.URL)
 					auth.ID = "codex-output-budget-test"
 					if stream {

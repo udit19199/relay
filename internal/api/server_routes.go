@@ -9,24 +9,21 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	managementHandlers "github.com/router-for-me/CLIProxyAPI/v8/internal/api/handlers/management"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/api/middleware"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/client/grokbuild"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/clienterror"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/logging"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/api/handlers"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/api/handlers/claude"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/api/handlers/openai"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	coreexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
 	log "github.com/sirupsen/logrus"
+	"github.com/udit19199/relay/internal/api/handlers"
+	"github.com/udit19199/relay/internal/api/handlers/claude"
+	managementHandlers "github.com/udit19199/relay/internal/api/handlers/management"
+	"github.com/udit19199/relay/internal/api/handlers/openai"
+	"github.com/udit19199/relay/internal/client/grokbuild"
+	"github.com/udit19199/relay/internal/clienterror"
+	"github.com/udit19199/relay/internal/logging"
+	"github.com/udit19199/relay/internal/registry"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	"github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 const oauthCallbackSuccessHTML = `<html><head><meta charset="utf-8"><title>Authentication successful</title><script>setTimeout(function(){window.close();},5000);</script></head><body><h1>Authentication successful!</h1><p>You can close this window.</p><p>This window will close automatically in 5 seconds.</p></body></html>`
-
-const codexAlphaSearchSourceFormat = "codex-alpha-search"
 
 // setupRoutes configures the API routes for the server.
 // It defines the endpoints and associates them with their respective handlers.
@@ -42,7 +39,6 @@ func (s *Server) setupRoutes() {
 	s.engine.GET("/healthz", healthzHandler)
 	s.engine.HEAD("/healthz", healthzHandler)
 
-	s.engine.GET("/management.html", s.serveManagementControlPanel)
 	openaiHandlers := openai.NewOpenAIAPIHandler(s.handlers)
 	claudeCodeHandlers := claude.NewClaudeCodeAPIHandler(s.handlers)
 	openaiResponsesHandlers := openai.NewOpenAIResponsesAPIHandler(s.handlers)
@@ -369,46 +365,6 @@ func (s *Server) codexAlphaSearch(c *gin.Context) {
 	}
 	c.Status(resp.StatusCode)
 	_, _ = c.Writer.Write(upstreamBody)
-}
-
-// AttachWebsocketRoute registers a websocket upgrade handler on the primary Gin engine.
-func (s *Server) AttachWebsocketRoute(path string, handler http.Handler) {
-	if s == nil || s.engine == nil || handler == nil {
-		return
-	}
-	trimmed := strings.TrimSpace(path)
-	if trimmed == "" {
-		trimmed = "/v1/ws"
-	}
-	if !strings.HasPrefix(trimmed, "/") {
-		trimmed = "/" + trimmed
-	}
-	s.wsRouteMu.Lock()
-	if _, exists := s.wsRoutes[trimmed]; exists {
-		s.wsRouteMu.Unlock()
-		return
-	}
-	s.wsRoutes[trimmed] = struct{}{}
-	s.wsRouteMu.Unlock()
-
-	authMiddleware := AuthMiddleware(s.accessManager)
-	conditionalAuth := func(c *gin.Context) {
-		if !s.wsAuthEnabled.Load() {
-			middleware.CaptureAuthenticatedRequestBody(c)
-			if c.IsAborted() {
-				return
-			}
-			c.Next()
-			return
-		}
-		authMiddleware(c)
-	}
-	finalHandler := func(c *gin.Context) {
-		handler.ServeHTTP(c.Writer, c.Request)
-		c.Abort()
-	}
-
-	s.engine.GET(trimmed, conditionalAuth, finalHandler)
 }
 
 // isAnthropicModelsRequest reports whether a /v1/models request should be served in

@@ -15,16 +15,16 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	claudeauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/claude"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/codex"
-	xaiauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/xai"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/clienterror"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/credentialweight"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/watcher/synthesizer"
-	sdkAuth "github.com/router-for-me/CLIProxyAPI/v8/sdk/auth"
-	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	log "github.com/sirupsen/logrus"
+	claudeauth "github.com/udit19199/relay/internal/auth/claude"
+	"github.com/udit19199/relay/internal/auth/codex"
+	authlogin "github.com/udit19199/relay/internal/auth/login"
+	xaiauth "github.com/udit19199/relay/internal/auth/xai"
+	"github.com/udit19199/relay/internal/clienterror"
+	"github.com/udit19199/relay/internal/credentialweight"
+	"github.com/udit19199/relay/internal/misc"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	"github.com/udit19199/relay/internal/watcher/synthesizer"
 )
 
 // PatchAuthFileStatus toggles the disabled state of an auth file
@@ -838,7 +838,7 @@ func (h *Handler) tokenStoreWithBaseDir() coreauth.Store {
 	}
 	store := h.tokenStore
 	if store == nil {
-		store = sdkAuth.GetTokenStore()
+		store = authlogin.GetTokenStore()
 		h.tokenStore = store
 	}
 	if cfg := h.configSnapshot(); cfg != nil {

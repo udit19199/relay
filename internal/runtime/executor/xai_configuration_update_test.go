@@ -4,11 +4,11 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/thinking"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/registry"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	"github.com/udit19199/relay/internal/thinking"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestXAIResponsesPreparationStripsUnsupportedConfigurationUpdates(t *testing.T) {
@@ -22,7 +22,7 @@ func TestXAIResponsesPreparationStripsUnsupportedConfigurationUpdates(t *testing
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			exec := NewXAIExecutor(&config.Config{})
-			prepared, errPrepare := exec.prepareResponsesRequest(t.Context(), cliproxyexecutor.Request{Model: tc.model, Payload: []byte(source)}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse}, tc.stream)
+			prepared, errPrepare := exec.prepareResponsesRequest(t.Context(), coreexecutor.Request{Model: tc.model, Payload: []byte(source)}, coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse}, tc.stream)
 			if errPrepare != nil {
 				t.Fatalf("prepareResponsesRequest() error = %v", errPrepare)
 			}
@@ -54,7 +54,7 @@ func TestXAIResponsesPreparationHonorsExplicitSupportOnly(t *testing.T) {
 		{model: "opaque-xai-route(low)", top: "low"},
 	} {
 		exec := NewXAIExecutor(&config.Config{})
-		prepared, errPrepare := exec.prepareResponsesRequest(t.Context(), cliproxyexecutor.Request{Model: tc.model, Payload: []byte(source), Metadata: map[string]any{"cliproxy.resolved_api_key_model_info": info}}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse}, false)
+		prepared, errPrepare := exec.prepareResponsesRequest(t.Context(), coreexecutor.Request{Model: tc.model, Payload: []byte(source), Metadata: map[string]any{"cliproxy.resolved_api_key_model_info": info}}, coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse}, false)
 		if errPrepare != nil {
 			t.Fatal(errPrepare)
 		}

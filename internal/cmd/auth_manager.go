@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	sdkAuth "github.com/router-for-me/CLIProxyAPI/v8/sdk/auth"
+	authlogin "github.com/udit19199/relay/internal/auth/login"
 )
 
 // newAuthManager creates a new authentication manager instance with all supported
@@ -9,15 +9,15 @@ import (
 // Codex, Claude, xAI, Devin, and Meta providers.
 //
 // Returns:
-//   - *sdkAuth.Manager: A configured authentication manager instance
-func newAuthManager() *sdkAuth.Manager {
-	store := sdkAuth.GetTokenStore()
-	manager := sdkAuth.NewManager(store,
-		sdkAuth.NewCodexAuthenticator(),
-		sdkAuth.NewClaudeAuthenticator(),
-		sdkAuth.NewXAIAuthenticator(),
-		sdkAuth.NewDevinAuthenticator(),
-		sdkAuth.NewMetaAuthenticator(),
+//   - *authlogin.Manager: A configured authentication manager instance
+func newAuthManager() *authlogin.Manager {
+	store := authlogin.GetTokenStore()
+	manager := authlogin.NewManager(store,
+		authlogin.NewCodexAuthenticator(),
+		authlogin.NewClaudeAuthenticator(),
+		authlogin.NewXAIAuthenticator(),
+		authlogin.NewDevinAuthenticator(),
+		authlogin.NewMetaAuthenticator(),
 	)
 	return manager
 }

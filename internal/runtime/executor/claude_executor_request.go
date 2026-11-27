@@ -7,24 +7,24 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"sort"
 	"strings"
 	"time"
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/google/uuid"
-	claudeauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/claude"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/buildinfo"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/session"
 	log "github.com/sirupsen/logrus"
+	claudeauth "github.com/udit19199/relay/internal/auth/claude"
+	"github.com/udit19199/relay/internal/buildinfo"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/misc"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	"github.com/udit19199/relay/internal/service/session"
+	"github.com/udit19199/relay/internal/util"
 
 	"github.com/gin-gonic/gin"
+	"sort"
 )
 
 const (
@@ -377,13 +377,6 @@ func claudeThinkingTypeAcceptsBlockBinding(model, thinkingType string) bool {
 	}
 }
 
-// claudeBodyHasSignedThinkingBlock reports whether any assistant message
-// carries a replayed thinking block with a signature or a redacted_thinking
-// block, i.e. history Anthropic subjects to prefix binding validation.
-func claudeBodyHasSignedThinkingBlock(body []byte) bool {
-	return claudeMessagesHaveSignedThinkingBlock(ojson.GetBytesNoCopy(body, "messages"))
-}
-
 func claudeDocHasSignedThinkingBlock(doc *ojson.Doc) bool {
 	if doc == nil {
 		return false
@@ -406,29 +399,6 @@ func claudeMessagesHaveSignedThinkingBlock(messages ojson.Result) bool {
 		return !found
 	})
 	return found
-}
-
-// applyClaudePreservedThinkingBinding makes relayed or reshaped histories
-// survivable on preserved-thinking models: when the request replays signed
-// thinking blocks, default thinking.block_binding.prefix_mismatch_behavior to
-// drop_block so a prefix mismatch (client reconnect resending history, a
-// changed tools list, reconstructed server-tool blocks) drops the bound
-// blocks instead of failing the whole request with a 400. On preserved-thinking
-// models, an omitted thinking field runs adaptive thinking and is equivalent to
-// {"type":"adaptive"}, so synthesize that adaptive thinking object unless
-// tool_choice forces tool use. A thinking object without a type and any
-// caller-supplied prefix_mismatch_behavior stay untouched. This must run before
-// user payload rules, which stay the final semantic barrier and may override or
-// filter the injected value.
-func applyClaudePreservedThinkingBinding(body []byte) []byte {
-	if len(body) == 0 {
-		return body
-	}
-	doc := ojson.NewDoc(body)
-	if !applyClaudePreservedThinkingBindingDoc(doc) {
-		return body
-	}
-	return doc.Bytes()
 }
 
 func applyClaudePreservedThinkingBindingDoc(doc *ojson.Doc) bool {
@@ -987,11 +957,6 @@ func extractAndRemoveBetasDoc(doc *ojson.Doc) ([]string, bool) {
 	return betas, doc.Delete("betas") == nil
 }
 
-func claudeToolChoiceForcesToolUse(body []byte) bool {
-	toolChoiceType := ojson.GetBytesNoCopy(body, "tool_choice.type").String()
-	return toolChoiceType == "any" || toolChoiceType == "tool"
-}
-
 func claudeToolChoiceForcesToolUseDoc(doc *ojson.Doc) bool {
 	if doc == nil {
 		return false
@@ -1119,11 +1084,11 @@ func decodeResponseBody(body io.ReadCloser, contentEncoding string) (io.ReadClos
 // claudeCredentialUsesOAuth classifies the selected upstream credential. It is the
 // single authority for every decision that has to agree with the OAuth beta
 // profile, including the extended-cache-ttl beta and the matching body cache ttl.
-func claudeCredentialUsesOAuth(auth *cliproxyauth.Auth, apiKey string) bool {
+func claudeCredentialUsesOAuth(auth *coreauth.Auth, apiKey string) bool {
 	if isClaudeOAuthToken(apiKey) {
 		return true
 	}
-	if auth != nil && auth.AuthKind() == cliproxyauth.AuthKindAPIKey {
+	if auth != nil && auth.AuthKind() == coreauth.AuthKindAPIKey {
 		return false
 	}
 	hasAPIKeyAttr := auth != nil && auth.Attributes != nil && strings.TrimSpace(auth.Attributes["api_key"]) != ""
@@ -1171,7 +1136,7 @@ func copyClaudeCallerFingerprintHeaders(dst, src http.Header, confirmedClaudeCod
 	}
 }
 
-func applyClaudeHeaders(r *http.Request, auth *cliproxyauth.Auth, apiKey string, stream bool, extraBetas []string, body []byte, cfg *config.Config, incomingHeaders http.Header, confirmedClaudeCode bool, sessionIDs ...string) error {
+func applyClaudeHeaders(r *http.Request, auth *coreauth.Auth, apiKey string, stream bool, extraBetas []string, body []byte, cfg *config.Config, incomingHeaders http.Header, confirmedClaudeCode bool, sessionIDs ...string) error {
 	return applyClaudeHeadersWithNativeProfile(
 		r,
 		auth,
@@ -1189,7 +1154,7 @@ func applyClaudeHeaders(r *http.Request, auth *cliproxyauth.Auth, apiKey string,
 
 func applyClaudeHeadersWithNativeProfile(
 	r *http.Request,
-	auth *cliproxyauth.Auth,
+	auth *coreauth.Auth,
 	apiKey string,
 	stream bool,
 	extraBetas []string,
@@ -1656,7 +1621,7 @@ func applyClaudeHeadersWithNativeProfile(
 // exactly how the streaming and non-streaming beta sets diverged before.
 func doClaudeUpstreamRequest(client *http.Client, req *http.Request) (*http.Response, error) {
 	applyClaudeWireHeaderCasing(req)
-	cliproxyexecutor.MarkUpstreamAttempt(req.Context())
+	coreexecutor.MarkUpstreamAttempt(req.Context())
 	return client.Do(req)
 }
 
@@ -1705,7 +1670,7 @@ func applyClaudeWireHeaderCasing(r *http.Request) {
 	}
 }
 
-func claudeCreds(a *cliproxyauth.Auth) (apiKey, baseURL string) {
+func claudeCreds(a *coreauth.Auth) (apiKey, baseURL string) {
 	if a == nil {
 		return "", ""
 	}
@@ -1725,13 +1690,6 @@ func claudePayloadHasMidSystemMessage(payload []byte) bool {
 	return claudeMessagesHaveMidSystemMessage(ojson.GetBytesNoCopy(payload, "messages"))
 }
 
-func claudeDocHasMidSystemMessage(doc *ojson.Doc) bool {
-	if doc == nil {
-		return false
-	}
-	return claudeMessagesHaveMidSystemMessage(doc.Get("messages"))
-}
-
 func claudeMessagesHaveMidSystemMessage(messages ojson.Result) bool {
 	if !messages.IsArray() {
 		return false
@@ -1745,14 +1703,6 @@ func claudeMessagesHaveMidSystemMessage(messages ojson.Result) bool {
 		return true
 	})
 	return found
-}
-
-func rebuildMidSystemMessagesToTopLevel(payload []byte) []byte {
-	doc := ojson.NewDoc(payload)
-	if !rebuildMidSystemMessagesToTopLevelDoc(doc) {
-		return payload
-	}
-	return doc.Bytes()
 }
 
 func rebuildMidSystemMessagesToTopLevelDoc(doc *ojson.Doc) bool {
@@ -1868,7 +1818,7 @@ func resolveClaudeMCPAliasOptions(ctx context.Context, metadataSets ...map[strin
 
 func callerScopeFromMetadataSets(metadataSets ...map[string]any) string {
 	for _, metadata := range metadataSets {
-		if scope := misc.MetadataString(metadata, cliproxyexecutor.CallerScopeMetadataKey); scope != "" {
+		if scope := misc.MetadataString(metadata, coreexecutor.CallerScopeMetadataKey); scope != "" {
 			return scope
 		}
 	}

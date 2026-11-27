@@ -12,8 +12,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/interfaces"
 	log "github.com/sirupsen/logrus"
+	"github.com/udit19199/relay/internal/interfaces"
 )
 
 var requestLogID atomic.Uint64

@@ -11,12 +11,12 @@ import (
 	"time"
 
 	"github.com/MoeForge/moego/ojson"
-	claudeauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/claude"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	claudeauth "github.com/udit19199/relay/internal/auth/claude"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 var claudeDateReminderPattern = regexp.MustCompile(`Today's date is (\d{4}-\d{2}-\d{2})`)
@@ -48,7 +48,7 @@ func TestClaudeCloakedDateReminderPinnedToSessionAcrossMidnight(t *testing.T) {
 	helps.ResetClaudeDiagnosticsForTest()
 	t.Cleanup(helps.ResetClaudeDiagnosticsForTest)
 
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:         "test-date-pin-cred",
 		Attributes: map[string]string{"timezone": "Asia/Shanghai"},
 	}
@@ -119,7 +119,7 @@ func TestClaudeCloakedDateReminderSessionByteStability(t *testing.T) {
 	t.Cleanup(helps.ResetClaudeDiagnosticsForTest)
 
 	var mockTime time.Time
-	claudeCodeCurrentTimeFunc = func(cfg *config.Config, auth *cliproxyauth.Auth) time.Time {
+	claudeCodeCurrentTimeFunc = func(cfg *config.Config, auth *coreauth.Auth) time.Time {
 		return mockTime
 	}
 	t.Cleanup(func() {
@@ -152,7 +152,7 @@ func TestClaudeCloakedDateReminderSessionByteStability(t *testing.T) {
 	})
 
 	cfg := &config.Config{}
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:         "test-date-pin-exec-oauth",
 		Attributes: map[string]string{"api_key": "sk-ant-oat-test-oauth-key-date-pin", "cloak_mode": "always", "timezone": "Asia/Shanghai"},
 		Metadata: map[string]any{
@@ -170,15 +170,15 @@ func TestClaudeCloakedDateReminderSessionByteStability(t *testing.T) {
 		"messages": [{"role": "user", "content": "Say OK."}],
 		"max_tokens": 100
 	}`
-	options := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatClaude,
+	options := coreexecutor.Options{
+		SourceFormat: translatorreg.FormatClaude,
 		Headers:      http.Header{"X-Session-ID": []string{"date-pin-session-1"}},
 	}
 
 	// Request 1: before midnight
 	mockTime = time.Date(2026, 8, 1, 23, 59, 0, 0, time.UTC)
 	ctx := context.WithValue(context.Background(), "cliproxy.roundtripper", http.RoundTripper(transport))
-	req := cliproxyexecutor.Request{Model: "claude-opus-5", Payload: []byte(payload)}
+	req := coreexecutor.Request{Model: "claude-opus-5", Payload: []byte(payload)}
 	if _, err := exec.Execute(ctx, auth, req, options); err != nil {
 		t.Fatalf("request 1 failed: %v", err)
 	}
@@ -237,7 +237,7 @@ func TestClaudeCloakedDateReminderProbeOverrideDoesNotReinitializeSessionDate(t 
 	t.Cleanup(helps.ResetClaudeDiagnosticsForTest)
 
 	var mockTime time.Time
-	claudeCodeCurrentTimeFunc = func(cfg *config.Config, auth *cliproxyauth.Auth) time.Time {
+	claudeCodeCurrentTimeFunc = func(cfg *config.Config, auth *coreauth.Auth) time.Time {
 		return mockTime
 	}
 	t.Cleanup(func() {
@@ -280,7 +280,7 @@ func TestClaudeCloakedDateReminderProbeOverrideDoesNotReinitializeSessionDate(t 
 			},
 		},
 	}
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:         "test-date-pin-exec-oauth-declass",
 		Attributes: map[string]string{"api_key": "sk-ant-oat-test-oauth-key-date-pin", "cloak_mode": "always", "timezone": "Asia/Shanghai"},
 		Metadata: map[string]any{
@@ -299,12 +299,12 @@ func TestClaudeCloakedDateReminderProbeOverrideDoesNotReinitializeSessionDate(t 
 		"messages": [{"role": "user", "content": "normal request"}],
 		"max_tokens": 100
 	}`
-	options := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatClaude,
+	options := coreexecutor.Options{
+		SourceFormat: translatorreg.FormatClaude,
 		Headers:      http.Header{"X-Session-ID": []string{"declass-session-1"}},
 	}
 	ctx := context.WithValue(context.Background(), "cliproxy.roundtripper", http.RoundTripper(transport))
-	req1 := cliproxyexecutor.Request{Model: "claude-opus-5", Payload: []byte(normalPayload)}
+	req1 := coreexecutor.Request{Model: "claude-opus-5", Payload: []byte(normalPayload)}
 	if _, err := exec.Execute(ctx, auth, req1, options); err != nil {
 		t.Fatalf("request 1 failed: %v", err)
 	}
@@ -317,13 +317,13 @@ func TestClaudeCloakedDateReminderProbeOverrideDoesNotReinitializeSessionDate(t 
 		"messages": [{"role": "user", "content": "probe"}],
 		"max_tokens": 1
 	}`
-	req2 := cliproxyexecutor.Request{Model: "claude-opus-5", Payload: []byte(probePayload)}
+	req2 := coreexecutor.Request{Model: "claude-opus-5", Payload: []byte(probePayload)}
 	if _, err := exec.Execute(ctx, auth, req2, options); err != nil {
 		t.Fatalf("request 2 (Execute) failed: %v", err)
 	}
 
 	// Request 3: Same thing for ExecuteStream
-	req3 := cliproxyexecutor.Request{Model: "claude-opus-5", Payload: []byte(probePayload)}
+	req3 := coreexecutor.Request{Model: "claude-opus-5", Payload: []byte(probePayload)}
 	if _, err := exec.ExecuteStream(ctx, auth, req3, options); err != nil {
 		t.Fatalf("request 3 (ExecuteStream) failed: %v", err)
 	}

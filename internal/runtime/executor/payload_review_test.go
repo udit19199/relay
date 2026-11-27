@@ -9,10 +9,10 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gorilla/websocket"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	core "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	core "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestClaudePayloadConditionsEvaluateOnceAtFinalBarrier(t *testing.T) {
@@ -76,8 +76,8 @@ func TestCodexDuplexSteerPayloadBarrier(t *testing.T) {
 			ctx = core.WithWebsocketInput(core.WithDownstreamWebsocket(ctx), input)
 			executor := NewCodexWebsocketsExecutor(cfg)
 			executor.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
-			auth := &cliproxyauth.Auth{ID: t.Name(), Provider: "codex", Attributes: map[string]string{"api_key": "test", "base_url": server.URL, "websockets": "true"}}
-			result, errStream := executor.ExecuteStream(ctx, auth, core.Request{Model: "gpt-6-astra", Payload: []byte(`{"input":[]}`)}, core.Options{SourceFormat: sdktranslator.FormatCodex})
+			auth := &coreauth.Auth{ID: t.Name(), Provider: "codex", Attributes: map[string]string{"api_key": "test", "base_url": server.URL, "websockets": "true"}}
+			result, errStream := executor.ExecuteStream(ctx, auth, core.Request{Model: "gpt-6-astra", Payload: []byte(`{"input":[]}`)}, core.Options{SourceFormat: translatorreg.FormatCodex})
 			if errStream != nil {
 				t.Fatal(errStream)
 			}

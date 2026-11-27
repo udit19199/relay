@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 // tlsHandshakeTimeoutContextKey carries the opt-in TLS establishment bound
@@ -91,5 +91,5 @@ func classifyHandshakeError(parentCtx, handshakeCtx context.Context, err error) 
 	if !errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 		return err
 	}
-	return cliproxyexecutor.NewConfiguredTLSHandshakeTimeoutError(err)
+	return coreexecutor.NewConfiguredTLSHandshakeTimeoutError(err)
 }

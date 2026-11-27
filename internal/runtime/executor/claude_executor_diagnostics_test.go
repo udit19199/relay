@@ -11,11 +11,11 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/google/uuid"
-	claudeauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/claude"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	claudeauth "github.com/udit19199/relay/internal/auth/claude"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestInjectClaudeDiagnosticsMatchesNativeFieldOrderAndContinuity(t *testing.T) {
@@ -23,7 +23,7 @@ func TestInjectClaudeDiagnosticsMatchesNativeFieldOrderAndContinuity(t *testing.
 
 	body := []byte(`{"context_management":{"edits":[{"type":"clear_thinking_20251015","keep":"all"}]},"max_tokens":1,"messages":[]}`)
 	testID := uuid.NewString()
-	auth := &cliproxyauth.Auth{ID: "credential-diagnostics-order-" + testID}
+	auth := &coreauth.Auth{ID: "credential-diagnostics-order-" + testID}
 	first, state := injectClaudeDiagnostics(body, auth, "session-diagnostics-order-"+testID)
 	wantOrder := `"context_management":{"edits":[{"type":"clear_thinking_20251015","keep":"all"}]},"diagnostics":{"previous_message_id":null},"max_tokens"`
 	if !bytes.Contains(first, []byte(wantOrder)) {
@@ -62,7 +62,7 @@ func TestClaudeExecutorDiagnosticsAdvancesAfterSuccessfulResponse(t *testing.T) 
 	ctx := context.WithValue(context.Background(), "cliproxy.roundtripper", http.RoundTripper(transport))
 	deviceIDs := []string{"0000000000000000000000000000000000000000000000000000000000000000"}
 	testID := uuid.NewString()
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:         "diagnostics-live-path-" + testID,
 		Attributes: map[string]string{"api_key": "sk-ant-oat-diagnostics-live-path", "cloak_mode": "always"},
 		Metadata: map[string]any{
@@ -71,10 +71,10 @@ func TestClaudeExecutorDiagnosticsAdvancesAfterSuccessfulResponse(t *testing.T) 
 		},
 	}
 	executor := NewClaudeExecutor(&config.Config{})
-	request := cliproxyexecutor.Request{Model: "claude-opus-5", Payload: []byte(`{"model":"claude-opus-5","messages":[{"role":"user","content":"x"}],"max_tokens":16}`)}
-	options := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatClaude,
-		Metadata:     map[string]any{cliproxyexecutor.ExecutionSessionMetadataKey: "diagnostics-conversation-" + testID},
+	request := coreexecutor.Request{Model: "claude-opus-5", Payload: []byte(`{"model":"claude-opus-5","messages":[{"role":"user","content":"x"}],"max_tokens":16}`)}
+	options := coreexecutor.Options{
+		SourceFormat: translatorreg.FormatClaude,
+		Metadata:     map[string]any{coreexecutor.ExecutionSessionMetadataKey: "diagnostics-conversation-" + testID},
 	}
 	for turn := range 2 {
 		if _, errExecute := executor.Execute(ctx, auth, request, options); errExecute != nil {
@@ -132,7 +132,7 @@ func TestClaudeExecutorContinuityAdvancesRequestIDAndPromptIDInBillingHeader(t *
 	ctx := context.WithValue(context.Background(), "cliproxy.roundtripper", http.RoundTripper(transport))
 	deviceIDs := []string{"0000000000000000000000000000000000000000000000000000000000000000"}
 	testID := uuid.NewString()
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:         "continuity-test-" + testID,
 		Attributes: map[string]string{"api_key": "sk-ant-oat-continuity-test", "cloak_mode": "always"},
 		Metadata: map[string]any{
@@ -141,48 +141,48 @@ func TestClaudeExecutorContinuityAdvancesRequestIDAndPromptIDInBillingHeader(t *
 		},
 	}
 	executor := NewClaudeExecutor(&config.Config{})
-	options := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatClaude,
-		Metadata:     map[string]any{cliproxyexecutor.ExecutionSessionMetadataKey: "continuity-conv-" + testID},
+	options := coreexecutor.Options{
+		SourceFormat: translatorreg.FormatClaude,
+		Metadata:     map[string]any{coreexecutor.ExecutionSessionMetadataKey: "continuity-conv-" + testID},
 	}
 
 	// Turn 1: User prompt
-	req1 := cliproxyexecutor.Request{Model: "claude-sonnet-5", Payload: []byte(`{"model":"claude-sonnet-5","messages":[{"role":"user","content":"turn 1 prompt"}],"max_tokens":100}`)}
+	req1 := coreexecutor.Request{Model: "claude-sonnet-5", Payload: []byte(`{"model":"claude-sonnet-5","messages":[{"role":"user","content":"turn 1 prompt"}],"max_tokens":100}`)}
 	if _, err := executor.Execute(ctx, auth, req1, options); err != nil {
 		t.Fatalf("turn 1 failed: %v", err)
 	}
 
 	// Turn 2: User prompt in same conversation
-	req2 := cliproxyexecutor.Request{Model: "claude-sonnet-5", Payload: []byte(`{"model":"claude-sonnet-5","messages":[{"role":"user","content":"turn 1 prompt"},{"role":"assistant","content":"ok"},{"role":"user","content":"turn 2 prompt"}],"max_tokens":100}`)}
+	req2 := coreexecutor.Request{Model: "claude-sonnet-5", Payload: []byte(`{"model":"claude-sonnet-5","messages":[{"role":"user","content":"turn 1 prompt"},{"role":"assistant","content":"ok"},{"role":"user","content":"turn 2 prompt"}],"max_tokens":100}`)}
 	if _, err := executor.Execute(ctx, auth, req2, options); err != nil {
 		t.Fatalf("turn 2 failed: %v", err)
 	}
 
 	// Turn 2.1: Tool result continuation within turn 2
-	req2Tool := cliproxyexecutor.Request{Model: "claude-sonnet-5", Payload: []byte(`{"model":"claude-sonnet-5","messages":[{"role":"user","content":"turn 1 prompt"},{"role":"assistant","content":"ok"},{"role":"user","content":"turn 2 prompt"},{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"bash","input":{}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"tool output"}]}],"max_tokens":100}`)}
+	req2Tool := coreexecutor.Request{Model: "claude-sonnet-5", Payload: []byte(`{"model":"claude-sonnet-5","messages":[{"role":"user","content":"turn 1 prompt"},{"role":"assistant","content":"ok"},{"role":"user","content":"turn 2 prompt"},{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"bash","input":{}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"tool output"}]}],"max_tokens":100}`)}
 	if _, err := executor.Execute(ctx, auth, req2Tool, options); err != nil {
 		t.Fatalf("turn 2.1 tool failed: %v", err)
 	}
 
 	// Turn 3: Probe request (max_tokens: 1)
-	reqProbe := cliproxyexecutor.Request{Model: "claude-sonnet-5", Payload: []byte(`{"model":"claude-sonnet-5","messages":[{"role":"user","content":"probe"}],"max_tokens":1}`)}
+	reqProbe := coreexecutor.Request{Model: "claude-sonnet-5", Payload: []byte(`{"model":"claude-sonnet-5","messages":[{"role":"user","content":"probe"}],"max_tokens":1}`)}
 	if _, err := executor.Execute(ctx, auth, reqProbe, options); err != nil {
 		t.Fatalf("probe failed: %v", err)
 	}
 
 	// Turn 4: Subagent request (carrying X-Claude-Code-Agent-Id)
-	subagentOptions := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatClaude,
+	subagentOptions := coreexecutor.Options{
+		SourceFormat: translatorreg.FormatClaude,
 		Headers:      http.Header{"X-Claude-Code-Agent-Id": []string{"subagent-worker-1"}},
-		Metadata:     map[string]any{cliproxyexecutor.ExecutionSessionMetadataKey: "continuity-subagent-" + testID},
+		Metadata:     map[string]any{coreexecutor.ExecutionSessionMetadataKey: "continuity-subagent-" + testID},
 	}
-	reqSubagent := cliproxyexecutor.Request{Model: "claude-sonnet-5", Payload: []byte(`{"model":"claude-sonnet-5","messages":[{"role":"user","content":"subagent prompt"}],"max_tokens":100}`)}
+	reqSubagent := coreexecutor.Request{Model: "claude-sonnet-5", Payload: []byte(`{"model":"claude-sonnet-5","messages":[{"role":"user","content":"subagent prompt"}],"max_tokens":100}`)}
 	if _, err := executor.Execute(ctx, auth, reqSubagent, subagentOptions); err != nil {
 		t.Fatalf("subagent failed: %v", err)
 	}
 
 	// Turn 5: Resumed main session user prompt after probe (must chain from turn 2.1, NOT from probe turn 3)
-	req5 := cliproxyexecutor.Request{Model: "claude-sonnet-5", Payload: []byte(`{"model":"claude-sonnet-5","messages":[{"role":"user","content":"turn 5 prompt"}],"max_tokens":100}`)}
+	req5 := coreexecutor.Request{Model: "claude-sonnet-5", Payload: []byte(`{"model":"claude-sonnet-5","messages":[{"role":"user","content":"turn 5 prompt"}],"max_tokens":100}`)}
 	if _, err := executor.Execute(ctx, auth, req5, options); err != nil {
 		t.Fatalf("turn 5 failed: %v", err)
 	}

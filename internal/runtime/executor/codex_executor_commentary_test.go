@@ -11,11 +11,11 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/translator"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	_ "github.com/udit19199/relay/internal/translator"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestCodexExecutorCommentaryConfigStreamAndNonStream(t *testing.T) {
@@ -57,9 +57,9 @@ data: {"type":"response.completed","response":{"id":"r","model":"gpt-6.1-sol","s
 				cfg := &config.Config{}
 				cfg.Client.Claude.ShowCodexCommentary = enabled
 				exec := NewCodexExecutor(cfg)
-				auth := &cliproxyauth.Auth{Attributes: map[string]string{"base_url": server.URL, "api_key": "test"}}
-				req := cliproxyexecutor.Request{Model: "gpt-6.1-sol", Payload: []byte(`{"model":"gpt-6.1-sol","messages":[{"role":"assistant","content":[{"type":"thinking","thinking":"Previous progress","signature":"cpa:commentary:v1"},{"type":"text","text":"Previous progress"}]},{"role":"user","content":"Status?"}]}`)}
-				opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude, Stream: stream}
+				auth := &coreauth.Auth{Attributes: map[string]string{"base_url": server.URL, "api_key": "test"}}
+				req := coreexecutor.Request{Model: "gpt-6.1-sol", Payload: []byte(`{"model":"gpt-6.1-sol","messages":[{"role":"assistant","content":[{"type":"thinking","thinking":"Previous progress","signature":"cpa:commentary:v1"},{"type":"text","text":"Previous progress"}]},{"role":"user","content":"Status?"}]}`)}
+				opts := coreexecutor.Options{SourceFormat: translatorreg.FormatClaude, Stream: stream}
 				var text strings.Builder
 				if stream {
 					result, err := exec.ExecuteStream(context.Background(), auth, req, opts)

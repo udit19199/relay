@@ -6,15 +6,15 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	translatorcommon "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/common"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	translatorcommon "github.com/udit19199/relay/internal/translator/common"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 const interactionsCodexHistory = `{"type":"user_input","content":[{"type":"text","text":"a"}]},{"type":"model_output","content":[{"type":"text","text":"b"}]}`
 
-func interactionsToCodexEnvelope(input string) sdktranslator.RequestEnvelope {
-	return sdktranslator.TranslateRequestEnvelope(context.Background(), sdktranslator.FormatInteractions, sdktranslator.FormatCodex, sdktranslator.RequestEnvelope{
-		Format: sdktranslator.FormatInteractions,
+func interactionsToCodexEnvelope(input string) translatorreg.RequestEnvelope {
+	return translatorreg.TranslateRequestEnvelope(context.Background(), translatorreg.FormatInteractions, translatorreg.FormatCodex, translatorreg.RequestEnvelope{
+		Format: translatorreg.FormatInteractions,
 		Model:  "m",
 		Body:   []byte(input),
 	})
@@ -22,11 +22,11 @@ func interactionsToCodexEnvelope(input string) sdktranslator.RequestEnvelope {
 
 // interactionsFinalTurnToCodex translates two history turns followed by a final
 // user step holding the given content parts.
-func interactionsFinalTurnToCodex(finalContent string) sdktranslator.RequestEnvelope {
+func interactionsFinalTurnToCodex(finalContent string) translatorreg.RequestEnvelope {
 	return interactionsToCodexEnvelope(`{"model":"m","input":[` + interactionsCodexHistory + `,{"type":"user_input","content":[` + finalContent + `]}]}`)
 }
 
-func requireInteractionsToCodexRefusal(t *testing.T, envelope sdktranslator.RequestEnvelope, wantType string) {
+func requireInteractionsToCodexRefusal(t *testing.T, envelope translatorreg.RequestEnvelope, wantType string) {
 	t.Helper()
 	var unsupported *translatorcommon.UnsupportedPartError
 	if !errors.As(envelope.Err, &unsupported) || unsupported.Type != wantType || unsupported.StatusCode() != 400 {

@@ -6,10 +6,10 @@ import (
 	"sync"
 	"testing"
 
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/usage"
 	log "github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	"github.com/udit19199/relay/internal/service/usage"
 )
 
 func TestExtractCodexResponseModel(t *testing.T) {
@@ -211,7 +211,7 @@ type codexUsageTestExecutor struct{}
 
 func (codexUsageTestExecutor) Identifier() string { return "codex" }
 
-func newCodexTestReporter(ctx context.Context, model string, auth *cliproxyauth.Auth) *UsageReporter {
+func newCodexTestReporter(ctx context.Context, model string, auth *coreauth.Auth) *UsageReporter {
 	return NewExecutorUsageReporter(ctx, codexUsageTestExecutor{}, model, auth)
 }
 
@@ -231,8 +231,8 @@ data: {"type":"response.output_text.delta","delta":"hello"}
 data: {"type":"response.completed","response":{"id":"resp_1","model":"gpt-5.6-luna","usage":{"input_tokens":5,"output_tokens":7,"total_tokens":12}}}
 data: [DONE]`
 
-func newSubstitutionTestAuth() *cliproxyauth.Auth {
-	return &cliproxyauth.Auth{
+func newSubstitutionTestAuth() *coreauth.Auth {
+	return &coreauth.Auth{
 		ID:       "codex-auth-1",
 		Index:    "auth-index-7",
 		Provider: "codex",
@@ -367,7 +367,7 @@ func TestUsageReporterEmitsWarningOnRepeatedSubstitutionsWithoutThrottle(t *test
 	ctx := context.Background()
 
 	publishSubstitutedAttempt := func(authID, authIndex string) {
-		auth := &cliproxyauth.Auth{ID: authID, Index: authIndex, Provider: "codex"}
+		auth := &coreauth.Auth{ID: authID, Index: authIndex, Provider: "codex"}
 		reporter := newCodexTestReporter(ctx, "gpt-6-astra", auth)
 		reporter.ObserveResponseModel([]byte(`{"type":"response.completed","response":{"model":"gpt-5.6-luna"}}`))
 		reporter.Publish(ctx, usage.Detail{TotalTokens: 3})
@@ -391,7 +391,7 @@ func TestUsageReporterEmitsWarningAcrossServedModelCaseWithoutThrottle(t *testin
 	hook := setupResponseModelLoggerHook(t)
 	ctx := context.Background()
 
-	auth := &cliproxyauth.Auth{ID: "codex-auth-1", Index: "auth-index-7", Provider: "codex"}
+	auth := &coreauth.Auth{ID: "codex-auth-1", Index: "auth-index-7", Provider: "codex"}
 	for _, served := range []string{"gpt-5.6-luna", "GPT-5.6-LUNA"} {
 		reporter := newCodexTestReporter(ctx, "gpt-6-astra", auth)
 		reporter.ObserveResponseModel([]byte(`{"type":"response.completed","response":{"model":"` + served + `"}}`))

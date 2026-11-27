@@ -5,17 +5,17 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 // fixtureAuth builds a cloaked direct-Anthropic API-key auth for header tests.
 // The key value is a placeholder that never reaches a real upstream.
-func fixtureAuth() *cliproxyauth.Auth {
+func fixtureAuth() *coreauth.Auth {
 	attrs := map[string]string{}
-	attrs[cliproxyauth.AttributeAPIKey] = strings.Join([]string{"test", "fixture", "key"}, "-")
+	attrs[coreauth.AttributeAPIKey] = strings.Join([]string{"test", "fixture", "key"}, "-")
 	attrs["fingerprint_profile"] = "claude-code-cli"
-	return &cliproxyauth.Auth{Attributes: attrs}
+	return &coreauth.Auth{Attributes: attrs}
 }
 
 // A caller the cloak does not recognize (a Claude Code newer than the pinned
@@ -32,7 +32,7 @@ func TestApplyClaudeHeaders_ForwardsUnmanagedCallerBetas(t *testing.T) {
 	}
 	incoming := http.Header{}
 	incoming.Set("Anthropic-Beta", "future-feature-2030-01-01")
-	if errHeaders := applyClaudeHeaders(req, auth, auth.Attributes[cliproxyauth.AttributeAPIKey], false, nil, []byte(`{"model":"claude-fable-5-1"}`), &config.Config{}, incoming, false); errHeaders != nil {
+	if errHeaders := applyClaudeHeaders(req, auth, auth.Attributes[coreauth.AttributeAPIKey], false, nil, []byte(`{"model":"claude-fable-5-1"}`), &config.Config{}, incoming, false); errHeaders != nil {
 		t.Fatalf("applyClaudeHeaders() error = %v", errHeaders)
 	}
 	betas := req.Header.Get("Anthropic-Beta")
@@ -57,7 +57,7 @@ func TestApplyClaudeHeaders_StillGatesManagedCallerBetas(t *testing.T) {
 	}
 	incoming := http.Header{}
 	incoming.Set("Anthropic-Beta", "effort-2025-11-24")
-	if errHeaders := applyClaudeHeaders(req, auth, auth.Attributes[cliproxyauth.AttributeAPIKey], false, nil, []byte(`{"model":"claude-haiku-4-5"}`), &config.Config{}, incoming, false); errHeaders != nil {
+	if errHeaders := applyClaudeHeaders(req, auth, auth.Attributes[coreauth.AttributeAPIKey], false, nil, []byte(`{"model":"claude-haiku-4-5"}`), &config.Config{}, incoming, false); errHeaders != nil {
 		t.Fatalf("applyClaudeHeaders() error = %v", errHeaders)
 	}
 	if betas := req.Header.Get("Anthropic-Beta"); strings.Contains(betas, "effort-2025-11-24") {
@@ -88,7 +88,7 @@ func TestApplyClaudeHeaders_PreservesNativeGatewayHintsOnly(t *testing.T) {
 				"x-claude-code-context-compacted":   {"false"},
 			}
 			auth := fixtureAuth()
-			if err := applyClaudeHeaders(req, auth, auth.Attributes[cliproxyauth.AttributeAPIKey], false, nil,
+			if err := applyClaudeHeaders(req, auth, auth.Attributes[coreauth.AttributeAPIKey], false, nil,
 				[]byte(`{"model":"claude-opus-5-5"}`), &config.Config{}, incoming, tt.confirmed); err != nil {
 				t.Fatal(err)
 			}
@@ -111,7 +111,7 @@ func TestApplyClaudeHeaders_PreservesNativeGatewayHintsOnly(t *testing.T) {
 func TestApplyClaudeHeaders_ForwardsUnmanagedCallerBetas_OAuth(t *testing.T) {
 	t.Parallel()
 
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:       "claude-oauth-fixture",
 		Metadata: map[string]any{"access_token": "sk-ant-oat-fixture"},
 	}

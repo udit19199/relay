@@ -10,10 +10,10 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gorilla/websocket"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 // SIWC (Sign in with ChatGPT) subscriptions reject configuration_update input
@@ -115,8 +115,8 @@ func TestStripCodexSIWCUnsupportedFieldsConfigurationUpdates(t *testing.T) {
 	})
 }
 
-func codexSIWCAuthForUpdateTest(baseURL string) *cliproxyauth.Auth {
-	return &cliproxyauth.Auth{
+func codexSIWCAuthForUpdateTest(baseURL string) *coreauth.Auth {
+	return &coreauth.Auth{
 		ID:         "codex-siwc-update",
 		Provider:   "codex",
 		Attributes: map[string]string{"base_url": baseURL},
@@ -185,10 +185,10 @@ func TestCodexExecutorUseSIWCStripsConfigurationUpdatesBeforePayloadFinalizer(t 
 			defer server.Close()
 
 			executor := NewCodexExecutor(tc.cfg)
-			_, err := executor.Execute(context.Background(), codexSIWCAuthForUpdateTest(server.URL), cliproxyexecutor.Request{
+			_, err := executor.Execute(context.Background(), codexSIWCAuthForUpdateTest(server.URL), coreexecutor.Request{
 				Model:   "gpt-6-astra",
 				Payload: []byte(codexSIWCUpdatePayload),
-			}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString("openai-response")})
+			}, coreexecutor.Options{SourceFormat: translatorreg.FromString("openai-response")})
 			if err != nil {
 				t.Fatalf("Execute error: %v", err)
 			}
@@ -208,11 +208,11 @@ func TestCodexExecutorCompactUseSIWCStripsConfigurationUpdates(t *testing.T) {
 	defer server.Close()
 
 	executor := NewCodexExecutor(&config.Config{})
-	_, err := executor.Execute(context.Background(), codexSIWCAuthForUpdateTest(server.URL), cliproxyexecutor.Request{
+	_, err := executor.Execute(context.Background(), codexSIWCAuthForUpdateTest(server.URL), coreexecutor.Request{
 		Model:   "gpt-6-astra",
 		Payload: []byte(codexSIWCUpdatePayload),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-response"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-response"),
 		Alt:          "responses/compact",
 	})
 	if err != nil {
@@ -245,10 +245,10 @@ func TestCodexWebsocketsExecuteUseSIWCStripsConfigurationUpdates(t *testing.T) {
 	defer server.Close()
 
 	executor := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
-	_, err := executor.Execute(context.Background(), codexSIWCAuthForUpdateTest(server.URL), cliproxyexecutor.Request{
+	_, err := executor.Execute(context.Background(), codexSIWCAuthForUpdateTest(server.URL), coreexecutor.Request{
 		Model:   "gpt-6-astra",
 		Payload: []byte(codexSIWCUpdatePayload),
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString("openai-response")})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FromString("openai-response")})
 	if err != nil {
 		t.Fatalf("websocket Execute error: %v", err)
 	}
@@ -278,10 +278,10 @@ func TestCodexExecutorUseSIWCKeepsSuffixEffortOverConfigurationUpdate(t *testing
 	// override into the top-level effort. The SIWC strip must keep that
 	// suffix intent instead of resurrecting the last configuration_update.
 	executor := NewCodexExecutor(&config.Config{})
-	_, err := executor.Execute(context.Background(), codexSIWCAuthForUpdateTest(server.URL), cliproxyexecutor.Request{
+	_, err := executor.Execute(context.Background(), codexSIWCAuthForUpdateTest(server.URL), coreexecutor.Request{
 		Model:   "gpt-6-astra(xhigh)",
 		Payload: []byte(codexSIWCUpdatePayload),
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString("openai-response")})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FromString("openai-response")})
 	if err != nil {
 		t.Fatalf("Execute error: %v", err)
 	}
@@ -299,10 +299,10 @@ func TestCodexExecutorExecuteStreamUseSIWCStripsConfigurationUpdates(t *testing.
 	defer server.Close()
 
 	executor := NewCodexExecutor(&config.Config{})
-	result, err := executor.ExecuteStream(context.Background(), codexSIWCAuthForUpdateTest(server.URL), cliproxyexecutor.Request{
+	result, err := executor.ExecuteStream(context.Background(), codexSIWCAuthForUpdateTest(server.URL), coreexecutor.Request{
 		Model:   "gpt-6-astra",
 		Payload: []byte(codexSIWCUpdatePayload),
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString("openai-response")})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FromString("openai-response")})
 	if err != nil {
 		t.Fatalf("ExecuteStream error: %v", err)
 	}
@@ -316,10 +316,10 @@ func TestCodexExecutorExecuteStreamUseSIWCStripsConfigurationUpdates(t *testing.
 
 func TestCodexWebsocketsPrepareStreamUseSIWCKeepsSuffixEffort(t *testing.T) {
 	executor := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
-	prepared, err := executor.prepareCodexWebsocketStream(context.Background(), codexSIWCAuthForUpdateTest("http://127.0.0.1:1"), cliproxyexecutor.Request{
+	prepared, err := executor.prepareCodexWebsocketStream(context.Background(), codexSIWCAuthForUpdateTest("http://127.0.0.1:1"), coreexecutor.Request{
 		Model:   "gpt-6-astra(xhigh)",
 		Payload: []byte(codexSIWCUpdatePayload),
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString("openai-response")})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FromString("openai-response")})
 	if err != nil {
 		t.Fatalf("prepareCodexWebsocketStream error: %v", err)
 	}
@@ -337,10 +337,10 @@ func TestCodexExecutorUseSIWCInvalidSuffixPromotesConfigurationUpdate(t *testing
 	defer server.Close()
 
 	executor := NewCodexExecutor(&config.Config{})
-	_, err := executor.Execute(context.Background(), codexSIWCAuthForUpdateTest(server.URL), cliproxyexecutor.Request{
+	_, err := executor.Execute(context.Background(), codexSIWCAuthForUpdateTest(server.URL), coreexecutor.Request{
 		Model:   "gpt-6-astra(invalid)",
 		Payload: []byte(codexSIWCUpdatePayload),
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString("openai-response")})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FromString("openai-response")})
 	if err != nil {
 		t.Fatalf("Execute error: %v", err)
 	}
@@ -358,10 +358,10 @@ func TestCodexExecutorWithoutSIWCKeepsConfigurationUpdates(t *testing.T) {
 	defer server.Close()
 
 	executor := NewCodexExecutor(&config.Config{})
-	_, err := executor.Execute(context.Background(), codexOAuthTestAuth(server.URL), cliproxyexecutor.Request{
+	_, err := executor.Execute(context.Background(), codexOAuthTestAuth(server.URL), coreexecutor.Request{
 		Model:   "gpt-6-astra",
 		Payload: []byte(codexSIWCUpdatePayload),
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString("openai-response")})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FromString("openai-response")})
 	if err != nil {
 		t.Fatalf("Execute error: %v", err)
 	}

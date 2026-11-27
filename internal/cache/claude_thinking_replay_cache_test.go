@@ -3,7 +3,7 @@ package cache
 import (
 	"bytes"
 	"context"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/kvstore"
+	"github.com/udit19199/relay/internal/kvstore"
 	"sync"
 	"testing"
 	"time"

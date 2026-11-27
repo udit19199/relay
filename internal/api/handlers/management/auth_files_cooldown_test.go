@@ -15,10 +15,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/codex"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
+	"github.com/udit19199/relay/internal/auth/codex"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 type authFilesCooldownResponse struct {
@@ -1249,20 +1249,20 @@ type failingRefreshManagementExecutor struct {
 
 func (e *failingRefreshManagementExecutor) Identifier() string { return e.provider }
 
-func (e *failingRefreshManagementExecutor) Execute(context.Context, *coreauth.Auth, cliproxyexecutor.Request, cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
-	return cliproxyexecutor.Response{}, nil
+func (e *failingRefreshManagementExecutor) Execute(context.Context, *coreauth.Auth, coreexecutor.Request, coreexecutor.Options) (coreexecutor.Response, error) {
+	return coreexecutor.Response{}, nil
 }
 
-func (e *failingRefreshManagementExecutor) ExecuteStream(context.Context, *coreauth.Auth, cliproxyexecutor.Request, cliproxyexecutor.Options) (*cliproxyexecutor.StreamResult, error) {
+func (e *failingRefreshManagementExecutor) ExecuteStream(context.Context, *coreauth.Auth, coreexecutor.Request, coreexecutor.Options) (*coreexecutor.StreamResult, error) {
 	if e.streamErr != nil {
 		return nil, e.streamErr
 	}
-	ch := make(chan cliproxyexecutor.StreamChunk, len(e.streamPayloads))
+	ch := make(chan coreexecutor.StreamChunk, len(e.streamPayloads))
 	for _, p := range e.streamPayloads {
-		ch <- cliproxyexecutor.StreamChunk{Payload: p}
+		ch <- coreexecutor.StreamChunk{Payload: p}
 	}
 	close(ch)
-	return &cliproxyexecutor.StreamResult{Chunks: ch}, nil
+	return &coreexecutor.StreamResult{Chunks: ch}, nil
 }
 
 func (e *failingRefreshManagementExecutor) Refresh(_ context.Context, auth *coreauth.Auth) (*coreauth.Auth, error) {
@@ -1279,8 +1279,8 @@ func (e *failingRefreshManagementExecutor) Refresh(_ context.Context, auth *core
 	return auth, nil
 }
 
-func (e *failingRefreshManagementExecutor) CountTokens(context.Context, *coreauth.Auth, cliproxyexecutor.Request, cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
-	return cliproxyexecutor.Response{}, nil
+func (e *failingRefreshManagementExecutor) CountTokens(context.Context, *coreauth.Auth, coreexecutor.Request, coreexecutor.Options) (coreexecutor.Response, error) {
+	return coreexecutor.Response{}, nil
 }
 
 func (e *failingRefreshManagementExecutor) HttpRequest(context.Context, *coreauth.Auth, *http.Request) (*http.Response, error) {

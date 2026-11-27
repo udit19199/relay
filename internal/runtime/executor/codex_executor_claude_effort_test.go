@@ -9,9 +9,9 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestCodexExecutorClaudeStandaloneEffortFinalPayload(t *testing.T) {
@@ -53,11 +53,11 @@ func TestCodexExecutorClaudeStandaloneEffortFinalPayload(t *testing.T) {
 				t.Cleanup(server.Close)
 
 				executor := NewCodexExecutor(&config.Config{Payload: tt.payload})
-				req := cliproxyexecutor.Request{
+				req := coreexecutor.Request{
 					Model:   "gpt-6.1-sol",
 					Payload: []byte(`{"model":"gpt-6.1-sol","max_tokens":256,"messages":[{"role":"user","content":"Reply exactly OK."}],"output_config":{"effort":"high"}}`),
 				}
-				opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude, Stream: stream}
+				opts := coreexecutor.Options{SourceFormat: translatorreg.FormatClaude, Stream: stream}
 				if stream {
 					result, errStream := executor.ExecuteStream(context.Background(), codexOAuthTestAuth(server.URL), req, opts)
 					if errStream != nil {

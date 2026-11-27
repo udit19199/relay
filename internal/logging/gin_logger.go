@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
 	log "github.com/sirupsen/logrus"
+	"github.com/udit19199/relay/internal/util"
 )
 
 // aiAPIPrefixes defines path prefixes for AI API requests that should have request ID tracking.
@@ -142,15 +142,6 @@ func GinLogrusRecovery() gin.HandlerFunc {
 
 		c.AbortWithStatus(http.StatusInternalServerError)
 	})
-}
-
-// SkipGinRequestLogging marks the provided Gin context so that GinLogrusLogger
-// will skip emitting a log line for the associated request.
-func SkipGinRequestLogging(c *gin.Context) {
-	if c == nil {
-		return
-	}
-	c.Set(skipGinLogKey, true)
 }
 
 func shouldSkipGinRequestLogging(c *gin.Context) bool {

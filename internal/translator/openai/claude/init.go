@@ -1,9 +1,9 @@
 package claude
 
 import (
-	. "github.com/router-for-me/CLIProxyAPI/v8/internal/constant"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/interfaces"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/translator/translator"
+	. "github.com/udit19199/relay/internal/constant"
+	"github.com/udit19199/relay/internal/interfaces"
+	"github.com/udit19199/relay/internal/translator/translator"
 )
 
 func init() {

@@ -30,14 +30,14 @@ import (
 	"time"
 
 	"github.com/MoeForge/moego/ojson"
-	codexauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/codex"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/logging"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	sdkauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/auth"
-	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/proxyutil"
 	log "github.com/sirupsen/logrus"
+	codexauth "github.com/udit19199/relay/internal/auth/codex"
+	authlogin "github.com/udit19199/relay/internal/auth/login"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/logging"
+	"github.com/udit19199/relay/internal/proxyutil"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	"github.com/udit19199/relay/internal/util"
 )
 
 const (
@@ -109,7 +109,7 @@ func main() {
 
 	fmt.Printf("Scanning auth files in: %s\n", authsDir)
 
-	fileStore := sdkauth.NewFileTokenStore()
+	fileStore := authlogin.NewFileTokenStore()
 	fileStore.SetBaseDir(authsDir)
 
 	ctx := context.Background()
@@ -181,7 +181,7 @@ func findCodexAuth(auths []*coreauth.Auth) *coreauth.Auth {
 	return nil
 }
 
-func ensureAccessToken(ctx context.Context, store *sdkauth.FileTokenStore, auth *coreauth.Auth) (string, bool, error) {
+func ensureAccessToken(ctx context.Context, store *authlogin.FileTokenStore, auth *coreauth.Auth) (string, bool, error) {
 	accessToken := metaStringValue(auth.Metadata, "access_token")
 	if accessToken != "" {
 		if expiresAt, ok := auth.ExpirationTime(); !ok || time.Now().Add(accessTokenRefreshLeeway).Before(expiresAt) {

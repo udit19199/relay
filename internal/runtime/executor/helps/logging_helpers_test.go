@@ -10,9 +10,9 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/logging"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/logging"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 func TestRequestLoggingDoesNotMarkUpstreamAttempt(t *testing.T) {
@@ -35,9 +35,9 @@ func TestRequestLoggingDoesNotMarkUpstreamAttempt(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ctx := cliproxyexecutor.WithUpstreamAttemptTracker(context.Background())
+			ctx := coreexecutor.WithUpstreamAttemptTracker(context.Background())
 			test.record(ctx)
-			if cliproxyexecutor.UpstreamAttempted(ctx) {
+			if coreexecutor.UpstreamAttempted(ctx) {
 				t.Fatal("request logging marked an upstream attempt before transport")
 			}
 		})

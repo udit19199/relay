@@ -7,11 +7,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	translatorcommon "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/common"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorcommon "github.com/udit19199/relay/internal/translator/common"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 // A turn whose only content is a file the target cannot receive must be refused
@@ -34,22 +34,18 @@ func TestExecutorsRefuseAFileOnlyTurnBeforeCallingUpstream(t *testing.T) {
 		interactionsCodexAudioRoleDeveloper = interactionsCodexAudioPrefix + `{"type":"user_input","role":"developer","content":[{"type":"text","text":"note"}]}]}`
 		interactionsCodexAudioTypeSystem    = interactionsCodexAudioPrefix + `{"type":"system","content":[{"type":"text","text":"note"}]}]}`
 		interactionsCodexAudioTypeDeveloper = interactionsCodexAudioPrefix + `{"type":"developer","content":[{"type":"text","text":"note"}]}]}`
-		// The only new user turn is inline audio, which Claude cannot read and must not receive as placeholder text.
-		geminiAudio = `{"model":"m","contents":[{"role":"user","parts":[{"text":"hello"}]},{"role":"model","parts":[{"text":"hi"}]},{"role":"user","parts":[{"inlineData":{"mimeType":"audio/wav","data":"UklGRg=="}}]}]}`
-		// The only new user turn is a remote image URL, so the earlier turn must not be answered in its place.
-		openAIImageURL = `{"model":"m","messages":[{"role":"user","content":"hello"},{"role":"assistant","content":"hi"},{"role":"user","content":[{"type":"image_url","image_url":{"url":"https://x.test/a.png"}}]}]}`
 	)
-	keyAuth := func(provider string, extra map[string]string) *cliproxyauth.Auth {
+	keyAuth := func(provider string, extra map[string]string) *coreauth.Auth {
 		attrs := map[string]string{"api_key": "k", "base_url": server.URL}
 		for k, v := range extra {
 			attrs[k] = v
 		}
-		return &cliproxyauth.Auth{Provider: provider, Attributes: attrs}
+		return &coreauth.Auth{Provider: provider, Attributes: attrs}
 	}
 	targets := []struct {
 		name     string
-		exec     cliproxyauth.ProviderExecutor
-		auth     *cliproxyauth.Auth
+		exec     coreauth.ProviderExecutor
+		auth     *coreauth.Auth
 		source   string
 		payload  string
 		wantPart string
@@ -64,9 +60,9 @@ func TestExecutorsRefuseAFileOnlyTurnBeforeCallingUpstream(t *testing.T) {
 		{"interactions developer type to codex", NewCodexExecutor(&config.Config{}), keyAuth("codex", map[string]string{"plan_type": "pro"}), "interactions", interactionsCodexAudioTypeDeveloper, "audio"},
 	}
 	for _, target := range targets {
-		req := cliproxyexecutor.Request{Model: "m", Payload: []byte(target.payload)}
-		opts := func(stream bool) cliproxyexecutor.Options {
-			return cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString(target.source), Stream: stream}
+		req := coreexecutor.Request{Model: "m", Payload: []byte(target.payload)}
+		opts := func(stream bool) coreexecutor.Options {
+			return coreexecutor.Options{SourceFormat: translatorreg.FromString(target.source), Stream: stream}
 		}
 		calls := map[string]func() error{
 			"Execute": func() error {

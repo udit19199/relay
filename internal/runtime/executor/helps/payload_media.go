@@ -11,14 +11,14 @@ import (
 	"net/textproto"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
+	"github.com/udit19199/relay/internal/config"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	"github.com/udit19199/relay/internal/util"
 )
 
 // ApplyMediaPayloadConfig exposes multipart fields as JSON business values. File
 // parts use {filename, content_type, data} with base64 data; framing stays opaque.
-func ApplyMediaPayloadConfig(cfg *config.Config, executor, model, protocol string, body []byte, contentType string, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) ([]byte, string, error) {
+func ApplyMediaPayloadConfig(cfg *config.Config, executor, model, protocol string, body []byte, contentType string, req coreexecutor.Request, opts coreexecutor.Options) ([]byte, string, error) {
 	view, multipartBody, errDecode := mediaPayloadJSON(body, contentType)
 	if errDecode != nil {
 		return nil, "", errDecode

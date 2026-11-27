@@ -11,10 +11,10 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gorilla/websocket"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 // Issue #5551: Tool schema with 13-branch oneOf causes ChatGPT Codex upstream
@@ -34,7 +34,7 @@ func TestCodexExecutorSimplifiesComplexOneOfToolSchema(t *testing.T) {
 	defer server.Close()
 
 	executor := NewCodexExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"api_key":   "test",
@@ -86,11 +86,11 @@ func TestCodexExecutorSimplifiesComplexOneOfToolSchema(t *testing.T) {
 		}]
 	}`)
 
-	_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "gpt-5.5",
 		Payload: requestPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai"),
 		Stream:       false,
 	})
 	if err != nil {
@@ -146,7 +146,7 @@ func TestCodexExecutorExecuteStream_ZeroTokenIncompleteResponseIsFailure(t *test
 	defer server.Close()
 
 	executor := NewCodexExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"base_url": server.URL,
@@ -154,11 +154,11 @@ func TestCodexExecutorExecuteStream_ZeroTokenIncompleteResponseIsFailure(t *test
 		},
 	}
 
-	res, err := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	res, err := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "gpt-5.5",
 		Payload: []byte(`{"model":"gpt-5.5","messages":[{"role":"user","content":"hello"}]}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai"),
 		Stream:       true,
 	})
 	if err != nil {
@@ -190,7 +190,7 @@ func TestCodexExecutorExecuteStream_PartialDeltasIncompleteResponseIsSuccessful(
 	defer server.Close()
 
 	executor := NewCodexExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"base_url": server.URL,
@@ -198,11 +198,11 @@ func TestCodexExecutorExecuteStream_PartialDeltasIncompleteResponseIsSuccessful(
 		},
 	}
 
-	res, err := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	res, err := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "gpt-5.5",
 		Payload: []byte(`{"model":"gpt-5.5","messages":[{"role":"user","content":"hello"}]}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai"),
 		Stream:       true,
 	})
 	if err != nil {
@@ -242,7 +242,7 @@ func TestCodexExecutorExecuteStream_BufferingPartialDeltasIncompleteResponseIsSu
 			StreamBootstrapBuffering: true,
 		},
 	})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"base_url": server.URL,
@@ -250,11 +250,11 @@ func TestCodexExecutorExecuteStream_BufferingPartialDeltasIncompleteResponseIsSu
 		},
 	}
 
-	res, err := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	res, err := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "gpt-5.5",
 		Payload: []byte(`{"model":"gpt-5.5","messages":[{"role":"user","content":"hello"}]}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai"),
 		Stream:       true,
 	})
 	if err != nil {
@@ -290,7 +290,7 @@ func TestCodexExecutorExecuteStream_EmptyDeltaDoesNotBypassZeroTokenFailure(t *t
 	defer server.Close()
 
 	executor := NewCodexExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"base_url": server.URL,
@@ -298,11 +298,11 @@ func TestCodexExecutorExecuteStream_EmptyDeltaDoesNotBypassZeroTokenFailure(t *t
 		},
 	}
 
-	res, err := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	res, err := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "gpt-5.5",
 		Payload: []byte(`{"model":"gpt-5.5","messages":[{"role":"user","content":"hello"}]}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai"),
 		Stream:       true,
 	})
 	if err != nil {
@@ -335,7 +335,7 @@ func TestCodexExecutor_DoesNotNormalizeToolIntegerTypesForCodexUserAgent(t *test
 	defer server.Close()
 
 	executor := NewCodexExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"api_key":  "test",
@@ -490,11 +490,11 @@ func TestCodexExecutor_DoesNotNormalizeToolIntegerTypesForCodexUserAgent(t *test
 	}`)
 
 	// 1. With non-Codex User-Agent, tool types must remain unchanged (number).
-	_, errExecuteNonCodex := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, errExecuteNonCodex := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "gpt-5.5",
 		Payload: requestPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-response"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-response"),
 		Headers:      http.Header{"User-Agent": []string{"curl/8.7.1"}},
 		Stream:       false,
 	})
@@ -512,11 +512,11 @@ func TestCodexExecutor_DoesNotNormalizeToolIntegerTypesForCodexUserAgent(t *test
 
 	// 2. With Codex User-Agent, tool parameter number types must NOT be rewritten to integer for Codex executor (Issue #6244).
 	gotBody = nil
-	_, errExecuteCodex := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, errExecuteCodex := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "gpt-5.5",
 		Payload: requestPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-response"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-response"),
 		Headers:      http.Header{"User-Agent": []string{"codex_cli_rs/0.1.0"}},
 		Stream:       false,
 	})
@@ -573,11 +573,11 @@ func TestCodexExecutor_DoesNotNormalizeToolIntegerTypesForCodexUserAgent(t *test
 
 	// 3. HTTP Stream: must also retain number
 	gotBody = nil
-	streamRes, errStream := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	streamRes, errStream := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "gpt-5.5",
 		Payload: requestPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-response"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-response"),
 		Headers:      http.Header{"User-Agent": []string{"codex_cli_rs/0.1.0"}},
 	})
 	if errStream != nil {
@@ -597,11 +597,11 @@ func TestCodexExecutor_DoesNotNormalizeToolIntegerTypesForCodexUserAgent(t *test
 
 	// 4. HTTP Compact (/responses/compact): must also retain number
 	gotBody = nil
-	_, errCompact := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, errCompact := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "gpt-5.5",
 		Payload: requestPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-response"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-response"),
 		Headers:      http.Header{"User-Agent": []string{"codex_cli_rs/0.1.0"}},
 		Alt:          "responses/compact",
 	})
@@ -645,7 +645,7 @@ func TestCodexWebsocketsExecutor_DoesNotNormalizeToolIntegerTypesForCodexUserAge
 	defer server.Close()
 
 	exec := NewCodexWebsocketsExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"api_key":   "sk-test",
@@ -721,12 +721,12 @@ func TestCodexWebsocketsExecutor_DoesNotNormalizeToolIntegerTypesForCodexUserAge
 		]
 	}`)
 
-	req := cliproxyexecutor.Request{
+	req := coreexecutor.Request{
 		Model:   "gpt-5.6-luna",
 		Payload: requestPayload,
 	}
-	opts := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-response"),
+	opts := coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-response"),
 		Headers:      http.Header{"User-Agent": []string{"codex_cli_rs/0.1.0"}},
 	}
 
@@ -808,7 +808,7 @@ func TestCodexWebsocketsExecutor_UpgradeFallbackToHTTP_PreservesNumber(t *testin
 	defer server.Close()
 
 	exec := NewCodexWebsocketsExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"api_key":   "sk-test",
@@ -867,12 +867,12 @@ func TestCodexWebsocketsExecutor_UpgradeFallbackToHTTP_PreservesNumber(t *testin
 		]
 	}`)
 
-	req := cliproxyexecutor.Request{
+	req := coreexecutor.Request{
 		Model:   "gpt-5.6-luna",
 		Payload: requestPayload,
 	}
-	opts := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-response"),
+	opts := coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-response"),
 		Headers:      http.Header{"User-Agent": []string{"codex_cli_rs/0.1.0"}},
 	}
 
@@ -925,7 +925,7 @@ func TestOpenAICompatExecutor_NormalizesToolIntegerTypesForCodexUserAgent_NonCod
 	defer server.Close()
 
 	executor := NewOpenAICompatExecutor("openai-compatibility", &config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "openai-compatibility",
 		Attributes: map[string]string{
 			"api_key":  "test-key",
@@ -953,11 +953,11 @@ func TestOpenAICompatExecutor_NormalizesToolIntegerTypesForCodexUserAgent_NonCod
 		]
 	}`)
 
-	_, errExec := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, errExec := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "test-model",
 		Payload: requestPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai"),
 		Headers:      http.Header{"User-Agent": []string{"codex-tui/0.154.0"}},
 		Stream:       false,
 	})

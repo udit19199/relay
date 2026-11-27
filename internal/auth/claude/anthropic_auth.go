@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
 	log "github.com/sirupsen/logrus"
+	"github.com/udit19199/relay/internal/config"
 	"golang.org/x/sync/singleflight"
 )
 

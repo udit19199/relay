@@ -8,10 +8,10 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 const claudeIssue6698SSE = "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_test\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-opus-5-5\",\"content\":[],\"stop_reason\":null,\"usage\":{\"input_tokens\":1,\"output_tokens\":0}}}\n\n" +
@@ -24,12 +24,12 @@ const claudeIssue6698SSE = "event: message_start\ndata: {\"type\":\"message_star
 func TestClaudeExecutor_Sonnet55ThinkingOffSendsBetweenTools(t *testing.T) {
 	sources := []struct {
 		name    string
-		format  sdktranslator.Format
+		format  translatorreg.Format
 		payload string
 	}{
-		{name: "claude", format: sdktranslator.FormatClaude, payload: `{"model":"MODEL","max_tokens":64,"messages":[{"role":"user","content":"hi"}],"thinking":{"type":"disabled","display":"summarized","block_binding":{"prefix_mismatch_behavior":"drop_block"}}}`},
-		{name: "openai chat", format: sdktranslator.FormatOpenAI, payload: `{"model":"MODEL","messages":[{"role":"user","content":"hi"}],"reasoning_effort":"none"}`},
-		{name: "openai responses", format: sdktranslator.FormatOpenAIResponse, payload: `{"model":"MODEL","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"hi"}]}],"reasoning":{"effort":"none"}}`},
+		{name: "claude", format: translatorreg.FormatClaude, payload: `{"model":"MODEL","max_tokens":64,"messages":[{"role":"user","content":"hi"}],"thinking":{"type":"disabled","display":"summarized","block_binding":{"prefix_mismatch_behavior":"drop_block"}}}`},
+		{name: "openai chat", format: translatorreg.FormatOpenAI, payload: `{"model":"MODEL","messages":[{"role":"user","content":"hi"}],"reasoning_effort":"none"}`},
+		{name: "openai responses", format: translatorreg.FormatOpenAIResponse, payload: `{"model":"MODEL","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"hi"}]}],"reasoning":{"effort":"none"}}`},
 	}
 	for _, model := range []string{"claude-sonnet-5-5", "claude-sonnet-5-5[1m]"} {
 		for _, source := range sources {
@@ -52,9 +52,9 @@ func TestClaudeExecutor_Sonnet55ThinkingOffSendsBetweenTools(t *testing.T) {
 					})
 					ctx := context.WithValue(context.Background(), "cliproxy.roundtripper", http.RoundTripper(transport))
 					executor := NewClaudeExecutor(&config.Config{})
-					auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "key-between-tools", "cloak_mode": "always"}}
-					request := cliproxyexecutor.Request{Model: model, Payload: []byte(strings.ReplaceAll(source.payload, "MODEL", model))}
-					options := cliproxyexecutor.Options{SourceFormat: source.format, Stream: stream}
+					auth := &coreauth.Auth{Attributes: map[string]string{"api_key": "key-between-tools", "cloak_mode": "always"}}
+					request := coreexecutor.Request{Model: model, Payload: []byte(strings.ReplaceAll(source.payload, "MODEL", model))}
+					options := coreexecutor.Options{SourceFormat: source.format, Stream: stream}
 					if stream {
 						result, err := executor.ExecuteStream(ctx, auth, request, options)
 						if err != nil {
@@ -87,12 +87,12 @@ func TestClaudeExecutor_Sonnet55ThinkingOffSendsBetweenTools(t *testing.T) {
 func TestClaudeExecutor_AdaptiveOnlyThinkingOffKeepsThinkingHidden(t *testing.T) {
 	sources := []struct {
 		name    string
-		format  sdktranslator.Format
+		format  translatorreg.Format
 		payload string
 	}{
-		{name: "claude", format: sdktranslator.FormatClaude, payload: `{"model":"MODEL","max_tokens":64,"messages":[{"role":"user","content":"hi"}],"thinking":{"type":"disabled"}}`},
-		{name: "openai chat", format: sdktranslator.FormatOpenAI, payload: `{"model":"MODEL","messages":[{"role":"user","content":"hi"}],"reasoning_effort":"none"}`},
-		{name: "openai responses", format: sdktranslator.FormatOpenAIResponse, payload: `{"model":"MODEL","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"hi"}]}],"reasoning":{"effort":"none"}}`},
+		{name: "claude", format: translatorreg.FormatClaude, payload: `{"model":"MODEL","max_tokens":64,"messages":[{"role":"user","content":"hi"}],"thinking":{"type":"disabled"}}`},
+		{name: "openai chat", format: translatorreg.FormatOpenAI, payload: `{"model":"MODEL","messages":[{"role":"user","content":"hi"}],"reasoning_effort":"none"}`},
+		{name: "openai responses", format: translatorreg.FormatOpenAIResponse, payload: `{"model":"MODEL","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"hi"}]}],"reasoning":{"effort":"none"}}`},
 	}
 	for _, model := range []string{"claude-opus-5-5", "claude-opus-5-5[1m]", "claude-fable-5", "claude-fable-5-1"} {
 		for _, source := range sources {
@@ -110,10 +110,10 @@ func TestClaudeExecutor_AdaptiveOnlyThinkingOffKeepsThinkingHidden(t *testing.T)
 				})
 				ctx := context.WithValue(context.Background(), "cliproxy.roundtripper", http.RoundTripper(transport))
 				executor := NewClaudeExecutor(&config.Config{})
-				auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "key-disabled-fallback", "cloak_mode": "always"}}
+				auth := &coreauth.Auth{Attributes: map[string]string{"api_key": "key-disabled-fallback", "cloak_mode": "always"}}
 				payload := strings.ReplaceAll(source.payload, "MODEL", model)
-				request := cliproxyexecutor.Request{Model: model, Payload: []byte(payload)}
-				if _, err := executor.Execute(ctx, auth, request, cliproxyexecutor.Options{SourceFormat: source.format}); err != nil {
+				request := coreexecutor.Request{Model: model, Payload: []byte(payload)}
+				if _, err := executor.Execute(ctx, auth, request, coreexecutor.Options{SourceFormat: source.format}); err != nil {
 					t.Fatalf("Execute() error = %v", err)
 				}
 

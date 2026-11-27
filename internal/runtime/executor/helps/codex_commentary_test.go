@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	translatorcommon "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/common"
+	"github.com/udit19199/relay/internal/config"
+	translatorcommon "github.com/udit19199/relay/internal/translator/common"
 )
 
 func TestCodexCommentaryPolicyDefaultsAndSnapshots(t *testing.T) {

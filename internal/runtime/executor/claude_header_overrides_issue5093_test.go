@@ -10,11 +10,11 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/google/uuid"
-	claudeauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/claude"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	claudeauth "github.com/udit19199/relay/internal/auth/claude"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func parseIssue5093Config(t *testing.T, raw string) *config.Config {
@@ -86,7 +86,7 @@ func TestApplyClaudeHeaders_OperatorBetaOverridesStableAcrossReapplication(t *te
 	incoming := http.Header{}
 	incoming.Set("Anthropic-Beta", claudeCodeBeta)
 	callerReq := newClaudeHeaderTestRequest(t, incoming)
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "key-caller-owned"}}
+	auth := &coreauth.Auth{Attributes: map[string]string{"api_key": "key-caller-owned"}}
 	if err := applyClaudeHeaders(callerReq, auth, "key-caller-owned", false, nil,
 		[]byte(`{"model":"claude-opus-5"}`), cfg, incoming, false); err != nil {
 		t.Fatalf("caller-owned applyClaudeHeaders() error = %v", err)
@@ -107,7 +107,7 @@ func TestApplyClaudeHeaders_CredentialHeadersKeepPrecedenceOverOperatorDefaults(
       anthropic-beta-append: ["operator-beta-2099-01-01"]
       client-request-id: "off"
 `)
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"api_key":                    "key-credential-headers",
 		"header:Anthropic-Beta":      "credential-beta-2099-01-01",
 		"header:X-Client-Request-Id": "credential-request-id",
@@ -149,7 +149,7 @@ func TestApplyClaudeHeaders_OperatorBetaStripAppliesToCallerOwnedBetas(t *testin
 `)
 	incoming := http.Header{}
 	incoming.Set("Anthropic-Beta", claudeCodeBeta+",fine-grained-tool-streaming-2025-05-14")
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "key-caller-owned"}}
+	auth := &coreauth.Auth{Attributes: map[string]string{"api_key": "key-caller-owned"}}
 	req := newClaudeHeaderTestRequest(t, incoming)
 	if err := applyClaudeHeaders(req, auth, "key-caller-owned", false, nil,
 		[]byte(`{"model":"claude-opus-5"}`), cfg, incoming, false); err != nil {
@@ -223,7 +223,7 @@ func TestClaudeExecutor_InjectDiagnosticsDisabledOmitsDiagnosticsAndCacheDiagnos
 		})
 		ctx := context.WithValue(context.Background(), "cliproxy.roundtripper", http.RoundTripper(transport))
 		testID := uuid.NewString()
-		auth := &cliproxyauth.Auth{
+		auth := &coreauth.Auth{
 			ID:         "diagnostics-disabled-" + testID,
 			Attributes: map[string]string{"api_key": "sk-ant-oat-diagnostics-disabled", "cloak_mode": "always"},
 			Metadata: map[string]any{
@@ -232,11 +232,11 @@ func TestClaudeExecutor_InjectDiagnosticsDisabledOmitsDiagnosticsAndCacheDiagnos
 			},
 		}
 		executor := NewClaudeExecutor(cfg)
-		request := cliproxyexecutor.Request{Model: "claude-opus-5", Payload: []byte(`{"model":"claude-opus-5","messages":[{"role":"user","content":"x"}],"max_tokens":16}`)}
-		options := cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FormatClaude,
+		request := coreexecutor.Request{Model: "claude-opus-5", Payload: []byte(`{"model":"claude-opus-5","messages":[{"role":"user","content":"x"}],"max_tokens":16}`)}
+		options := coreexecutor.Options{
+			SourceFormat: translatorreg.FormatClaude,
 			Stream:       stream,
-			Metadata:     map[string]any{cliproxyexecutor.ExecutionSessionMetadataKey: "diagnostics-disabled-" + testID},
+			Metadata:     map[string]any{coreexecutor.ExecutionSessionMetadataKey: "diagnostics-disabled-" + testID},
 		}
 		if stream {
 			result, errStream := executor.ExecuteStream(ctx, auth, request, options)
@@ -271,12 +271,12 @@ func TestApplyClaudeHeaders_ClientRequestIDModes(t *testing.T) {
 	const callerRequestID = "caller-request-id-5093"
 	withCallerID := http.Header{}
 	withCallerID.Set("X-Client-Request-Id", callerRequestID)
-	apiKeyAuth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "key-caller-owned"}}
+	apiKeyAuth := &coreauth.Auth{Attributes: map[string]string{"api_key": "key-caller-owned"}}
 
 	tests := []struct {
 		name     string
 		mode     string
-		auth     *cliproxyauth.Auth
+		auth     *coreauth.Auth
 		apiKey   string
 		incoming http.Header
 		check    func(t *testing.T, got string, present bool)

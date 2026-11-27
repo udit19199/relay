@@ -1,10 +1,9 @@
 package models
 
 import (
+	"github.com/udit19199/relay/internal/registry"
 	"reflect"
 	"testing"
-
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
 )
 
 func TestCodexCatalogApplyPatchCapability(t *testing.T) {

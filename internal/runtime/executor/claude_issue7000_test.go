@@ -9,10 +9,10 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestClaudeExecutor_Issue7000ForcedToolChoiceFallsBackToAuto(t *testing.T) {
@@ -56,10 +56,10 @@ func TestClaudeExecutor_Issue7000ForcedToolChoiceFallsBackToAuto(t *testing.T) {
 					})
 					ctx := context.WithValue(context.Background(), "cliproxy.roundtripper", http.RoundTripper(transport))
 					executor := NewClaudeExecutor(&config.Config{})
-					auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "sk-ant-api03-issue7000"}}
+					auth := &coreauth.Auth{Attributes: map[string]string{"api_key": "sk-ant-api03-issue7000"}}
 					payload := []byte(`{"model":"` + model + `","max_tokens":4096,"tools":` + tools + `,"tool_choice":` + choice.body + `,"messages":` + messages + `,"thinking":{"type":"adaptive"},"output_config":{"effort":"high"}}`)
-					request := cliproxyexecutor.Request{Model: model, Payload: payload}
-					options := cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude, Stream: stream}
+					request := coreexecutor.Request{Model: model, Payload: payload}
+					options := coreexecutor.Options{SourceFormat: translatorreg.FormatClaude, Stream: stream}
 					if stream {
 						result, errStream := executor.ExecuteStream(ctx, auth, request, options)
 						if errStream != nil {

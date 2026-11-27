@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	internalcache "github.com/router-for-me/CLIProxyAPI/v8/internal/cache"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
+	internalcache "github.com/udit19199/relay/internal/cache"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 var benchmarkSanitizeOpenAIResponsesReasoningOutput []byte
@@ -514,14 +514,14 @@ func TestSanitizeOpenAIResponsesReasoningEncryptedContent_StripsRouterSuffixOnNo
 	t.Cleanup(internalcache.ClearCodexReasoningReplayCache)
 	const sessionKey = "execution:test-channel-switch"
 	internalcache.CacheCodexReasoningReplayItem("o4-mini", sessionKey, []byte(`{"type":"reasoning","summary":[],"encrypted_content":"`+gptRouted+`"}`))
-	replayReq := cliproxyexecutor.Request{
+	replayReq := coreexecutor.Request{
 		Model:   "o4-mini",
 		Payload: []byte(`{"model":"o4-mini","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"next"}]}]}`),
 	}
-	replayOpts := cliproxyexecutor.Options{
+	replayOpts := coreexecutor.Options{
 		SourceFormat: "claude",
 		Metadata: map[string]any{
-			cliproxyexecutor.ExecutionSessionMetadataKey: "test-channel-switch",
+			coreexecutor.ExecutionSessionMetadataKey: "test-channel-switch",
 		},
 	}
 	injected, _, errReplay := applyCodexReasoningReplayCacheRequired(context.Background(), "claude", replayReq, replayOpts, replayReq.Payload)

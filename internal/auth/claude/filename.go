@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
-	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	"github.com/udit19199/relay/internal/misc"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 // CredentialFileName returns the filename used to persist Claude OAuth credentials.

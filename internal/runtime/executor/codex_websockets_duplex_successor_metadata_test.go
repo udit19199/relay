@@ -10,10 +10,10 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gorilla/websocket"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	auth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	core "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	translator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	auth "github.com/udit19199/relay/internal/service/auth"
+	core "github.com/udit19199/relay/internal/service/executor"
+	translator "github.com/udit19199/relay/internal/translator/registry"
 )
 
 // Explicit creates can arrive before pending notifications. They must not

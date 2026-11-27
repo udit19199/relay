@@ -14,12 +14,11 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/redisqueue"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/watcher/diff"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/watcher/synthesizer"
-	sdkAuth "github.com/router-for-me/CLIProxyAPI/v8/sdk/auth"
-	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	authlogin "github.com/udit19199/relay/internal/auth/login"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	"github.com/udit19199/relay/internal/watcher/diff"
+	"github.com/udit19199/relay/internal/watcher/synthesizer"
 	"gopkg.in/yaml.v3"
 )
 
@@ -396,34 +395,6 @@ func TestRemoveClientRemovesHash(t *testing.T) {
 	}
 }
 
-func TestAuthFileClientChangesNotifyUsageSubscribersToRefresh(t *testing.T) {
-	tmpDir := t.TempDir()
-	authFile := filepath.Join(tmpDir, "sample.json")
-	if err := os.WriteFile(authFile, []byte(`{"type":"demo","api_key":"k"}`), 0o644); err != nil {
-		t.Fatalf("failed to create auth file: %v", err)
-	}
-
-	redisqueue.SetEnabled(false)
-	redisqueue.SetEnabled(true)
-	t.Cleanup(func() { redisqueue.SetEnabled(false) })
-
-	subscriber, unsubscribe := redisqueue.SubscribeUsage()
-	defer unsubscribe()
-	requireWatcherUsagePayload(t, subscriber, `{"support_refresh":true}`)
-
-	w := &Watcher{
-		authDir:        tmpDir,
-		lastAuthHashes: make(map[string]string),
-	}
-	w.SetConfig(&config.Config{AuthDir: tmpDir})
-
-	w.addOrUpdateClient(authFile)
-	requireWatcherUsagePayload(t, subscriber, `{"refresh":true}`)
-
-	w.removeClient(authFile)
-	requireWatcherUsagePayload(t, subscriber, `{"refresh":true}`)
-}
-
 func TestAuthFileEventsDoNotInvokeSnapshotCoreAuths(t *testing.T) {
 	tmpDir := t.TempDir()
 	authFile := filepath.Join(tmpDir, "sample.json")
@@ -682,25 +653,6 @@ func TestReloadClientsHandlesNilConfig(t *testing.T) {
 	w.reloadClients(true, nil, false)
 }
 
-func TestReloadClientsNotifiesUsageSubscribersToRefresh(t *testing.T) {
-	tmp := t.TempDir()
-	redisqueue.SetEnabled(false)
-	redisqueue.SetEnabled(true)
-	t.Cleanup(func() { redisqueue.SetEnabled(false) })
-
-	subscriber, unsubscribe := redisqueue.SubscribeUsage()
-	defer unsubscribe()
-	requireWatcherUsagePayload(t, subscriber, `{"support_refresh":true}`)
-
-	w := &Watcher{
-		authDir: tmp,
-		config:  &config.Config{AuthDir: tmp},
-	}
-	w.reloadClients(false, nil, false)
-
-	requireWatcherUsagePayload(t, subscriber, `{"refresh":true}`)
-}
-
 func TestReloadClientsFiltersProvidersWithNilCurrentAuths(t *testing.T) {
 	tmp := t.TempDir()
 	w := &Watcher{
@@ -710,22 +662,6 @@ func TestReloadClientsFiltersProvidersWithNilCurrentAuths(t *testing.T) {
 	w.reloadClients(false, []string{"match"}, false)
 	if w.currentAuths != nil && len(w.currentAuths) != 0 {
 		t.Fatalf("expected currentAuths to be nil or empty, got %d", len(w.currentAuths))
-	}
-}
-
-func requireWatcherUsagePayload(t *testing.T, subscriber <-chan []byte, want string) {
-	t.Helper()
-
-	select {
-	case got, ok := <-subscriber:
-		if !ok {
-			t.Fatalf("subscriber closed before receiving %q", want)
-		}
-		if string(got) != want {
-			t.Fatalf("subscriber payload = %q, want %q", string(got), want)
-		}
-	case <-time.After(time.Second):
-		t.Fatalf("timeout waiting for subscriber payload %q", want)
 	}
 }
 
@@ -1677,9 +1613,9 @@ func (s *stubStore) persistenceSnapshot() (cfgPersisted, authPersisted int, mess
 func TestNewWatcherDetectsPersisterAndAuthDir(t *testing.T) {
 	tmp := t.TempDir()
 	store := &stubStore{authDir: tmp}
-	orig := sdkAuth.GetTokenStore()
-	sdkAuth.RegisterTokenStore(store)
-	defer sdkAuth.RegisterTokenStore(orig)
+	orig := authlogin.GetTokenStore()
+	authlogin.RegisterTokenStore(store)
+	defer authlogin.RegisterTokenStore(orig)
 
 	w, err := NewWatcher("config.yaml", "auth", nil)
 	if err != nil {

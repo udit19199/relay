@@ -2,9 +2,8 @@ package helps
 
 import (
 	"bytes"
-	"testing"
-
 	"github.com/MoeForge/moego/ojson"
+	"testing"
 )
 
 func TestEnsureMetaMuseToolNamespacePreservesCallerTools(t *testing.T) {

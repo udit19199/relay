@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	sdkAuth "github.com/router-for-me/CLIProxyAPI/v8/sdk/auth"
 	log "github.com/sirupsen/logrus"
+	authlogin "github.com/udit19199/relay/internal/auth/login"
+	"github.com/udit19199/relay/internal/config"
 )
 
 // DoXAILogin triggers the OAuth device-code flow for the xAI provider and saves tokens.
@@ -21,7 +21,7 @@ func DoXAILogin(cfg *config.Config, options *LoginOptions) {
 	}
 
 	manager := newAuthManager()
-	authOpts := &sdkAuth.LoginOptions{
+	authOpts := &authlogin.LoginOptions{
 		NoBrowser:    options.NoBrowser,
 		CallbackPort: options.CallbackPort,
 		ProxyURL:     options.ProxyURL,

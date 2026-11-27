@@ -3,8 +3,8 @@ package openai
 
 import (
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/thinking"
+	"github.com/udit19199/relay/internal/registry"
+	"github.com/udit19199/relay/internal/thinking"
 )
 
 // Applier implements thinking.ProviderApplier for OpenAI models.

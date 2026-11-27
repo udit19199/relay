@@ -10,11 +10,11 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/google/uuid"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/registry"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 const claudeIssue7000Tools = `[{"name":"lookup_weather","input_schema":{"type":"object","properties":{"city":{"type":"string"}},"required":["city"]}}]`
@@ -28,13 +28,13 @@ func claudeIssue7000Payload(model, choice string) []byte {
 }
 
 type claudeIssue7000Executor interface {
-	Execute(context.Context, *cliproxyauth.Auth, cliproxyexecutor.Request, cliproxyexecutor.Options) (cliproxyexecutor.Response, error)
-	ExecuteStream(context.Context, *cliproxyauth.Auth, cliproxyexecutor.Request, cliproxyexecutor.Options) (*cliproxyexecutor.StreamResult, error)
-	CountTokens(context.Context, *cliproxyauth.Auth, cliproxyexecutor.Request, cliproxyexecutor.Options) (cliproxyexecutor.Response, error)
+	Execute(context.Context, *coreauth.Auth, coreexecutor.Request, coreexecutor.Options) (coreexecutor.Response, error)
+	ExecuteStream(context.Context, *coreauth.Auth, coreexecutor.Request, coreexecutor.Options) (*coreexecutor.StreamResult, error)
+	CountTokens(context.Context, *coreauth.Auth, coreexecutor.Request, coreexecutor.Options) (coreexecutor.Response, error)
 }
 
 // Capture only the network boundary; translation and all request preparation stay real.
-func captureClaudeIssue7000(t *testing.T, executor claudeIssue7000Executor, auth *cliproxyauth.Auth, request cliproxyexecutor.Request, options cliproxyexecutor.Options, method string) ([]byte, http.Header) {
+func captureClaudeIssue7000(t *testing.T, executor claudeIssue7000Executor, auth *coreauth.Auth, request coreexecutor.Request, options coreexecutor.Options, method string) ([]byte, http.Header) {
 	t.Helper()
 	var captured []byte
 	var headers http.Header
@@ -123,7 +123,7 @@ func TestClaudeExecutor_Issue7000ModelAndChoiceBoundaries(t *testing.T) {
 			if bodyModel == "" {
 				bodyModel = tc.route
 			}
-			body, _ := captureClaudeIssue7000(t, executor, &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "key-issue7000"}}, cliproxyexecutor.Request{Model: tc.route, Payload: claudeIssue7000Payload(bodyModel, tc.choice)}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude}, "Execute")
+			body, _ := captureClaudeIssue7000(t, executor, &coreauth.Auth{Attributes: map[string]string{"api_key": "key-issue7000"}}, coreexecutor.Request{Model: tc.route, Payload: claudeIssue7000Payload(bodyModel, tc.choice)}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude}, "Execute")
 			if got, want := ojson.GetBytes(body, "tool_choice").Value(), ojson.Parse(tc.want).Value(); !reflect.DeepEqual(got, want) {
 				t.Fatalf("tool_choice = %#v, want %#v; body=%s", got, want, body)
 			}
@@ -134,10 +134,10 @@ func TestClaudeExecutor_Issue7000OpenAITranslation(t *testing.T) {
 	const schema = `{"type":"object","properties":{"issue7000_title":{"type":"string"}},"required":["issue7000_title"],"additionalProperties":false}`
 	for _, source := range []struct {
 		name, prefix, functionChoice, schemaField, method string
-		format                                            sdktranslator.Format
+		format                                            translatorreg.Format
 	}{
-		{name: "chat", format: sdktranslator.FormatOpenAI, prefix: `"messages":[{"role":"user","content":"Weather in Paris?"}],"reasoning_effort":"high","tools":[{"type":"function","function":{"name":"lookup_weather","parameters":{"type":"object","properties":{"city":{"type":"string"}},"required":["city"]}}}]`, functionChoice: `{"type":"function","function":{"name":"lookup_weather"}}`, schemaField: `"response_format":{"type":"json_schema","json_schema":{"name":"weather","strict":true,"schema":` + schema + `}}`, method: "Execute"},
-		{name: "responses", format: sdktranslator.FormatOpenAIResponse, prefix: `"input":[{"role":"user","content":[{"type":"input_text","text":"Weather in Paris?"}]}],"reasoning":{"effort":"high"},"tools":[{"type":"function","name":"lookup_weather","parameters":{"type":"object","properties":{"city":{"type":"string"}},"required":["city"]}}]`, functionChoice: `{"type":"function","name":"lookup_weather"}`, schemaField: `"text":{"format":{"type":"json_schema","name":"weather","strict":true,"schema":` + schema + `}}`, method: "ExecuteStream"},
+		{name: "chat", format: translatorreg.FormatOpenAI, prefix: `"messages":[{"role":"user","content":"Weather in Paris?"}],"reasoning_effort":"high","tools":[{"type":"function","function":{"name":"lookup_weather","parameters":{"type":"object","properties":{"city":{"type":"string"}},"required":["city"]}}}]`, functionChoice: `{"type":"function","function":{"name":"lookup_weather"}}`, schemaField: `"response_format":{"type":"json_schema","json_schema":{"name":"weather","strict":true,"schema":` + schema + `}}`, method: "Execute"},
+		{name: "responses", format: translatorreg.FormatOpenAIResponse, prefix: `"input":[{"role":"user","content":[{"type":"input_text","text":"Weather in Paris?"}]}],"reasoning":{"effort":"high"},"tools":[{"type":"function","name":"lookup_weather","parameters":{"type":"object","properties":{"city":{"type":"string"}},"required":["city"]}}]`, functionChoice: `{"type":"function","name":"lookup_weather"}`, schemaField: `"text":{"format":{"type":"json_schema","name":"weather","strict":true,"schema":` + schema + `}}`, method: "ExecuteStream"},
 	} {
 		for _, choice := range []string{`"required"`, source.functionChoice} {
 			for _, withSchema := range []bool{false, true} {
@@ -150,7 +150,7 @@ func TestClaudeExecutor_Issue7000OpenAITranslation(t *testing.T) {
 					if withSchema {
 						payload += `,` + source.schemaField
 					}
-					body, _ := captureClaudeIssue7000(t, NewClaudeExecutor(&config.Config{}), &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "key-issue7000"}}, cliproxyexecutor.Request{Model: "claude-sonnet-5-5", Payload: []byte(payload + `}`)}, cliproxyexecutor.Options{SourceFormat: source.format}, source.method)
+					body, _ := captureClaudeIssue7000(t, NewClaudeExecutor(&config.Config{}), &coreauth.Auth{Attributes: map[string]string{"api_key": "key-issue7000"}}, coreexecutor.Request{Model: "claude-sonnet-5-5", Payload: []byte(payload + `}`)}, coreexecutor.Options{SourceFormat: source.format}, source.method)
 					for path, want := range map[string]any{"tool_choice.type": "auto", "tool_choice.disable_parallel_tool_use": true, "tools.0.name": "lookup_weather", "tools.0.input_schema.required.0": "city", "thinking.type": "adaptive", "output_config.effort": "high"} {
 						if got := ojson.GetBytes(body, path).Value(); !reflect.DeepEqual(got, want) {
 							t.Errorf("%s = %#v, want %#v; body=%s", path, got, want, body)
@@ -177,7 +177,7 @@ func TestClaudeExecutor_Issue7000KeepsNativeOutputFormat(t *testing.T) {
 	_ = payloadDoc.SetRawBytes("output_config", []byte(`{"effort":"high","format":`+format+`}`))
 	_ = payloadDoc.SetRawBytes("thinking", []byte(`{"type":"adaptive"}`))
 	payload := payloadDoc.Bytes()
-	body, _ := captureClaudeIssue7000(t, NewClaudeExecutor(&config.Config{}), &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "key-issue7000"}}, cliproxyexecutor.Request{Model: "claude-opus-5-5", Payload: payload}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude}, "Execute")
+	body, _ := captureClaudeIssue7000(t, NewClaudeExecutor(&config.Config{}), &coreauth.Auth{Attributes: map[string]string{"api_key": "key-issue7000"}}, coreexecutor.Request{Model: "claude-opus-5-5", Payload: payload}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude}, "Execute")
 	if got := ojson.GetBytes(body, "output_config.format").Value(); !reflect.DeepEqual(got, ojson.Parse(format).Value()) {
 		t.Errorf("native output format changed: %s", body)
 	}
@@ -196,7 +196,7 @@ func TestClaudeExecutor_Issue7000OAuthPreservesThinkingHistory(t *testing.T) {
 			payload := payloadDoc.Bytes()
 			metadata := claudeOAuthTestMetadata()
 			metadata["access_token"] = "sk-ant-oat01-issue7000"
-			body, headers := captureClaudeIssue7000(t, NewClaudeExecutor(&config.Config{}), &cliproxyauth.Auth{Provider: "claude", Metadata: metadata}, cliproxyexecutor.Request{Model: "claude-opus-5-5", Payload: payload}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude}, method)
+			body, headers := captureClaudeIssue7000(t, NewClaudeExecutor(&config.Config{}), &coreauth.Auth{Provider: "claude", Metadata: metadata}, coreexecutor.Request{Model: "claude-opus-5-5", Payload: payload}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude}, method)
 			for path, want := range map[string]any{"tool_choice.type": "auto", "tool_choice.disable_parallel_tool_use": true, "thinking.type": "adaptive", "thinking.block_binding.prefix_mismatch_behavior": "drop_block"} {
 				if got := ojson.GetBytes(body, path).Value(); !reflect.DeepEqual(got, want) {
 					t.Errorf("%s = %#v, want %#v; body=%s", path, got, want, body)
@@ -217,7 +217,7 @@ func TestClaudeExecutor_Issue7000CountTokensUpstreamAndLocal(t *testing.T) {
 	for _, choice := range []string{`{"type":"any","disable_parallel_tool_use":true}`, `{"type":"tool","name":"lookup_weather","disable_parallel_tool_use":true}`} {
 		t.Run(choice, func(t *testing.T) {
 			payload := claudeIssue7000Payload("spoofed-body-model", choice)
-			body, headers := captureClaudeIssue7000(t, NewClaudeExecutor(&config.Config{}), &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "key-issue7000"}}, cliproxyexecutor.Request{Model: model, Payload: payload}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude}, "CountTokens")
+			body, headers := captureClaudeIssue7000(t, NewClaudeExecutor(&config.Config{}), &coreauth.Auth{Attributes: map[string]string{"api_key": "key-issue7000"}}, coreexecutor.Request{Model: model, Payload: payload}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude}, "CountTokens")
 			if got := ojson.GetBytes(body, "tool_choice").Value(); !reflect.DeepEqual(got, ojson.Parse(`{"type":"auto","disable_parallel_tool_use":true}`).Value()) {
 				t.Errorf("upstream count choice = %#v, want auto with parallel flag", got)
 			}
@@ -225,14 +225,14 @@ func TestClaudeExecutor_Issue7000CountTokensUpstreamAndLocal(t *testing.T) {
 				t.Error("upstream count did not preserve routed model/API-key authentication")
 			}
 			executor := NewClaudeExecutor(&config.Config{})
-			auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "key-issue7000", "base_url": "https://gateway.invalid"}}
+			auth := &coreauth.Auth{Attributes: map[string]string{"api_key": "key-issue7000", "base_url": "https://gateway.invalid"}}
 			ctx := context.WithValue(context.Background(), "cliproxy.roundtripper", http.RoundTripper(roundTripperFunc(func(*http.Request) (*http.Response, error) {
 				t.Error("local count must not call upstream")
 				return nil, io.ErrUnexpectedEOF
 			})))
 			count := func(input []byte) int64 {
 				t.Helper()
-				response, errCount := executor.CountTokens(ctx, auth, cliproxyexecutor.Request{Model: model, Payload: input}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude})
+				response, errCount := executor.CountTokens(ctx, auth, coreexecutor.Request{Model: model, Payload: input}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude})
 				if errCount != nil {
 					t.Fatalf("local CountTokens: %v", errCount)
 				}
@@ -265,7 +265,7 @@ func TestClaudeExecutor_Issue7000PayloadRulesRemainFinal(t *testing.T) {
 				_ = payloadDoc.SetRawBytes("thinking", []byte(`{"type":"adaptive"}`))
 				_ = payloadDoc.SetRawBytes("output_config", []byte(`{"effort":"high"}`))
 				payload := payloadDoc.Bytes()
-				body, _ := captureClaudeIssue7000(t, NewClaudeExecutor(cfg), &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "key-issue7000"}}, cliproxyexecutor.Request{Model: model, Payload: payload}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude}, method)
+				body, _ := captureClaudeIssue7000(t, NewClaudeExecutor(cfg), &coreauth.Auth{Attributes: map[string]string{"api_key": "key-issue7000"}}, coreexecutor.Request{Model: model, Payload: payload}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude}, method)
 				if filter {
 					for _, path := range []string{"tool_choice", "thinking", "output_config.effort", "tools"} {
 						if ojson.GetBytes(body, path).Exists() {
@@ -296,10 +296,10 @@ func TestClaudeExecutor_Issue7000LocalCountPayloadRulesRemainFinal(t *testing.T)
 				cfg.Payload = config.PayloadConfig{Filter: []config.PayloadFilterRule{{Models: models, Params: []string{"tool_choice"}}}}
 				controlChoice = ""
 			}
-			auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "key-issue7000", "base_url": "https://gateway.invalid"}}
+			auth := &coreauth.Auth{Attributes: map[string]string{"api_key": "key-issue7000", "base_url": "https://gateway.invalid"}}
 			count := func(executor *ClaudeExecutor, route string, payload []byte) int64 {
 				t.Helper()
-				resp, errCount := executor.CountTokens(context.Background(), auth, cliproxyexecutor.Request{Model: route, Payload: payload}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude})
+				resp, errCount := executor.CountTokens(context.Background(), auth, coreexecutor.Request{Model: route, Payload: payload}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude})
 				if errCount != nil {
 					t.Fatalf("local CountTokens: %v", errCount)
 				}
@@ -322,14 +322,14 @@ func TestClaudeExecutor_Issue7000ManagerRetryKeepsAuto(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			const model = "claude-sonnet-5-5"
-			manager := cliproxyauth.NewManager(nil, nil, nil)
+			manager := coreauth.NewManager(nil, nil, nil)
 			manager.SetRetryConfig(1, 0, 0)
 			manager.RegisterExecutor(NewClaudeExecutor(&config.Config{}))
 			authID := uuid.NewString() + "-issue7000"
 			reg := registry.GetGlobalRegistry()
 			reg.RegisterClient(authID, "claude", []*registry.ModelInfo{{ID: model}})
 			t.Cleanup(func() { reg.UnregisterClient(authID) })
-			if _, errRegister := manager.Register(context.Background(), &cliproxyauth.Auth{ID: authID, Provider: "claude", Attributes: map[string]string{"api_key": "key-issue7000"}}); errRegister != nil {
+			if _, errRegister := manager.Register(context.Background(), &coreauth.Auth{ID: authID, Provider: "claude", Attributes: map[string]string{"api_key": "key-issue7000"}}); errRegister != nil {
 				t.Fatalf("register auth: %v", errRegister)
 			}
 			var bodies [][]byte
@@ -354,8 +354,8 @@ func TestClaudeExecutor_Issue7000ManagerRetryKeepsAuto(t *testing.T) {
 			})
 			ctx := context.WithValue(context.Background(), "cliproxy.roundtripper", http.RoundTripper(transport))
 			payload := claudeIssue7000Payload(model, `{"type":"tool","name":"lookup_weather","disable_parallel_tool_use":true}`)
-			request := cliproxyexecutor.Request{Model: model, Payload: payload}
-			options := cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude}
+			request := coreexecutor.Request{Model: model, Payload: payload}
+			options := coreexecutor.Options{SourceFormat: translatorreg.FormatClaude}
 			if stream {
 				result, errStream := manager.ExecuteStream(ctx, []string{"claude"}, request, options)
 				if errStream != nil {

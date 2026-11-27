@@ -14,9 +14,9 @@ import (
 
 	"github.com/MoeForge/moego/base64"
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
 	log "github.com/sirupsen/logrus"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	"github.com/udit19199/relay/internal/util"
 )
 
 const (
@@ -74,27 +74,13 @@ func HasResponsesCompactionTrigger(payload []byte) bool {
 	return false
 }
 
-// HasResponsesCompactionItem checks whether input contains a compaction item.
-func HasResponsesCompactionItem(payload []byte) bool {
-	input := ojson.GetBytesNoCopy(payload, "input")
-	if !input.IsArray() {
-		return false
-	}
-	for _, item := range input.Array() {
-		if item.Get("type").String() == "compaction" {
-			return true
-		}
-	}
-	return false
-}
-
 // HasResponsesCompactionTriggerRequest reports whether req.Payload or opts.OriginalRequest contains a compaction_trigger item.
-func HasResponsesCompactionTriggerRequest(req cliproxyexecutor.Request, opts cliproxyexecutor.Options) bool {
+func HasResponsesCompactionTriggerRequest(req coreexecutor.Request, opts coreexecutor.Options) bool {
 	return HasResponsesCompactionTrigger(req.Payload) || HasResponsesCompactionTrigger(opts.OriginalRequest)
 }
 
 // ResponsesCompactionSourcePayload selects the source payload containing the compaction trigger or request history.
-func ResponsesCompactionSourcePayload(req cliproxyexecutor.Request, opts cliproxyexecutor.Options) []byte {
+func ResponsesCompactionSourcePayload(req coreexecutor.Request, opts coreexecutor.Options) []byte {
 	payload := req.Payload
 	if !HasResponsesCompactionTrigger(payload) && HasResponsesCompactionTrigger(opts.OriginalRequest) {
 		payload = opts.OriginalRequest
@@ -103,18 +89,6 @@ func ResponsesCompactionSourcePayload(req cliproxyexecutor.Request, opts cliprox
 		payload = opts.OriginalRequest
 	}
 	return payload
-}
-
-// DropForeignResponsesCompactionItems removes compaction items whose encrypted_content does not use the CPA capsule prefix.
-func DropForeignResponsesCompactionItems(payload []byte, provider string) []byte {
-	if len(payload) == 0 {
-		return payload
-	}
-	doc := ojson.NewDoc(payload)
-	if !DropForeignResponsesCompactionItemsDoc(doc, provider) {
-		return payload
-	}
-	return doc.Bytes()
 }
 
 // DropForeignResponsesCompactionItemsDoc removes non-CPA compaction items in place on doc.
@@ -143,7 +117,7 @@ func DropForeignResponsesCompactionItemsDoc(doc *ojson.Doc, provider string) boo
 }
 
 // ExpandResponsesCompactionCapsules drops foreign compaction items and expands recognized CPA compaction capsules in req and opts.
-func ExpandResponsesCompactionCapsules(req *cliproxyexecutor.Request, opts *cliproxyexecutor.Options, provider string) error {
+func ExpandResponsesCompactionCapsules(req *coreexecutor.Request, opts *coreexecutor.Options, provider string) error {
 	sameOriginal := req != nil && opts != nil && len(opts.OriginalRequest) > 0 && bytes.Equal(req.Payload, opts.OriginalRequest)
 	if req != nil && len(req.Payload) > 0 {
 		doc := ojson.NewDoc(req.Payload)
@@ -175,7 +149,7 @@ func ExpandResponsesCompactionCapsules(req *cliproxyexecutor.Request, opts *clip
 }
 
 // ExpandRecognizedResponsesCompactionCapsules expands recognized CPA compaction capsules in req and opts while preserving foreign compaction items.
-func ExpandRecognizedResponsesCompactionCapsules(req *cliproxyexecutor.Request, opts *cliproxyexecutor.Options) error {
+func ExpandRecognizedResponsesCompactionCapsules(req *coreexecutor.Request, opts *coreexecutor.Options) error {
 	sameOriginal := req != nil && opts != nil && len(opts.OriginalRequest) > 0 && bytes.Equal(req.Payload, opts.OriginalRequest)
 	if req != nil && HasRecognizedResponsesCompactionItem(req.Payload) {
 		expanded, errExpand := ExpandRecognizedCPACompactionCapsules(req.Payload)
@@ -335,22 +309,6 @@ func UnsealResponsesCompaction(encryptedContent string) (string, error) {
 		return "", fmt.Errorf("unmarshal compaction capsule: %w", errUnmarshal)
 	}
 	return data.Summary, nil
-}
-
-// ExpandCPACompactionCapsules expands compaction items in input into developer context.
-func ExpandCPACompactionCapsules(payload []byte) ([]byte, error) {
-	if len(payload) == 0 {
-		return payload, nil
-	}
-	doc := ojson.NewDoc(payload)
-	changed, errExpand := ExpandCPACompactionCapsulesDoc(doc)
-	if errExpand != nil {
-		return nil, errExpand
-	}
-	if !changed {
-		return payload, nil
-	}
-	return doc.Bytes(), nil
 }
 
 // ExpandCPACompactionCapsulesDoc expands compaction items in input into developer context in place on doc.

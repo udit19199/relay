@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/translator"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	_ "github.com/udit19199/relay/internal/translator"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestCodexToClaudeParallelFunctionCallsHaveValidLifecycle(t *testing.T) {
@@ -35,10 +35,10 @@ func TestCodexToClaudeParallelFunctionCallsHaveValidLifecycle(t *testing.T) {
 	messageState := 0
 
 	for _, chunk := range chunks {
-		outputs := sdktranslator.TranslateStream(
+		outputs := translatorreg.TranslateStream(
 			context.Background(),
-			sdktranslator.FormatCodex,
-			sdktranslator.FormatClaude,
+			translatorreg.FormatCodex,
+			translatorreg.FormatClaude,
 			"gpt-5",
 			originalRequest,
 			nil,

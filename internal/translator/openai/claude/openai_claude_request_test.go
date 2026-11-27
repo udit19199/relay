@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
+	"github.com/udit19199/relay/internal/util"
 )
 
 // TestConvertClaudeRequestToOpenAI_ThinkingToReasoningContent tests the mapping
@@ -1841,9 +1841,9 @@ func TestConvertClaudeRequestToOpenAI_UncachedFileKeepsOldDrop(t *testing.T) {
 	}
 }
 
-func claudeToOpenAIEnvelope(model string, input []byte) sdktranslator.RequestEnvelope {
-	return sdktranslator.TranslateRequestEnvelope(context.Background(), sdktranslator.FormatClaude, sdktranslator.FormatOpenAI, sdktranslator.RequestEnvelope{
-		Format: sdktranslator.FormatClaude,
+func claudeToOpenAIEnvelope(model string, input []byte) translatorreg.RequestEnvelope {
+	return translatorreg.TranslateRequestEnvelope(context.Background(), translatorreg.FormatClaude, translatorreg.FormatOpenAI, translatorreg.RequestEnvelope{
+		Format: translatorreg.FormatClaude,
 		Model:  model,
 		Body:   input,
 	})

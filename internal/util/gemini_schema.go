@@ -44,17 +44,6 @@ type jsonSchemaCleanOptions struct {
 	preserveStandardConstraints       bool
 }
 
-// CleanJSONSchemaForGemini transforms a JSON schema to be compatible with Gemini tool calling.
-// It removes unsupported keywords and simplifies schemas, without adding empty-schema placeholders.
-func CleanJSONSchemaForGemini(jsonStr string) string {
-	return cleanJSONSchema(jsonStr, jsonSchemaCleanOptions{
-		addMissingArrayItems: true,
-		removeGeminiMetadata: true,
-		flattenUnions:        true,
-		forceEnumStringType:  true,
-	})
-}
-
 // CleanJSONSchemaForGeminiJSONSchema transforms a JSON schema for Gemini tool calling
 // when using the parametersJsonSchema carrier. It preserves standard JSON Schema constraints
 // (such as pattern, minLength, maxLength) and additionalProperties (both boolean and schema-valued),
@@ -1632,27 +1621,6 @@ func moveConstraintsToDescription(jsonStr string, options jsonSchemaCleanOptions
 			appendHintDoc(doc, parentPath, fmt.Sprintf("%s: %s", key, val.String()))
 			modified = true
 		}
-	}
-	if modified {
-		return doc.String()
-	}
-	return jsonStr
-}
-
-func moveNotToDescription(jsonStr string) string {
-	paths := findPaths(jsonStr, "not")
-	if len(paths) == 0 {
-		return jsonStr
-	}
-	doc := ojson.NewDocString(jsonStr)
-	modified := false
-	for _, path := range paths {
-		value := doc.Get(path)
-		if !value.Exists() || isPropertyDefinition(trimSuffix(path, ".not")) {
-			continue
-		}
-		appendHintDoc(doc, trimSuffix(path, ".not"), "not: "+value.Raw)
-		modified = true
 	}
 	if modified {
 		return doc.String()

@@ -68,22 +68,6 @@ func CodexClientModelUsesResponsesLite(slug string) bool {
 	return codexClientCatalogStore.responsesLiteMap[slug]
 }
 
-// CodexClientModelThinkingLevels returns a copy of the supported reasoning
-// levels for slug in the active Codex client model catalog, or nil if absent.
-func CodexClientModelThinkingLevels(slug string) []string {
-	slug = strings.ToLower(strings.TrimSpace(slug))
-	if slug == "" {
-		return nil
-	}
-	codexClientCatalogStore.mu.RLock()
-	defer codexClientCatalogStore.mu.RUnlock()
-	levels := codexClientCatalogStore.thinkingLevelsMap[slug]
-	if len(levels) == 0 {
-		return nil
-	}
-	return append([]string(nil), levels...)
-}
-
 func loadCodexClientModelsFromBytes(data []byte, source string) (bool, error) {
 	responsesLiteMap, thinkingLevelsMap, err := parseAndValidateCodexClientModelsJSON(data)
 	if err != nil {

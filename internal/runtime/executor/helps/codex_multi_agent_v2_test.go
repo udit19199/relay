@@ -1,17 +1,17 @@
 package helps
 
 import (
-	"bytes"
-	"context"
 	"fmt"
 	"net/http"
 	"strings"
 	"testing"
 
+	"bytes"
+	"context"
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/translator"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	_ "github.com/udit19199/relay/internal/translator"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func geminiToolHistoryPayload(turns int) []byte {
@@ -31,8 +31,8 @@ func geminiToolHistoryPayload(turns int) []byte {
 // TestTranslateRequestPairMatchesSeparateTranslations pins the reuse fast path to
 // the behavior of translating both payloads independently.
 func TestTranslateRequestPairMatchesSeparateTranslations(t *testing.T) {
-	from := sdktranslator.FormatClaude
-	to := sdktranslator.FromString("antigravity")
+	from := translatorreg.FormatClaude
+	to := translatorreg.FromString("antigravity")
 	cfg := &config.Config{}
 	const model = "gemini-3.6-flash-high"
 
@@ -75,8 +75,8 @@ func TestTranslateRequestPairMatchesSeparateTranslations(t *testing.T) {
 // TestTranslateRequestPairTranslatesDistinctPayloads guards the case where the
 // executor really does hand over two different requests.
 func TestTranslateRequestPairTranslatesDistinctPayloads(t *testing.T) {
-	from := sdktranslator.FormatClaude
-	to := sdktranslator.FromString("antigravity")
+	from := translatorreg.FormatClaude
+	to := translatorreg.FromString("antigravity")
 	cfg := &config.Config{}
 	const model = "gemini-3.6-flash-high"
 
@@ -130,14 +130,14 @@ func TestTranslateRequestCompatibilityForExecutorToolIntegerTypes(t *testing.T) 
 	const claudePayload = `{"messages":[{"role":"user","content":"hi"}],"tools":[{"name":"exec_command","input_schema":{"type":"object","properties":{"yield_time_ms":{"type":"number"},"unrelated":{"type":"number"}}}}]}`
 	for _, route := range []struct {
 		name       string
-		from, to   sdktranslator.Format
+		from, to   translatorreg.Format
 		payload    string
 		properties string
 	}{
-		{name: "responses_to_codex", from: sdktranslator.FormatOpenAIResponse, to: sdktranslator.FormatCodex, payload: responsesPayload, properties: "tools.0.parameters.properties"},
-		{name: "claude_to_codex", from: sdktranslator.FormatClaude, to: sdktranslator.FormatCodex, payload: claudePayload, properties: "tools.0.parameters.properties"},
-		{name: "responses_to_claude", from: sdktranslator.FormatOpenAIResponse, to: sdktranslator.FormatClaude, payload: responsesPayload, properties: "tools.0.input_schema.properties"},
-		{name: "responses_passthrough", from: sdktranslator.FormatOpenAIResponse, to: sdktranslator.FormatOpenAIResponse, payload: responsesPayload, properties: "tools.0.parameters.properties"},
+		{name: "responses_to_codex", from: translatorreg.FormatOpenAIResponse, to: translatorreg.FormatCodex, payload: responsesPayload, properties: "tools.0.parameters.properties"},
+		{name: "claude_to_codex", from: translatorreg.FormatClaude, to: translatorreg.FormatCodex, payload: claudePayload, properties: "tools.0.parameters.properties"},
+		{name: "responses_to_claude", from: translatorreg.FormatOpenAIResponse, to: translatorreg.FormatClaude, payload: responsesPayload, properties: "tools.0.input_schema.properties"},
+		{name: "responses_passthrough", from: translatorreg.FormatOpenAIResponse, to: translatorreg.FormatOpenAIResponse, payload: responsesPayload, properties: "tools.0.parameters.properties"},
 	} {
 		for _, target := range []struct {
 			name     string
@@ -214,8 +214,8 @@ func TestTranslateRequestWithCodexMultiAgentV2_NormalizesCodexToolTypes(t *testi
 		context.Background(),
 		headers,
 		&config.Config{},
-		sdktranslator.FormatOpenAIResponse,
-		sdktranslator.FormatClaude,
+		translatorreg.FormatOpenAIResponse,
+		translatorreg.FormatClaude,
 		"claude-opus-5-5",
 		payload,
 		false,

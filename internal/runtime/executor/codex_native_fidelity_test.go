@@ -11,18 +11,18 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gorilla/websocket"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestCodexNativeStreamFidelity(t *testing.T) {
-	for _, source := range []sdktranslator.Format{sdktranslator.FormatCodex, sdktranslator.FormatOpenAIResponse, sdktranslator.FormatClaude, sdktranslator.FormatOpenAI} {
+	for _, source := range []translatorreg.Format{translatorreg.FormatCodex, translatorreg.FormatOpenAIResponse, translatorreg.FormatClaude, translatorreg.FormatOpenAI} {
 		t.Run(source.String(), func(t *testing.T) { testCodexNativeStreamFidelity(t, source) })
 	}
 }
 
-func testCodexNativeStreamFidelity(t *testing.T, source sdktranslator.Format) {
+func testCodexNativeStreamFidelity(t *testing.T, source translatorreg.Format) {
 	t.Helper()
 	for _, transport := range []string{"http", "websocket"} {
 		for _, lite := range []string{"", "header", "metadata"} {
@@ -79,7 +79,7 @@ func testCodexNativeStreamFidelity(t *testing.T, source sdktranslator.Format) {
 					if transport == "websocket" {
 						executeStream = NewCodexWebsocketsExecutor(cfg).ExecuteStream
 					}
-					result, err := executeStream(context.Background(), codexTestAuth(server.URL), cliproxyexecutor.Request{Model: "gpt-5.6-sol", Payload: payload}, cliproxyexecutor.Options{SourceFormat: source, ResponseFormat: sdktranslator.FormatCodex, Headers: headers, Stream: true})
+					result, err := executeStream(context.Background(), codexTestAuth(server.URL), coreexecutor.Request{Model: "gpt-5.6-sol", Payload: payload}, coreexecutor.Options{SourceFormat: source, ResponseFormat: translatorreg.FormatCodex, Headers: headers, Stream: true})
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -101,7 +101,7 @@ func testCodexNativeStreamFidelity(t *testing.T, source sdktranslator.Format) {
 					}
 					body := <-captured
 					upstreamHeaders := <-capturedHeaders
-					native := lite != "" && (source == sdktranslator.FormatCodex || source == sdktranslator.FormatOpenAIResponse)
+					native := lite != "" && (source == translatorreg.FormatCodex || source == translatorreg.FormatOpenAIResponse)
 					if transport == "websocket" {
 						wantLiteHeader := ""
 						if native && lite == "header" {

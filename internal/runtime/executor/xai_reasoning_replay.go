@@ -7,14 +7,14 @@ import (
 	"strings"
 
 	"github.com/MoeForge/moego/ojson"
-	internalcache "github.com/router-for-me/CLIProxyAPI/v8/internal/cache"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/signature"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/thinking"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
 	log "github.com/sirupsen/logrus"
+	internalcache "github.com/udit19199/relay/internal/cache"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	"github.com/udit19199/relay/internal/signature"
+	"github.com/udit19199/relay/internal/thinking"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
+	"github.com/udit19199/relay/internal/util"
 )
 
 type xaiReasoningReplayScope struct {
@@ -28,7 +28,7 @@ func (s xaiReasoningReplayScope) valid() bool {
 	return strings.TrimSpace(s.modelName) != "" && strings.TrimSpace(s.sessionKey) != ""
 }
 
-func applyXAIReasoningReplayCacheRequired(ctx context.Context, from sdktranslator.Format, req cliproxyexecutor.Request, opts cliproxyexecutor.Options, body []byte) ([]byte, xaiReasoningReplayScope, error) {
+func applyXAIReasoningReplayCacheRequired(ctx context.Context, from translatorreg.Format, req coreexecutor.Request, opts coreexecutor.Options, body []byte) ([]byte, xaiReasoningReplayScope, error) {
 	doc := ojson.NewDoc(body)
 	scope, changed, err := applyXAIReasoningReplayCacheRequiredDoc(ctx, from, req, opts, doc)
 	if err != nil || !changed {
@@ -37,7 +37,7 @@ func applyXAIReasoningReplayCacheRequired(ctx context.Context, from sdktranslato
 	return doc.Bytes(), scope, nil
 }
 
-func applyXAIReasoningReplayCacheRequiredDoc(ctx context.Context, from sdktranslator.Format, req cliproxyexecutor.Request, opts cliproxyexecutor.Options, doc *ojson.Doc) (xaiReasoningReplayScope, bool, error) {
+func applyXAIReasoningReplayCacheRequiredDoc(ctx context.Context, from translatorreg.Format, req coreexecutor.Request, opts coreexecutor.Options, doc *ojson.Doc) (xaiReasoningReplayScope, bool, error) {
 	if doc == nil {
 		return xaiReasoningReplayScope{}, false, nil
 	}
@@ -60,17 +60,17 @@ func applyXAIReasoningReplayCacheRequiredDoc(ctx context.Context, from sdktransl
 	return scope, insertCodexReasoningReplayItemsDoc(doc, items), nil
 }
 
-func xaiReasoningReplayScopeFromRequest(ctx context.Context, from sdktranslator.Format, req cliproxyexecutor.Request, opts cliproxyexecutor.Options, body []byte) xaiReasoningReplayScope {
+func xaiReasoningReplayScopeFromRequest(ctx context.Context, from translatorreg.Format, req coreexecutor.Request, opts coreexecutor.Options, body []byte) xaiReasoningReplayScope {
 	return xaiReasoningReplayScopeFromRequestDoc(ctx, from, req, opts, ojson.NewDoc(body))
 }
 
-func xaiReasoningReplayScopeFromRequestDoc(ctx context.Context, from sdktranslator.Format, req cliproxyexecutor.Request, opts cliproxyexecutor.Options, doc *ojson.Doc) xaiReasoningReplayScope {
+func xaiReasoningReplayScopeFromRequestDoc(ctx context.Context, from translatorreg.Format, req coreexecutor.Request, opts coreexecutor.Options, doc *ojson.Doc) xaiReasoningReplayScope {
 	if !xaiReasoningReplayEnabledForSource(from) {
 		return xaiReasoningReplayScope{}
 	}
 	// End-to-end WebSocket requests use upstream previous_response_id state.
 	// Replaying encrypted reasoning as input as well would duplicate the turn.
-	if cliproxyexecutor.DownstreamWebsocket(ctx) && strings.TrimSpace(ojson.GetBytesNoCopy(req.Payload, "previous_response_id").String()) != "" {
+	if coreexecutor.DownstreamWebsocket(ctx) && strings.TrimSpace(ojson.GetBytesNoCopy(req.Payload, "previous_response_id").String()) != "" {
 		return xaiReasoningReplayScope{}
 	}
 	sessionKey := codexReasoningReplaySessionKeyDoc(ctx, from, req, opts, doc)
@@ -102,9 +102,9 @@ func xaiReasoningReplayIsolateSessionKey(ctx context.Context, sessionKey string)
 	return "caller:" + hex.EncodeToString(sum[:8]) + ":" + sessionKey
 }
 
-func xaiReasoningReplayEnabledForSource(from sdktranslator.Format) bool {
-	return sourceFormatEqual(from, sdktranslator.FormatClaude) ||
-		sourceFormatEqual(from, sdktranslator.FormatOpenAIResponse)
+func xaiReasoningReplayEnabledForSource(from translatorreg.Format) bool {
+	return sourceFormatEqual(from, translatorreg.FormatClaude) ||
+		sourceFormatEqual(from, translatorreg.FormatOpenAIResponse)
 }
 
 func canonicalXAIReasoningReplaySignatureKey(rawSignature string) string {

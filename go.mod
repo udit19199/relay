@@ -1,4 +1,4 @@
-module github.com/router-for-me/CLIProxyAPI/v8
+module github.com/udit19199/relay
 
 go 1.26.10
 

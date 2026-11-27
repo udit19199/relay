@@ -6,8 +6,8 @@ import (
 	"sync/atomic"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/translator/common"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
+	"github.com/udit19199/relay/internal/translator/common"
+	"github.com/udit19199/relay/internal/util"
 )
 
 // Codex declares client-executed tool search as {"type":"tool_search",

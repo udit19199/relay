@@ -41,16 +41,6 @@ func WithEndpoint(ctx context.Context, endpoint string) context.Context {
 	return context.WithValue(ctx, endpointKey{}, endpoint)
 }
 
-func GetEndpoint(ctx context.Context) string {
-	if ctx == nil {
-		return ""
-	}
-	if endpoint, ok := ctx.Value(endpointKey{}).(string); ok {
-		return endpoint
-	}
-	return ""
-}
-
 // WithClientRequestMetadata stores a snapshot of downstream request metadata in ctx.
 func WithClientRequestMetadata(ctx context.Context, metadata ClientRequestMetadata) context.Context {
 	if ctx == nil {
@@ -147,17 +137,6 @@ func MergeResponseHeaders(ctx context.Context, headers http.Header) {
 		}
 		holder.headers[canonicalKey] = append([]string(nil), values...)
 	}
-}
-
-func GetResponseStatus(ctx context.Context) int {
-	if ctx == nil {
-		return 0
-	}
-	holder, ok := ctx.Value(responseStatusKey{}).(*responseStatusHolder)
-	if !ok || holder == nil {
-		return 0
-	}
-	return int(holder.status.Load())
 }
 
 func GetResponseHeaders(ctx context.Context) http.Header {

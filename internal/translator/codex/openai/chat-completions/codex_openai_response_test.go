@@ -3,10 +3,10 @@ package chat_completions
 import (
 	"context"
 	"encoding/json"
-	"strings"
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
+	"strings"
 )
 
 func TestConvertCodexResponseToOpenAI_IncompleteTerminal(t *testing.T) {

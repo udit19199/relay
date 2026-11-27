@@ -15,7 +15,7 @@ import (
 	"time"
 
 	tls "github.com/refraction-networking/utls"
-	sdkconfig "github.com/router-for-me/CLIProxyAPI/v8/sdk/config"
+	"github.com/udit19199/relay/internal/config"
 )
 
 type claudeTestDialer struct {
@@ -115,8 +115,8 @@ func TestClaudeOAuthTLSResumptionIsWireSafe(t *testing.T) {
 	// ClaudeAuth is rebuilt for every refresh and every executor profile check, so
 	// the cache must be keyed on the proxy rather than owned by the transport;
 	// otherwise every dial starts with an empty cache and never resumes.
-	first := newUtlsRoundTripper(&sdkconfig.SDKConfig{ProxyURL: "http://127.0.0.1:9"})
-	second := newUtlsRoundTripper(&sdkconfig.SDKConfig{ProxyURL: "http://127.0.0.1:9"})
+	first := newUtlsRoundTripper(&config.SDKConfig{ProxyURL: "http://127.0.0.1:9"})
+	second := newUtlsRoundTripper(&config.SDKConfig{ProxyURL: "http://127.0.0.1:9"})
 	if first.sessionCache == nil || second.sessionCache == nil {
 		t.Fatal("round tripper session cache = nil, want a shared per-proxy cache")
 	}
@@ -125,7 +125,7 @@ func TestClaudeOAuthTLSResumptionIsWireSafe(t *testing.T) {
 	}
 
 	// Resumption must not cross proxy boundaries.
-	other := newUtlsRoundTripper(&sdkconfig.SDKConfig{ProxyURL: "http://127.0.0.1:10"})
+	other := newUtlsRoundTripper(&config.SDKConfig{ProxyURL: "http://127.0.0.1:10"})
 	if first.sessionCache == other.sessionCache {
 		t.Fatal("different proxies share a session cache, want per-proxy isolation")
 	}

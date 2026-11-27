@@ -9,11 +9,11 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/registry"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestOpenAICompatExecutorUsesCompatibleClaudeTranslation(t *testing.T) {
@@ -26,23 +26,23 @@ func TestOpenAICompatExecutorUsesCompatibleClaudeTranslation(t *testing.T) {
 	defer server.Close()
 
 	executor := NewOpenAICompatExecutor("openai-compatibility", &config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "openai-compatibility",
 		Attributes: map[string]string{
 			"base_url": server.URL,
 			"api_key":  "test-key",
 		},
 	}
-	request := cliproxyexecutor.Request{
+	request := coreexecutor.Request{
 		Model:   "deepseek-v4-flash",
 		Payload: []byte(`{"model":"deepseek-v4-flash","messages":[{"role":"assistant","content":[{"type":"thinking","thinking":"prior reasoning","signature":""},{"type":"tool_use","id":"call_1","name":"Read","input":{}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"call_1","content":"ok"}]}]}`),
 		Metadata: map[string]any{
 			"cliproxy.resolved_api_key_model_info": &registry.ModelInfo{IsCompat: true},
 		},
 	}
-	options := cliproxyexecutor.Options{
-		SourceFormat:   sdktranslator.FormatClaude,
-		ResponseFormat: sdktranslator.FormatOpenAI,
+	options := coreexecutor.Options{
+		SourceFormat:   translatorreg.FormatClaude,
+		ResponseFormat: translatorreg.FormatOpenAI,
 	}
 
 	if _, errExecute := executor.Execute(context.Background(), auth, request, options); errExecute != nil {
@@ -100,18 +100,18 @@ func TestOpenAICompatExecutorClaudeStandaloneEffortFinalPayload(t *testing.T) {
 				t.Cleanup(server.Close)
 
 				executor := NewOpenAICompatExecutor("openai-compatibility", &config.Config{Payload: tt.payload})
-				auth := &cliproxyauth.Auth{
+				auth := &coreauth.Auth{
 					Provider: "openai-compatibility",
 					Attributes: map[string]string{
 						"base_url": server.URL,
 						"api_key":  "test-key",
 					},
 				}
-				req := cliproxyexecutor.Request{
+				req := coreexecutor.Request{
 					Model:   "custom-openai",
 					Payload: []byte(`{"model":"custom-openai","max_tokens":16,"output_config":{"effort":"high"},"messages":[{"role":"user","content":"hi"}]}`),
 				}
-				opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude, Stream: stream}
+				opts := coreexecutor.Options{SourceFormat: translatorreg.FormatClaude, Stream: stream}
 				if stream {
 					result, errStream := executor.ExecuteStream(context.Background(), auth, req, opts)
 					if errStream != nil {

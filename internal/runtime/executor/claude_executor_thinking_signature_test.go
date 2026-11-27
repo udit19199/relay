@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
+	"github.com/udit19199/relay/internal/config"
 )
 
 // thinkingSignatureFixtures are signature shapes that survive a JSON round trip
@@ -97,7 +97,7 @@ func TestClaudeThinkingSignaturesSurviveUpstreamPreparation(t *testing.T) {
 	}
 
 	cfg := &config.Config{}
-	auth := &cliproxyauth.Auth{Metadata: map[string]any{"cloak_mode": "always"}}
+	auth := &coreauth.Auth{Metadata: map[string]any{"cloak_mode": "always"}}
 
 	cloaked, didCloak, errCloaking := applyCloaking(
 		context.Background(),
@@ -149,7 +149,7 @@ func TestClaudeThinkingSignaturesSurviveSensitiveWordObfuscation(t *testing.T) {
 			Cloak:  &config.CloakConfig{SensitiveWords: []string{sensitive}},
 		}},
 	}
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "key-123"}}
+	auth := &coreauth.Auth{Attributes: map[string]string{"api_key": "key-123"}}
 
 	out, didCloak, errCloaking := applyCloaking(context.Background(), cfg, auth, payload, "key-123", false, true)
 	if errCloaking != nil {

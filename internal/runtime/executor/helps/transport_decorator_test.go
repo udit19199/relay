@@ -10,11 +10,10 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	coreexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdkconfig "github.com/router-for-me/CLIProxyAPI/v8/sdk/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/httptransport"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/httptransport"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 type observingTransport struct {
@@ -96,7 +95,7 @@ func TestClientDecoratorsPreserveProtectedAndProxyTransports(t *testing.T) {
 		})
 		c := NewProxyAwareHTTPClient(
 			ctx,
-			&config.Config{SDKConfig: sdkconfig.SDKConfig{ProxyURL: "http://127.0.0.1:18080"}},
+			&config.Config{SDKConfig: config.SDKConfig{ProxyURL: "http://127.0.0.1:18080"}},
 			&coreauth.Auth{ProxyURL: "http://127.0.0.1:18082"},
 			0,
 		)

@@ -5,12 +5,12 @@ import (
 	"strings"
 
 	"github.com/MoeForge/moego/ojson"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 // EmitWebSocketResponseEvent delivers an upstream WebSocket response frame to any configured observer.
-func EmitWebSocketResponseEvent(ctx context.Context, opts cliproxyexecutor.Options, auth *cliproxyauth.Auth, provider, model string, payload []byte) {
+func EmitWebSocketResponseEvent(ctx context.Context, opts coreexecutor.Options, auth *coreauth.Auth, provider, model string, payload []byte) {
 	if opts.WebSocketResponseObserver == nil || len(payload) == 0 {
 		return
 	}
@@ -32,7 +32,7 @@ func EmitWebSocketResponseEvent(ctx context.Context, opts cliproxyexecutor.Optio
 		}
 	}
 	requestedModel := PayloadRequestedModel(opts, model)
-	opts.WebSocketResponseObserver(ctx, cliproxyexecutor.WebSocketResponseEvent{
+	opts.WebSocketResponseObserver(ctx, coreexecutor.WebSocketResponseEvent{
 		RequestID:      requestID,
 		TraceID:        traceID,
 		SourceFormat:   opts.SourceFormat.String(),

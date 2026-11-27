@@ -12,9 +12,9 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/google/uuid"
-	kvstore "github.com/router-for-me/CLIProxyAPI/v8/internal/kvstore"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
 	log "github.com/sirupsen/logrus"
+	kvstore "github.com/udit19199/relay/internal/kvstore"
+	"github.com/udit19199/relay/internal/util"
 )
 
 const (

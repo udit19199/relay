@@ -99,20 +99,3 @@ func JoinRawJSONArray(items [][]byte) []byte {
 	}
 	return append(out, ']')
 }
-
-// JoinRawJSONStrings joins raw JSON array items held as strings.
-func JoinRawJSONStrings(items []string) []byte {
-	size := len(items) + 1
-	for _, item := range items {
-		size += len(item)
-	}
-	out := make([]byte, 0, size)
-	out = append(out, '[')
-	for index, item := range items {
-		if index > 0 {
-			out = append(out, ',')
-		}
-		out = append(out, item...)
-	}
-	return append(out, ']')
-}

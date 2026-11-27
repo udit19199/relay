@@ -5,14 +5,14 @@ import (
 	"sync/atomic"
 	"testing"
 
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestTranslateCodexRequestPairReusesEqualPayload(t *testing.T) {
-	from := sdktranslator.Format("codex-test-from-equal")
-	to := sdktranslator.Format("codex-test-to-equal")
+	from := translatorreg.Format("codex-test-from-equal")
+	to := translatorreg.Format("codex-test-to-equal")
 	var calls int32
-	sdktranslator.Register(from, to, func(model string, rawJSON []byte, stream bool) ([]byte, error) {
+	translatorreg.Register(from, to, func(model string, rawJSON []byte, stream bool) ([]byte, error) {
 		atomic.AddInt32(&calls, 1)
 		if model != "test-model" {
 			t.Errorf("model = %q, want test-model", model)
@@ -21,7 +21,7 @@ func TestTranslateCodexRequestPairReusesEqualPayload(t *testing.T) {
 			t.Error("stream = false, want true")
 		}
 		return append([]byte(nil), rawJSON...), nil
-	}, sdktranslator.ResponseTransform{})
+	}, translatorreg.ResponseTransform{})
 
 	payload := []byte(`{"model":"test-model","input":[{"role":"user"}]}`)
 	originalTranslated, body := translateCodexRequestPair(from, to, "test-model", payload, bytes.Clone(payload), true)
@@ -35,13 +35,13 @@ func TestTranslateCodexRequestPairReusesEqualPayload(t *testing.T) {
 }
 
 func TestTranslateCodexRequestPairTranslatesDifferentPayloads(t *testing.T) {
-	from := sdktranslator.Format("codex-test-from-different")
-	to := sdktranslator.Format("codex-test-to-different")
+	from := translatorreg.Format("codex-test-from-different")
+	to := translatorreg.Format("codex-test-to-different")
 	var calls int32
-	sdktranslator.Register(from, to, func(_ string, rawJSON []byte, _ bool) ([]byte, error) {
+	translatorreg.Register(from, to, func(_ string, rawJSON []byte, _ bool) ([]byte, error) {
 		atomic.AddInt32(&calls, 1)
 		return append([]byte(nil), rawJSON...), nil
-	}, sdktranslator.ResponseTransform{})
+	}, translatorreg.ResponseTransform{})
 
 	originalPayload := []byte(`{"model":"test-model","input":[{"role":"system"}]}`)
 	payload := []byte(`{"model":"test-model","input":[{"role":"user"}]}`)

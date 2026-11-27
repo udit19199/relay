@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestOpenAICompatRetryAfter(t *testing.T) {
@@ -91,11 +91,11 @@ func TestOpenAICompatExecutorPropagatesRetryAfter(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	executor := NewOpenAICompatExecutor("openai-compatibility", &config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"base_url": server.URL + "/v1",
 		"api_key":  "test",
 	}}
-	request := cliproxyexecutor.Request{
+	request := coreexecutor.Request{
 		Model:   "compatible-model",
 		Payload: []byte(`{"model":"compatible-model","messages":[{"role":"user","content":"hi"}]}`),
 	}
@@ -106,8 +106,8 @@ func TestOpenAICompatExecutorPropagatesRetryAfter(t *testing.T) {
 		{
 			name: "nonstream",
 			invoke: func() error {
-				_, errExecute := executor.Execute(context.Background(), auth, request, cliproxyexecutor.Options{
-					SourceFormat: sdktranslator.FromString("openai"),
+				_, errExecute := executor.Execute(context.Background(), auth, request, coreexecutor.Options{
+					SourceFormat: translatorreg.FromString("openai"),
 				})
 				return errExecute
 			},
@@ -115,8 +115,8 @@ func TestOpenAICompatExecutorPropagatesRetryAfter(t *testing.T) {
 		{
 			name: "stream bootstrap",
 			invoke: func() error {
-				_, errExecute := executor.ExecuteStream(context.Background(), auth, request, cliproxyexecutor.Options{
-					SourceFormat: sdktranslator.FromString("openai"),
+				_, errExecute := executor.ExecuteStream(context.Background(), auth, request, coreexecutor.Options{
+					SourceFormat: translatorreg.FromString("openai"),
 					Stream:       true,
 				})
 				return errExecute

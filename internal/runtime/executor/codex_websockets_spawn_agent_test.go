@@ -10,11 +10,11 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gorilla/websocket"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/registry"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestCodexWebsocketsExecutorRestoresMultiAgentV2NamespaceAcrossIncrementalTurns(t *testing.T) {
@@ -61,24 +61,24 @@ func TestCodexWebsocketsExecutorRestoresMultiAgentV2NamespaceAcrossIncrementalTu
 			executor := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{Client: config.ClientConfig{Codex: config.CodexClientConfig{OptimizeMultiAgentV2: true}}}})
 			const executionSessionID = "multi-agent-v2-incremental"
 			t.Cleanup(func() { executor.CloseExecutionSession(executionSessionID) })
-			auth := &cliproxyauth.Auth{
+			auth := &coreauth.Auth{
 				ID: "codex-test",
 				Attributes: map[string]string{
 					"base_url": server.URL,
 					"api_key":  "test",
 				},
 			}
-			opts := cliproxyexecutor.Options{
-				SourceFormat:   sdktranslator.FromString("openai-response"),
-				ResponseFormat: sdktranslator.FromString("openai-response"),
+			opts := coreexecutor.Options{
+				SourceFormat:   translatorreg.FromString("openai-response"),
+				ResponseFormat: translatorreg.FromString("openai-response"),
 				Headers:        http.Header{"User-Agent": []string{"overridden-client/1.0"}},
 				Metadata: map[string]any{
-					cliproxyexecutor.ExecutionSessionMetadataKey: executionSessionID,
+					coreexecutor.ExecutionSessionMetadataKey: executionSessionID,
 				},
 			}
 			execute := func(payload []byte) []byte {
 				t.Helper()
-				req := cliproxyexecutor.Request{Model: "gpt-5.4", Payload: payload}
+				req := coreexecutor.Request{Model: "gpt-5.4", Payload: payload}
 				if !tt.stream {
 					response, errExecute := executor.Execute(codexSpawnAgentTestContext(), auth, req, opts)
 					if errExecute != nil {
@@ -194,13 +194,13 @@ func TestCodexWebsocketsExecutorOptimizeMultiAgentV2(t *testing.T) {
 	}))
 	defer server.Close()
 
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"base_url": server.URL,
 		"api_key":  "test",
 	}}
-	req := cliproxyexecutor.Request{Model: "gpt-5.4", Payload: codexSpawnAgentTestPayload()}
-	opts := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-response"),
+	req := coreexecutor.Request{Model: "gpt-5.4", Payload: codexSpawnAgentTestPayload()}
+	opts := coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-response"),
 		Headers:      http.Header{"User-Agent": []string{"overridden-client/1.0"}},
 	}
 

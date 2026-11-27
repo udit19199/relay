@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/proxyutil"
 	log "github.com/sirupsen/logrus"
+	"github.com/udit19199/relay/internal/proxyutil"
 )
 
 const (
@@ -26,7 +26,6 @@ var (
 	errInvalidOAuthState      = errors.New("invalid oauth state")
 	errUnsupportedOAuthFlow   = errors.New("unsupported oauth provider")
 	errOAuthSessionNotPending = errors.New("oauth session is not pending")
-	errOAuthSessionExists     = errors.New("oauth session already exists")
 )
 
 // ErrSIWCCallbackRequiresV8 prevents legacy callback sinks from accepting SIWC codes.
@@ -178,41 +177,6 @@ func (s *oauthSessionStore) FailCommit(state, message string) {
 	session.SIWCCommitting = false
 	session.ExpiresAt = now.Add(s.ttl)
 	s.sessions[state] = session
-}
-
-func (s *oauthSessionStore) FailPendingPoll(state, message string) (errStatus string, completed bool, committing bool, ok bool) {
-	state = strings.TrimSpace(state)
-	message = strings.TrimSpace(message)
-	if state == "" {
-		return "", false, false, false
-	}
-	if message == "" {
-		message = "Authentication failed"
-	}
-	now := time.Now()
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.purgeExpiredLocked(now)
-	session, exists := s.sessions[state]
-	if !exists {
-		return "", false, false, false
-	}
-	if session.Completed {
-		return "", true, false, true
-	}
-	if session.Committing || session.SIWCCommitting {
-		return "", false, true, true
-	}
-	if session.Status != "" {
-		return session.Status, false, false, true
-	}
-	session.Status = redactSessionProxyInString(message, session.ProxyURL)
-	session.ProxyURL = ""
-	session.ExpiresAt = now.Add(s.ttl)
-	s.sessions[state] = session
-	return session.Status, false, false, true
 }
 
 func (s *oauthSessionStore) Complete(state string) {
@@ -463,10 +427,6 @@ func FailOAuthSessionCommit(state, message string) { oauthSessions.FailCommit(st
 
 func CompleteOAuthSession(state string) { oauthSessions.Complete(state) }
 
-func CompleteOAuthSessionWithAuth(state, authID string) {
-	oauthSessions.CompleteWithAuth(state, authID)
-}
-
 func CompleteOAuthSessionWithOutcome(state, authID, savedGrantHash string, saved, adopted, baselineExisted bool, baselineVersion, baselineEpoch, adoptedVersion, adoptedEpoch uint64, adoptErr, verifyErr string) {
 	oauthSessions.CompleteWithOutcome(state, authID, savedGrantHash, saved, adopted, baselineExisted, baselineVersion, baselineEpoch, adoptedVersion, adoptedEpoch, adoptErr, verifyErr)
 }
@@ -477,10 +437,6 @@ func SetOAuthSessionTarget(state string, target oauthRecoveryTarget) {
 
 func GetOAuthSessionTarget(state string) (oauthRecoveryTarget, bool) {
 	return oauthSessions.GetTarget(state)
-}
-
-func CompleteOAuthSessionsByProvider(provider string) int {
-	return oauthSessions.CompleteProvider(provider)
 }
 
 func GetOAuthSession(state string) (provider string, status string, ok bool) {
@@ -597,14 +553,6 @@ type oauthCallbackFilePayload struct {
 	Code  string `json:"code"`
 	State string `json:"state"`
 	Error string `json:"error"`
-}
-
-func WriteOAuthCallbackFile(authDir, provider, state, code, errorMessage string) (string, error) {
-	canonicalProvider, err := NormalizeOAuthCallbackProvider(provider)
-	if err != nil {
-		return "", err
-	}
-	return writeOAuthCallbackFile(authDir, canonicalProvider, state, code, errorMessage)
 }
 
 func writeOAuthCallbackFile(authDir, canonicalProvider, state, code, errorMessage string) (string, error) {

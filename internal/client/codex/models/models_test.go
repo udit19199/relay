@@ -3,10 +3,10 @@ package models
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"testing"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
+	"fmt"
+	"github.com/udit19199/relay/internal/registry"
 )
 
 func TestCodexClientModelsResponse_InputModalitiesFromRegistry(t *testing.T) {

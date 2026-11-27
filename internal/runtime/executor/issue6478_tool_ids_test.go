@@ -10,11 +10,11 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 var issue6478Calls = []struct {
@@ -98,10 +98,10 @@ func TestIssue6478_DevinClaudeOutputAndToolResultRoundTrip(t *testing.T) {
 
 			cfg := &config.Config{}
 			executor := NewDevinExecutor(cfg)
-			auth := &cliproxyauth.Auth{ID: t.Name(), Provider: "devin", Attributes: map[string]string{"api_key": "test-key", "base_url": server.URL}}
+			auth := &coreauth.Auth{ID: t.Name(), Provider: "devin", Attributes: map[string]string{"api_key": "test-key", "base_url": server.URL}}
 			payload := []byte(`{"model":"devin/swe-2","max_tokens":64,"messages":[{"role":"user","content":"run tools"}]}`)
-			req := cliproxyexecutor.Request{Model: "devin/swe-2", Payload: payload}
-			opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude, OriginalRequest: payload, Stream: stream}
+			req := coreexecutor.Request{Model: "devin/swe-2", Payload: payload}
+			opts := coreexecutor.Options{SourceFormat: translatorreg.FormatClaude, OriginalRequest: payload, Stream: stream}
 			var ids []string
 			if stream {
 				result, errStream := executor.ExecuteStream(t.Context(), auth, req, opts)

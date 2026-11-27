@@ -6,34 +6,34 @@ import (
 	"strings"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
 	"github.com/tiktoken-go/tokenizer"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
+	"github.com/udit19199/relay/internal/util"
 )
 
 // CountTokens estimates token count for xAI Responses requests.
-func (e *XAIExecutor) CountTokens(ctx context.Context, auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
+func (e *XAIExecutor) CountTokens(ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) (coreexecutor.Response, error) {
 	prepared, err := e.prepareResponsesRequestDoc(ctx, req, opts, false)
 	if err != nil {
-		return cliproxyexecutor.Response{}, err
+		return coreexecutor.Response{}, err
 	}
 	enc, err := tokenizer.Get(tokenizer.O200kBase)
 	if err != nil {
-		return cliproxyexecutor.Response{}, fmt.Errorf("xai executor: tokenizer init failed: %w", err)
+		return coreexecutor.Response{}, fmt.Errorf("xai executor: tokenizer init failed: %w", err)
 	}
 	doc := prepared.ensureDoc()
 	helps.FinalizePayloadDoc(helps.WithPayloadFinalizer(ctx, prepared.finalizePayload), doc)
 	prepared.body = doc.Bytes()
 	count, err := countXAIInputTokens(enc, prepared.body)
 	if err != nil {
-		return cliproxyexecutor.Response{}, fmt.Errorf("xai executor: token counting failed: %w", err)
+		return coreexecutor.Response{}, fmt.Errorf("xai executor: token counting failed: %w", err)
 	}
 	usageJSON := fmt.Sprintf(`{"response":{"usage":{"input_tokens":%d,"output_tokens":0,"total_tokens":%d}}}`, count, count)
-	translated := sdktranslator.TranslateTokenCount(ctx, prepared.to, prepared.responseFormat, count, []byte(usageJSON))
-	return cliproxyexecutor.Response{Payload: translated}, nil
+	translated := translatorreg.TranslateTokenCount(ctx, prepared.to, prepared.responseFormat, count, []byte(usageJSON))
+	return coreexecutor.Response{Payload: translated}, nil
 }
 
 func countXAIInputTokens(enc tokenizer.Codec, body []byte) (int64, error) {

@@ -12,8 +12,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 // These tests share the process-wide pool and must not run in parallel.
@@ -57,31 +57,31 @@ func TestProxyPoolIsolatesCredentials(t *testing.T) {
 
 	// API-key credentials without an ID fall back to a digested key scope.
 	keyOne := poolAuth("", poolEnabled())
-	keyOne.Attributes = map[string]string{cliproxyauth.AttributeAPIKey: "sk-one"}
+	keyOne.Attributes = map[string]string{coreauth.AttributeAPIKey: "sk-one"}
 	keyTwo := poolAuth("", poolEnabled())
-	keyTwo.Attributes = map[string]string{cliproxyauth.AttributeAPIKey: "sk-two"}
+	keyTwo.Attributes = map[string]string{coreauth.AttributeAPIKey: "sk-two"}
 	if pooledProxyTransport("direct", cfg, keyOne) == pooledProxyTransport("direct", cfg, keyTwo) {
 		t.Fatal("different API keys share one pool")
 	}
 	if scope := proxyPoolScope(keyOne); strings.Contains(scope, "sk-one") {
 		t.Fatalf("pool scope leaks credential material: %q", scope)
 	}
-	if proxyPoolScope(keyOne) != proxyPoolScope(&cliproxyauth.Auth{Attributes: map[string]string{cliproxyauth.AttributeAPIKey: "sk-one"}}) {
+	if proxyPoolScope(keyOne) != proxyPoolScope(&coreauth.Auth{Attributes: map[string]string{coreauth.AttributeAPIKey: "sk-one"}}) {
 		t.Fatal("identical credentials must map to one scope")
 	}
 	// A human readable label is not an identity.
-	if proxyPoolScope(&cliproxyauth.Auth{Label: "same"}) != proxyPoolScope(&cliproxyauth.Auth{Label: "same"}) {
+	if proxyPoolScope(&coreauth.Auth{Label: "same"}) != proxyPoolScope(&coreauth.Auth{Label: "same"}) {
 		t.Fatal("label-only auths must share the anonymous scope")
 	}
-	if got := proxyPoolScope(&cliproxyauth.Auth{Label: "shared"}); got != proxyPoolAnonymousScope {
+	if got := proxyPoolScope(&coreauth.Auth{Label: "shared"}); got != proxyPoolAnonymousScope {
 		t.Fatalf("label must not become a scope, got %q", got)
 	}
 
 	// Rotating an API key in-place under a stable Auth.ID must switch pools.
 	rotatedBefore := poolAuth("stable-id", poolEnabled())
-	rotatedBefore.Attributes = map[string]string{cliproxyauth.AttributeAPIKey: "sk-old"}
+	rotatedBefore.Attributes = map[string]string{coreauth.AttributeAPIKey: "sk-old"}
 	rotatedAfter := poolAuth("stable-id", poolEnabled())
-	rotatedAfter.Attributes = map[string]string{cliproxyauth.AttributeAPIKey: "sk-new"}
+	rotatedAfter.Attributes = map[string]string{coreauth.AttributeAPIKey: "sk-new"}
 	if pooledProxyTransport("direct", cfg, rotatedBefore) == pooledProxyTransport("direct", cfg, rotatedAfter) {
 		t.Fatal("rotating API key under the same Auth.ID must not reuse the old key's pool")
 	}

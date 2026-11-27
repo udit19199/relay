@@ -7,10 +7,10 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestInsertClaudeMidConversationSystemMessages_EffortDirective(t *testing.T) {
@@ -129,7 +129,7 @@ func TestClaudeExecutor_EffortDirectiveAfterCompaction(t *testing.T) {
 		t.Run(path, func(t *testing.T) {
 			upstream := &midSystemUpstream{}
 			ctx := upstream.context(t, http.Header{"Anthropic-Beta": []string{"mid-conversation-output-config-2026-07-01"}})
-			auth := &cliproxyauth.Auth{
+			auth := &coreauth.Auth{
 				ID:         "effort-directive-oauth",
 				Attributes: map[string]string{"api_key": "sk-ant-oat-effort-directive", "cloak_mode": "always"},
 				Metadata: map[string]any{
@@ -140,8 +140,8 @@ func TestClaudeExecutor_EffortDirectiveAfterCompaction(t *testing.T) {
 				},
 			}
 			ex := NewClaudeExecutor(&config.Config{})
-			req := cliproxyexecutor.Request{Model: model, Payload: payload}
-			opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude}
+			req := coreexecutor.Request{Model: model, Payload: payload}
+			opts := coreexecutor.Options{SourceFormat: translatorreg.FormatClaude}
 			switch path {
 			case "execute":
 				if _, errExecute := ex.Execute(ctx, auth, req, opts); errExecute != nil {

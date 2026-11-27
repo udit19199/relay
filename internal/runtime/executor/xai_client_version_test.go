@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 // xaiVersionAtLeast compares dotted numeric version strings.
@@ -39,7 +39,7 @@ func TestXAIChatProxyClientVersionMeetsServerFloor(t *testing.T) {
 }
 
 func TestXAIChatProxyIdentityHeadersDeriveFromOneConstant(t *testing.T) {
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider:   "xai",
 		Attributes: map[string]string{"auth_kind": "oauth"},
 	}
@@ -58,7 +58,7 @@ func TestXAIChatProxyIdentityHeadersDeriveFromOneConstant(t *testing.T) {
 }
 
 func TestXAIChatProxyCustomHeadersOverridePinnedVersion(t *testing.T) {
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "xai",
 		Attributes: map[string]string{
 			"auth_kind":                    "oauth",
@@ -80,7 +80,7 @@ func TestXAIChatProxyIdentityHeadersFollowDynamicVersion(t *testing.T) {
 	restore := helps.SetXAIClientVersionForTest("1.2.34")
 	defer restore()
 
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider:   "xai",
 		Attributes: map[string]string{"auth_kind": "oauth"},
 	}

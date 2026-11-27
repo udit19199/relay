@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/MoeForge/moego/ojson"
-	translatorcommon "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/common"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
+	translatorcommon "github.com/udit19199/relay/internal/translator/common"
+	"github.com/udit19199/relay/internal/util"
 )
 
 type codexToInteractionsStreamState struct {
@@ -142,14 +142,6 @@ func codexStreamPayload(rawJSON []byte) []byte {
 		rawJSON = bytes.TrimSpace(rawJSON[len("data:"):])
 	}
 	return rawJSON
-}
-
-func codexStreamEventType(rawJSON []byte) string {
-	payload := codexStreamPayload(rawJSON)
-	if len(payload) == 0 || bytes.Equal(payload, []byte("[DONE]")) {
-		return ""
-	}
-	return ojson.GetBytesNoCopy(payload, "type").String()
 }
 
 func appendCodexInteractionsCreated(out [][]byte, st *codexToInteractionsStreamState, response ojson.Result) [][]byte {

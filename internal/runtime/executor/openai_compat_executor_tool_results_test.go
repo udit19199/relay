@@ -9,10 +9,10 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestOpenAICompatExecutorToolResultContentByInputModalities(t *testing.T) {
@@ -53,7 +53,7 @@ func TestOpenAICompatExecutorToolResultContentByInputModalities(t *testing.T) {
 					}},
 				}},
 			})
-			auth := &cliproxyauth.Auth{
+			auth := &coreauth.Auth{
 				Provider: "openai-compatibility",
 				Attributes: map[string]string{
 					"base_url":     server.URL + "/v1",
@@ -63,10 +63,10 @@ func TestOpenAICompatExecutorToolResultContentByInputModalities(t *testing.T) {
 				},
 			}
 			payload := []byte(`{"model":"claude-client","max_tokens":64,"messages":[{"role":"assistant","content":[{"type":"tool_use","id":"call_1","name":"inspect_image","input":{}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"call_1","content":[{"type":"text","text":"image inspected"},{"type":"image","source":{"type":"base64","media_type":"image/png","data":"AA=="}}]}]}]}`)
-			req := cliproxyexecutor.Request{Model: "mapped-model", Payload: payload}
-			opts := cliproxyexecutor.Options{
-				SourceFormat:   sdktranslator.FormatClaude,
-				ResponseFormat: sdktranslator.FormatOpenAI,
+			req := coreexecutor.Request{Model: "mapped-model", Payload: payload}
+			opts := coreexecutor.Options{
+				SourceFormat:   translatorreg.FormatClaude,
+				ResponseFormat: translatorreg.FormatOpenAI,
 				Stream:         tt.stream,
 			}
 
@@ -137,7 +137,7 @@ func TestTextOnlyModelDoesNotReceiveImageURL(t *testing.T) {
 					}},
 				}},
 			})
-			auth := &cliproxyauth.Auth{
+			auth := &coreauth.Auth{
 				Provider: "openai-compatibility",
 				Attributes: map[string]string{
 					"base_url": server.URL + "/v1", "api_key": "test",
@@ -146,12 +146,12 @@ func TestTextOnlyModelDoesNotReceiveImageURL(t *testing.T) {
 			}
 			payload := []byte(`{"model":"claude-client","max_tokens":64,"messages":[{"role":"assistant","content":[{"type":"tool_use","id":"call_1","name":"inspect_image","input":{}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"call_1","content":[{"type":"text","text":"image inspected"},{"type":"image","source":{"type":"base64","media_type":"image/png","data":"AA=="}}]}]}]}`)
 
-			opts := cliproxyexecutor.Options{
-				SourceFormat:   sdktranslator.FormatClaude,
-				ResponseFormat: sdktranslator.FormatOpenAI,
+			opts := coreexecutor.Options{
+				SourceFormat:   translatorreg.FormatClaude,
+				ResponseFormat: translatorreg.FormatOpenAI,
 				Stream:         stream,
 			}
-			req := cliproxyexecutor.Request{Model: "mapped-model", Payload: payload}
+			req := coreexecutor.Request{Model: "mapped-model", Payload: payload}
 
 			if stream {
 				result, err := exec.ExecuteStream(context.Background(), auth, req, opts)

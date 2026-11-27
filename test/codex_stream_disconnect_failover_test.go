@@ -11,15 +11,15 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	runtimeexecutor "github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor"
-	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/translator"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/api/handlers"
-	openaihandlers "github.com/router-for-me/CLIProxyAPI/v8/sdk/api/handlers/openai"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/api/handlers"
+	openaihandlers "github.com/udit19199/relay/internal/api/handlers/openai"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/registry"
+	runtimeexecutor "github.com/udit19199/relay/internal/runtime/executor"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	_ "github.com/udit19199/relay/internal/translator"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 // TestCodexStreamDisconnectAfterHeadersFailsOver reproduces issue #6247:
@@ -66,7 +66,7 @@ func TestCodexStreamDisconnectAfterHeadersFailsOver(t *testing.T) {
 			}))
 			defer server.Close()
 
-			manager := cliproxyauth.NewManager(nil, &cliproxyauth.RoundRobinSelector{}, nil)
+			manager := coreauth.NewManager(nil, &coreauth.RoundRobinSelector{}, nil)
 			manager.SetRetryConfig(0, 0, 2)
 			cfg := &config.Config{}
 			cfg.Codex.StreamBootstrapBuffering = buffering
@@ -81,15 +81,15 @@ func TestCodexStreamDisconnectAfterHeadersFailsOver(t *testing.T) {
 				registry.GetGlobalRegistry().UnregisterClient(authB)
 			})
 
-			if _, errRegister := manager.Register(context.Background(), &cliproxyauth.Auth{
-				ID: authA, Provider: "codex", Status: cliproxyauth.StatusActive,
+			if _, errRegister := manager.Register(context.Background(), &coreauth.Auth{
+				ID: authA, Provider: "codex", Status: coreauth.StatusActive,
 				Attributes: map[string]string{"priority": "100", "base_url": server.URL, "api_key": "account-a"},
 				Metadata:   map[string]any{"disable_cooling": true},
 			}); errRegister != nil {
 				t.Fatal(errRegister)
 			}
-			if _, errRegister := manager.Register(context.Background(), &cliproxyauth.Auth{
-				ID: authB, Provider: "codex", Status: cliproxyauth.StatusActive,
+			if _, errRegister := manager.Register(context.Background(), &coreauth.Auth{
+				ID: authB, Provider: "codex", Status: coreauth.StatusActive,
 				Attributes: map[string]string{"priority": "0", "base_url": server.URL, "api_key": "account-b"},
 				Metadata:   map[string]any{"disable_cooling": true},
 			}); errRegister != nil {
@@ -97,14 +97,14 @@ func TestCodexStreamDisconnectAfterHeadersFailsOver(t *testing.T) {
 			}
 
 			// Test ExecuteStream directly via Conductor
-			req := cliproxyexecutor.Request{
+			req := coreexecutor.Request{
 				Model:   model,
 				Payload: []byte(fmt.Sprintf(`{"model":%q,"input":"hello","stream":true}`, model)),
 			}
-			opts := cliproxyexecutor.Options{
+			opts := coreexecutor.Options{
 				Stream:          true,
-				SourceFormat:    sdktranslator.FromString("openai-response"),
-				ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+				SourceFormat:    translatorreg.FromString("openai-response"),
+				ResponseFormat:  translatorreg.FormatOpenAIResponse,
 				OriginalRequest: req.Payload,
 			}
 
@@ -154,7 +154,7 @@ func TestCodexStreamDisconnectExhaustionNotInvalidRequestError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	manager := cliproxyauth.NewManager(nil, &cliproxyauth.RoundRobinSelector{}, nil)
+	manager := coreauth.NewManager(nil, &coreauth.RoundRobinSelector{}, nil)
 	manager.SetRetryConfig(0, 0, 0)
 	cfg := &config.Config{}
 	manager.RegisterExecutor(runtimeexecutor.NewCodexExecutor(cfg))
@@ -163,8 +163,8 @@ func TestCodexStreamDisconnectExhaustionNotInvalidRequestError(t *testing.T) {
 	registry.GetGlobalRegistry().RegisterClient(authID, "codex", []*registry.ModelInfo{{ID: model}})
 	t.Cleanup(func() { registry.GetGlobalRegistry().UnregisterClient(authID) })
 
-	if _, errRegister := manager.Register(context.Background(), &cliproxyauth.Auth{
-		ID: authID, Provider: "codex", Status: cliproxyauth.StatusActive,
+	if _, errRegister := manager.Register(context.Background(), &coreauth.Auth{
+		ID: authID, Provider: "codex", Status: coreauth.StatusActive,
 		Attributes: map[string]string{"base_url": server.URL, "api_key": "dummy"},
 		Metadata:   map[string]any{"disable_cooling": true},
 	}); errRegister != nil {
@@ -234,7 +234,7 @@ func TestCodexStreamDisconnectAfterOutputDoesNotFailOver(t *testing.T) {
 			}))
 			defer server.Close()
 
-			manager := cliproxyauth.NewManager(nil, &cliproxyauth.RoundRobinSelector{}, nil)
+			manager := coreauth.NewManager(nil, &coreauth.RoundRobinSelector{}, nil)
 			manager.SetRetryConfig(0, 0, 2)
 			cfg := &config.Config{}
 			cfg.Codex.StreamBootstrapBuffering = buffering
@@ -249,29 +249,29 @@ func TestCodexStreamDisconnectAfterOutputDoesNotFailOver(t *testing.T) {
 				registry.GetGlobalRegistry().UnregisterClient(authB)
 			})
 
-			if _, errRegister := manager.Register(context.Background(), &cliproxyauth.Auth{
-				ID: authA, Provider: "codex", Status: cliproxyauth.StatusActive,
+			if _, errRegister := manager.Register(context.Background(), &coreauth.Auth{
+				ID: authA, Provider: "codex", Status: coreauth.StatusActive,
 				Attributes: map[string]string{"priority": "100", "base_url": server.URL, "api_key": "account-a"},
 				Metadata:   map[string]any{"disable_cooling": true},
 			}); errRegister != nil {
 				t.Fatal(errRegister)
 			}
-			if _, errRegister := manager.Register(context.Background(), &cliproxyauth.Auth{
-				ID: authB, Provider: "codex", Status: cliproxyauth.StatusActive,
+			if _, errRegister := manager.Register(context.Background(), &coreauth.Auth{
+				ID: authB, Provider: "codex", Status: coreauth.StatusActive,
 				Attributes: map[string]string{"priority": "0", "base_url": server.URL, "api_key": "account-b"},
 				Metadata:   map[string]any{"disable_cooling": true},
 			}); errRegister != nil {
 				t.Fatal(errRegister)
 			}
 
-			req := cliproxyexecutor.Request{
+			req := coreexecutor.Request{
 				Model:   model,
 				Payload: []byte(fmt.Sprintf(`{"model":%q,"input":"hello","stream":true}`, model)),
 			}
-			opts := cliproxyexecutor.Options{
+			opts := coreexecutor.Options{
 				Stream:          true,
-				SourceFormat:    sdktranslator.FromString("openai-response"),
-				ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+				SourceFormat:    translatorreg.FromString("openai-response"),
+				ResponseFormat:  translatorreg.FormatOpenAIResponse,
 				OriginalRequest: req.Payload,
 			}
 
@@ -350,7 +350,7 @@ func TestCodexStreamAbnormalDisconnectBeforeOutputFailsOver(t *testing.T) {
 	}))
 	defer server.Close()
 
-	manager := cliproxyauth.NewManager(nil, &cliproxyauth.RoundRobinSelector{}, nil)
+	manager := coreauth.NewManager(nil, &coreauth.RoundRobinSelector{}, nil)
 	manager.SetRetryConfig(0, 0, 2)
 	cfg := &config.Config{}
 	manager.RegisterExecutor(runtimeexecutor.NewCodexExecutor(cfg))
@@ -364,29 +364,29 @@ func TestCodexStreamAbnormalDisconnectBeforeOutputFailsOver(t *testing.T) {
 		registry.GetGlobalRegistry().UnregisterClient(authB)
 	})
 
-	if _, errRegister := manager.Register(context.Background(), &cliproxyauth.Auth{
-		ID: authA, Provider: "codex", Status: cliproxyauth.StatusActive,
+	if _, errRegister := manager.Register(context.Background(), &coreauth.Auth{
+		ID: authA, Provider: "codex", Status: coreauth.StatusActive,
 		Attributes: map[string]string{"priority": "100", "base_url": server.URL, "api_key": "account-a"},
 		Metadata:   map[string]any{"disable_cooling": true},
 	}); errRegister != nil {
 		t.Fatal(errRegister)
 	}
-	if _, errRegister := manager.Register(context.Background(), &cliproxyauth.Auth{
-		ID: authB, Provider: "codex", Status: cliproxyauth.StatusActive,
+	if _, errRegister := manager.Register(context.Background(), &coreauth.Auth{
+		ID: authB, Provider: "codex", Status: coreauth.StatusActive,
 		Attributes: map[string]string{"priority": "0", "base_url": server.URL, "api_key": "account-b"},
 		Metadata:   map[string]any{"disable_cooling": true},
 	}); errRegister != nil {
 		t.Fatal(errRegister)
 	}
 
-	req := cliproxyexecutor.Request{
+	req := coreexecutor.Request{
 		Model:   model,
 		Payload: []byte(fmt.Sprintf(`{"model":%q,"input":"hello","stream":true}`, model)),
 	}
-	opts := cliproxyexecutor.Options{
+	opts := coreexecutor.Options{
 		Stream:          true,
-		SourceFormat:    sdktranslator.FromString("openai-response"),
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+		SourceFormat:    translatorreg.FromString("openai-response"),
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		OriginalRequest: req.Payload,
 	}
 

@@ -3,13 +3,12 @@ package multiagentv2
 import (
 	"context"
 	"fmt"
+	"github.com/MoeForge/moego/ojson"
+	"github.com/udit19199/relay/internal/config"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
+	"github.com/udit19199/relay/internal/util"
 	"net/http"
 	"testing"
-
-	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
 )
 
 func testRewriteCodexOrphan(payload []byte, enabled bool) []byte {
@@ -487,7 +486,7 @@ func TestTranslateRequestWithCodexMultiAgentV2OrphanDelegation(t *testing.T) {
 				OrphanDelegationCompatibility: true,
 			},
 		}
-		got := TranslateRequestWithCodexMultiAgentV2(context.Background(), http.Header{}, cfg, sdktranslator.FormatOpenAIResponse, sdktranslator.FormatOpenAIResponse, "test-model", payload, false)
+		got := TranslateRequestWithCodexMultiAgentV2(context.Background(), http.Header{}, cfg, translatorreg.FormatOpenAIResponse, translatorreg.FormatOpenAIResponse, "test-model", payload, false)
 		parsed := util.ParseGJSONBytesNoCopy(got)
 
 		item0 := parsed.Get("input.0")
@@ -503,7 +502,7 @@ func TestTranslateRequestWithCodexMultiAgentV2OrphanDelegation(t *testing.T) {
 			},
 		}
 		headers := http.Header{"X-Openai-Subagent": []string{"other_agent"}}
-		got := TranslateRequestWithCodexMultiAgentV2(context.Background(), headers, cfg, sdktranslator.FormatOpenAIResponse, sdktranslator.FormatOpenAIResponse, "test-model", payload, false)
+		got := TranslateRequestWithCodexMultiAgentV2(context.Background(), headers, cfg, translatorreg.FormatOpenAIResponse, translatorreg.FormatOpenAIResponse, "test-model", payload, false)
 		parsed := util.ParseGJSONBytesNoCopy(got)
 
 		item0 := parsed.Get("input.0")
@@ -518,7 +517,7 @@ func TestTranslateRequestWithCodexMultiAgentV2OrphanDelegation(t *testing.T) {
 				OrphanDelegationCompatibility: true,
 			},
 		}
-		got := TranslateRequestWithCodexMultiAgentV2(context.Background(), collabHeaders, cfg, sdktranslator.FormatOpenAIResponse, sdktranslator.FormatOpenAIResponse, "test-model", payload, false)
+		got := TranslateRequestWithCodexMultiAgentV2(context.Background(), collabHeaders, cfg, translatorreg.FormatOpenAIResponse, translatorreg.FormatOpenAIResponse, "test-model", payload, false)
 		parsed := util.ParseGJSONBytesNoCopy(got)
 
 		item0 := parsed.Get("input.0")
@@ -537,7 +536,7 @@ func TestTranslateRequestWithCodexMultiAgentV2OrphanDelegation(t *testing.T) {
 				OrphanDelegationCompatibility: true,
 			},
 		}
-		got := TranslateRequestWithCodexMultiAgentV2(context.Background(), collabHeaders, cfg, sdktranslator.FormatOpenAIResponse, sdktranslator.FormatOpenAI, "test-model", payload, false)
+		got := TranslateRequestWithCodexMultiAgentV2(context.Background(), collabHeaders, cfg, translatorreg.FormatOpenAIResponse, translatorreg.FormatOpenAI, "test-model", payload, false)
 		parsed := util.ParseGJSONBytesNoCopy(got)
 
 		messages := parsed.Get("messages").Array()
@@ -566,7 +565,7 @@ func TestTranslateRequestWithCodexMultiAgentV2OrphanDelegation(t *testing.T) {
 				OrphanDelegationCompatibility: false,
 			},
 		}
-		got := TranslateRequestWithCodexMultiAgentV2(context.Background(), collabHeaders, cfg, sdktranslator.FormatOpenAIResponse, sdktranslator.FormatOpenAIResponse, "test-model", payload, false)
+		got := TranslateRequestWithCodexMultiAgentV2(context.Background(), collabHeaders, cfg, translatorreg.FormatOpenAIResponse, translatorreg.FormatOpenAIResponse, "test-model", payload, false)
 		parsed := util.ParseGJSONBytesNoCopy(got)
 
 		item0 := parsed.Get("input.0")
@@ -604,7 +603,7 @@ func TestTranslateRequestWithCodexMultiAgentV2OrphanDelegation(t *testing.T) {
 				OrphanDelegationCompatibility: true,
 			},
 		}
-		got := TranslateRequestWithCodexMultiAgentV2(context.Background(), collabHeaders, cfg, sdktranslator.FormatOpenAIResponse, sdktranslator.FormatOpenAIResponse, "test-model", interleaved, false)
+		got := TranslateRequestWithCodexMultiAgentV2(context.Background(), collabHeaders, cfg, translatorreg.FormatOpenAIResponse, translatorreg.FormatOpenAIResponse, "test-model", interleaved, false)
 		parsed := util.ParseGJSONBytesNoCopy(got)
 
 		if parsed.Get("input.0.type").String() != "function_call" {

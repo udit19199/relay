@@ -9,10 +9,10 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gorilla/websocket"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	core "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	core "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 // The upstream deliberately cannot finish the initial response until it reads
@@ -72,7 +72,7 @@ func TestCodexDuplexSIWCSteerStripsConfigurationUpdates(t *testing.T) {
 		Model:   "gpt-6-astra",
 		Payload: []byte(`{"model":"gpt-6-astra","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"hi"}]}],"instructions":"Initial settings"}`),
 	}
-	opts := core.Options{SourceFormat: sdktranslator.FromString("codex"), Metadata: map[string]any{core.ExecutionSessionMetadataKey: "duplex-siwc-steer"}}
+	opts := core.Options{SourceFormat: translatorreg.FromString("codex"), Metadata: map[string]any{core.ExecutionSessionMetadataKey: "duplex-siwc-steer"}}
 	result, err := exec.ExecuteStream(ctx, codexSIWCAuthForUpdateTest(server.URL), req, opts)
 	if err != nil {
 		t.Fatal(err)
@@ -183,12 +183,12 @@ func TestCodexDuplexAppendInheritsContextAndInstructions(t *testing.T) {
 
 	exec := NewCodexWebsocketsExecutor(&config.Config{Codex: config.CodexConfig{ResponseSteering: true}})
 	exec.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
-	auth := &cliproxyauth.Auth{ID: "append-test-auth", Provider: "codex", Attributes: map[string]string{"api_key": "test-key", "base_url": server.URL, "websockets": "true"}}
+	auth := &coreauth.Auth{ID: "append-test-auth", Provider: "codex", Attributes: map[string]string{"api_key": "test-key", "base_url": server.URL, "websockets": "true"}}
 	req := core.Request{
 		Model:   "gpt-6-astra",
 		Payload: []byte(`{"model":"gpt-6-astra","input":[{"role":"user","content":"turn 1"}],"instructions":"Initial system instructions"}`),
 	}
-	opts := core.Options{SourceFormat: sdktranslator.FromString("codex"), Metadata: map[string]any{core.ExecutionSessionMetadataKey: "append-test"}}
+	opts := core.Options{SourceFormat: translatorreg.FromString("codex"), Metadata: map[string]any{core.ExecutionSessionMetadataKey: "append-test"}}
 
 	result, err := exec.ExecuteStream(ctx, auth, req, opts)
 	if err != nil {
@@ -266,12 +266,12 @@ func TestCodexDuplexStandaloneCreateDoesNotInheritParentID(t *testing.T) {
 
 	exec := NewCodexWebsocketsExecutor(&config.Config{Codex: config.CodexConfig{ResponseSteering: true}})
 	exec.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
-	auth := &cliproxyauth.Auth{ID: "standalone-create-test", Provider: "codex", Attributes: map[string]string{"api_key": "test-key", "base_url": server.URL, "websockets": "true"}}
+	auth := &coreauth.Auth{ID: "standalone-create-test", Provider: "codex", Attributes: map[string]string{"api_key": "test-key", "base_url": server.URL, "websockets": "true"}}
 	req := core.Request{
 		Model:   "gpt-6-astra",
 		Payload: []byte(`{"model":"gpt-6-astra","input":[{"role":"user","content":"turn 1"}]}`),
 	}
-	opts := core.Options{SourceFormat: sdktranslator.FromString("codex"), Metadata: map[string]any{core.ExecutionSessionMetadataKey: "standalone-test"}}
+	opts := core.Options{SourceFormat: translatorreg.FromString("codex"), Metadata: map[string]any{core.ExecutionSessionMetadataKey: "standalone-test"}}
 
 	result, err := exec.ExecuteStream(ctx, auth, req, opts)
 	if err != nil {
@@ -379,12 +379,12 @@ func TestCodexDuplexQueuedCreateDoesNotBlockSubsequentSteer(t *testing.T) {
 
 	exec := NewCodexWebsocketsExecutor(&config.Config{Codex: config.CodexConfig{ResponseSteering: true}})
 	exec.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
-	auth := &cliproxyauth.Auth{ID: "steer-blocking-test", Provider: "codex", Attributes: map[string]string{"api_key": "test-key", "base_url": server.URL, "websockets": "true"}}
+	auth := &coreauth.Auth{ID: "steer-blocking-test", Provider: "codex", Attributes: map[string]string{"api_key": "test-key", "base_url": server.URL, "websockets": "true"}}
 	req := core.Request{
 		Model:   "gpt-6-astra",
 		Payload: []byte(`{"model":"gpt-6-astra","input":[{"role":"user","content":"start"}]}`),
 	}
-	opts := core.Options{SourceFormat: sdktranslator.FromString("codex"), Metadata: map[string]any{core.ExecutionSessionMetadataKey: "steer-block-test"}}
+	opts := core.Options{SourceFormat: translatorreg.FromString("codex"), Metadata: map[string]any{core.ExecutionSessionMetadataKey: "steer-block-test"}}
 
 	result, err := exec.ExecuteStream(ctx, auth, req, opts)
 	if err != nil {

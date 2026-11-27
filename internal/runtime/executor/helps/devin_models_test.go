@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
+	"github.com/udit19199/relay/internal/registry"
 )
 
 func TestResolveDevinChatModelUID(t *testing.T) {

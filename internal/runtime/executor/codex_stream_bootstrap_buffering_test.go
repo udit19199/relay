@@ -13,11 +13,11 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gorilla/websocket"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/translator"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	_ "github.com/udit19199/relay/internal/translator"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 const (
@@ -40,16 +40,16 @@ func codexBufferingConfigWithTimeout(enabled bool, timeout string) *config.Confi
 	return &config.Config{Codex: config.CodexConfig{StreamBootstrapBuffering: enabled, StreamBootstrapTimeout: timeout}}
 }
 
-func codexTestAuth(baseURL string) *cliproxyauth.Auth {
-	return &cliproxyauth.Auth{Attributes: map[string]string{"base_url": baseURL, "api_key": "test"}}
+func codexTestAuth(baseURL string) *coreauth.Auth {
+	return &coreauth.Auth{Attributes: map[string]string{"base_url": baseURL, "api_key": "test"}}
 }
 
-func codexTestRequest() (cliproxyexecutor.Request, cliproxyexecutor.Options) {
-	return cliproxyexecutor.Request{
+func codexTestRequest() (coreexecutor.Request, coreexecutor.Options) {
+	return coreexecutor.Request{
 			Model:   "gpt-5.6-terra",
 			Payload: []byte(`{"model":"gpt-5.6-terra","input":"hello"}`),
-		}, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FromString("openai-response"),
+		}, coreexecutor.Options{
+			SourceFormat: translatorreg.FromString("openai-response"),
 			Stream:       true,
 		}
 }
@@ -90,17 +90,17 @@ func codexWebsocketServer(t *testing.T, frames ...string) *httptest.Server {
 	}))
 }
 
-func codexWebsocketRequest() (cliproxyexecutor.Request, cliproxyexecutor.Options) {
-	return cliproxyexecutor.Request{
+func codexWebsocketRequest() (coreexecutor.Request, coreexecutor.Options) {
+	return coreexecutor.Request{
 			Model:   "gpt-5.6-terra",
 			Payload: []byte(`{"model":"gpt-5.6-terra","input":[{"type":"message","role":"user","content":"hello"}]}`),
-		}, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FromString("openai-response"),
+		}, coreexecutor.Options{
+			SourceFormat: translatorreg.FromString("openai-response"),
 		}
 }
 
 // drainChunks collects every payload and the first error from a stream result.
-func drainChunks(result *cliproxyexecutor.StreamResult) (string, error) {
+func drainChunks(result *coreexecutor.StreamResult) (string, error) {
 	var payloads [][]byte
 	var streamErr error
 	for chunk := range result.Chunks {
@@ -313,7 +313,7 @@ func TestCodexWebsocketsExecutor_BootstrapBuffering_ByteCapOrderingAndSeed(t *te
 		defer server.Close()
 
 		req, _ := codexWebsocketRequest()
-		opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString("openai")}
+		opts := coreexecutor.Options{SourceFormat: translatorreg.FromString("openai")}
 		result, err := NewCodexWebsocketsExecutor(codexBufferingConfig(true)).ExecuteStream(context.Background(), codexTestAuth(server.URL), req, opts)
 		if err != nil {
 			t.Fatalf("ten messages of cap/8 must exhaust the byte budget: %v", err)
@@ -409,7 +409,7 @@ func TestCodexExecutor_BootstrapBuffering_InStreamDeliveryNeedsRenderedFrames(t 
 	defer server.Close()
 
 	req, _ := codexTestRequest()
-	opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString("openai"), Stream: true}
+	opts := coreexecutor.Options{SourceFormat: translatorreg.FromString("openai"), Stream: true}
 	result, err := NewCodexExecutor(codexBufferingConfig(true)).ExecuteStream(context.Background(), codexTestAuth(server.URL), req, opts)
 	if err != nil {
 		t.Fatalf("the executor still returns a stream; it is the conductor that cannot commit it: %v", err)
@@ -490,7 +490,7 @@ func TestCodexExecutor_BootstrapBuffering_ByteCapCountsUpstreamFrames(t *testing
 	defer server.Close()
 
 	req, _ := codexTestRequest()
-	opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString("openai"), Stream: true}
+	opts := coreexecutor.Options{SourceFormat: translatorreg.FromString("openai"), Stream: true}
 	result, err := NewCodexExecutor(codexBufferingConfig(true)).ExecuteStream(context.Background(), codexTestAuth(server.URL), req, opts)
 	if err != nil {
 		t.Fatalf("ten frames of cap/8 must exhaust the byte budget: %v", err)
@@ -641,7 +641,7 @@ func TestCodexExecutor_BootstrapBuffering_BoundHoldsForEverySSEFraming(t *testin
 			req, _ := codexTestRequest()
 			// Chat Completions renders an unrecognised frame as zero chunks, so a bound derived from
 			// the downstream chunk count would never advance here.
-			opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString("openai"), Stream: true}
+			opts := coreexecutor.Options{SourceFormat: translatorreg.FromString("openai"), Stream: true}
 			result, err := NewCodexExecutor(codexBufferingConfig(true)).ExecuteStream(context.Background(), codexTestAuth(server.URL), req, opts)
 
 			if err != nil {
@@ -1327,7 +1327,7 @@ func executeWebsocketStreamInSession(t *testing.T, frames ...string) (notified b
 	}
 
 	req, opts := codexWebsocketRequest()
-	opts.Metadata = map[string]any{cliproxyexecutor.ExecutionSessionMetadataKey: sessionID}
+	opts.Metadata = map[string]any{coreexecutor.ExecutionSessionMetadataKey: sessionID}
 	_, err = exec.ExecuteStream(context.Background(), codexTestAuth(server.URL), req, opts)
 
 	select {
@@ -1821,7 +1821,7 @@ func TestCodexWebsocketsExecutor_UnbufferedUpstreamErrorIsDeliveredBeforeDisconn
 			}()
 
 			req, opts := codexWebsocketRequest()
-			opts.Metadata = map[string]any{cliproxyexecutor.ExecutionSessionMetadataKey: sessionID}
+			opts.Metadata = map[string]any{coreexecutor.ExecutionSessionMetadataKey: sessionID}
 			result, err := exec.ExecuteStream(ctx, codexTestAuth(server.URL), req, opts)
 			if err != nil {
 				t.Fatalf("ExecuteStream() error = %v", err)
@@ -1889,7 +1889,7 @@ func TestCodexWebsocketsExecutor_PreOutputUpstreamErrorDoesNotNotifyDisconnect(t
 				}
 
 				req, opts := codexWebsocketRequest()
-				opts.Metadata = map[string]any{cliproxyexecutor.ExecutionSessionMetadataKey: sessionID}
+				opts.Metadata = map[string]any{coreexecutor.ExecutionSessionMetadataKey: sessionID}
 				result, err := exec.ExecuteStream(context.Background(), codexTestAuth(server.URL), req, opts)
 
 				streamErr := err

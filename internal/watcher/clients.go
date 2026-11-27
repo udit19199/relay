@@ -16,13 +16,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/redisqueue"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/watcher/diff"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/watcher/synthesizer"
-	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	log "github.com/sirupsen/logrus"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	"github.com/udit19199/relay/internal/util"
+	"github.com/udit19199/relay/internal/watcher/diff"
+	"github.com/udit19199/relay/internal/watcher/synthesizer"
 )
 
 func (w *Watcher) reloadClients(rescanAuth bool, affectedOAuthProviders []string, forceAuthRefresh bool) {
@@ -214,7 +213,6 @@ func (w *Watcher) reloadClients(rescanAuth bool, affectedOAuthProviders []string
 	}
 
 	w.refreshAuthState(forceAuthRefresh)
-	redisqueue.NotifyUsageRefresh()
 
 	log.Infof("full client load complete - %d clients (%d auth files + %d Claude API keys + %d Codex keys + %d xAI keys + %d Meta API keys + %d OpenAI-compat)",
 		totalNewClients,
@@ -414,7 +412,6 @@ func (w *Watcher) addOrUpdateClientLocked(path string) {
 		w.persistAuthAsync(fmt.Sprintf("Sync auth %s", filepath.Base(path)), path)
 	}
 	w.dispatchAuthUpdates(updates)
-	redisqueue.NotifyUsageRefresh()
 }
 
 func (w *Watcher) removeClient(path string) {
@@ -455,7 +452,6 @@ func (w *Watcher) removeClientLocked(path string) {
 
 	w.persistAuthAsync(fmt.Sprintf("Remove auth %s", filepath.Base(path)), path)
 	w.dispatchAuthUpdates(updates)
-	redisqueue.NotifyUsageRefresh()
 }
 
 func (w *Watcher) computePerPathUpdatesLocked(oldByID, newByID map[string]*coreauth.Auth) []AuthUpdate {

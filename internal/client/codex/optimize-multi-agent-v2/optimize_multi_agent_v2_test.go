@@ -9,10 +9,10 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gin-gonic/gin"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/translator"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/registry"
+	_ "github.com/udit19199/relay/internal/translator"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestIsCodexMultiAgentClient(t *testing.T) {
@@ -753,18 +753,18 @@ func TestTranslateRequestWithCodexMultiAgentV2Conditions(t *testing.T) {
 
 	translations := []struct {
 		name  string
-		to    sdktranslator.Format
+		to    translatorreg.Format
 		path  string
 		want  string
 		model string
 	}{
-		{name: "Claude", to: sdktranslator.FormatClaude, path: "messages.0.content", want: "task", model: "claude-sonnet-4-5"},
-		{name: "OpenAI", to: sdktranslator.FormatOpenAI, path: "messages.0.content.0.text", want: "task", model: "chat-model"},
-		{name: "Interactions", to: sdktranslator.FormatInteractions, path: "input.0.content.0.text", want: "task", model: "interaction-model"},
+		{name: "Claude", to: translatorreg.FormatClaude, path: "messages.0.content", want: "task", model: "claude-sonnet-4-5"},
+		{name: "OpenAI", to: translatorreg.FormatOpenAI, path: "messages.0.content.0.text", want: "task", model: "chat-model"},
+		{name: "Interactions", to: translatorreg.FormatInteractions, path: "input.0.content.0.text", want: "task", model: "interaction-model"},
 	}
 	for _, tt := range translations {
 		t.Run(tt.name, func(t *testing.T) {
-			got := TranslateRequestWithCodexMultiAgentV2(context.Background(), eligibleHeaders, enabledCfg, sdktranslator.FormatOpenAIResponse, tt.to, tt.model, payload, false)
+			got := TranslateRequestWithCodexMultiAgentV2(context.Background(), eligibleHeaders, enabledCfg, translatorreg.FormatOpenAIResponse, tt.to, tt.model, payload, false)
 			if value := ojson.GetBytesNoCopy(got, tt.path).String(); value != tt.want {
 				t.Fatalf("%s = %q, want %q; output=%s", tt.path, value, tt.want, got)
 			}
@@ -772,27 +772,27 @@ func TestTranslateRequestWithCodexMultiAgentV2Conditions(t *testing.T) {
 	}
 
 	t.Run("disabled optimization", func(t *testing.T) {
-		got := TranslateRequestWithCodexMultiAgentV2(context.Background(), eligibleHeaders, &config.Config{}, sdktranslator.FormatOpenAIResponse, sdktranslator.FormatOpenAI, "chat-model", payload, false)
+		got := TranslateRequestWithCodexMultiAgentV2(context.Background(), eligibleHeaders, &config.Config{}, translatorreg.FormatOpenAIResponse, translatorreg.FormatOpenAI, "chat-model", payload, false)
 		if count := ojson.GetBytesNoCopy(got, "messages.#").Int(); count != 0 {
 			t.Fatalf("disabled optimization translated agent_message; output=%s", got)
 		}
 	})
 	t.Run("unrelated client", func(t *testing.T) {
 		headers := http.Header{"User-Agent": []string{"curl/8.7.1"}}
-		got := TranslateRequestWithCodexMultiAgentV2(context.Background(), headers, enabledCfg, sdktranslator.FormatOpenAIResponse, sdktranslator.FormatOpenAI, "chat-model", payload, false)
+		got := TranslateRequestWithCodexMultiAgentV2(context.Background(), headers, enabledCfg, translatorreg.FormatOpenAIResponse, translatorreg.FormatOpenAI, "chat-model", payload, false)
 		if count := ojson.GetBytesNoCopy(got, "messages.#").Int(); count != 0 {
 			t.Fatalf("unrelated client agent_message was translated; output=%s", got)
 		}
 	})
 	t.Run("non-Responses source", func(t *testing.T) {
-		got := TranslateRequestWithCodexMultiAgentV2(context.Background(), eligibleHeaders, enabledCfg, sdktranslator.FormatOpenAI, sdktranslator.FormatOpenAI, "test-model", payload, false)
+		got := TranslateRequestWithCodexMultiAgentV2(context.Background(), eligibleHeaders, enabledCfg, translatorreg.FormatOpenAI, translatorreg.FormatOpenAI, "test-model", payload, false)
 		if messageType := ojson.GetBytesNoCopy(got, "input.0.type").String(); messageType != "agent_message" {
 			t.Fatalf("non-Responses source changed agent_message; output=%s", got)
 		}
 	})
-	for _, target := range []sdktranslator.Format{sdktranslator.FormatCodex, sdktranslator.FormatOpenAIResponse} {
+	for _, target := range []translatorreg.Format{translatorreg.FormatCodex, translatorreg.FormatOpenAIResponse} {
 		t.Run("excluded target "+target.String(), func(t *testing.T) {
-			got := TranslateRequestWithCodexMultiAgentV2(context.Background(), eligibleHeaders, enabledCfg, sdktranslator.FormatOpenAIResponse, target, "test-model", payload, false)
+			got := TranslateRequestWithCodexMultiAgentV2(context.Background(), eligibleHeaders, enabledCfg, translatorreg.FormatOpenAIResponse, target, "test-model", payload, false)
 			if messageType := ojson.GetBytesNoCopy(got, "input.0.type").String(); messageType != "agent_message" {
 				t.Fatalf("target %s changed agent_message; output=%s", target, got)
 			}

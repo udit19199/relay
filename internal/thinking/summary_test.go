@@ -1,9 +1,9 @@
 package thinking
 
 import (
-	"bytes"
 	"testing"
 
+	"bytes"
 	"github.com/MoeForge/moego/ojson"
 )
 

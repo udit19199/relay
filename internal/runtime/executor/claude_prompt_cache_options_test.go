@@ -11,10 +11,10 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func writeClaudeSSEMockResponse(w http.ResponseWriter) {
@@ -35,7 +35,7 @@ func TestClaudeExecutor_PromptCacheOptionsMode_Explicit_SuppressesAutoCacheContr
 	defer server.Close()
 
 	executor := NewClaudeExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"api_key":  "key-123",
 		"base_url": server.URL,
 	}}
@@ -51,11 +51,11 @@ func TestClaudeExecutor_PromptCacheOptionsMode_Explicit_SuppressesAutoCacheContr
 		]
 	}`)
 
-	_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-3-5-sonnet-20241022",
 		Payload: originalReq,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FromString("openai"),
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FromString("openai"),
 		OriginalRequest: originalReq,
 	})
 	if err != nil {
@@ -80,7 +80,7 @@ func TestClaudeExecutor_PromptCacheOptionsMode_Explicit_PreservesClientBreakpoin
 	defer server.Close()
 
 	executor := NewClaudeExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"api_key":  "key-123",
 		"base_url": server.URL,
 	}}
@@ -99,11 +99,11 @@ func TestClaudeExecutor_PromptCacheOptionsMode_Explicit_PreservesClientBreakpoin
 		]
 	}`)
 
-	_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-3-5-sonnet-20241022",
 		Payload: originalReq,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FromString("openai"),
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FromString("openai"),
 		OriginalRequest: originalReq,
 	})
 	if err != nil {
@@ -134,7 +134,7 @@ func TestClaudeExecutor_PromptCacheOptionsMode_Stream_Explicit_SuppressesAutoCac
 	defer server.Close()
 
 	executor := NewClaudeExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"api_key":  "key-123",
 		"base_url": server.URL,
 	}}
@@ -150,12 +150,12 @@ func TestClaudeExecutor_PromptCacheOptionsMode_Stream_Explicit_SuppressesAutoCac
 		]
 	}`)
 
-	streamRes, err := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	streamRes, err := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-3-5-sonnet-20241022",
 		Payload: originalReq,
-	}, cliproxyexecutor.Options{
+	}, coreexecutor.Options{
 		Stream:          true,
-		SourceFormat:    sdktranslator.FromString("openai"),
+		SourceFormat:    translatorreg.FromString("openai"),
 		OriginalRequest: originalReq,
 	})
 	if err != nil {
@@ -211,16 +211,16 @@ func TestClaudeExecutor_PromptCacheOptionsMode_ImplicitOrMissing_PreservesAutoCa
 			defer server.Close()
 
 			executor := NewClaudeExecutor(&config.Config{})
-			auth := &cliproxyauth.Auth{Attributes: map[string]string{
+			auth := &coreauth.Auth{Attributes: map[string]string{
 				"api_key":  "key-123",
 				"base_url": server.URL,
 			}}
 
-			_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+			_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 				Model:   "claude-3-5-sonnet-20241022",
 				Payload: tc.originalReq,
-			}, cliproxyexecutor.Options{
-				SourceFormat:    sdktranslator.FromString("openai"),
+			}, coreexecutor.Options{
+				SourceFormat:    translatorreg.FromString("openai"),
 				OriginalRequest: tc.originalReq,
 			})
 			if err != nil {
@@ -248,7 +248,7 @@ func TestClaudeExecutor_PromptCacheOptionsMode_Explicit_ToolsFallbackSuppressed(
 	defer server.Close()
 
 	executor := NewClaudeExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"api_key":  "key-123",
 		"base_url": server.URL,
 	}}
@@ -267,11 +267,11 @@ func TestClaudeExecutor_PromptCacheOptionsMode_Explicit_ToolsFallbackSuppressed(
 		]
 	}`)
 
-	_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-3-5-sonnet-20241022",
 		Payload: originalReq,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FromString("openai"),
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FromString("openai"),
 		OriginalRequest: originalReq,
 	})
 	if err != nil {
@@ -293,7 +293,7 @@ func TestClaudeExecutor_PromptCacheOptionsMode_Explicit_ClientToolBreakpointPres
 	defer server.Close()
 
 	executor := NewClaudeExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"api_key":  "key-123",
 		"base_url": server.URL,
 	}}
@@ -312,11 +312,11 @@ func TestClaudeExecutor_PromptCacheOptionsMode_Explicit_ClientToolBreakpointPres
 		]
 	}`)
 
-	_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-3-5-sonnet-20241022",
 		Payload: originalReq,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FromString("openai"),
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FromString("openai"),
 		OriginalRequest: originalReq,
 	})
 	if err != nil {
@@ -353,7 +353,7 @@ func TestClaudeExecutor_PromptCacheOptionsMode_Explicit_Cloaked_SuppressesAllAut
 		}},
 	}
 	executor := NewClaudeExecutor(cfg)
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"api_key":  "key-123",
 		"base_url": server.URL,
 	}}
@@ -369,11 +369,11 @@ func TestClaudeExecutor_PromptCacheOptionsMode_Explicit_Cloaked_SuppressesAllAut
 		]
 	}`)
 
-	_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-3-5-sonnet-20241022",
 		Payload: originalReq,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FromString("openai"),
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FromString("openai"),
 		OriginalRequest: originalReq,
 	})
 	if err != nil {
@@ -404,7 +404,7 @@ func TestClaudeExecutor_PromptCacheOptionsMode_Explicit_Cloaked_PreservesClientB
 		}},
 	}
 	executor := NewClaudeExecutor(cfg)
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"api_key":  "key-123",
 		"base_url": server.URL,
 	}}
@@ -424,11 +424,11 @@ func TestClaudeExecutor_PromptCacheOptionsMode_Explicit_Cloaked_PreservesClientB
 		]
 	}`)
 
-	_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-3-5-sonnet-20241022",
 		Payload: originalReq,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FromString("openai"),
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FromString("openai"),
 		OriginalRequest: originalReq,
 	})
 	if err != nil {
@@ -462,7 +462,7 @@ func TestClaudeExecutor_PromptCacheOptionsMode_Explicit_Cloaked_PreservesClientS
 		}},
 	}
 	executor := NewClaudeExecutor(cfg)
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"api_key":  "key-123",
 		"base_url": server.URL,
 	}}
@@ -485,11 +485,11 @@ func TestClaudeExecutor_PromptCacheOptionsMode_Explicit_Cloaked_PreservesClientS
 		]
 	}`)
 
-	_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-3-5-sonnet-20241022",
 		Payload: originalReq,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FromString("openai"),
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FromString("openai"),
 		OriginalRequest: originalReq,
 	})
 	if err != nil {
@@ -551,7 +551,7 @@ func TestClaudeExecutor_CountTokens_StripsPromptCacheOptions(t *testing.T) {
 	defer server.Close()
 
 	executor := NewClaudeExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"api_key":  "key-123",
 		"base_url": server.URL,
 	}}
@@ -566,11 +566,11 @@ func TestClaudeExecutor_CountTokens_StripsPromptCacheOptions(t *testing.T) {
 		]
 	}`)
 
-	resp, err := executor.CountTokens(context.Background(), auth, cliproxyexecutor.Request{
+	resp, err := executor.CountTokens(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-3-5-sonnet-20241022",
 		Payload: originalReq,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FromString("openai"),
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FromString("openai"),
 		OriginalRequest: originalReq,
 	})
 	if err != nil {
@@ -582,11 +582,11 @@ func TestClaudeExecutor_CountTokens_StripsPromptCacheOptions(t *testing.T) {
 
 	// For custom base_url, CountTokens uses the local estimator after stripping fields.
 	// Now test countTokensUpstream specifically to verify upstream payload body:
-	upstreamResp, errUpstream := executor.countTokensUpstream(context.Background(), auth, cliproxyexecutor.Request{
+	upstreamResp, errUpstream := executor.countTokensUpstream(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-3-5-sonnet-20241022",
 		Payload: originalReq,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FromString("openai"),
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FromString("openai"),
 		OriginalRequest: originalReq,
 	})
 	if errUpstream != nil {
@@ -623,7 +623,7 @@ func TestClaudeExecutor_CountTokensUpstream_StripsPromptCacheOptions_EvenWithPay
 		},
 	}
 	executor := NewClaudeExecutor(cfg)
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"api_key":  "key-123",
 		"base_url": server.URL,
 	}}
@@ -635,11 +635,11 @@ func TestClaudeExecutor_CountTokensUpstream_StripsPromptCacheOptions_EvenWithPay
 		]
 	}`)
 
-	upstreamResp, errUpstream := executor.countTokensUpstream(context.Background(), auth, cliproxyexecutor.Request{
+	upstreamResp, errUpstream := executor.countTokensUpstream(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-3-5-sonnet-20241022",
 		Payload: originalReq,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FromString("openai"),
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FromString("openai"),
 		OriginalRequest: originalReq,
 	})
 	if errUpstream != nil {
@@ -663,7 +663,7 @@ func TestClaudeExecutor_PromptCacheOptionsMode_Explicit_ProbePreservesClient1hTT
 	defer server.Close()
 
 	executor := NewClaudeExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"api_key":  "key-123",
 		"base_url": server.URL,
 	}}
@@ -684,11 +684,11 @@ func TestClaudeExecutor_PromptCacheOptionsMode_Explicit_ProbePreservesClient1hTT
 		]
 	}`)
 
-	_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-3-5-sonnet-20241022",
 		Payload: originalReq,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FromString("openai"),
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FromString("openai"),
 		OriginalRequest: originalReq,
 	})
 	if err != nil {
@@ -717,7 +717,7 @@ func TestClaudeExecutor_CountTokensUpstream_Cloaked_ExplicitPreservesClientSyste
 		}},
 	}
 	executor := NewClaudeExecutor(cfg)
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"api_key":  "key-123",
 		"base_url": server.URL,
 	}}
@@ -740,11 +740,11 @@ func TestClaudeExecutor_CountTokensUpstream_Cloaked_ExplicitPreservesClientSyste
 		]
 	}`)
 
-	upstreamResp, errUpstream := executor.countTokensUpstream(context.Background(), auth, cliproxyexecutor.Request{
+	upstreamResp, errUpstream := executor.countTokensUpstream(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-3-5-sonnet-20241022",
 		Payload: originalReq,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FromString("openai"),
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FromString("openai"),
 		OriginalRequest: originalReq,
 	})
 	if errUpstream != nil {
@@ -795,7 +795,7 @@ func TestClaudeExecutor_PromptCacheOptionsMode_Explicit_Cloaked_LegacyModelPrese
 		}},
 	}
 	executor := NewClaudeExecutor(cfg)
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"api_key":  "key-123",
 		"base_url": server.URL,
 	}}
@@ -819,11 +819,11 @@ func TestClaudeExecutor_PromptCacheOptionsMode_Explicit_Cloaked_LegacyModelPrese
 		]
 	}`)
 
-	_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-3-5-haiku-20241022",
 		Payload: originalReq,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FromString("openai"),
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FromString("openai"),
 		OriginalRequest: originalReq,
 	})
 	if err != nil {
@@ -878,7 +878,7 @@ func TestClaudeExecutor_CountTokensUpstream_Cloaked_LegacyModel_ExplicitPreserve
 		}},
 	}
 	executor := NewClaudeExecutor(cfg)
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"api_key":  "key-123",
 		"base_url": server.URL,
 	}}
@@ -901,11 +901,11 @@ func TestClaudeExecutor_CountTokensUpstream_Cloaked_LegacyModel_ExplicitPreserve
 		]
 	}`)
 
-	upstreamResp, errUpstream := executor.countTokensUpstream(context.Background(), auth, cliproxyexecutor.Request{
+	upstreamResp, errUpstream := executor.countTokensUpstream(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-3-5-haiku-20241022",
 		Payload: originalReq,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FromString("openai"),
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FromString("openai"),
 		OriginalRequest: originalReq,
 	})
 	if errUpstream != nil {
@@ -979,7 +979,7 @@ func TestClaudeExecutor_CountTokensUpstream_OAuthRelocatesAffectedSystemPrompts(
 			}))
 			defer server.Close()
 
-			auth := &cliproxyauth.Auth{
+			auth := &coreauth.Auth{
 				Attributes: map[string]string{
 					"api_key":  "sk-ant-oat-count-tokens",
 					"base_url": server.URL,
@@ -988,11 +988,11 @@ func TestClaudeExecutor_CountTokensUpstream_OAuthRelocatesAffectedSystemPrompts(
 			}
 			payload := []byte(`{"model":"claude-opus-5","system":"caller guidance","messages":` + test.messages + `}`)
 			executor := NewClaudeExecutor(&config.Config{})
-			resp, errCount := executor.countTokensUpstream(context.Background(), auth, cliproxyexecutor.Request{
+			resp, errCount := executor.countTokensUpstream(context.Background(), auth, coreexecutor.Request{
 				Model:   "claude-opus-5",
 				Payload: payload,
-			}, cliproxyexecutor.Options{
-				SourceFormat:    sdktranslator.FormatClaude,
+			}, coreexecutor.Options{
+				SourceFormat:    translatorreg.FormatClaude,
 				OriginalRequest: payload,
 			})
 			if errCount != nil {

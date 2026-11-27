@@ -10,11 +10,11 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 const (
@@ -28,7 +28,7 @@ func TestClaudeExecutor_CompactionTriggerReturnsSingleCompactionItem(t *testing.
 	defer server.Close()
 
 	executor := NewClaudeExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"api_key":  "key-compaction",
 		"base_url": server.URL,
 	}}
@@ -37,12 +37,12 @@ func TestClaudeExecutor_CompactionTriggerReturnsSingleCompactionItem(t *testing.
 		`{"type":"message","role":"assistant","content":[{"type":"output_text","text":"OK, I will check the build."}]},` +
 		`{"type":"compaction_trigger"}]}`)
 
-	resp, errExecute := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	resp, errExecute := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-haiku-4-5-20251001",
 		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		OriginalRequest: payload,
 	})
 	if errExecute != nil {
@@ -58,7 +58,7 @@ func TestClaudeExecutor_CompactionTriggerStreamReturnsSingleCompactionItem(t *te
 	defer server.Close()
 
 	executor := NewClaudeExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"api_key":  "key-compaction",
 		"base_url": server.URL,
 	}}
@@ -67,12 +67,12 @@ func TestClaudeExecutor_CompactionTriggerStreamReturnsSingleCompactionItem(t *te
 		`{"type":"message","role":"assistant","content":[{"type":"output_text","text":"OK, I will check the build."}]},` +
 		`{"type":"compaction_trigger"}]}`)
 
-	streamResult, errStream := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	streamResult, errStream := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-haiku-4-5-20251001",
 		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		Stream:          true,
 		OriginalRequest: payload,
 	})
@@ -103,7 +103,7 @@ func TestClaudeExecutor_ReplayedCompactionCapsuleIsExpanded(t *testing.T) {
 	defer server.Close()
 
 	executor := NewClaudeExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"api_key":  "key-compaction",
 		"base_url": server.URL,
 	}}
@@ -111,12 +111,12 @@ func TestClaudeExecutor_ReplayedCompactionCapsuleIsExpanded(t *testing.T) {
 		`{"type":"compaction","encrypted_content":` + ojson.Get(`{"v":"`+capsule+`"}`, "v").Raw + `},` +
 		`{"type":"message","role":"user","content":[{"type":"input_text","text":"continue"}]}]}`)
 
-	_, errExecute := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, errExecute := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-haiku-4-5-20251001",
 		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		OriginalRequest: payload,
 	})
 	if errExecute != nil {
@@ -136,7 +136,7 @@ func TestClaudeExecutor_CompactionTriggerKeepsToolsForToolHistory(t *testing.T) 
 	defer server.Close()
 
 	executor := NewClaudeExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"api_key":  "key-compaction",
 		"base_url": server.URL,
 	}}
@@ -146,12 +146,12 @@ func TestClaudeExecutor_CompactionTriggerKeepsToolsForToolHistory(t *testing.T) 
 		`{"type":"function_call_output","call_id":"call_1","output":"build ok"},` +
 		`{"type":"compaction_trigger"}]}`)
 
-	resp, errExecute := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	resp, errExecute := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-haiku-4-5-20251001",
 		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		OriginalRequest: payload,
 	})
 	if errExecute != nil {
@@ -176,7 +176,7 @@ func TestClaudeExecutor_CompactionTriggerFlattensToolHistoryWithoutTools(t *test
 	defer server.Close()
 
 	executor := NewClaudeExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"api_key":  "key-compaction",
 		"base_url": server.URL,
 	}}
@@ -186,12 +186,12 @@ func TestClaudeExecutor_CompactionTriggerFlattensToolHistoryWithoutTools(t *test
 		`{"type":"function_call_output","call_id":"call_1","output":"build ok"},` +
 		`{"type":"compaction_trigger"}]}`)
 
-	_, errExecute := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, errExecute := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-haiku-4-5-20251001",
 		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		OriginalRequest: payload,
 	})
 	if errExecute != nil {
@@ -221,7 +221,7 @@ func TestClaudeExecutor_CompactionSummaryPayloadRuleIsLast(t *testing.T) {
 			}},
 		},
 	})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"api_key":  "key-compaction",
 		"base_url": server.URL,
 	}}
@@ -231,12 +231,12 @@ func TestClaudeExecutor_CompactionSummaryPayloadRuleIsLast(t *testing.T) {
 		`{"type":"function_call_output","call_id":"call_1","output":"build ok"},` +
 		`{"type":"compaction_trigger"}]}`)
 
-	_, errExecute := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, errExecute := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-haiku-4-5-20251001",
 		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		OriginalRequest: payload,
 	})
 	if errExecute != nil {
@@ -260,7 +260,7 @@ func TestClaudeExecutor_CompactionTriggerIncludesPreviousCapsule(t *testing.T) {
 	defer server.Close()
 
 	executor := NewClaudeExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"api_key":  "key-compaction",
 		"base_url": server.URL,
 	}}
@@ -270,12 +270,12 @@ func TestClaudeExecutor_CompactionTriggerIncludesPreviousCapsule(t *testing.T) {
 		`{"type":"message","role":"assistant","content":[{"type":"output_text","text":"continued"}]},` +
 		`{"type":"compaction_trigger"}]}`)
 
-	resp, errExecute := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	resp, errExecute := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-haiku-4-5-20251001",
 		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		OriginalRequest: payload,
 	})
 	if errExecute != nil {
@@ -294,7 +294,7 @@ func TestClaudeExecutor_ForeignCompactionCapsuleIsDropped(t *testing.T) {
 	defer server.Close()
 
 	executor := NewClaudeExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"api_key":  "key-compaction",
 		"base_url": server.URL,
 	}}
@@ -303,12 +303,12 @@ func TestClaudeExecutor_ForeignCompactionCapsuleIsDropped(t *testing.T) {
 		`{"type":"message","role":"user","content":[{"type":"input_text","text":"continue"}]},` +
 		`{"type":"compaction_trigger"}]}`)
 
-	resp, errExecute := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	resp, errExecute := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-haiku-4-5-20251001",
 		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		OriginalRequest: payload,
 	})
 	if errExecute != nil {
@@ -335,7 +335,7 @@ func TestClaudeExecutor_CompactionUsageMatchesResponsesAccounting(t *testing.T) 
 	defer server.Close()
 
 	executor := NewClaudeExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"api_key":  "key-compaction",
 		"base_url": server.URL,
 	}}
@@ -343,12 +343,12 @@ func TestClaudeExecutor_CompactionUsageMatchesResponsesAccounting(t *testing.T) 
 		`{"type":"message","role":"user","content":[{"type":"input_text","text":"Check the build next."}]},` +
 		`{"type":"compaction_trigger"}]}`)
 
-	resp, errExecute := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	resp, errExecute := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-haiku-4-5-20251001",
 		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		OriginalRequest: payload,
 	})
 	if errExecute != nil {
@@ -369,7 +369,7 @@ func TestClaudeExecutor_InvalidCompactionCapsuleReturns400(t *testing.T) {
 	defer server.Close()
 
 	executor := NewClaudeExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"api_key":  "key-compaction",
 		"base_url": server.URL,
 	}}
@@ -377,12 +377,12 @@ func TestClaudeExecutor_InvalidCompactionCapsuleReturns400(t *testing.T) {
 		`{"type":"compaction","encrypted_content":"cpa-ag-compact-v1:not-valid-base64"},` +
 		`{"type":"message","role":"user","content":[{"type":"input_text","text":"continue"}]}]}`)
 
-	_, errExecute := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, errExecute := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-haiku-4-5-20251001",
 		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		OriginalRequest: payload,
 	})
 	if errExecute == nil {

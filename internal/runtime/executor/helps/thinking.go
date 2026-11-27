@@ -4,18 +4,9 @@ import (
 	"strings"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/thinking"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/thinking"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
-
-// ApplyThinkingWithSourcePayload preserves summary visibility from the original
-// client payload while applying thinking configuration to its translated target
-// payload. currentSourcePayload is the payload that was translated, while
-// originalSourcePayload retains intent removed by an earlier request rewrite.
-func ApplyThinkingWithSourcePayload(body, currentSourcePayload, originalSourcePayload []byte, model, fromFormat, toFormat, providerKey string) ([]byte, error) {
-	summary := translatedRequestSummaryConfig(body, currentSourcePayload, originalSourcePayload, model, fromFormat, toFormat)
-	return thinking.ApplyThinkingWithSummary(body, model, fromFormat, toFormat, providerKey, summary)
-}
 
 // ApplyThinkingWithSourcePayloadDoc preserves summary visibility from the original
 // client payload while applying thinking configuration onto doc in place.
@@ -52,9 +43,9 @@ func translatedRequestSummaryConfig(body, currentSourcePayload, originalSourcePa
 		return originalSummary
 	}
 
-	from := sdktranslator.FromString(fromFormat)
-	to := sdktranslator.FromString(toFormat)
-	if !sdktranslator.HasRequestTransformer(from, to) {
+	from := translatorreg.FromString(fromFormat)
+	to := translatorreg.FromString(toFormat)
+	if !translatorreg.HasRequestTransformer(from, to) {
 		// A missing translation must remain source-shaped. Same-format requests
 		// were handled by targetSummary above, including explicit native aliases.
 		return thinking.SummaryConfig{}
@@ -97,9 +88,9 @@ func translatedRequestSummaryConfigDoc(doc *ojson.Doc, currentSourcePayload, ori
 		return originalSummary
 	}
 
-	from := sdktranslator.FromString(fromFormat)
-	to := sdktranslator.FromString(toFormat)
-	if !sdktranslator.HasRequestTransformer(from, to) {
+	from := translatorreg.FromString(fromFormat)
+	to := translatorreg.FromString(toFormat)
+	if !translatorreg.HasRequestTransformer(from, to) {
 		return thinking.SummaryConfig{}
 	}
 

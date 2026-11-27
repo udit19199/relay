@@ -3,16 +3,15 @@ package helps
 import (
 	"bytes"
 	"context"
+	"github.com/udit19199/relay/internal/config"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 	"testing"
-
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
 )
 
 func TestCompatibilityRequestPair(t *testing.T) {
 	ctx := context.Background()
 	cfg := &config.Config{}
-	from, to := sdktranslator.FormatOpenAIResponse, sdktranslator.FormatOpenAI
+	from, to := translatorreg.FormatOpenAIResponse, translatorreg.FormatOpenAI
 	for _, compat := range []bool{false, true} {
 		for _, stream := range []bool{false, true} {
 			for _, distinct := range []bool{false, true} {
@@ -40,16 +39,16 @@ func TestCompatibilityRequestPair(t *testing.T) {
 // translator calls. Claude and Gemini Execute share this helper, and byte equality
 // stays green when the same deterministic translator runs twice.
 func TestTranslateRequestPairWithAPIKeyModelCompatibilityCountsTranslations(t *testing.T) {
-	from := sdktranslator.Format("api-key-compat-count-from")
-	to := sdktranslator.Format("api-key-compat-count-to")
-	if sdktranslator.HasRequestTransformer(from, to) {
+	from := translatorreg.Format("api-key-compat-count-from")
+	to := translatorreg.Format("api-key-compat-count-to")
+	if translatorreg.HasRequestTransformer(from, to) {
 		t.Fatalf("request transformer %s -> %s is already registered", from, to)
 	}
 
 	const model = "compat-count-model"
 	var calls int
 	var wantStream bool
-	sdktranslator.Register(from, to, func(gotModel string, rawJSON []byte, stream bool) ([]byte, error) {
+	translatorreg.Register(from, to, func(gotModel string, rawJSON []byte, stream bool) ([]byte, error) {
 		if gotModel != model {
 			t.Errorf("model = %q, want %q", gotModel, model)
 		}
@@ -58,8 +57,8 @@ func TestTranslateRequestPairWithAPIKeyModelCompatibilityCountsTranslations(t *t
 		}
 		calls++
 		return append([]byte(nil), rawJSON...), nil
-	}, sdktranslator.ResponseTransform{})
-	t.Cleanup(func() { sdktranslator.Unregister(from, to) })
+	}, translatorreg.ResponseTransform{})
+	t.Cleanup(func() { translatorreg.Unregister(from, to) })
 
 	ctx := context.Background()
 	cfg := &config.Config{}

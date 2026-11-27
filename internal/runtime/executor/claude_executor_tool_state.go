@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/MoeForge/moego/ojson"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 const claudeOAuthToolAliasStateLimit = 1024
@@ -185,4 +185,4 @@ func (claudeThreadNotFoundError) ResponseBody() []byte {
 	return []byte(`{"type":"error","error":{"type":"not_found_error","message":"` + claudeThreadNotFoundErrorMessage + `"}}`)
 }
 
-var _ cliproxyexecutor.RequestScopedError = claudeThreadNotFoundError{}
+var _ coreexecutor.RequestScopedError = claudeThreadNotFoundError{}

@@ -6,12 +6,12 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestApplyPatchResponsesHelperNativeSSEBytes(t *testing.T) {
 	request := []byte(`{"tools":[{"type":"custom","name":"apply_patch"}]}`)
-	s := NewApplyPatchResponsesState(sdktranslator.FormatCodex, request, request)
+	s := NewApplyPatchResponsesState(translatorreg.FormatCodex, request, request)
 	for _, line := range [][]byte{
 		[]byte("event: response.output_item.done"),
 		[]byte(`data:   { "type":"response.output_item.done", "output_index":0, "item":{"type":"custom_tool_call","id":"a","name":"apply_patch","input":"raw"}}  `),
@@ -37,7 +37,7 @@ func TestApplyPatchResponsesHelperDispatcherKeysAndFinal(t *testing.T) {
 	for _, key := range []string{`"output_index":0`, `"call_id":"c"`, `"item_id":"a"`} {
 		for _, terminalOnly := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/%v", key, terminalOnly), func(t *testing.T) {
-				s := NewApplyPatchResponsesState(sdktranslator.FormatOpenAIResponse, request, request)
+				s := NewApplyPatchResponsesState(translatorreg.FormatOpenAIResponse, request, request)
 				s.AddDispatcher("n", "n")
 				_, errAdded := s.Transform([]byte(`{"type":"response.output_item.added","output_index":0,"item":{"type":"function_call","id":"a","call_id":"c","name":"n","namespace":"n","arguments":""}}`))
 				if errAdded != nil {
@@ -85,7 +85,7 @@ func TestApplyPatchResponsesHelperDispatcherKeysAndFinal(t *testing.T) {
 func TestApplyPatchResponsesHelperChatFunctionPreference(t *testing.T) {
 	original := []byte(`{"tools":[{"type":"custom","name":"apply_patch"},{"type":"function","function":{"name":"apply_patch"}}]}`)
 	declarations := []byte(`{"tools":[{"type":"custom","name":"apply_patch"},{"type":"function","name":"apply_patch"}]}`)
-	s := NewApplyPatchResponsesState(sdktranslator.FormatOpenAI, original, declarations)
+	s := NewApplyPatchResponsesState(translatorreg.FormatOpenAI, original, declarations)
 	raw := []byte(`{"type":"response.output_item.done","output_index":0,"item":{"type":"function_call","name":"apply_patch","arguments":"ordinary"}}`)
 	out, errTransform := s.Transform(raw)
 	if errTransform != nil || len(out) != 1 || !bytes.Equal(out[0], raw) {
@@ -106,7 +106,7 @@ func TestApplyPatchResponsesHelperDispatcherOmittedArguments(t *testing.T) {
 	req := []byte(`{"tools":[{"type":"namespace","name":"n","tools":[{"type":"custom","name":"apply_patch"}]}]}`)
 	for _, lateName := range []string{"n", "apply_patch"} {
 		t.Run(lateName, func(t *testing.T) {
-			s := NewApplyPatchResponsesState(sdktranslator.FormatOpenAIResponse, req, req)
+			s := NewApplyPatchResponsesState(translatorreg.FormatOpenAIResponse, req, req)
 			s.AddDispatcher("n", "n")
 			for _, raw := range []string{
 				`{"type":"response.output_item.added","output_index":0,"item":{"type":"function_call","id":"a","call_id":"c","name":"n","arguments":""}}`,
@@ -126,7 +126,7 @@ func TestApplyPatchResponsesHelperDispatcherOmittedArguments(t *testing.T) {
 
 func TestApplyPatchResponsesHelperClosedResponse(t *testing.T) {
 	req := []byte(`{"tools":[{"type":"namespace","name":"n","tools":[{"type":"custom","name":"apply_patch"}]}]}`)
-	s := NewApplyPatchResponsesState(sdktranslator.FormatOpenAIResponse, req, req)
+	s := NewApplyPatchResponsesState(translatorreg.FormatOpenAIResponse, req, req)
 	s.AddDispatcher("n", "n")
 	if _, errTransform := s.Transform([]byte(`{"type":"response.completed","response":{"output":[{"type":"function_call","id":"a","call_id":"c","namespace":"n","name":"apply_patch","arguments":"{\"input\":\"p\"}"}]}}`)); errTransform != nil {
 		t.Fatal(errTransform)
@@ -145,7 +145,7 @@ func TestApplyPatchResponsesHelperTransportTerminal(t *testing.T) {
 	complete := []byte(`data: {"type":"response.output_item.done","output_index":0,"item":{"type":"function_call","id":"a","call_id":"c","name":"apply_patch","arguments":"{\"input\":\"p\"}"}}`)
 	for _, jsonTerminal := range []bool{false, true} {
 		t.Run(fmt.Sprint(jsonTerminal), func(t *testing.T) {
-			s := NewApplyPatchResponsesState(sdktranslator.FormatOpenAIResponse, request, request)
+			s := NewApplyPatchResponsesState(translatorreg.FormatOpenAIResponse, request, request)
 			if _, errStream := s.Stream(complete); errStream != nil {
 				t.Fatal(errStream)
 			}
@@ -179,7 +179,7 @@ func TestApplyPatchResponsesHelperTransportTerminal(t *testing.T) {
 
 func TestApplyPatchResponsesHelperFailedTransport(t *testing.T) {
 	req := []byte(`{"tools":[{"type":"custom","name":"apply_patch"}]}`)
-	s := NewApplyPatchResponsesState(sdktranslator.FormatOpenAIResponse, req, req)
+	s := NewApplyPatchResponsesState(translatorreg.FormatOpenAIResponse, req, req)
 	if _, errStream := s.Stream([]byte(`data: {"type":"response.output_item.added","output_index":0,"item":{"type":"function_call","id":"a","name":"apply_patch","arguments":""}}`)); errStream != nil {
 		t.Fatal(errStream)
 	}
@@ -197,7 +197,7 @@ func TestApplyPatchResponsesHelperFailedTransport(t *testing.T) {
 
 func TestApplyPatchResponsesHelperInactiveTransportBytes(t *testing.T) {
 	req := []byte(`{"tools":[{"type":"function","name":"apply_patch"}]}`)
-	s := NewApplyPatchResponsesState(sdktranslator.FormatOpenAIResponse, req, req)
+	s := NewApplyPatchResponsesState(translatorreg.FormatOpenAIResponse, req, req)
 	for _, line := range [][]byte{[]byte("data: [DONE]"), []byte(`data:  { "type":"response.completed", "response":{"output":[]}} `), []byte("event: response.completed"), []byte(""), []byte("data: [DONE]")} {
 		out, errStream := s.Stream(line)
 		if errStream != nil || len(out) != 1 || !bytes.Equal(out[0], line) {
@@ -226,7 +226,7 @@ func TestApplyPatchResponsesHelperRetainedDispatcherProvenance(t *testing.T) {
 		{"ordinary_arguments_are_not_dispatcher_provenance", "", []string{`{"name":"lookup","arguments":{"name":"apply_patch","arguments":{"input":"not patch"}}}`}, "n", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			s := NewApplyPatchResponsesState(sdktranslator.FormatOpenAIResponse, req, req)
+			s := NewApplyPatchResponsesState(translatorreg.FormatOpenAIResponse, req, req)
 			s.AddDispatcher("n", "n")
 			if _, errTransform := s.Transform([]byte(`{"type":"response.output_item.added","output_index":0,"item":{"type":"function_call","id":"a","name":"n","arguments":""}}`)); errTransform != nil {
 				t.Fatal(errTransform)
@@ -260,7 +260,7 @@ func TestApplyPatchResponsesHelperDispatcherSnapshotsAllMatched(t *testing.T) {
 	req := []byte(`{"tools":[{"type":"namespace","name":"n","tools":[{"type":"custom","name":"apply_patch"}]}]}`)
 	for discover := 0; discover < 3; discover++ {
 		t.Run(fmt.Sprint(discover), func(t *testing.T) {
-			s := NewApplyPatchResponsesState(sdktranslator.FormatOpenAIResponse, req, req)
+			s := NewApplyPatchResponsesState(translatorreg.FormatOpenAIResponse, req, req)
 			s.AddDispatcher("n", "n")
 			for i := 0; i < 3; i++ {
 				if _, errTransform := s.Transform([]byte(fmt.Sprintf(`{"type":"response.output_item.added","output_index":%d,"item":{"type":"function_call","id":"i%d","call_id":"c%d","name":"n","arguments":""}}`, i, i, i))); errTransform != nil {
@@ -287,7 +287,7 @@ func TestApplyPatchResponsesHelperDispatcherSnapshotsAllMatched(t *testing.T) {
 
 func TestApplyPatchResponsesHelperOrdinaryProgress(t *testing.T) {
 	request := []byte(`{"tools":[{"type":"namespace","name":"n","tools":[{"type":"custom","name":"apply_patch"},{"type":"function","name":"lookup"}]}]}`)
-	s := NewApplyPatchResponsesState(sdktranslator.FormatOpenAIResponse, request, request)
+	s := NewApplyPatchResponsesState(translatorreg.FormatOpenAIResponse, request, request)
 	s.AddDispatcher("n", "n")
 	for _, raw := range []string{
 		`{"type":"response.output_item.added","output_index":0,"item":{"type":"function_call","id":"a","name":"lookup","namespace":"n","arguments":""}}`,
@@ -307,7 +307,7 @@ func TestApplyPatchResponsesHelperDispatcherLifecycle(t *testing.T) {
 	request := []byte(`{"tools":[{"type":"namespace","name":"n","tools":[{"type":"custom","name":"apply_patch"}]}]}`)
 	for _, closeAt := range []string{"response", "sentinel", "upstream_failure", "local_failure"} {
 		t.Run(closeAt, func(t *testing.T) {
-			s := NewApplyPatchResponsesState(sdktranslator.FormatOpenAIResponse, request, request)
+			s := NewApplyPatchResponsesState(translatorreg.FormatOpenAIResponse, request, request)
 			s.AddDispatcher("n", "n")
 			for _, raw := range []string{
 				`{"type":"response.output_item.added","output_index":2,"item":{"type":"function_call","id":"a"}}`,
@@ -367,7 +367,7 @@ func TestApplyPatchResponsesHelperDispatcherLifecycle(t *testing.T) {
 
 func TestApplyPatchResponsesHelperLateChildNamespace(t *testing.T) {
 	request := []byte(`{"tools":[{"type":"namespace","name":"n","tools":[{"type":"custom","name":"apply_patch"}]}]}`)
-	s := NewApplyPatchResponsesState(sdktranslator.FormatOpenAIResponse, request, request)
+	s := NewApplyPatchResponsesState(translatorreg.FormatOpenAIResponse, request, request)
 	s.AddDispatcher("n", "n")
 	var out [][]byte
 	for _, raw := range []string{
@@ -389,7 +389,7 @@ func TestApplyPatchResponsesHelperLateChildNamespace(t *testing.T) {
 
 func TestApplyPatchResponsesHelperTerminalSourceIdentity(t *testing.T) {
 	request := []byte(`{"tools":[{"type":"namespace","name":"n","tools":[{"type":"custom","name":"apply_patch"}]}]}`)
-	s := NewApplyPatchResponsesState(sdktranslator.FormatOpenAIResponse, request, request)
+	s := NewApplyPatchResponsesState(translatorreg.FormatOpenAIResponse, request, request)
 	s.AddDispatcher("n", "n")
 	for _, raw := range []string{
 		`{"type":"response.output_item.added","output_index":1,"item":{"type":"function_call","id":"a","name":"n","arguments":""}}`,
@@ -411,7 +411,7 @@ func TestApplyPatchResponsesHelperTerminalSourceIdentity(t *testing.T) {
 
 func TestApplyPatchResponsesHelperIndexOnlyTerminal(t *testing.T) {
 	request := []byte(`{"tools":[{"type":"namespace","name":"n","tools":[{"type":"custom","name":"apply_patch"}]}]}`)
-	s := NewApplyPatchResponsesState(sdktranslator.FormatOpenAIResponse, request, request)
+	s := NewApplyPatchResponsesState(translatorreg.FormatOpenAIResponse, request, request)
 	s.AddDispatcher("n", "n")
 	for _, raw := range []string{
 		`{"type":"response.output_item.added","output_index":0,"item":{"type":"function_call"}}`,
@@ -434,7 +434,7 @@ func TestApplyPatchResponsesHelperIndexOnlyTerminal(t *testing.T) {
 
 func TestApplyPatchResponsesHelperCompletedOrdinaryDelta(t *testing.T) {
 	request := []byte(`{"tools":[{"type":"namespace","name":"n","tools":[{"type":"custom","name":"apply_patch"},{"type":"function","name":"lookup"}]}]}`)
-	s := NewApplyPatchResponsesState(sdktranslator.FormatOpenAIResponse, request, request)
+	s := NewApplyPatchResponsesState(translatorreg.FormatOpenAIResponse, request, request)
 	s.AddDispatcher("n", "n")
 	for _, raw := range []string{
 		`{"type":"response.output_item.added","output_index":0,"item":{"type":"function_call","id":"a","name":"n"}}`,
@@ -458,7 +458,7 @@ func TestApplyPatchResponsesHelperSourceTerminalRequired(t *testing.T) {
 	request := []byte(`{"tools":[{"type":"custom","name":"apply_patch"}]}`)
 	for _, mode := range []string{"empty", "arguments", "item"} {
 		t.Run(mode, func(t *testing.T) {
-			s := NewApplyPatchResponsesState(sdktranslator.FormatCodex, request, request)
+			s := NewApplyPatchResponsesState(translatorreg.FormatCodex, request, request)
 			if mode != "empty" {
 				_, errTransform := s.Transform([]byte(`{"type":"response.output_item.added","output_index":0,"item":{"type":"function_call","id":"a","name":"apply_patch","arguments":""}}`))
 				if errTransform != nil {
@@ -485,7 +485,7 @@ func TestApplyPatchResponsesHelperSourceTerminalRequired(t *testing.T) {
 
 func TestApplyPatchResponsesHelperInactiveEOFAndDONE(t *testing.T) {
 	for _, request := range []string{`{}`, `{"tools":[{"type":"function","name":"apply_patch"}]}`} {
-		s := NewApplyPatchResponsesState(sdktranslator.FormatCodex, []byte(request), []byte(request))
+		s := NewApplyPatchResponsesState(translatorreg.FormatCodex, []byte(request), []byte(request))
 		if out, errFinishStream := s.FinishStream(); len(out) != 0 || errFinishStream != nil {
 			t.Fatalf("inactive EOF changed: %s %v", out, errFinishStream)
 		}

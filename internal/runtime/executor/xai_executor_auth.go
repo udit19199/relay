@@ -6,13 +6,13 @@ import (
 	"strings"
 	"time"
 
-	xaiauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/xai"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	log "github.com/sirupsen/logrus"
+	xaiauth "github.com/udit19199/relay/internal/auth/xai"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 // Refresh refreshes xAI OAuth credentials using the stored refresh token.
-func (e *XAIExecutor) Refresh(ctx context.Context, auth *cliproxyauth.Auth) (*cliproxyauth.Auth, error) {
+func (e *XAIExecutor) Refresh(ctx context.Context, auth *coreauth.Auth) (*coreauth.Auth, error) {
 	log.Debugf("xai executor: refresh called")
 	if auth == nil {
 		return nil, statusErr{code: http.StatusInternalServerError, msg: "xai executor: auth is nil"}

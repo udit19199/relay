@@ -9,11 +9,11 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 	"google.golang.org/protobuf/encoding/protowire"
 )
 
@@ -99,9 +99,9 @@ func TestDevinApplyPatchRejectionCarriesLogDiagnostic(t *testing.T) {
 				}))
 				defer server.Close()
 				exec := NewDevinExecutor(&config.Config{})
-				auth := &cliproxyauth.Auth{ID: "devin-patch-diagnostic", Provider: "devin", Attributes: map[string]string{"api_key": "test", "base_url": server.URL}}
-				req := cliproxyexecutor.Request{Model: "devin/swe-2", Payload: []byte(task6PatchRequest)}
-				opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse, OriginalRequest: req.Payload}
+				auth := &coreauth.Auth{ID: "devin-patch-diagnostic", Provider: "devin", Attributes: map[string]string{"api_key": "test", "base_url": server.URL}}
+				req := coreexecutor.Request{Model: "devin/swe-2", Payload: []byte(task6PatchRequest)}
+				opts := coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse, OriginalRequest: req.Payload}
 
 				var errPatch error
 				if stream {
@@ -232,9 +232,9 @@ func TestDevinApplyPatchRecoversCompleteBarePatchFromInvalidJSONStr(t *testing.T
 				}))
 				defer server.Close()
 				exec := NewDevinExecutor(&config.Config{})
-				auth := &cliproxyauth.Auth{ID: "devin-bare-patch-ok", Provider: "devin", Attributes: map[string]string{"api_key": "test", "base_url": server.URL}}
-				req := cliproxyexecutor.Request{Model: "devin/swe-2", Payload: []byte(tc.requestJSON)}
-				opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse, OriginalRequest: req.Payload}
+				auth := &coreauth.Auth{ID: "devin-bare-patch-ok", Provider: "devin", Attributes: map[string]string{"api_key": "test", "base_url": server.URL}}
+				req := coreexecutor.Request{Model: "devin/swe-2", Payload: []byte(tc.requestJSON)}
+				opts := coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse, OriginalRequest: req.Payload}
 
 				if !stream {
 					resp, errExecute := exec.Execute(t.Context(), auth, req, opts)
@@ -376,9 +376,9 @@ func TestDevinApplyPatchBarePatchRecoveryFailsClosedOnMalformedOrTruncated(t *te
 				}))
 				defer server.Close()
 				exec := NewDevinExecutor(&config.Config{})
-				auth := &cliproxyauth.Auth{ID: "devin-bare-fail-closed", Provider: "devin", Attributes: map[string]string{"api_key": "test", "base_url": server.URL}}
-				req := cliproxyexecutor.Request{Model: "devin/swe-2", Payload: []byte(task6PatchRequest)}
-				opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse, OriginalRequest: req.Payload}
+				auth := &coreauth.Auth{ID: "devin-bare-fail-closed", Provider: "devin", Attributes: map[string]string{"api_key": "test", "base_url": server.URL}}
+				req := coreexecutor.Request{Model: "devin/swe-2", Payload: []byte(task6PatchRequest)}
+				opts := coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse, OriginalRequest: req.Payload}
 
 				if stream {
 					result, errExecuteStream := exec.ExecuteStream(t.Context(), auth, req, opts)

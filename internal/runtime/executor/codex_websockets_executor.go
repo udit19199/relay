@@ -10,10 +10,10 @@ import (
 	"strings"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
 	log "github.com/sirupsen/logrus"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 // CodexWebsocketsExecutor executes Codex Responses requests using a WebSocket transport.
@@ -57,56 +57,56 @@ func (e *CodexAutoExecutor) UsesConfig(cfg *config.Config) bool {
 	return e != nil && e.httpExec != nil && e.httpExec.cfg == cfg
 }
 
-func (e *CodexAutoExecutor) PrepareRequest(req *http.Request, auth *cliproxyauth.Auth) error {
+func (e *CodexAutoExecutor) PrepareRequest(req *http.Request, auth *coreauth.Auth) error {
 	if e == nil || e.httpExec == nil {
 		return nil
 	}
 	return e.httpExec.PrepareRequest(req, auth)
 }
 
-func (e *CodexAutoExecutor) HttpRequest(ctx context.Context, auth *cliproxyauth.Auth, req *http.Request) (*http.Response, error) {
+func (e *CodexAutoExecutor) HttpRequest(ctx context.Context, auth *coreauth.Auth, req *http.Request) (*http.Response, error) {
 	if e == nil || e.httpExec == nil {
 		return nil, fmt.Errorf("codex auto executor: http executor is nil")
 	}
 	return e.httpExec.HttpRequest(ctx, auth, req)
 }
 
-func (e *CodexAutoExecutor) Execute(ctx context.Context, auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
+func (e *CodexAutoExecutor) Execute(ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) (coreexecutor.Response, error) {
 	if e == nil || e.httpExec == nil || e.wsExec == nil {
-		return cliproxyexecutor.Response{}, fmt.Errorf("codex auto executor: executor is nil")
+		return coreexecutor.Response{}, fmt.Errorf("codex auto executor: executor is nil")
 	}
-	if cliproxyexecutor.DownstreamWebsocket(ctx) && codexWebsocketsEnabled(auth) {
+	if coreexecutor.DownstreamWebsocket(ctx) && codexWebsocketsEnabled(auth) {
 		return e.wsExec.Execute(ctx, auth, req, opts)
 	}
-	if cliproxyexecutor.RequiredUpstreamWebsocket(ctx) {
-		return cliproxyexecutor.Response{}, cliproxyexecutor.NewUpstreamWebsocketReplayRequiredError()
+	if coreexecutor.RequiredUpstreamWebsocket(ctx) {
+		return coreexecutor.Response{}, coreexecutor.NewUpstreamWebsocketReplayRequiredError()
 	}
 	return e.httpExec.Execute(ctx, auth, req, opts)
 }
 
-func (e *CodexAutoExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (*cliproxyexecutor.StreamResult, error) {
+func (e *CodexAutoExecutor) ExecuteStream(ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) (*coreexecutor.StreamResult, error) {
 	if e == nil || e.httpExec == nil || e.wsExec == nil {
 		return nil, fmt.Errorf("codex auto executor: executor is nil")
 	}
-	if cliproxyexecutor.DownstreamWebsocket(ctx) && codexWebsocketsEnabled(auth) {
+	if coreexecutor.DownstreamWebsocket(ctx) && codexWebsocketsEnabled(auth) {
 		return e.wsExec.ExecuteStream(ctx, auth, req, opts)
 	}
-	if cliproxyexecutor.RequiredUpstreamWebsocket(ctx) {
-		return nil, cliproxyexecutor.NewUpstreamWebsocketReplayRequiredError()
+	if coreexecutor.RequiredUpstreamWebsocket(ctx) {
+		return nil, coreexecutor.NewUpstreamWebsocketReplayRequiredError()
 	}
 	return e.httpExec.ExecuteStream(ctx, auth, req, opts)
 }
 
-func (e *CodexAutoExecutor) Refresh(ctx context.Context, auth *cliproxyauth.Auth) (*cliproxyauth.Auth, error) {
+func (e *CodexAutoExecutor) Refresh(ctx context.Context, auth *coreauth.Auth) (*coreauth.Auth, error) {
 	if e == nil || e.httpExec == nil {
 		return nil, fmt.Errorf("codex auto executor: http executor is nil")
 	}
 	return e.httpExec.Refresh(ctx, auth)
 }
 
-func (e *CodexAutoExecutor) CountTokens(ctx context.Context, auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
+func (e *CodexAutoExecutor) CountTokens(ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) (coreexecutor.Response, error) {
 	if e == nil || e.httpExec == nil {
-		return cliproxyexecutor.Response{}, fmt.Errorf("codex auto executor: http executor is nil")
+		return coreexecutor.Response{}, fmt.Errorf("codex auto executor: http executor is nil")
 	}
 	return e.httpExec.CountTokens(ctx, auth, req, opts)
 }
@@ -118,7 +118,7 @@ func (e *CodexAutoExecutor) CloseExecutionSession(sessionID string) {
 	e.wsExec.CloseExecutionSession(sessionID)
 }
 
-func (e *CodexAutoExecutor) SharesExecutionSessionsWith(other cliproxyauth.ProviderExecutor) bool {
+func (e *CodexAutoExecutor) SharesExecutionSessionsWith(other coreauth.ProviderExecutor) bool {
 	if e == nil || e.wsExec == nil {
 		return false
 	}
@@ -139,7 +139,7 @@ func (e *CodexAutoExecutor) UpstreamDisconnectChan(sessionID string) <-chan erro
 	return e.wsExec.UpstreamDisconnectChan(sessionID)
 }
 
-func codexWebsocketsEnabled(auth *cliproxyauth.Auth) bool {
+func codexWebsocketsEnabled(auth *coreauth.Auth) bool {
 	if auth == nil {
 		return false
 	}
@@ -180,7 +180,7 @@ func (e *CodexAutoExecutor) SupportsApplyPatch() bool {
 // current upstream socket. It does not dial, replay, or select another credential.
 func (e *CodexAutoExecutor) InterruptExecutionSession(ctx context.Context, sessionID string, payload []byte) error {
 	if e == nil || e.wsExec == nil {
-		return cliproxyexecutor.ErrNoActiveUpstreamWebsocket
+		return coreexecutor.ErrNoActiveUpstreamWebsocket
 	}
 	return e.wsExec.InterruptExecutionSession(ctx, sessionID, payload)
 }
@@ -190,7 +190,7 @@ func (e *CodexAutoExecutor) InterruptExecutionSession(ctx context.Context, sessi
 // must not rewrite response_id, mode, or extension fields.
 func (e *CodexWebsocketsExecutor) InterruptExecutionSession(ctx context.Context, sessionID string, payload []byte) error {
 	if e == nil {
-		return cliproxyexecutor.ErrNoActiveUpstreamWebsocket
+		return coreexecutor.ErrNoActiveUpstreamWebsocket
 	}
 	if ctx != nil {
 		if errCtx := ctx.Err(); errCtx != nil {
@@ -199,7 +199,7 @@ func (e *CodexWebsocketsExecutor) InterruptExecutionSession(ctx context.Context,
 	}
 	sessionID = strings.TrimSpace(sessionID)
 	if sessionID == "" {
-		return cliproxyexecutor.ErrNoActiveUpstreamWebsocket
+		return coreexecutor.ErrNoActiveUpstreamWebsocket
 	}
 	store := e.store
 	if store == nil {
@@ -209,22 +209,22 @@ func (e *CodexWebsocketsExecutor) InterruptExecutionSession(ctx context.Context,
 	sess := store.sessions[sessionID]
 	store.mu.Unlock()
 	if sess == nil {
-		return cliproxyexecutor.ErrNoActiveUpstreamWebsocket
+		return coreexecutor.ErrNoActiveUpstreamWebsocket
 	}
 	sess.connMu.Lock()
 	conn := sess.conn
 	authID := sess.authID
 	sess.connMu.Unlock()
 	if conn == nil {
-		return cliproxyexecutor.ErrNoActiveUpstreamWebsocket
+		return coreexecutor.ErrNoActiveUpstreamWebsocket
 	}
 	// Account checks may call back into the auth manager; do not hold session
 	// locks across them. Take the lifecycle snapshot only after they finish.
-	authEnabled := cliproxyexecutor.WebsocketAuthEnabled(ctx, authID)
+	authEnabled := coreexecutor.WebsocketAuthEnabled(ctx, authID)
 	sess.connMu.Lock()
 	if sess.conn != conn {
 		sess.connMu.Unlock()
-		return cliproxyexecutor.ErrNoActiveUpstreamWebsocket
+		return coreexecutor.ErrNoActiveUpstreamWebsocket
 	}
 	sess.activeMu.Lock()
 	targetID := ojson.GetBytesNoCopy(payload, "response_id").String()
@@ -256,13 +256,13 @@ func (e *CodexWebsocketsExecutor) InterruptExecutionSession(ctx context.Context,
 	// A retained socket from an earlier turn is not the current upstream.
 	// HTTP turns must fall through to local cancellation instead.
 	if !liveChannel {
-		return cliproxyexecutor.ErrNoActiveUpstreamWebsocket
+		return coreexecutor.ErrNoActiveUpstreamWebsocket
 	}
 	// The socket owns this turn, but the frame does not target its running
 	// response. Reject outright: a local HTTP fallback would fabricate an
 	// incomplete event and cancel the healthy websocket turn.
 	if !active {
-		return cliproxyexecutor.ErrUpstreamWebsocketInterruptRejected
+		return coreexecutor.ErrUpstreamWebsocketInterruptRejected
 	}
 	if !authEnabled {
 		return fmt.Errorf("websocket credential is no longer enabled")

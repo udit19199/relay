@@ -10,15 +10,15 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/api/middleware"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/httpwire"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/logging"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/safemode"
-	sdkaccess "github.com/router-for-me/CLIProxyAPI/v8/sdk/access"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/api/handlers"
-	coreusage "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/usage"
 	log "github.com/sirupsen/logrus"
+	"github.com/udit19199/relay/internal/access"
+	"github.com/udit19199/relay/internal/api/handlers"
+	"github.com/udit19199/relay/internal/api/middleware"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/httpwire"
+	"github.com/udit19199/relay/internal/logging"
+	"github.com/udit19199/relay/internal/safemode"
+	coreusage "github.com/udit19199/relay/internal/service/usage"
 )
 
 var corsExposedResponseHeaders = []string{
@@ -52,11 +52,6 @@ var corsAllowedRequestHeaders = []string{
 	"Anthropic-Version",
 	"Anthropic-Beta",
 }
-
-const (
-	exampleAPIKeyManagementPath = "/management.html"
-	exampleAPIKeyManagementURL  = "/management.html?safe-mode=configure"
-)
 
 func (s *Server) maxRequestBodyBytes() int64 {
 	if s == nil {
@@ -341,11 +336,7 @@ func (s *Server) exampleAPIKeySafeModeMiddleware() gin.HandlerFunc {
 		}
 
 		path := c.Request.URL.Path
-		if path == exampleAPIKeyManagementPath && c.Query("safe-mode") == "configure" {
-			c.Next()
-			return
-		}
-		if (path == "/" || path == exampleAPIKeyManagementPath) && (c.Request.Method == http.MethodGet || c.Request.Method == http.MethodHead) {
+		if path == "/" && (c.Request.Method == http.MethodGet || c.Request.Method == http.MethodHead) {
 			s.serveExampleAPIKeyWarningPage(c)
 			return
 		}
@@ -358,7 +349,7 @@ func (s *Server) exampleAPIKeySafeModeMiddleware() gin.HandlerFunc {
 		c.Header("X-CPA-SAFE-MODE", "example-api-key")
 		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
 			"error":   "unsafe_example_api_key",
-			"message": "Proxy API endpoints are disabled because api-keys contains template values. Open /management.html?safe-mode=configure, update api-keys in Management, then retry.",
+			"message": "Proxy API endpoints are disabled because api-keys contains template values. Set real api-keys in ~/.relay/config.yaml (or run relay setup), then retry.",
 		})
 	}
 }
@@ -376,7 +367,7 @@ func (s *Server) serveExampleAPIKeyWarningPage(c *gin.Context) {
 		c.Abort()
 		return
 	}
-	c.String(http.StatusOK, safemode.ExampleAPIKeyWarningPageHTML(keys, exampleAPIKeyManagementURL))
+	c.String(http.StatusOK, safemode.ExampleAPIKeyWarningPageHTML(keys))
 	c.Abort()
 }
 
@@ -453,7 +444,7 @@ func corsAllowHeadersValue(req *http.Request) string {
 // AuthMiddleware returns a Gin middleware handler that authenticates requests
 // using the configured authentication providers. When no providers are available,
 // it allows all requests (legacy behaviour).
-func AuthMiddleware(manager *sdkaccess.Manager) gin.HandlerFunc {
+func AuthMiddleware(manager *access.Manager) gin.HandlerFunc {
 	return accessAuthMiddleware(manager)
 }
 
@@ -467,7 +458,7 @@ func closeUnconsumedRequestOnAbort(c *gin.Context) {
 	}
 }
 
-func accessAuthMiddleware(manager *sdkaccess.Manager) gin.HandlerFunc {
+func accessAuthMiddleware(manager *access.Manager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if manager == nil {
 			middleware.CaptureAuthenticatedRequestBody(c)

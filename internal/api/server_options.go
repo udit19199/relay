@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/logging"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/api/handlers"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	"github.com/udit19199/relay/internal/api/handlers"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/logging"
+	"github.com/udit19199/relay/internal/service/auth"
 )
 
 type serverOptionConfig struct {
@@ -48,27 +48,6 @@ func effectiveSDKConfig(cfg *config.Config) *config.SDKConfig {
 		sdkCfg.RequestLog = false
 	}
 	return &sdkCfg
-}
-
-// WithMiddleware appends additional Gin middleware during server construction.
-func WithMiddleware(mw ...gin.HandlerFunc) ServerOption {
-	return func(cfg *serverOptionConfig) {
-		cfg.extraMiddleware = append(cfg.extraMiddleware, mw...)
-	}
-}
-
-// WithEngineConfigurator allows callers to mutate the Gin engine prior to middleware setup.
-func WithEngineConfigurator(fn func(*gin.Engine)) ServerOption {
-	return func(cfg *serverOptionConfig) {
-		cfg.engineConfigurator = fn
-	}
-}
-
-// WithRouterConfigurator appends a callback after default routes are registered.
-func WithRouterConfigurator(fn func(*gin.Engine, *handlers.BaseAPIHandler, *config.Config)) ServerOption {
-	return func(cfg *serverOptionConfig) {
-		cfg.routerConfigurator = fn
-	}
 }
 
 // WithLocalManagementPassword stores a runtime-only management password accepted for localhost requests.

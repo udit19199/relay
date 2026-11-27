@@ -18,14 +18,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	internalcache "github.com/router-for-me/CLIProxyAPI/v8/internal/cache"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdkconfig "github.com/router-for-me/CLIProxyAPI/v8/sdk/config"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
 	log "github.com/sirupsen/logrus"
+	internalcache "github.com/udit19199/relay/internal/cache"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/registry"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 var benchmarkBuildCodexWebsocketRequestBodyOutput []byte
@@ -135,8 +134,8 @@ func TestCodexWebsocketsExecuteRestoresClaudeAgentReasoningReplay(t *testing.T) 
 	defer server.Close()
 
 	exec := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
-	auth := &cliproxyauth.Auth{Provider: "codex", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
-	req := cliproxyexecutor.Request{
+	auth := &coreauth.Auth{Provider: "codex", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
+	req := coreexecutor.Request{
 		Model: "gpt-5.4",
 		Payload: []byte(`{
 			"model":"gpt-5.4",
@@ -150,7 +149,7 @@ func TestCodexWebsocketsExecuteRestoresClaudeAgentReasoningReplay(t *testing.T) 
 	headers := http.Header{}
 	headers.Set("X-Claude-Code-Session-Id", "ws-replay-session")
 	headers.Set("X-Claude-Code-Agent-Id", "agent-a")
-	opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString("claude"), Headers: headers}
+	opts := coreexecutor.Options{SourceFormat: translatorreg.FromString("claude"), Headers: headers}
 
 	if _, errExecute := exec.Execute(context.Background(), auth, req, opts); errExecute != nil {
 		t.Fatalf("Execute() error = %v", errExecute)
@@ -215,7 +214,7 @@ func TestCodexWebsocketsExecuteResponsesLiteDoesNotInjectImageGenerationTool(t *
 	defer server.Close()
 
 	exec := NewCodexWebsocketsExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"api_key":   "sk-test",
@@ -223,11 +222,11 @@ func TestCodexWebsocketsExecuteResponsesLiteDoesNotInjectImageGenerationTool(t *
 			"plan_type": "pro",
 		},
 	}
-	req := cliproxyexecutor.Request{
+	req := coreexecutor.Request{
 		Model:   "gpt-5.6-sol",
 		Payload: []byte(`{"model":"gpt-5.6-sol","input":[{"type":"additional_tools","role":"developer","tools":[{"type":"custom","name":"exec"}]},{"role":"user","content":"hello"}],"parallel_tool_calls":true,"client_metadata":{"ws_request_header_x_openai_internal_codex_responses_lite":"true"}}`),
 	}
-	opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString("codex")}
+	opts := coreexecutor.Options{SourceFormat: translatorreg.FromString("codex")}
 
 	if _, err := exec.Execute(context.Background(), auth, req, opts); err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -282,7 +281,7 @@ func TestCodexWebsocketsExecuteStreamResponsesLiteForcesParallelToolCallsFalse(t
 	defer server.Close()
 
 	exec := NewCodexWebsocketsExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"api_key":   "sk-test",
@@ -290,11 +289,11 @@ func TestCodexWebsocketsExecuteStreamResponsesLiteForcesParallelToolCallsFalse(t
 			"plan_type": "pro",
 		},
 	}
-	req := cliproxyexecutor.Request{
+	req := coreexecutor.Request{
 		Model:   "gpt-5.6-luna",
 		Payload: []byte(`{"model":"gpt-5.6-luna","input":[{"type":"additional_tools","role":"developer","tools":[{"type":"custom","name":"exec"}]},{"role":"user","content":"hello"}],"parallel_tool_calls":true,"client_metadata":{"ws_request_header_x_openai_internal_codex_responses_lite":"true"}}`),
 	}
-	opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString("codex")}
+	opts := coreexecutor.Options{SourceFormat: translatorreg.FromString("codex")}
 
 	result, errExecute := exec.ExecuteStream(context.Background(), auth, req, opts)
 	if errExecute != nil {
@@ -357,12 +356,12 @@ func TestCodexWebsocketsExecutePreservesPreviousResponseIDUpstream(t *testing.T)
 	defer server.Close()
 
 	exec := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
-	req := cliproxyexecutor.Request{
+	auth := &coreauth.Auth{Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
+	req := coreexecutor.Request{
 		Model:   "gpt-5-codex",
 		Payload: []byte(`{"model":"gpt-5-codex","previous_response_id":"resp-1","input":[{"type":"message","id":"msg-1"}]}`),
 	}
-	opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString("codex")}
+	opts := coreexecutor.Options{SourceFormat: translatorreg.FromString("codex")}
 
 	if _, err := exec.Execute(context.Background(), auth, req, opts); err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -398,7 +397,7 @@ func TestCodexWebsocketsExecuteStreamUpgradeRequiredReturnsWithoutLockingSession
 	exec := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
 	const executionSessionID = "ws-upgrade-required-session"
 	t.Cleanup(func() { exec.CloseExecutionSession(executionSessionID) })
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:       "codex-test",
 		Provider: "codex",
 		Attributes: map[string]string{
@@ -406,20 +405,20 @@ func TestCodexWebsocketsExecuteStreamUpgradeRequiredReturnsWithoutLockingSession
 			"base_url": server.URL,
 		},
 	}
-	opts := cliproxyexecutor.Options{
-		SourceFormat:   sdktranslator.FromString("openai-response"),
-		ResponseFormat: sdktranslator.FromString("openai-response"),
+	opts := coreexecutor.Options{
+		SourceFormat:   translatorreg.FromString("openai-response"),
+		ResponseFormat: translatorreg.FromString("openai-response"),
 		Metadata: map[string]any{
-			cliproxyexecutor.ExecutionSessionMetadataKey: executionSessionID,
+			coreexecutor.ExecutionSessionMetadataKey: executionSessionID,
 		},
 	}
-	ctx := cliproxyexecutor.WithDownstreamWebsocket(context.Background())
+	ctx := coreexecutor.WithDownstreamWebsocket(context.Background())
 
 	execute := func(payload string) {
 		t.Helper()
 		done := make(chan error, 1)
 		go func() {
-			_, errExecute := exec.ExecuteStream(ctx, auth, cliproxyexecutor.Request{
+			_, errExecute := exec.ExecuteStream(ctx, auth, coreexecutor.Request{
 				Model:   "gpt-5.4",
 				Payload: []byte(payload),
 			}, opts)
@@ -458,7 +457,7 @@ func TestCodexWebsocketsExecuteStreamHandshakeErrorReturnsWithoutLockingSession(
 	exec := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
 	const executionSessionID = "ws-handshake-error-session"
 	t.Cleanup(func() { exec.CloseExecutionSession(executionSessionID) })
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:       "codex-test",
 		Provider: "codex",
 		Attributes: map[string]string{
@@ -466,18 +465,18 @@ func TestCodexWebsocketsExecuteStreamHandshakeErrorReturnsWithoutLockingSession(
 			"base_url": server.URL,
 		},
 	}
-	opts := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-response"),
+	opts := coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-response"),
 		Metadata: map[string]any{
-			cliproxyexecutor.ExecutionSessionMetadataKey: executionSessionID,
+			coreexecutor.ExecutionSessionMetadataKey: executionSessionID,
 		},
 	}
 
 	for i := 0; i < 2; i++ {
-		attemptCtx := cliproxyexecutor.WithUpstreamAttemptTracker(context.Background())
+		attemptCtx := coreexecutor.WithUpstreamAttemptTracker(context.Background())
 		done := make(chan error, 1)
 		go func(ctx context.Context) {
-			_, errExecute := exec.ExecuteStream(ctx, auth, cliproxyexecutor.Request{
+			_, errExecute := exec.ExecuteStream(ctx, auth, coreexecutor.Request{
 				Model:   "gpt-5.4",
 				Payload: []byte(`{"model":"gpt-5.4","input":[{"type":"message","id":"msg-1"}]}`),
 			}, opts)
@@ -489,7 +488,7 @@ func TestCodexWebsocketsExecuteStreamHandshakeErrorReturnsWithoutLockingSession(
 			if !ok || statusErr.StatusCode() != http.StatusUnauthorized {
 				t.Fatalf("attempt %d error = %T %v, want status 401", i+1, errExecute, errExecute)
 			}
-			if !cliproxyexecutor.UpstreamAttempted(attemptCtx) {
+			if !coreexecutor.UpstreamAttempted(attemptCtx) {
 				t.Fatalf("attempt %d websocket handshake was not marked as upstream", i+1)
 			}
 		case <-time.After(5 * time.Second):
@@ -525,20 +524,20 @@ func TestExistingWebsocketSessionConnRequiresMatchingHealthyConnection(t *testin
 
 func TestCodexAutoExecutorRequiredUpstreamWebsocketRejectsHTTPFallback(t *testing.T) {
 	exec := NewCodexAutoExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:       "codex-http-only",
 		Provider: "codex",
 		Attributes: map[string]string{
 			"api_key": "sk-test",
 		},
 	}
-	ctx := cliproxyexecutor.WithRequiredUpstreamWebsocket(
-		cliproxyexecutor.WithDownstreamWebsocket(context.Background()),
+	ctx := coreexecutor.WithRequiredUpstreamWebsocket(
+		coreexecutor.WithDownstreamWebsocket(context.Background()),
 	)
-	_, errExecute := exec.ExecuteStream(ctx, auth, cliproxyexecutor.Request{
+	_, errExecute := exec.ExecuteStream(ctx, auth, coreexecutor.Request{
 		Model:   "gpt-5.4",
 		Payload: []byte(`{"model":"gpt-5.4","previous_response_id":"resp-1","input":[{"type":"message","id":"msg-2"}]}`),
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString("openai-response")})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FromString("openai-response")})
 	if errExecute == nil {
 		t.Fatal("ExecuteStream() error = nil, want replay-required error")
 	}
@@ -549,7 +548,7 @@ func TestCodexAutoExecutorRequiredUpstreamWebsocketRejectsHTTPFallback(t *testin
 	if got := ojson.Get(errExecute.Error(), "error.code").String(); got != "upstream_http_replay_required" {
 		t.Fatalf("ExecuteStream() error code = %q, want upstream_http_replay_required", got)
 	}
-	requestScoped, ok := errExecute.(cliproxyexecutor.RequestScopedError)
+	requestScoped, ok := errExecute.(coreexecutor.RequestScopedError)
 	if !ok || !requestScoped.IsRequestScoped() {
 		t.Fatalf("ExecuteStream() error = %T, want request-scoped replay signal", errExecute)
 	}
@@ -558,18 +557,18 @@ func TestCodexAutoExecutorRequiredUpstreamWebsocketRejectsHTTPFallback(t *testin
 func TestCodexWebsocketUpgradeFallbackLocalErrorDoesNotMarkUpstreamAttempt(t *testing.T) {
 	tests := []struct {
 		name    string
-		execute func(*CodexWebsocketsExecutor, context.Context, *cliproxyauth.Auth, cliproxyexecutor.Request, cliproxyexecutor.Options) error
+		execute func(*CodexWebsocketsExecutor, context.Context, *coreauth.Auth, coreexecutor.Request, coreexecutor.Options) error
 	}{
 		{
 			name: "non-stream",
-			execute: func(exec *CodexWebsocketsExecutor, ctx context.Context, auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) error {
+			execute: func(exec *CodexWebsocketsExecutor, ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) error {
 				_, errExecute := exec.Execute(ctx, auth, req, opts)
 				return errExecute
 			},
 		},
 		{
 			name: "stream",
-			execute: func(exec *CodexWebsocketsExecutor, ctx context.Context, auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) error {
+			execute: func(exec *CodexWebsocketsExecutor, ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) error {
 				_, errExecute := exec.ExecuteStream(ctx, auth, req, opts)
 				return errExecute
 			},
@@ -592,7 +591,7 @@ func TestCodexWebsocketUpgradeFallbackLocalErrorDoesNotMarkUpstreamAttempt(t *te
 			defer server.Close()
 
 			exec := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
-			auth := &cliproxyauth.Auth{
+			auth := &coreauth.Auth{
 				ID:       "codex-fallback-local-error",
 				Provider: "codex",
 				Attributes: map[string]string{
@@ -600,9 +599,9 @@ func TestCodexWebsocketUpgradeFallbackLocalErrorDoesNotMarkUpstreamAttempt(t *te
 					"base_url": server.URL,
 				},
 			}
-			ctx := cliproxyexecutor.WithUpstreamAttemptTracker(context.Background())
+			ctx := coreexecutor.WithUpstreamAttemptTracker(context.Background())
 			opts := codexOpenAIImageTestOptions(codexImagesGenerationsPath, tc.name == "stream")
-			errExecute := tc.execute(exec, ctx, auth, cliproxyexecutor.Request{
+			errExecute := tc.execute(exec, ctx, auth, coreexecutor.Request{
 				Model:   "gpt-5.4",
 				Payload: []byte("not-json"),
 			}, opts)
@@ -612,7 +611,7 @@ func TestCodexWebsocketUpgradeFallbackLocalErrorDoesNotMarkUpstreamAttempt(t *te
 			if got := upgradeAttempts.Load(); got != 1 {
 				t.Fatalf("websocket upgrade attempts = %d, want 1", got)
 			}
-			if cliproxyexecutor.UpstreamAttempted(ctx) {
+			if coreexecutor.UpstreamAttempted(ctx) {
 				t.Fatal("transparent 426 fallback marked a local HTTP preparation error as an upstream attempt")
 			}
 		})
@@ -622,29 +621,29 @@ func TestCodexWebsocketUpgradeFallbackLocalErrorDoesNotMarkUpstreamAttempt(t *te
 func TestCodexWebsocketMissingRequiredSessionDoesNotMarkUpstreamAttempt(t *testing.T) {
 	exec := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
 	exec.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:       "codex-required-session",
 		Provider: "codex",
 		Attributes: map[string]string{
 			"api_key": "sk-test",
 		},
 	}
-	ctx := cliproxyexecutor.WithUpstreamAttemptTracker(
-		cliproxyexecutor.WithRequiredUpstreamWebsocket(context.Background()),
+	ctx := coreexecutor.WithUpstreamAttemptTracker(
+		coreexecutor.WithRequiredUpstreamWebsocket(context.Background()),
 	)
-	_, errExecute := exec.Execute(ctx, auth, cliproxyexecutor.Request{
+	_, errExecute := exec.Execute(ctx, auth, coreexecutor.Request{
 		Model:   "gpt-5.4",
 		Payload: []byte(`{"model":"gpt-5.4","previous_response_id":"resp-1","input":[{"type":"message","role":"user","content":"hello"}]}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FormatOpenAIResponse,
 		Metadata: map[string]any{
-			cliproxyexecutor.ExecutionSessionMetadataKey: "missing-codex-session",
+			coreexecutor.ExecutionSessionMetadataKey: "missing-codex-session",
 		},
 	})
-	if !cliproxyexecutor.IsUpstreamWebsocketReplayRequired(errExecute) {
+	if !coreexecutor.IsUpstreamWebsocketReplayRequired(errExecute) {
 		t.Fatalf("Execute() error = %T %v, want replay-required", errExecute, errExecute)
 	}
-	if cliproxyexecutor.UpstreamAttempted(ctx) {
+	if coreexecutor.UpstreamAttempted(ctx) {
 		t.Fatal("missing retained websocket connection was marked as an upstream attempt")
 	}
 }
@@ -680,24 +679,24 @@ func TestCodexWebsocketsExecuteStreamPassesThroughUpstreamWebsocketPayloadForDow
 	defer server.Close()
 
 	exec := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
-	req := cliproxyexecutor.Request{
+	auth := &coreauth.Auth{Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
+	req := coreexecutor.Request{
 		Model:   "gpt-5-codex",
 		Payload: []byte(`{"model":"prolite/gpt-5-codex","input":[{"type":"additional_tools","role":"developer","tools":[{"type":"custom","name":"exec"}]},{"type":"message","role":"user","content":"hello"}],"parallel_tool_calls":true}`),
 	}
-	opts := cliproxyexecutor.Options{
-		SourceFormat:   sdktranslator.FromString("openai-response"),
-		ResponseFormat: sdktranslator.FromString("openai-response"),
+	opts := coreexecutor.Options{
+		SourceFormat:   translatorreg.FromString("openai-response"),
+		ResponseFormat: translatorreg.FromString("openai-response"),
 	}
-	ctx := cliproxyexecutor.WithUpstreamAttemptTracker(
-		cliproxyexecutor.WithDownstreamWebsocket(context.Background()),
+	ctx := coreexecutor.WithUpstreamAttemptTracker(
+		coreexecutor.WithDownstreamWebsocket(context.Background()),
 	)
 
 	result, err := exec.ExecuteStream(ctx, auth, req, opts)
 	if err != nil {
 		t.Fatalf("ExecuteStream() error = %v", err)
 	}
-	if !cliproxyexecutor.UpstreamAttempted(ctx) {
+	if !coreexecutor.UpstreamAttempted(ctx) {
 		t.Fatal("websocket write did not mark an upstream attempt")
 	}
 
@@ -753,16 +752,16 @@ func TestCodexWebsocketsExecuteStreamPropagatesUpstreamErrorForDownstreamWebsock
 	defer server.Close()
 
 	exec := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
-	req := cliproxyexecutor.Request{
+	auth := &coreauth.Auth{Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
+	req := coreexecutor.Request{
 		Model:   "gpt-5-codex",
 		Payload: []byte(`{"model":"gpt-5-codex","input":[{"type":"message","role":"user","content":"hello"}]}`),
 	}
-	opts := cliproxyexecutor.Options{
-		SourceFormat:   sdktranslator.FromString("openai-response"),
-		ResponseFormat: sdktranslator.FromString("openai-response"),
+	opts := coreexecutor.Options{
+		SourceFormat:   translatorreg.FromString("openai-response"),
+		ResponseFormat: translatorreg.FromString("openai-response"),
 	}
-	ctx := cliproxyexecutor.WithDownstreamWebsocket(context.Background())
+	ctx := coreexecutor.WithDownstreamWebsocket(context.Background())
 
 	result, err := exec.ExecuteStream(ctx, auth, req, opts)
 	if err != nil {
@@ -983,14 +982,14 @@ func TestCodexWebsocketsExecuteStreamMapsMessageTooBigClose(t *testing.T) {
 	defer server.Close()
 
 	exec := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
-	req := cliproxyexecutor.Request{
+	auth := &coreauth.Auth{Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
+	req := coreexecutor.Request{
 		Model:   "gpt-5-codex",
 		Payload: []byte(`{"model":"gpt-5-codex","input":[{"type":"message","role":"user","content":"hello"}]}`),
 	}
-	opts := cliproxyexecutor.Options{
-		SourceFormat:   sdktranslator.FromString("openai-response"),
-		ResponseFormat: sdktranslator.FromString("openai-response"),
+	opts := coreexecutor.Options{
+		SourceFormat:   translatorreg.FromString("openai-response"),
+		ResponseFormat: translatorreg.FromString("openai-response"),
 	}
 
 	result, err := exec.ExecuteStream(context.Background(), auth, req, opts)
@@ -1122,12 +1121,12 @@ func TestApplyCodexWebsocketHeadersDefaultsToCurrentResponsesBeta(t *testing.T) 
 func TestApplyCodexWebsocketHeadersDefaultsToCodexCloaking(t *testing.T) {
 	tests := []struct {
 		name  string
-		auth  *cliproxyauth.Auth
+		auth  *coreauth.Auth
 		token string
 	}{
 		{
 			name: "OAuth",
-			auth: &cliproxyauth.Auth{
+			auth: &coreauth.Auth{
 				Provider: "codex",
 				Attributes: map[string]string{
 					"header:User-Agent": "custom-ua",
@@ -1137,7 +1136,7 @@ func TestApplyCodexWebsocketHeadersDefaultsToCodexCloaking(t *testing.T) {
 		},
 		{
 			name: "API key",
-			auth: &cliproxyauth.Auth{
+			auth: &coreauth.Auth{
 				Provider: "codex",
 				Attributes: map[string]string{
 					"api_key":           "sk-test",
@@ -1176,7 +1175,7 @@ func TestApplyCodexWebsocketHeadersDefaultsToCodexCloaking(t *testing.T) {
 
 func TestApplyCodexWebsocketHeadersPassesThroughClientIdentityHeadersWhenCloakingDisabled(t *testing.T) {
 	cfg := &config.Config{Codex: config.CodexConfig{DisableCodexCloaking: true}}
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Metadata: map[string]any{"email": "user@example.com"},
 	}
@@ -1226,7 +1225,7 @@ func TestApplyCodexWebsocketHeadersNativeSessionCombinations(t *testing.T) {
 	cfg := &config.Config{
 		Codex: config.CodexConfig{DisableCodexCloaking: true},
 	}
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Metadata: map[string]any{"email": "user@example.com"},
 	}
@@ -1308,7 +1307,7 @@ func TestApplyCodexWebsocketHeadersNativeSessionCombinations(t *testing.T) {
 }
 
 func TestApplyCodexWebsocketHeadersCanonicalizesLegacyUnderscoreSessionHeader(t *testing.T) {
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Metadata: map[string]any{"email": "user@example.com"},
 	}
@@ -1336,7 +1335,7 @@ func TestApplyCodexWebsocketHeadersUsesConfigDefaultsForOAuth(t *testing.T) {
 			BetaFeatures: "feature-a,feature-b",
 		},
 	}
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Metadata: map[string]any{"email": "user@example.com"},
 	}
@@ -1362,7 +1361,7 @@ func TestApplyCodexWebsocketHeadersPrefersExistingHeadersOverClientAndConfig(t *
 			BetaFeatures: "config-beta",
 		},
 	}
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Metadata: map[string]any{"email": "user@example.com"},
 	}
@@ -1392,7 +1391,7 @@ func TestApplyCodexWebsocketHeadersConfigUserAgentOverridesClientHeader(t *testi
 			BetaFeatures: "config-beta",
 		},
 	}
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Metadata: map[string]any{"email": "user@example.com"},
 	}
@@ -1419,7 +1418,7 @@ func TestApplyCodexWebsocketHeadersIgnoresConfigForAPIKeyAuth(t *testing.T) {
 			BetaFeatures: "config-beta",
 		},
 	}
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider:   "codex",
 		Attributes: map[string]string{"api_key": "sk-test"},
 	}
@@ -1438,7 +1437,7 @@ func TestApplyCodexWebsocketHeadersIgnoresConfigForAPIKeyAuth(t *testing.T) {
 }
 
 func TestApplyCodexWebsocketHeadersPreservesExplicitAPIKeyUserAgent(t *testing.T) {
-	auth := &cliproxyauth.Auth{Provider: "codex", Attributes: map[string]string{"api_key": "sk-test"}}
+	auth := &coreauth.Auth{Provider: "codex", Attributes: map[string]string{"api_key": "sk-test"}}
 	ctx := contextWithGinHeaders(map[string]string{"User-Agent": "api-key-client/1.0", "Originator": "explicit-origin"})
 
 	headers := applyCodexWebsocketHeaders(ctx, http.Header{}, auth, "sk-test", nil, false)
@@ -1452,7 +1451,7 @@ func TestApplyCodexWebsocketHeadersPreservesExplicitAPIKeyUserAgent(t *testing.T
 }
 
 func TestApplyCodexWebsocketHeadersUsesCanonicalAccountHeader(t *testing.T) {
-	auth := &cliproxyauth.Auth{Provider: "codex", Metadata: map[string]any{"account_id": "acct-1"}}
+	auth := &coreauth.Auth{Provider: "codex", Metadata: map[string]any{"account_id": "acct-1"}}
 
 	headers := applyCodexWebsocketHeaders(context.Background(), http.Header{}, auth, "", nil, false)
 
@@ -1469,7 +1468,7 @@ func TestApplyCodexWebsocketHeadersUsesCanonicalAccountHeader(t *testing.T) {
 }
 
 func TestApplyCodexPromptCacheHeadersSetsSessionIDAndLegacyConversation(t *testing.T) {
-	req := cliproxyexecutor.Request{Model: "gpt-5-codex", Payload: []byte(`{"prompt_cache_key":"cache-1"}`)}
+	req := coreexecutor.Request{Model: "gpt-5-codex", Payload: []byte(`{"prompt_cache_key":"cache-1"}`)}
 
 	_, headers := applyCodexPromptCacheHeaders("openai-response", req, []byte(`{"model":"gpt-5-codex"}`))
 
@@ -1487,12 +1486,12 @@ func TestApplyCodexPromptCacheHeadersSetsSessionIDAndLegacyConversation(t *testi
 func TestApplyCodexPromptCacheHeadersUsesDerivedSessionUUID(t *testing.T) {
 	t.Parallel()
 
-	req := cliproxyexecutor.Request{
+	req := coreexecutor.Request{
 		Model:    "gpt-5-codex",
 		Payload:  []byte(`{"input":"hello"}`),
-		Metadata: map[string]any{cliproxyexecutor.DerivedSessionIDMetadataKey: "ctx:v1:derived-root"},
+		Metadata: map[string]any{coreexecutor.DerivedSessionIDMetadataKey: "ctx:v1:derived-root"},
 	}
-	body, headers := applyCodexPromptCacheHeaders(sdktranslator.FormatInteractions, req, []byte(`{"model":"gpt-5-codex"}`))
+	body, headers := applyCodexPromptCacheHeaders(translatorreg.FormatInteractions, req, []byte(`{"model":"gpt-5-codex"}`))
 	cacheKey := ojson.GetBytes(body, "prompt_cache_key").String()
 	if _, errParse := uuid.Parse(cacheKey); errParse != nil {
 		t.Fatalf("prompt_cache_key %q is not a UUID: %v", cacheKey, errParse)
@@ -1508,24 +1507,24 @@ func TestApplyCodexPromptCacheHeadersUsesDerivedSessionUUID(t *testing.T) {
 func TestApplyCodexPromptCacheHeadersKeepsExecutionSessionAcrossIncrementalRoots(t *testing.T) {
 	t.Parallel()
 
-	firstReq := cliproxyexecutor.Request{
+	firstReq := coreexecutor.Request{
 		Model:   "gpt-5-codex",
 		Payload: []byte(`{"input":"first"}`),
 		Metadata: map[string]any{
-			cliproxyexecutor.ExecutionSessionMetadataKey: "connection-1",
-			cliproxyexecutor.DerivedSessionIDMetadataKey: "ctx:v1:first-root",
+			coreexecutor.ExecutionSessionMetadataKey: "connection-1",
+			coreexecutor.DerivedSessionIDMetadataKey: "ctx:v1:first-root",
 		},
 	}
-	secondReq := cliproxyexecutor.Request{
+	secondReq := coreexecutor.Request{
 		Model:   "gpt-5-codex",
 		Payload: []byte(`{"input":"second"}`),
 		Metadata: map[string]any{
-			cliproxyexecutor.ExecutionSessionMetadataKey: "connection-1",
-			cliproxyexecutor.DerivedSessionIDMetadataKey: "ctx:v1:second-root",
+			coreexecutor.ExecutionSessionMetadataKey: "connection-1",
+			coreexecutor.DerivedSessionIDMetadataKey: "ctx:v1:second-root",
 		},
 	}
-	firstBody, _ := applyCodexPromptCacheHeaders(sdktranslator.FormatOpenAIResponse, firstReq, []byte(`{"model":"gpt-5-codex"}`))
-	secondBody, _ := applyCodexPromptCacheHeaders(sdktranslator.FormatOpenAIResponse, secondReq, []byte(`{"model":"gpt-5-codex"}`))
+	firstBody, _ := applyCodexPromptCacheHeaders(translatorreg.FormatOpenAIResponse, firstReq, []byte(`{"model":"gpt-5-codex"}`))
+	secondBody, _ := applyCodexPromptCacheHeaders(translatorreg.FormatOpenAIResponse, secondReq, []byte(`{"model":"gpt-5-codex"}`))
 	firstKey := ojson.GetBytes(firstBody, "prompt_cache_key").String()
 	secondKey := ojson.GetBytes(secondBody, "prompt_cache_key").String()
 	if firstKey == "" || firstKey != secondKey {
@@ -1534,14 +1533,14 @@ func TestApplyCodexPromptCacheHeadersKeepsExecutionSessionAcrossIncrementalRoots
 }
 
 func TestApplyCodexPromptCacheHeadersClaudeUsesClaudeCodeSessionID(t *testing.T) {
-	firstReq := cliproxyexecutor.Request{
+	firstReq := coreexecutor.Request{
 		Model: "gpt-5-codex-claude-ws-cache-session",
 		Payload: []byte(`{
 			"metadata":{"user_id":"{\"device_id\":\"device-a\",\"account_uuid\":\"\",\"session_id\":\"ws-cache-session-1\"}"},
 			"messages":[{"role":"user","content":[{"type":"text","text":"first"}]}]
 		}`),
 	}
-	secondReq := cliproxyexecutor.Request{
+	secondReq := coreexecutor.Request{
 		Model: "gpt-5-codex-claude-ws-cache-session",
 		Payload: []byte(`{
 			"metadata":{"user_id":"{\"device_id\":\"device-b\",\"account_uuid\":\"\",\"session_id\":\"ws-cache-session-1\"}"},
@@ -1569,7 +1568,7 @@ func TestApplyCodexPromptCacheHeadersClaudeUsesClaudeCodeSessionID(t *testing.T)
 }
 
 func TestApplyCodexPromptCacheHeadersClaudeRejectsBareUserID(t *testing.T) {
-	req := cliproxyexecutor.Request{
+	req := coreexecutor.Request{
 		Model:   "gpt-5-codex-claude-ws-cache-bare-user",
 		Payload: []byte(`{"metadata":{"user_id":"same-user-across-chats"},"messages":[{"role":"user","content":[{"type":"text","text":"first"}]}]}`),
 	}
@@ -1677,7 +1676,7 @@ func TestApplyCodexHeadersUsesConfigUserAgentForOAuth(t *testing.T) {
 			BetaFeatures: "config-beta",
 		},
 	}
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Metadata: map[string]any{"email": "user@example.com"},
 	}
@@ -1707,7 +1706,7 @@ func TestApplyCodexHeadersDefaultsToCodexCloaking(t *testing.T) {
 			UserAgent: "config-ua",
 		},
 	}
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"api_key":           "api-key",
@@ -1735,7 +1734,7 @@ func TestApplyCodexHeaders_EmptyAPIKey_OmitsAuthorizationAndOAuthHeaders(t *test
 	if err != nil {
 		t.Fatalf("NewRequest() error = %v", err)
 	}
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"auth_kind": "apikey",
@@ -1770,7 +1769,7 @@ func TestApplyCodexHeaders_EmptyAPIKey_OmitsAuthorizationAndOAuthHeaders(t *test
 }
 
 func TestApplyCodexWebsocketHeaders_EmptyAPIKey_OmitsAuthorizationAndOAuthHeaders(t *testing.T) {
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"auth_kind": "apikey",
@@ -1818,7 +1817,7 @@ func TestApplyModelHeaderOverridesFromModelConfig(t *testing.T) {
 			UserAgent: "config-ua",
 		},
 	}
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Metadata: map[string]any{"email": "user@example.com"},
 	}
@@ -1877,7 +1876,7 @@ func TestApplyCodexHeadersPassesThroughClientIdentityHeaders(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewRequest() error = %v", err)
 	}
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Metadata: map[string]any{"email": "user@example.com"},
 	}
@@ -1948,8 +1947,8 @@ func TestNewProxyAwareWebsocketDialerDirectDisablesProxy(t *testing.T) {
 
 	dialer := newProxyAwareWebsocketDialer(
 		context.Background(),
-		&config.Config{SDKConfig: sdkconfig.SDKConfig{ProxyURL: "http://global-proxy.example.com:8080"}},
-		&cliproxyauth.Auth{ProxyURL: "direct"},
+		&config.Config{SDKConfig: config.SDKConfig{ProxyURL: "http://global-proxy.example.com:8080"}},
+		&coreauth.Auth{ProxyURL: "direct"},
 	)
 
 	if dialer.Proxy != nil {
@@ -1970,11 +1969,11 @@ func TestCodexWebsocketUpgradeRequiredDoesNotFallbackToHTTPWithLifecycle(t *test
 	defer server.Close()
 
 	exec := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
-	auth := &cliproxyauth.Auth{ID: "auth-a", Provider: "codex", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
-	req := cliproxyexecutor.Request{Model: "gpt-5-codex", Payload: []byte(`{"model":"gpt-5-codex","input":[{"type":"message","role":"user","content":"hello"}]}`)}
-	opts := cliproxyexecutor.Options{
-		SourceFormat:       sdktranslator.FromString("openai-response"),
-		ResponseFormat:     sdktranslator.FromString("openai-response"),
+	auth := &coreauth.Auth{ID: "auth-a", Provider: "codex", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
+	req := coreexecutor.Request{Model: "gpt-5-codex", Payload: []byte(`{"model":"gpt-5-codex","input":[{"type":"message","role":"user","content":"hello"}]}`)}
+	opts := coreexecutor.Options{
+		SourceFormat:       translatorreg.FromString("openai-response"),
+		ResponseFormat:     translatorreg.FromString("openai-response"),
 		ExecutionLifecycle: newTerminalFailureLifecycle(),
 	}
 
@@ -1996,13 +1995,13 @@ func TestCodexWebsocketHandshakeFailureReleasesSessionRequestLock(t *testing.T) 
 
 			exec := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
 			exec.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
-			auth := &cliproxyauth.Auth{ID: "auth-a", Provider: "codex", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
-			req := cliproxyexecutor.Request{Model: "gpt-5-codex", Payload: []byte(`{"model":"gpt-5-codex","input":[{"type":"message","role":"user","content":"hello"}]}`)}
-			opts := cliproxyexecutor.Options{
-				SourceFormat:   sdktranslator.FromString("openai-response"),
-				ResponseFormat: sdktranslator.FromString("openai-response"),
+			auth := &coreauth.Auth{ID: "auth-a", Provider: "codex", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
+			req := coreexecutor.Request{Model: "gpt-5-codex", Payload: []byte(`{"model":"gpt-5-codex","input":[{"type":"message","role":"user","content":"hello"}]}`)}
+			opts := coreexecutor.Options{
+				SourceFormat:   translatorreg.FromString("openai-response"),
+				ResponseFormat: translatorreg.FromString("openai-response"),
 				Metadata: map[string]any{
-					cliproxyexecutor.ExecutionSessionMetadataKey: "failed-handshake",
+					coreexecutor.ExecutionSessionMetadataKey: "failed-handshake",
 				},
 			}
 
@@ -2068,14 +2067,14 @@ func TestCodexWebsocketTerminalFailureInvalidatesRetainedLifecycle(t *testing.T)
 
 	exec := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
 	exec.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
-	auth := &cliproxyauth.Auth{ID: "auth-a", Provider: "codex", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
-	req := cliproxyexecutor.Request{Model: "gpt-5-codex", Payload: []byte(`{"model":"gpt-5-codex","input":[{"type":"message","role":"user","content":"hello"}]}`)}
-	opts := cliproxyexecutor.Options{
-		SourceFormat:       sdktranslator.FromString("openai-response"),
-		ResponseFormat:     sdktranslator.FromString("openai-response"),
+	auth := &coreauth.Auth{ID: "auth-a", Provider: "codex", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
+	req := coreexecutor.Request{Model: "gpt-5-codex", Payload: []byte(`{"model":"gpt-5-codex","input":[{"type":"message","role":"user","content":"hello"}]}`)}
+	opts := coreexecutor.Options{
+		SourceFormat:       translatorreg.FromString("openai-response"),
+		ResponseFormat:     translatorreg.FromString("openai-response"),
 		ExecutionLifecycle: newTerminalFailureLifecycle(),
 		Metadata: map[string]any{
-			cliproxyexecutor.ExecutionSessionMetadataKey: "terminal-failure",
+			coreexecutor.ExecutionSessionMetadataKey: "terminal-failure",
 		},
 	}
 
@@ -2152,21 +2151,21 @@ func TestCodexWebsocketNonstreamLifecycleBindFailureDetachesConnection(t *testin
 
 	exec := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
 	exec.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
-	auth := &cliproxyauth.Auth{ID: "auth-a", Provider: "codex", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
-	req := cliproxyexecutor.Request{Model: "gpt-5-codex", Payload: []byte(`{"model":"gpt-5-codex","input":[{"type":"message","role":"user","content":"hello"}]}`)}
-	opts := cliproxyexecutor.Options{
-		SourceFormat:       sdktranslator.FromString("openai-response"),
-		ResponseFormat:     sdktranslator.FromString("openai-response"),
+	auth := &coreauth.Auth{ID: "auth-a", Provider: "codex", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
+	req := coreexecutor.Request{Model: "gpt-5-codex", Payload: []byte(`{"model":"gpt-5-codex","input":[{"type":"message","role":"user","content":"hello"}]}`)}
+	opts := coreexecutor.Options{
+		SourceFormat:       translatorreg.FromString("openai-response"),
+		ResponseFormat:     translatorreg.FromString("openai-response"),
 		ExecutionLifecycle: rejectingExecutionLifecycle{},
 		Metadata: map[string]any{
-			cliproxyexecutor.ExecutionSessionMetadataKey: "nonstream-bind-failed",
+			coreexecutor.ExecutionSessionMetadataKey: "nonstream-bind-failed",
 		},
 	}
-	attemptCtx := cliproxyexecutor.WithUpstreamAttemptTracker(context.Background())
+	attemptCtx := coreexecutor.WithUpstreamAttemptTracker(context.Background())
 	if _, errExecute := exec.Execute(attemptCtx, auth, req, opts); errExecute == nil {
 		t.Fatal("Execute() error = nil, want lifecycle bind failure")
 	}
-	if cliproxyexecutor.UpstreamAttempted(attemptCtx) {
+	if coreexecutor.UpstreamAttempted(attemptCtx) {
 		t.Fatal("successful handshake marked a lifecycle bind failure as an upstream request attempt")
 	}
 	select {
@@ -2214,21 +2213,21 @@ func TestCodexWebsocketLifecycleBindFailureReleasesSessionRequestLock(t *testing
 
 	exec := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
 	exec.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
-	auth := &cliproxyauth.Auth{ID: "auth-a", Provider: "codex", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
-	req := cliproxyexecutor.Request{Model: "gpt-5-codex", Payload: []byte(`{"model":"gpt-5-codex","input":[{"type":"message","role":"user","content":"hello"}]}`)}
-	opts := cliproxyexecutor.Options{
-		SourceFormat:       sdktranslator.FromString("openai-response"),
-		ResponseFormat:     sdktranslator.FromString("openai-response"),
+	auth := &coreauth.Auth{ID: "auth-a", Provider: "codex", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
+	req := coreexecutor.Request{Model: "gpt-5-codex", Payload: []byte(`{"model":"gpt-5-codex","input":[{"type":"message","role":"user","content":"hello"}]}`)}
+	opts := coreexecutor.Options{
+		SourceFormat:       translatorreg.FromString("openai-response"),
+		ResponseFormat:     translatorreg.FromString("openai-response"),
 		ExecutionLifecycle: rejectingExecutionLifecycle{},
 		Metadata: map[string]any{
-			cliproxyexecutor.ExecutionSessionMetadataKey: "bind-failed",
+			coreexecutor.ExecutionSessionMetadataKey: "bind-failed",
 		},
 	}
-	attemptCtx := cliproxyexecutor.WithUpstreamAttemptTracker(context.Background())
+	attemptCtx := coreexecutor.WithUpstreamAttemptTracker(context.Background())
 	if _, errExecute := exec.ExecuteStream(attemptCtx, auth, req, opts); errExecute == nil {
 		t.Fatal("ExecuteStream() error = nil, want lifecycle bind failure")
 	}
-	if cliproxyexecutor.UpstreamAttempted(attemptCtx) {
+	if coreexecutor.UpstreamAttempted(attemptCtx) {
 		t.Fatal("successful handshake marked a lifecycle bind failure as an upstream request attempt")
 	}
 	select {
@@ -2277,7 +2276,7 @@ func TestCodexWebsocketsExecuteObservesWebSocketResponseEvents(t *testing.T) {
 	defer server.Close()
 
 	exec := NewCodexWebsocketsExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:       "auth-codex-1",
 		Label:    "codex-account",
 		Provider: "codex",
@@ -2290,18 +2289,18 @@ func TestCodexWebsocketsExecuteObservesWebSocketResponseEvents(t *testing.T) {
 			"email": "user@example.com",
 		},
 	}
-	req := cliproxyexecutor.Request{
+	req := coreexecutor.Request{
 		Model:   "gpt-5.6-sol",
 		Payload: []byte(`{"model":"gpt-5.6-sol","input":[{"role":"user","content":"hello"}]}`),
 	}
 
-	var observedEvents []cliproxyexecutor.WebSocketResponseEvent
-	opts := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("codex"),
+	var observedEvents []coreexecutor.WebSocketResponseEvent
+	opts := coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("codex"),
 		Metadata: map[string]any{
 			"request_id": "test-req-codex",
 		},
-		WebSocketResponseObserver: func(_ context.Context, ev cliproxyexecutor.WebSocketResponseEvent) {
+		WebSocketResponseObserver: func(_ context.Context, ev coreexecutor.WebSocketResponseEvent) {
 			observedEvents = append(observedEvents, ev)
 		},
 	}
@@ -2355,7 +2354,7 @@ func TestCodexWebsocketsExecuteStreamObservesWebSocketResponseEvents(t *testing.
 	defer server.Close()
 
 	exec := NewCodexWebsocketsExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:       "auth-stream-1",
 		Label:    "codex-stream-account",
 		Provider: "codex",
@@ -2365,18 +2364,18 @@ func TestCodexWebsocketsExecuteStreamObservesWebSocketResponseEvents(t *testing.
 			"auth_kind": "oauth",
 		},
 	}
-	req := cliproxyexecutor.Request{
+	req := coreexecutor.Request{
 		Model:   "gpt-5.6-sol",
 		Payload: []byte(`{"model":"gpt-5.6-sol","input":[{"role":"user","content":"hello"}]}`),
 	}
 
-	var observedEvents []cliproxyexecutor.WebSocketResponseEvent
-	opts := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("codex"),
+	var observedEvents []coreexecutor.WebSocketResponseEvent
+	opts := coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("codex"),
 		Metadata: map[string]any{
 			"request_id": "test-req-stream",
 		},
-		WebSocketResponseObserver: func(_ context.Context, ev cliproxyexecutor.WebSocketResponseEvent) {
+		WebSocketResponseObserver: func(_ context.Context, ev coreexecutor.WebSocketResponseEvent) {
 			observedEvents = append(observedEvents, ev)
 		},
 	}
@@ -2424,7 +2423,7 @@ func TestCodexWebsocketsExecuteHandshakeUsageLimitReachedSetsRetryAfter(t *testi
 	defer server.Close()
 
 	exec := NewCodexWebsocketsExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:       "codex-auth-quota-exhausted",
 		Provider: "codex",
 		Attributes: map[string]string{
@@ -2433,21 +2432,21 @@ func TestCodexWebsocketsExecuteHandshakeUsageLimitReachedSetsRetryAfter(t *testi
 			"api_key":    "sk-test",
 		},
 	}
-	req := cliproxyexecutor.Request{
+	req := coreexecutor.Request{
 		Model:   "gpt-5.6-luna",
 		Payload: []byte(`{"model":"gpt-5.6-luna","input":[{"type":"message","id":"msg-1"}]}`),
 	}
-	opts := cliproxyexecutor.Options{
-		SourceFormat:   sdktranslator.FromString("openai-response"),
-		ResponseFormat: sdktranslator.FromString("openai-response"),
+	opts := coreexecutor.Options{
+		SourceFormat:   translatorreg.FromString("openai-response"),
+		ResponseFormat: translatorreg.FromString("openai-response"),
 	}
 
-	ctx := cliproxyexecutor.WithUpstreamAttemptTracker(context.Background())
+	ctx := coreexecutor.WithUpstreamAttemptTracker(context.Background())
 	_, errExecute := exec.Execute(ctx, auth, req, opts)
 	if errExecute == nil {
 		t.Fatal("Execute() error = nil, want handshake rejection")
 	}
-	if !cliproxyexecutor.UpstreamAttempted(ctx) {
+	if !coreexecutor.UpstreamAttempted(ctx) {
 		t.Fatal("429 websocket handshake was not marked as an upstream attempt")
 	}
 	statusErr, ok := errExecute.(interface{ StatusCode() int })
@@ -2475,7 +2474,7 @@ func TestCodexWebsocketsExecuteStreamHandshakeUsageLimitReachedSetsRetryAfter(t 
 	defer server.Close()
 
 	exec := NewCodexWebsocketsExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:       "codex-auth-quota-exhausted-stream",
 		Provider: "codex",
 		Attributes: map[string]string{
@@ -2484,21 +2483,21 @@ func TestCodexWebsocketsExecuteStreamHandshakeUsageLimitReachedSetsRetryAfter(t 
 			"api_key":    "sk-test",
 		},
 	}
-	req := cliproxyexecutor.Request{
+	req := coreexecutor.Request{
 		Model:   "gpt-5.6-luna",
 		Payload: []byte(`{"model":"gpt-5.6-luna","input":[{"type":"message","id":"msg-1"}]}`),
 	}
-	opts := cliproxyexecutor.Options{
-		SourceFormat:   sdktranslator.FromString("openai-response"),
-		ResponseFormat: sdktranslator.FromString("openai-response"),
+	opts := coreexecutor.Options{
+		SourceFormat:   translatorreg.FromString("openai-response"),
+		ResponseFormat: translatorreg.FromString("openai-response"),
 	}
 
-	ctx := cliproxyexecutor.WithUpstreamAttemptTracker(context.Background())
+	ctx := coreexecutor.WithUpstreamAttemptTracker(context.Background())
 	_, errExecuteStream := exec.ExecuteStream(ctx, auth, req, opts)
 	if errExecuteStream == nil {
 		t.Fatal("ExecuteStream() error = nil, want handshake rejection")
 	}
-	if !cliproxyexecutor.UpstreamAttempted(ctx) {
+	if !coreexecutor.UpstreamAttempted(ctx) {
 		t.Fatal("429 streaming websocket handshake was not marked as an upstream attempt")
 	}
 	statusErr, ok := errExecuteStream.(interface{ StatusCode() int })
@@ -2540,13 +2539,13 @@ func TestCodexWebsocketZeroTokenIncompleteReleasesSessionRequestLock(t *testing.
 		},
 	})
 	exec.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
-	auth := &cliproxyauth.Auth{ID: "auth-a", Provider: "codex", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
-	req := cliproxyexecutor.Request{Model: "gpt-5-codex", Payload: []byte(`{"model":"gpt-5-codex","input":[{"type":"message","role":"user","content":"hello"}]}`)}
-	opts := cliproxyexecutor.Options{
-		SourceFormat:   sdktranslator.FromString("openai-response"),
-		ResponseFormat: sdktranslator.FromString("openai-response"),
+	auth := &coreauth.Auth{ID: "auth-a", Provider: "codex", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
+	req := coreexecutor.Request{Model: "gpt-5-codex", Payload: []byte(`{"model":"gpt-5-codex","input":[{"type":"message","role":"user","content":"hello"}]}`)}
+	opts := coreexecutor.Options{
+		SourceFormat:   translatorreg.FromString("openai-response"),
+		ResponseFormat: translatorreg.FromString("openai-response"),
 		Metadata: map[string]any{
-			cliproxyexecutor.ExecutionSessionMetadataKey: "zero-token-session",
+			coreexecutor.ExecutionSessionMetadataKey: "zero-token-session",
 		},
 	}
 
@@ -2733,16 +2732,16 @@ func TestCodexWebsockets_KeepalivePingDuringUpload_WithSession(t *testing.T) {
 			DisableImageGeneration: config.DisableImageGenerationAll,
 		},
 	})
-	auth := &cliproxyauth.Auth{ID: "auth-session-ping", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
-	req := cliproxyexecutor.Request{
+	auth := &coreauth.Auth{ID: "auth-session-ping", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
+	req := coreexecutor.Request{
 		Model:   "gpt-5.6-sol",
 		Payload: []byte(`{"model":"gpt-5.6-sol","input":[{"type":"message","role":"user","content":"ping test"}]}`),
 	}
-	opts := cliproxyexecutor.Options{
-		SourceFormat:   sdktranslator.FromString("openai-response"),
-		ResponseFormat: sdktranslator.FromString("openai-response"),
+	opts := coreexecutor.Options{
+		SourceFormat:   translatorreg.FromString("openai-response"),
+		ResponseFormat: translatorreg.FromString("openai-response"),
 		Metadata: map[string]any{
-			cliproxyexecutor.ExecutionSessionMetadataKey: "session-ping-test",
+			coreexecutor.ExecutionSessionMetadataKey: "session-ping-test",
 		},
 	}
 
@@ -2846,14 +2845,14 @@ func TestCodexWebsockets_KeepalivePingDuringUpload_Sessionless(t *testing.T) {
 			DisableImageGeneration: config.DisableImageGenerationAll,
 		},
 	})
-	auth := &cliproxyauth.Auth{ID: "auth-sessionless-ping", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
-	req := cliproxyexecutor.Request{
+	auth := &coreauth.Auth{ID: "auth-sessionless-ping", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
+	req := coreexecutor.Request{
 		Model:   "gpt-5.6-sol",
 		Payload: []byte(`{"model":"gpt-5.6-sol","input":[{"type":"message","role":"user","content":"ping test sessionless"}]}`),
 	}
-	opts := cliproxyexecutor.Options{
-		SourceFormat:   sdktranslator.FromString("openai-response"),
-		ResponseFormat: sdktranslator.FromString("openai-response"),
+	opts := coreexecutor.Options{
+		SourceFormat:   translatorreg.FromString("openai-response"),
+		ResponseFormat: translatorreg.FromString("openai-response"),
 	}
 
 	result, errStream := exec.ExecuteStream(context.Background(), auth, req, opts)
@@ -2956,14 +2955,14 @@ func TestCodexWebsockets_KeepalivePingDuringUpload_NonstreamSessionless(t *testi
 			DisableImageGeneration: config.DisableImageGenerationAll,
 		},
 	})
-	auth := &cliproxyauth.Auth{ID: "auth-nonstream-ping", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
-	req := cliproxyexecutor.Request{
+	auth := &coreauth.Auth{ID: "auth-nonstream-ping", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
+	req := coreexecutor.Request{
 		Model:   "gpt-5.6-sol",
 		Payload: []byte(`{"model":"gpt-5.6-sol","input":[{"type":"message","role":"user","content":"ping test nonstream"}]}`),
 	}
-	opts := cliproxyexecutor.Options{
-		SourceFormat:   sdktranslator.FromString("openai-response"),
-		ResponseFormat: sdktranslator.FromString("openai-response"),
+	opts := coreexecutor.Options{
+		SourceFormat:   translatorreg.FromString("openai-response"),
+		ResponseFormat: translatorreg.FromString("openai-response"),
 	}
 
 	resp, errExec := exec.Execute(context.Background(), auth, req, opts)
@@ -3016,14 +3015,14 @@ func TestCodexWebsockets_SessionlessBufferingImmediateTerminalClosesConnection(t
 			DisableImageGeneration: config.DisableImageGenerationAll,
 		},
 	})
-	auth := &cliproxyauth.Auth{ID: "auth-buffering-close", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
-	req := cliproxyexecutor.Request{
+	auth := &coreauth.Auth{ID: "auth-buffering-close", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
+	req := coreexecutor.Request{
 		Model:   "gpt-5.6-sol",
 		Payload: []byte(`{"model":"gpt-5.6-sol","input":[{"type":"message","role":"user","content":"buffering close test"}]}`),
 	}
-	opts := cliproxyexecutor.Options{
-		SourceFormat:   sdktranslator.FromString("openai-response"),
-		ResponseFormat: sdktranslator.FromString("openai-response"),
+	opts := coreexecutor.Options{
+		SourceFormat:   translatorreg.FromString("openai-response"),
+		ResponseFormat: translatorreg.FromString("openai-response"),
 		// Sessionless
 	}
 
@@ -3316,14 +3315,14 @@ func TestCodexWebsockets_SendErrorLogsSessionObject(t *testing.T) {
 			DisableImageGeneration: config.DisableImageGenerationAll,
 		},
 	})
-	auth := &cliproxyauth.Auth{ID: "auth-send-fail", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
-	req := cliproxyexecutor.Request{
+	auth := &coreauth.Auth{ID: "auth-send-fail", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
+	req := coreexecutor.Request{
 		Model:   "gpt-5.6-sol",
 		Payload: []byte(`{"model":"gpt-5.6-sol","input":[{"type":"message","role":"user","content":"send fail"}]}`),
 	}
-	opts := cliproxyexecutor.Options{
-		SourceFormat:   sdktranslator.FromString("openai-response"),
-		ResponseFormat: sdktranslator.FromString("openai-response"),
+	opts := coreexecutor.Options{
+		SourceFormat:   translatorreg.FromString("openai-response"),
+		ResponseFormat: translatorreg.FromString("openai-response"),
 		// Sessionless -> ephemeral
 	}
 

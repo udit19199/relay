@@ -10,10 +10,10 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestOpenAICompatExecutor_VideoInput(t *testing.T) {
@@ -43,7 +43,7 @@ func TestOpenAICompatExecutor_VideoInput(t *testing.T) {
 				defer server.Close()
 
 				executor := NewOpenAICompatExecutor("openai-compatibility", &config.Config{})
-				auth := &cliproxyauth.Auth{
+				auth := &coreauth.Auth{
 					Provider: "openai-compatibility",
 					Attributes: map[string]string{
 						"base_url": server.URL + "/v1",
@@ -54,8 +54,8 @@ func TestOpenAICompatExecutor_VideoInput(t *testing.T) {
 				if source == "openai-response" {
 					payload = `{"model":"client-alias","input":[{"role":"user","content":[{"type":"input_text","text":"Describe the videos."},{"type":"input_video","video_url":"https://example.com/clip.mp4?part=1&name=a%20b","processing":"agentic"},{"type":"input_video","video_url":"data:video/mp4;base64,AAECAwQ="}]}]}`
 				}
-				req := cliproxyexecutor.Request{Model: "video-model", Payload: []byte(payload)}
-				opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString(source), Stream: stream}
+				req := coreexecutor.Request{Model: "video-model", Payload: []byte(payload)}
+				opts := coreexecutor.Options{SourceFormat: translatorreg.FromString(source), Stream: stream}
 				var response strings.Builder
 				if stream {
 					result, errExecute := executor.ExecuteStream(context.Background(), auth, req, opts)

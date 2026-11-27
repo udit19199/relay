@@ -5,8 +5,8 @@
 package xai
 
 import (
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/thinking"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/thinking/provider/codex"
+	"github.com/udit19199/relay/internal/thinking"
+	"github.com/udit19199/relay/internal/thinking/provider/codex"
 )
 
 // Applier implements thinking.ProviderApplier for xAI models.

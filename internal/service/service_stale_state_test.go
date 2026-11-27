@@ -1,0 +1,71 @@
+package service
+
+import (
+	"context"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/registry"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	"testing"
+	"time"
+)
+
+func TestServiceApplyCoreAuthAddOrUpdate_DeleteReAddDoesNotInheritStaleRuntimeState(t *testing.T) {
+	service := &Service{
+		cfg:         &config.Config{},
+		coreManager: coreauth.NewManager(nil, nil, nil),
+	}
+
+	authID := "service-stale-state-auth"
+	modelID := "stale-model"
+	lastRefreshedAt := time.Date(2026, time.March, 1, 8, 0, 0, 0, time.UTC)
+	nextRefreshAfter := lastRefreshedAt.Add(30 * time.Minute)
+
+	t.Cleanup(func() {
+		GlobalModelRegistry().UnregisterClient(authID)
+	})
+
+	service.applyCoreAuthAddOrUpdate(context.Background(), &coreauth.Auth{
+		ID:               authID,
+		Provider:         "claude",
+		Status:           coreauth.StatusActive,
+		LastRefreshedAt:  lastRefreshedAt,
+		NextRefreshAfter: nextRefreshAfter,
+		ModelStates: map[string]*coreauth.ModelState{
+			modelID: {
+				Quota: coreauth.QuotaState{BackoffLevel: 7},
+			},
+		},
+	})
+
+	service.applyCoreAuthRemoval(context.Background(), authID)
+
+	if _, ok := service.coreManager.GetByID(authID); ok {
+		t.Fatalf("expected auth %q to be removed from runtime state", authID)
+	}
+
+	service.applyCoreAuthAddOrUpdate(context.Background(), &coreauth.Auth{
+		ID:       authID,
+		Provider: "claude",
+		Status:   coreauth.StatusActive,
+	})
+
+	updated, ok := service.coreManager.GetByID(authID)
+	if !ok || updated == nil {
+		t.Fatalf("expected re-added auth to be present")
+	}
+	if updated.Disabled {
+		t.Fatalf("expected re-added auth to be active")
+	}
+	if !updated.LastRefreshedAt.IsZero() {
+		t.Fatalf("expected LastRefreshedAt to reset on delete -> re-add, got %v", updated.LastRefreshedAt)
+	}
+	if !updated.NextRefreshAfter.IsZero() {
+		t.Fatalf("expected NextRefreshAfter to reset on delete -> re-add, got %v", updated.NextRefreshAfter)
+	}
+	if len(updated.ModelStates) != 0 {
+		t.Fatalf("expected ModelStates to reset on delete -> re-add, got %d entries", len(updated.ModelStates))
+	}
+	if models := registry.GetGlobalRegistry().GetModelsForClient(authID); len(models) == 0 {
+		t.Fatalf("expected re-added auth to re-register models in global registry")
+	}
+}

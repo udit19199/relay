@@ -5,14 +5,14 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	claudeauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/claude"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	claudeauth "github.com/udit19199/relay/internal/auth/claude"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 func TestEnsureClaudeCLIFingerprintIdentitySynthesizesStableSources(t *testing.T) {
 	t.Parallel()
 
-	auth := &cliproxyauth.Auth{}
+	auth := &coreauth.Auth{}
 	if err := EnsureClaudeCLIFingerprintIdentity(auth, "key-a", true); err != nil {
 		t.Fatalf("EnsureClaudeCLIFingerprintIdentity() error = %v", err)
 	}
@@ -61,13 +61,13 @@ func TestClaudeCLIAuthIdentitySeedPrefersStableAuthIdentity(t *testing.T) {
 
 	tests := []struct {
 		name string
-		auth *cliproxyauth.Auth
+		auth *coreauth.Auth
 		want string
 	}{
-		{name: "auth ID", auth: &cliproxyauth.Auth{ID: "cli-auth"}, want: "auth-id|cli-auth"},
-		{name: "auth index", auth: &cliproxyauth.Auth{Index: "cli-index"}, want: "auth-index|cli-index"},
-		{name: "auth file", auth: &cliproxyauth.Auth{FileName: "cli.json"}, want: "auth-file|cli.json"},
-		{name: "missing identity", auth: &cliproxyauth.Auth{}, want: ""},
+		{name: "auth ID", auth: &coreauth.Auth{ID: "cli-auth"}, want: "auth-id|cli-auth"},
+		{name: "auth index", auth: &coreauth.Auth{Index: "cli-index"}, want: "auth-index|cli-index"},
+		{name: "auth file", auth: &coreauth.Auth{FileName: "cli.json"}, want: "auth-file|cli.json"},
+		{name: "missing identity", auth: &coreauth.Auth{}, want: ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -82,7 +82,7 @@ func TestClaudeCLIAuthIdentitySeedPrefersStableAuthIdentity(t *testing.T) {
 func TestPrepareClaudeCLIFingerprintAuthDoesNotMutateSharedMetadata(t *testing.T) {
 	t.Parallel()
 
-	shared := &cliproxyauth.Auth{
+	shared := &coreauth.Auth{
 		ID: "cli-shared",
 		Metadata: map[string]any{
 			"access_token": "token-1",
@@ -107,7 +107,7 @@ func TestPrepareClaudeCLIFingerprintAuthDoesNotMutateSharedMetadata(t *testing.T
 }
 
 func TestPrepareClaudeCLIFingerprintAuthIsolatesUnlockedMetadataReaders(t *testing.T) {
-	shared := &cliproxyauth.Auth{
+	shared := &coreauth.Auth{
 		ID: "cli-race",
 		Metadata: map[string]any{
 			"access_token":  "token-1",
@@ -143,7 +143,7 @@ func TestPrepareClaudeCLIFingerprintAuthIsolatesUnlockedMetadataReaders(t *testi
 func TestEnsureClaudeCLIFingerprintIdentityNoopWithoutSynthesize(t *testing.T) {
 	t.Parallel()
 
-	auth := &cliproxyauth.Auth{}
+	auth := &coreauth.Auth{}
 	if err := EnsureClaudeCLIFingerprintIdentity(auth, "key-a", false); err != nil {
 		t.Fatalf("EnsureClaudeCLIFingerprintIdentity() error = %v", err)
 	}
@@ -155,7 +155,7 @@ func TestEnsureClaudeCLIFingerprintIdentityNoopWithoutSynthesize(t *testing.T) {
 func TestEnsureClaudeCLIFingerprintIdentityPreservesExistingOAuthSources(t *testing.T) {
 	t.Parallel()
 
-	auth := &cliproxyauth.Auth{Metadata: map[string]any{
+	auth := &coreauth.Auth{Metadata: map[string]any{
 		"account_uuid":                        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
 		claudeauth.ClaudeDeviceIDsMetadataKey: []string{"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
 	}}

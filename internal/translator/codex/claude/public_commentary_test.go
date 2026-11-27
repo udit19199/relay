@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	translatorcommon "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/common"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	translatorcommon "github.com/udit19199/relay/internal/translator/common"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestVisiblePublicCommentaryPreservesReasoningAndFinalAnswer(t *testing.T) {
@@ -78,8 +78,8 @@ func TestVisibleCommentaryReplayContextPreservesAdjacentFinalText(t *testing.T) 
 	t.Setenv("CPA_VISIBLE_CODEX_COMMENTARY", "")
 	ctx := translatorcommon.WithVisibleCodexCommentary(context.Background(), true)
 	input := []byte(`{"model":"m","messages":[{"role":"assistant","content":[{"type":"thinking","thinking":"Progress","signature":"cpa:commentary:v1"},{"type":"text","text":"Progress"},{"type":"text","text":"Actual final answer"}]},{"role":"user","content":"What are the agents doing?"}]}`)
-	result := sdktranslator.TranslateRequestEnvelope(ctx, sdktranslator.FormatClaude, sdktranslator.FormatCodex,
-		sdktranslator.RequestEnvelope{Format: sdktranslator.FormatClaude, Model: "gpt-6.1-sol", Body: input})
+	result := translatorreg.TranslateRequestEnvelope(ctx, translatorreg.FormatClaude, translatorreg.FormatCodex,
+		translatorreg.RequestEnvelope{Format: translatorreg.FormatClaude, Model: "gpt-6.1-sol", Body: input})
 	if result.Err != nil {
 		t.Fatal(result.Err)
 	}

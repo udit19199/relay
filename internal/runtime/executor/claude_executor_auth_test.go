@@ -7,28 +7,28 @@ import (
 	"net/http"
 	"testing"
 
-	claudeauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/claude"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	claudeauth "github.com/udit19199/relay/internal/auth/claude"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestClaudeExecutorDuplicateMetadataIsRequestScoped(t *testing.T) {
 	testCases := []struct {
 		name string
-		run  func(context.Context, *ClaudeExecutor, *cliproxyauth.Auth, cliproxyexecutor.Request, cliproxyexecutor.Options) error
+		run  func(context.Context, *ClaudeExecutor, *coreauth.Auth, coreexecutor.Request, coreexecutor.Options) error
 	}{
 		{
 			name: "execute",
-			run: func(ctx context.Context, executor *ClaudeExecutor, auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) error {
+			run: func(ctx context.Context, executor *ClaudeExecutor, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) error {
 				_, errExecute := executor.Execute(ctx, auth, req, opts)
 				return errExecute
 			},
 		},
 		{
 			name: "stream",
-			run: func(ctx context.Context, executor *ClaudeExecutor, auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) error {
+			run: func(ctx context.Context, executor *ClaudeExecutor, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) error {
 				_, errStream := executor.ExecuteStream(ctx, auth, req, opts)
 				return errStream
 			},
@@ -43,7 +43,7 @@ func TestClaudeExecutorDuplicateMetadataIsRequestScoped(t *testing.T) {
 				return nil, errors.New("unexpected upstream request")
 			})
 			ctx := context.WithValue(t.Context(), "cliproxy.roundtripper", http.RoundTripper(transport))
-			auth := &cliproxyauth.Auth{
+			auth := &coreauth.Auth{
 				Provider:   "claude",
 				Attributes: map[string]string{"api_key": "sk-ant-oat-duplicate-metadata", "auth_kind": "oauth"},
 				Metadata: map[string]any{
@@ -53,19 +53,19 @@ func TestClaudeExecutorDuplicateMetadataIsRequestScoped(t *testing.T) {
 					},
 				},
 			}
-			req := cliproxyexecutor.Request{
+			req := coreexecutor.Request{
 				Model: "claude-opus-5",
 				Payload: []byte(`{"model":"claude-opus-5","messages":[{"role":"user","content":"hello"}],` +
 					`"metadata":{"user_id":"{}"},"metadata":{"user_id":"{}"}}`),
 			}
-			errRun := testCase.run(ctx, NewClaudeExecutor(&config.Config{}), auth, req, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude})
+			errRun := testCase.run(ctx, NewClaudeExecutor(&config.Config{}), auth, req, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude})
 			if errRun == nil {
 				t.Fatal("duplicate metadata error = nil")
 			}
 			if upstreamCalled {
 				t.Fatal("duplicate metadata reached upstream")
 			}
-			var requestErr cliproxyexecutor.RequestScopedError
+			var requestErr coreexecutor.RequestScopedError
 			if !errors.As(errRun, &requestErr) || requestErr == nil || !requestErr.IsRequestScoped() {
 				t.Fatalf("duplicate metadata error = %T %v, want request-scoped", errRun, errRun)
 			}
@@ -79,7 +79,7 @@ func TestClaudeExecutorDuplicateMetadataIsRequestScoped(t *testing.T) {
 
 func TestClaudeExecutorPrepareRequestAuthPopulatesCredentialIdentity(t *testing.T) {
 	executor := NewClaudeExecutor(&config.Config{})
-	executor.oauthProfileFetcher = func(_ context.Context, _ *cliproxyauth.Auth, accessToken string) (*claudeauth.OAuthProfile, error) {
+	executor.oauthProfileFetcher = func(_ context.Context, _ *coreauth.Auth, accessToken string) (*claudeauth.OAuthProfile, error) {
 		if accessToken != "sk-ant-oat-prepare" {
 			t.Fatalf("access token = %q, want selected credential token", accessToken)
 		}
@@ -90,7 +90,7 @@ func TestClaudeExecutorPrepareRequestAuthPopulatesCredentialIdentity(t *testing.
 		profile.Organization.Name = "Example Org"
 		return profile, nil
 	}
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID: "claude-old-credential",
 		Attributes: map[string]string{
 			"api_key": "sk-ant-oat-prepare",
@@ -129,11 +129,11 @@ func TestClaudeExecutorPrepareRequestAuthMigratesFiveDevicesToOne(t *testing.T) 
 		"4444444444444444444444444444444444444444444444444444444444444444",
 	}
 	executor := NewClaudeExecutor(&config.Config{})
-	executor.oauthProfileFetcher = func(context.Context, *cliproxyauth.Auth, string) (*claudeauth.OAuthProfile, error) {
+	executor.oauthProfileFetcher = func(context.Context, *coreauth.Auth, string) (*claudeauth.OAuthProfile, error) {
 		t.Fatal("profile lookup should not run when account UUID is already present")
 		return nil, nil
 	}
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:         "claude-five-device-credential",
 		Attributes: map[string]string{"api_key": "sk-ant-oat-five-device"},
 		Metadata: map[string]any{
@@ -160,12 +160,12 @@ func TestClaudeExecutorPrepareRequestAuthMigratesFiveDevicesToOne(t *testing.T) 
 func TestClaudeExecutorPrepareRequestAuthIgnoresFreshTimestampWithoutIdentity(t *testing.T) {
 	calls := 0
 	executor := NewClaudeExecutor(&config.Config{})
-	executor.oauthProfileFetcher = func(context.Context, *cliproxyauth.Auth, string) (*claudeauth.OAuthProfile, error) {
+	executor.oauthProfileFetcher = func(context.Context, *coreauth.Auth, string) (*claudeauth.OAuthProfile, error) {
 		calls++
 		return nil, fmt.Errorf("profile unavailable")
 	}
 	const previousCheckedAt = "2999-01-01T00:00:00Z"
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:         "claude-profile-unavailable",
 		Attributes: map[string]string{"api_key": "sk-ant-oat-profile-unavailable"},
 		Metadata: map[string]any{
@@ -195,11 +195,11 @@ func TestClaudeExecutorPrepareRequestAuthIgnoresFreshTimestampWithoutIdentity(t 
 
 func TestClaudeExecutorPrepareRequestAuthSetupTokenBypassesProfile(t *testing.T) {
 	executor := NewClaudeExecutor(&config.Config{})
-	executor.oauthProfileFetcher = func(context.Context, *cliproxyauth.Auth, string) (*claudeauth.OAuthProfile, error) {
+	executor.oauthProfileFetcher = func(context.Context, *coreauth.Auth, string) (*claudeauth.OAuthProfile, error) {
 		t.Fatal("profile fetcher should NOT be called for setup-tokens")
 		return nil, nil
 	}
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID: "claude-setuptoken.json",
 		Attributes: map[string]string{
 			"api_key": "sk-ant-oat01-test-setup-token-value",
@@ -236,11 +236,11 @@ func TestClaudeExecutorPrepareRequestAuthSetupTokenBypassesProfile(t *testing.T)
 func TestClaudeExecutorPrepareRequestAuth403ScopeFallback(t *testing.T) {
 	executor := NewClaudeExecutor(&config.Config{})
 	fetchCalls := 0
-	executor.oauthProfileFetcher = func(context.Context, *cliproxyauth.Auth, string) (*claudeauth.OAuthProfile, error) {
+	executor.oauthProfileFetcher = func(context.Context, *coreauth.Auth, string) (*claudeauth.OAuthProfile, error) {
 		fetchCalls++
 		return nil, fmt.Errorf("fetch Claude OAuth profile failed with status 403: permission_error: OAuth token does not meet scope requirement any_of(user:profile, user:office)")
 	}
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID: "claude-scope-restricted-credential",
 		Attributes: map[string]string{
 			"api_key": "sk-ant-oat01-scope-restricted",
@@ -275,11 +275,11 @@ func TestClaudeExecutorPrepareRequestAuth403ScopeFallback(t *testing.T) {
 
 func TestClaudeExecutorPrepareRequestAuthSkipAccountProfileConfig(t *testing.T) {
 	executor := NewClaudeExecutor(&config.Config{})
-	executor.oauthProfileFetcher = func(context.Context, *cliproxyauth.Auth, string) (*claudeauth.OAuthProfile, error) {
+	executor.oauthProfileFetcher = func(context.Context, *coreauth.Auth, string) (*claudeauth.OAuthProfile, error) {
 		t.Fatal("profile fetcher should NOT be called when skip_account_profile is true")
 		return nil, nil
 	}
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID: "claude-skip-profile.json",
 		Attributes: map[string]string{
 			"api_key": "sk-ant-oat01-skip-profile",
@@ -312,11 +312,11 @@ func TestClaudeExecutorPrepareRequestAuthSkipAccountProfileConfig(t *testing.T) 
 func TestClaudeExecutorPrepareRequestAuthEmptyAccountUUIDInProfileFallback(t *testing.T) {
 	executor := NewClaudeExecutor(&config.Config{})
 	fetchCalls := 0
-	executor.oauthProfileFetcher = func(context.Context, *cliproxyauth.Auth, string) (*claudeauth.OAuthProfile, error) {
+	executor.oauthProfileFetcher = func(context.Context, *coreauth.Auth, string) (*claudeauth.OAuthProfile, error) {
 		fetchCalls++
 		return &claudeauth.OAuthProfile{}, nil
 	}
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID: "claude-empty-uuid-in-profile",
 		Attributes: map[string]string{
 			"api_key": "sk-ant-oat01-empty-uuid",

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
 	log "github.com/sirupsen/logrus"
+	"github.com/udit19199/relay/internal/registry"
 )
 
 // ValidateConfig validates a thinking configuration against model capabilities.

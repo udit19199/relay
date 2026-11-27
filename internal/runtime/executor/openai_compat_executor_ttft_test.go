@@ -9,11 +9,11 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	coreusage "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/usage"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	coreusage "github.com/udit19199/relay/internal/service/usage"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 type openAICompatTTFTRoundTripFunc func(*http.Request) (*http.Response, error)
@@ -25,37 +25,37 @@ func (f openAICompatTTFTRoundTripFunc) RoundTrip(req *http.Request) (*http.Respo
 func TestOpenAICompatExecutorStreamTTFTWaitsForEffectiveToken(t *testing.T) {
 	tests := []struct {
 		name   string
-		format sdktranslator.Format
+		format translatorreg.Format
 		token  string
 		finish string
 	}{
 		{
 			name:   "text",
-			format: sdktranslator.FormatOpenAI,
+			format: translatorreg.FormatOpenAI,
 			token:  "data: " + `{"choices":[{"index":0,"delta":{"content":"hello"}}]}` + "\n\n",
 			finish: "stop",
 		},
 		{
 			name:   "reasoning_content",
-			format: sdktranslator.FormatOpenAI,
+			format: translatorreg.FormatOpenAI,
 			token:  "data: " + `{"choices":[{"index":0,"delta":{"reasoning_content":"thinking"}}]}` + "\n\n",
 			finish: "stop",
 		},
 		{
 			name:   "reasoning",
-			format: sdktranslator.FormatOpenAI,
+			format: translatorreg.FormatOpenAI,
 			token:  "data: " + `{"choices":[{"index":0,"delta":{"reasoning":"thinking"}}]}` + "\n\n",
 			finish: "stop",
 		},
 		{
 			name:   "tool_call_responses_downstream",
-			format: sdktranslator.FormatOpenAIResponse,
+			format: translatorreg.FormatOpenAIResponse,
 			token:  "data: " + `{"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_test","type":"function","function":{"name":"lookup","arguments":"{\"query\":\"hello\"}"}}]}}]}` + "\n\n",
 			finish: "tool_calls",
 		},
 		{
 			name:   "multiline_sse_frame",
-			format: sdktranslator.FormatOpenAI,
+			format: translatorreg.FormatOpenAI,
 			token:  "data: {\"choices\":[\ndata: {\"index\":0,\"delta\":{\"content\":\"hello\"}}]}\n\n",
 			finish: "stop",
 		},
@@ -104,14 +104,14 @@ func TestOpenAICompatExecutorStreamTTFTWaitsForEffectiveToken(t *testing.T) {
 				ctx := context.WithValue(context.Background(), "cliproxy.roundtripper", http.RoundTripper(transport))
 				ctx = coreusage.WithRequestedModelAlias(ctx, alias)
 				executor := NewOpenAICompatExecutor("openai-compatibility", &config.Config{})
-				auth := &cliproxyauth.Auth{Attributes: map[string]string{"base_url": "http://example.invalid/v1"}}
+				auth := &coreauth.Auth{Attributes: map[string]string{"base_url": "http://example.invalid/v1"}}
 				payload := []byte(`{"model":"glm-5.3-flash-unc","messages":[{"role":"user","content":"hello"}]}`)
-				if tt.format == sdktranslator.FormatOpenAIResponse {
+				if tt.format == translatorreg.FormatOpenAIResponse {
 					payload = []byte(`{"model":"glm-5.3-flash-unc","input":"hello","tools":[{"type":"function","name":"lookup","parameters":{"type":"object","properties":{"query":{"type":"string"}}}}]}`)
 				}
-				result, errExecute := executor.ExecuteStream(ctx, auth, cliproxyexecutor.Request{
+				result, errExecute := executor.ExecuteStream(ctx, auth, coreexecutor.Request{
 					Model: "glm-5.3-flash-unc", Payload: payload,
-				}, cliproxyexecutor.Options{SourceFormat: tt.format, Stream: true})
+				}, coreexecutor.Options{SourceFormat: tt.format, Stream: true})
 				if errExecute != nil {
 					t.Fatalf("ExecuteStream: %v", errExecute)
 				}
@@ -159,10 +159,10 @@ func TestOpenAICompatExecutorStreamTTFTErrorFallback(t *testing.T) {
 		ctx := context.WithValue(context.Background(), "cliproxy.roundtripper", http.RoundTripper(transport))
 		ctx = coreusage.WithRequestedModelAlias(ctx, alias)
 		executor := NewOpenAICompatExecutor("openai-compatibility", &config.Config{})
-		auth := &cliproxyauth.Auth{Attributes: map[string]string{"base_url": "http://example.invalid/v1"}}
-		_, errExecute := executor.ExecuteStream(ctx, auth, cliproxyexecutor.Request{
+		auth := &coreauth.Auth{Attributes: map[string]string{"base_url": "http://example.invalid/v1"}}
+		_, errExecute := executor.ExecuteStream(ctx, auth, coreexecutor.Request{
 			Model: "glm-5.3-flash-unc", Payload: []byte(`{"model":"glm-5.3-flash-unc","messages":[{"role":"user","content":"hello"}]}`),
-		}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAI, Stream: true})
+		}, coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAI, Stream: true})
 		if errExecute == nil {
 			t.Fatal("expected rate limit error")
 		}

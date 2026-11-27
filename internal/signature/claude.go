@@ -2,9 +2,8 @@ package signature
 
 import (
 	"fmt"
-	"strings"
-
 	"github.com/MoeForge/moego/ojson"
+	"strings"
 )
 
 // StripInvalidClaudeThinkingBlocks removes Claude thinking blocks whose

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 // Failure events terminate responses too, in the shapes duplex attribution
@@ -120,7 +120,7 @@ func TestInterruptExecutionSessionErrorTerminalShapes(t *testing.T) {
 	}
 	wantRejected := func(payload, what string) {
 		t.Helper()
-		if errInterrupt := interrupt(payload); !errors.Is(errInterrupt, cliproxyexecutor.ErrUpstreamWebsocketInterruptRejected) {
+		if errInterrupt := interrupt(payload); !errors.Is(errInterrupt, coreexecutor.ErrUpstreamWebsocketInterruptRejected) {
 			t.Fatalf("%s = %v, want ErrUpstreamWebsocketInterruptRejected", what, errInterrupt)
 		}
 	}

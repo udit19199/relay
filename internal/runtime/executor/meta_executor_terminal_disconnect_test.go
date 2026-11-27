@@ -9,12 +9,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/clienterror"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/usage"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/clienterror"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	"github.com/udit19199/relay/internal/service/usage"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 type metaTerminalDisconnectUsageCapture struct {
@@ -56,7 +56,7 @@ func runMetaClaudeDisconnect(t *testing.T, upstreamSSE, cancelAfter string) usag
 	}))
 	defer server.Close()
 
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:       t.Name(),
 		Provider: "meta",
 		Attributes: map[string]string{
@@ -72,11 +72,11 @@ func runMetaClaudeDisconnect(t *testing.T, upstreamSSE, cancelAfter string) usag
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	result, errExecute := NewMetaExecutor(&config.Config{}).ExecuteStream(ctx, auth, cliproxyexecutor.Request{
+	result, errExecute := NewMetaExecutor(&config.Config{}).ExecuteStream(ctx, auth, coreexecutor.Request{
 		Model:   "muse-wonder-1.0",
 		Payload: []byte(`{"model":"muse-wonder-1.0","max_tokens":64,"stream":true,"messages":[{"role":"user","content":"hello"}]}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatClaude,
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FormatClaude,
 		Stream:       true,
 	})
 	if errExecute != nil {

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
+	"github.com/udit19199/relay/internal/util"
 )
 
 // oauthProviders are the browser sign-ins Relay offers.

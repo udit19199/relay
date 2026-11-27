@@ -11,11 +11,11 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestIssue6478_DevinReservedPrefixStatelessFragmentedRoundTrip(t *testing.T) {
@@ -40,7 +40,7 @@ func TestIssue6478_DevinReservedPrefixStatelessFragmentedRoundTrip(t *testing.T)
 		}
 	}))
 	defer server.Close()
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "test", "base_url": server.URL}}
+	auth := &coreauth.Auth{Attributes: map[string]string{"api_key": "test", "base_url": server.URL}}
 	var idsByMode [][]string
 	for _, stream := range []bool{false, true} {
 		name := "Execute"
@@ -50,8 +50,8 @@ func TestIssue6478_DevinReservedPrefixStatelessFragmentedRoundTrip(t *testing.T)
 		t.Run(name, func(t *testing.T) {
 			executor := NewDevinExecutor(&config.Config{})
 			payload := []byte(`{"model":"devin/swe-2","messages":[{"role":"user","content":"tools"}]}`)
-			req := cliproxyexecutor.Request{Model: "devin/swe-2", Payload: payload}
-			opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude, OriginalRequest: payload, Stream: stream}
+			req := coreexecutor.Request{Model: "devin/swe-2", Payload: payload}
+			opts := coreexecutor.Options{SourceFormat: translatorreg.FormatClaude, OriginalRequest: payload, Stream: stream}
 			var ids, arguments []string
 			if stream {
 				result, errStream := executor.ExecuteStream(t.Context(), auth, req, opts)
@@ -196,8 +196,8 @@ func TestIssue6478_ClaudeUpstreamCountTokensRepairBeforePayload(t *testing.T) {
 			return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"input_tokens":12}`)), Request: req}, nil
 		})
 		ctx := context.WithValue(t.Context(), "cliproxy.roundtripper", http.RoundTripper(transport))
-		auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "test"}}
-		_, errCount := NewClaudeExecutor(cfg).CountTokens(ctx, auth, cliproxyexecutor.Request{Model: "claude-opus-5", Payload: issue6478History(ids)}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude})
+		auth := &coreauth.Auth{Attributes: map[string]string{"api_key": "test"}}
+		_, errCount := NewClaudeExecutor(cfg).CountTokens(ctx, auth, coreexecutor.Request{Model: "claude-opus-5", Payload: issue6478History(ids)}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude})
 		if errCount != nil {
 			t.Fatal(errCount)
 		}
@@ -228,7 +228,7 @@ func TestIssue6478_ClaudeUpstreamCountTokensRepairBeforePayload(t *testing.T) {
 
 func TestIssue6478_DevinDoesNotDecodeOrdinaryNativeIDs(t *testing.T) {
 	ids := []string{"call_1", "cpa_tid_v1_Y2FsbF8x", "cpa_tid_v1_not_base64!", "cpa_tid_v1_"}
-	httpReq, _, body, errPrepare := NewDevinExecutor(&config.Config{}).prepareDevinHTTPRequest(t.Context(), &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "test"}}, cliproxyexecutor.Request{Model: "devin/swe-2", Payload: issue6478History(ids)}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude})
+	httpReq, _, body, errPrepare := NewDevinExecutor(&config.Config{}).prepareDevinHTTPRequest(t.Context(), &coreauth.Auth{Attributes: map[string]string{"api_key": "test"}}, coreexecutor.Request{Model: "devin/swe-2", Payload: issue6478History(ids)}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude})
 	if errPrepare != nil {
 		t.Fatal(errPrepare)
 	}

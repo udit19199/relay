@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
+	"github.com/udit19199/relay/internal/config"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 func TestValidateCodexHostedImageGenerationDoc(t *testing.T) {
@@ -48,7 +48,7 @@ func TestValidateCodexHostedImageGenerationDoc(t *testing.T) {
 					t.Fatal("validation changed the configured payload")
 				}
 				if errValidate != nil {
-					var requestErr cliproxyexecutor.RequestScopedError
+					var requestErr coreexecutor.RequestScopedError
 					var statusErr interface{ StatusCode() int }
 					if !errors.As(errValidate, &requestErr) || !requestErr.IsRequestScoped() || !errors.As(errValidate, &statusErr) || statusErr.StatusCode() != http.StatusBadRequest {
 						t.Fatalf("expected request-scoped HTTP 400, got %v", errValidate)

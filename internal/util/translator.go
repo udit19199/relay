@@ -5,31 +5,16 @@ package util
 
 import (
 	"bytes"
+	"strings"
+
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"sort"
-	"strconv"
-	"strings"
-
 	"github.com/MoeForge/moego/ojson"
 	log "github.com/sirupsen/logrus"
+	"sort"
+	"strconv"
 )
-
-// Walk recursively traverses a JSON structure to find all occurrences of a specific field.
-// It builds paths to each occurrence and adds them to the provided paths slice.
-//
-// Parameters:
-//   - value: The ojson.Result object to traverse
-//   - path: The current path in the JSON structure (empty string for root)
-//   - field: The field name to search for
-//   - paths: Pointer to a slice where found paths will be stored
-//
-// The function works recursively, building dot-notation paths to each occurrence
-// of the specified field throughout the JSON structure.
-func Walk(value ojson.Result, path, field string, paths *[]string) {
-	walk(value, path, field, paths, false)
-}
 
 // WalkSchema is Walk for JSON Schema documents: it records the field wherever a schema keyword
 // may appear, but does not descend into literal values (default, example, examples, const, enum),
@@ -70,40 +55,6 @@ func walk(value ojson.Result, path, field string, paths *[]string, schemaAware b
 	case ojson.String, ojson.Number, ojson.True, ojson.False, ojson.Null:
 		// Terminal types - no further traversal needed
 	}
-}
-
-// RenameKey renames a key in a JSON string by moving its value to a new key path
-// and then deleting the old key path.
-//
-// Parameters:
-//   - jsonStr: The JSON string to modify
-//   - oldKeyPath: The dot-notation path to the key that should be renamed
-//   - newKeyPath: The dot-notation path where the value should be moved to
-//
-// Returns:
-//   - string: The modified JSON string with the key renamed
-//   - error: An error if the operation fails
-//
-// The function performs the rename in two steps:
-// 1. Sets the value at the new key path
-// 2. Deletes the old key path
-func RenameKey(jsonStr, oldKeyPath, newKeyPath string) (string, error) {
-	value := ojson.Get(jsonStr, oldKeyPath)
-
-	if !value.Exists() {
-		return "", fmt.Errorf("old key '%s' does not exist", oldKeyPath)
-	}
-
-	doc := ojson.NewDocString(jsonStr)
-	if errSet := doc.SetRaw(newKeyPath, value.Raw); errSet != nil {
-		return "", fmt.Errorf("failed to set new key '%s': %w", newKeyPath, errSet)
-	}
-
-	if errDelete := doc.Delete(oldKeyPath); errDelete != nil {
-		return "", fmt.Errorf("failed to delete old key '%s': %w", oldKeyPath, errDelete)
-	}
-
-	return doc.String(), nil
 }
 
 // FixJSON converts non-standard JSON that uses single quotes for strings into
@@ -459,14 +410,6 @@ func SanitizedFunctionNameMap(rawJSON []byte) map[string]string {
 		return nil
 	}
 	return out
-}
-
-// MapSanitizedFunctionName returns the request-specific sanitized name when available.
-func MapSanitizedFunctionName(nameMap map[string]string, name string) string {
-	if mapped := nameMap[name]; mapped != "" {
-		return mapped
-	}
-	return SanitizeFunctionName(name)
 }
 
 // DisambiguatedToolNameMap builds a sanitized-name → original-name map using the

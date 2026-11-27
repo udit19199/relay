@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestCustomMagicHeaders_OpenAICompat(t *testing.T) {
@@ -28,7 +28,7 @@ func TestCustomMagicHeaders_OpenAICompat(t *testing.T) {
 			Name: "compat",
 		}},
 	})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "openai-compatibility",
 		Attributes: map[string]string{
 			"base_url":                        server.URL,
@@ -40,12 +40,12 @@ func TestCustomMagicHeaders_OpenAICompat(t *testing.T) {
 		},
 	}
 
-	req := cliproxyexecutor.Request{
+	req := coreexecutor.Request{
 		Model:   "gpt-4o",
 		Payload: []byte(`{"messages":[{"role":"user","content":"hi"}]}`),
 	}
-	opts := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatOpenAI,
+	opts := coreexecutor.Options{
+		SourceFormat: translatorreg.FormatOpenAI,
 		Headers: http.Header{
 			"Abc":              []string{"session-abc-value"},
 			"X-Client-Session": []string{"client-session-uuid-123"},
@@ -88,22 +88,22 @@ func TestOpenAICompatExecutor_UserAgentPassthroughAndDefault(t *testing.T) {
 	executor := NewOpenAICompatExecutor("openai-compatibility", &config.Config{
 		OpenAICompatibility: []config.OpenAICompatibility{{Name: "compat"}},
 	})
-	baseAuth := &cliproxyauth.Auth{
+	baseAuth := &coreauth.Auth{
 		Provider: "openai-compatibility",
 		Attributes: map[string]string{
 			"base_url": server.URL,
 			"api_key":  "test-key",
 		},
 	}
-	req := cliproxyexecutor.Request{
+	req := coreexecutor.Request{
 		Model:   "gpt-4o",
 		Payload: []byte(`{"messages":[{"role":"user","content":"hi"}]}`),
 	}
 
 	t.Run("Execute defaults to cli-proxy-openai-compat when downstream User-Agent is absent", func(t *testing.T) {
 		gotUserAgent = ""
-		_, err := executor.Execute(context.Background(), baseAuth, req, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FormatOpenAI,
+		_, err := executor.Execute(context.Background(), baseAuth, req, coreexecutor.Options{
+			SourceFormat: translatorreg.FormatOpenAI,
 		})
 		if err != nil {
 			t.Fatalf("Execute() error = %v", err)
@@ -115,8 +115,8 @@ func TestOpenAICompatExecutor_UserAgentPassthroughAndDefault(t *testing.T) {
 
 	t.Run("Execute forwards downstream User-Agent when present", func(t *testing.T) {
 		gotUserAgent = ""
-		_, err := executor.Execute(context.Background(), baseAuth, req, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FormatOpenAI,
+		_, err := executor.Execute(context.Background(), baseAuth, req, coreexecutor.Options{
+			SourceFormat: translatorreg.FormatOpenAI,
 			Headers:      http.Header{"User-Agent": []string{"downstream-compat-client/1.0"}},
 		})
 		if err != nil {
@@ -129,8 +129,8 @@ func TestOpenAICompatExecutor_UserAgentPassthroughAndDefault(t *testing.T) {
 
 	t.Run("ExecuteStream forwards downstream User-Agent when present", func(t *testing.T) {
 		gotUserAgent = ""
-		streamRes, err := executor.ExecuteStream(context.Background(), baseAuth, req, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FormatOpenAI,
+		streamRes, err := executor.ExecuteStream(context.Background(), baseAuth, req, coreexecutor.Options{
+			SourceFormat: translatorreg.FormatOpenAI,
 			Stream:       true,
 			Headers:      http.Header{"User-Agent": []string{"downstream-stream-client/1.0"}},
 		})
@@ -145,13 +145,13 @@ func TestOpenAICompatExecutor_UserAgentPassthroughAndDefault(t *testing.T) {
 	})
 
 	t.Run("Execute images and ExecuteStream images forward downstream User-Agent", func(t *testing.T) {
-		imageReq := cliproxyexecutor.Request{
+		imageReq := coreexecutor.Request{
 			Model:   "gpt-image-1",
 			Payload: []byte(`{"model":"gpt-image-1","prompt":"draw a cat"}`),
 		}
 		gotUserAgent = ""
-		_, err := executor.Execute(context.Background(), baseAuth, imageReq, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FromString(openAICompatImageHandlerType),
+		_, err := executor.Execute(context.Background(), baseAuth, imageReq, coreexecutor.Options{
+			SourceFormat: translatorreg.FromString(openAICompatImageHandlerType),
 			Headers:      http.Header{"User-Agent": []string{"downstream-image-client/1.0"}},
 		})
 		if err != nil {
@@ -162,8 +162,8 @@ func TestOpenAICompatExecutor_UserAgentPassthroughAndDefault(t *testing.T) {
 		}
 
 		gotUserAgent = ""
-		streamRes, err := executor.ExecuteStream(context.Background(), baseAuth, imageReq, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FromString(openAICompatImageHandlerType),
+		streamRes, err := executor.ExecuteStream(context.Background(), baseAuth, imageReq, coreexecutor.Options{
+			SourceFormat: translatorreg.FromString(openAICompatImageHandlerType),
 			Stream:       true,
 			Headers:      http.Header{"User-Agent": []string{"downstream-image-stream-client/1.0"}},
 		})
@@ -179,7 +179,7 @@ func TestOpenAICompatExecutor_UserAgentPassthroughAndDefault(t *testing.T) {
 
 	t.Run("configured header:User-Agent overrides downstream User-Agent", func(t *testing.T) {
 		gotUserAgent = ""
-		overrideAuth := &cliproxyauth.Auth{
+		overrideAuth := &coreauth.Auth{
 			Provider: "openai-compatibility",
 			Attributes: map[string]string{
 				"base_url":          server.URL,
@@ -187,8 +187,8 @@ func TestOpenAICompatExecutor_UserAgentPassthroughAndDefault(t *testing.T) {
 				"header:User-Agent": "configured-compat-ua/3.0",
 			},
 		}
-		_, err := executor.Execute(context.Background(), overrideAuth, req, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FormatOpenAI,
+		_, err := executor.Execute(context.Background(), overrideAuth, req, coreexecutor.Options{
+			SourceFormat: translatorreg.FormatOpenAI,
 			Headers:      http.Header{"User-Agent": []string{"downstream-compat-client/1.0"}},
 		})
 		if err != nil {
@@ -210,7 +210,7 @@ func TestCustomMagicHeaders_XAI(t *testing.T) {
 	defer server.Close()
 
 	executor := NewXAIExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "xai",
 		Attributes: map[string]string{
 			"base_url":                        server.URL,
@@ -220,12 +220,12 @@ func TestCustomMagicHeaders_XAI(t *testing.T) {
 		},
 	}
 
-	req := cliproxyexecutor.Request{
+	req := coreexecutor.Request{
 		Model:   "grok-2",
 		Payload: []byte(`{"messages":[{"role":"user","content":"hi"}]}`),
 	}
-	opts := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatOpenAI,
+	opts := coreexecutor.Options{
+		SourceFormat: translatorreg.FormatOpenAI,
 		Headers: http.Header{
 			"ABC": []string{"xai-session-value"},
 		},
@@ -254,7 +254,7 @@ func TestCustomMagicHeaders_Claude(t *testing.T) {
 	defer server.Close()
 
 	executor := NewClaudeExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "claude",
 		Attributes: map[string]string{
 			"base_url":                        server.URL,
@@ -264,12 +264,12 @@ func TestCustomMagicHeaders_Claude(t *testing.T) {
 		},
 	}
 
-	req := cliproxyexecutor.Request{
+	req := coreexecutor.Request{
 		Model:   "claude-3-7-sonnet-20250219",
 		Payload: []byte(`{"messages":[{"role":"user","content":"hi"}]}`),
 	}
-	opts := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatClaude,
+	opts := coreexecutor.Options{
+		SourceFormat: translatorreg.FormatClaude,
 		Headers: http.Header{
 			"Abc": []string{"claude-session-value"},
 		},
@@ -302,7 +302,7 @@ func TestCustomMagicHeaders_OpenAICompat_Stream(t *testing.T) {
 			Name: "compat",
 		}},
 	})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "openai-compatibility",
 		Attributes: map[string]string{
 			"base_url":                        server.URL,
@@ -314,12 +314,12 @@ func TestCustomMagicHeaders_OpenAICompat_Stream(t *testing.T) {
 		},
 	}
 
-	req := cliproxyexecutor.Request{
+	req := coreexecutor.Request{
 		Model:   "gpt-4o",
 		Payload: []byte(`{"messages":[{"role":"user","content":"hi"}]}`),
 	}
-	opts := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatOpenAI,
+	opts := coreexecutor.Options{
+		SourceFormat: translatorreg.FormatOpenAI,
 		Stream:       true,
 		Headers: http.Header{
 			"Abc": []string{"stream-session-abc"},
@@ -363,7 +363,7 @@ func TestCustomMagicHeaders_Codex(t *testing.T) {
 			DisableCodexCloaking: true,
 		},
 	})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"base_url":                        server.URL,
@@ -373,12 +373,12 @@ func TestCustomMagicHeaders_Codex(t *testing.T) {
 		},
 	}
 
-	req := cliproxyexecutor.Request{
+	req := coreexecutor.Request{
 		Model:   "gpt-5-codex",
 		Payload: []byte(`{"messages":[{"role":"user","content":"hi"}]}`),
 	}
-	opts := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatCodex,
+	opts := coreexecutor.Options{
+		SourceFormat: translatorreg.FormatCodex,
 		Headers: http.Header{
 			"Abc": []string{"codex-session-value"},
 		},
@@ -411,7 +411,7 @@ func TestCustomMagicHeaders_CPASessionID_OpenAICompat(t *testing.T) {
 			Name: "compat",
 		}},
 	})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "openai-compatibility",
 		Attributes: map[string]string{
 			"base_url":             server.URL,
@@ -422,12 +422,12 @@ func TestCustomMagicHeaders_CPASessionID_OpenAICompat(t *testing.T) {
 		},
 	}
 
-	req := cliproxyexecutor.Request{
+	req := coreexecutor.Request{
 		Model:   "gpt-4o",
 		Payload: []byte(`{"messages":[{"role":"user","content":"hi"}]}`),
 	}
-	opts := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatOpenAI,
+	opts := coreexecutor.Options{
+		SourceFormat: translatorreg.FormatOpenAI,
 		Headers: http.Header{
 			"Session-Id": []string{"codex-thread-abc"},
 		},
@@ -460,7 +460,7 @@ func TestCustomMagicHeaders_CPASessionID_Claude(t *testing.T) {
 	defer server.Close()
 
 	executor := NewClaudeExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "claude",
 		Attributes: map[string]string{
 			"base_url":         server.URL,
@@ -469,12 +469,12 @@ func TestCustomMagicHeaders_CPASessionID_Claude(t *testing.T) {
 		},
 	}
 
-	req := cliproxyexecutor.Request{
+	req := coreexecutor.Request{
 		Model:   "claude-3-7-sonnet-20250219",
 		Payload: []byte(`{"messages":[{"role":"user","content":"hi"}]}`),
 	}
-	opts := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatClaude,
+	opts := coreexecutor.Options{
+		SourceFormat: translatorreg.FormatClaude,
 		Headers: http.Header{
 			"X-Claude-Code-Session-Id": []string{"claude-sess-789"},
 		},
@@ -506,7 +506,7 @@ func TestCustomMagicHeaders_CPASessionID_Codex(t *testing.T) {
 			DisableCodexCloaking: true,
 		},
 	})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"base_url":         server.URL,
@@ -515,12 +515,12 @@ func TestCustomMagicHeaders_CPASessionID_Codex(t *testing.T) {
 		},
 	}
 
-	req := cliproxyexecutor.Request{
+	req := coreexecutor.Request{
 		Model:   "gpt-5-codex",
 		Payload: []byte(`{"messages":[{"role":"user","content":"hi"}]}`),
 	}
-	opts := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatCodex,
+	opts := coreexecutor.Options{
+		SourceFormat: translatorreg.FormatCodex,
 		Headers: http.Header{
 			"Session-Id": []string{"codex-sess-uuid"},
 		},
@@ -547,7 +547,7 @@ func TestCustomMagicHeaders_CPASessionID_XAI(t *testing.T) {
 	defer server.Close()
 
 	executor := NewXAIExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "xai",
 		Attributes: map[string]string{
 			"base_url":         server.URL,
@@ -556,12 +556,12 @@ func TestCustomMagicHeaders_CPASessionID_XAI(t *testing.T) {
 		},
 	}
 
-	req := cliproxyexecutor.Request{
+	req := coreexecutor.Request{
 		Model:   "grok-2",
 		Payload: []byte(`{"messages":[{"role":"user","content":"hi"}]}`),
 	}
-	opts := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatOpenAI,
+	opts := coreexecutor.Options{
+		SourceFormat: translatorreg.FormatOpenAI,
 		Headers: http.Header{
 			"X-Session-ID": []string{"xai-sess-111"},
 		},
@@ -603,7 +603,7 @@ func TestCustomMagicHeaders_CPASessionID_SessionAffinityOnAndOff(t *testing.T) {
 			}
 
 			executor := NewOpenAICompatExecutor("openai-compatibility", cfg)
-			auth := &cliproxyauth.Auth{
+			auth := &coreauth.Auth{
 				ID:       "auth-compat-1",
 				Provider: "openai-compatibility",
 				Attributes: map[string]string{
@@ -613,12 +613,12 @@ func TestCustomMagicHeaders_CPASessionID_SessionAffinityOnAndOff(t *testing.T) {
 				},
 			}
 
-			req := cliproxyexecutor.Request{
+			req := coreexecutor.Request{
 				Model:   "gpt-4o",
 				Payload: []byte(`{"messages":[{"role":"user","content":"hi"}]}`),
 			}
-			opts := cliproxyexecutor.Options{
-				SourceFormat: sdktranslator.FormatOpenAI,
+			opts := coreexecutor.Options{
+				SourceFormat: translatorreg.FormatOpenAI,
 				Headers: http.Header{
 					"X-Session-ID": []string{"aff-test-sess-99"},
 				},

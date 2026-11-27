@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/watcher/synthesizer"
-	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	"github.com/udit19199/relay/internal/watcher/synthesizer"
 	"gopkg.in/yaml.v3"
 )
 
@@ -198,142 +198,6 @@ func stripAPIKeysAuthIndexesFromUpdate(parts []string, update *yaml.Node) {
 		return
 	}
 	stripAPIKeysAuthIndexesFromGroups(node)
-}
-
-func yamlMapScalarPresent(node *yaml.Node, key string) (string, bool) {
-	if node == nil || node.Kind != yaml.MappingNode {
-		return "", false
-	}
-	for i := 0; i+1 < len(node.Content); i += 2 {
-		if node.Content[i].Value == key {
-			if node.Content[i+1].Tag == "!!null" {
-				return "", false
-			}
-			return strings.TrimSpace(node.Content[i+1].Value), true
-		}
-	}
-	return "", false
-}
-
-func yamlMapHeadersPresent(node *yaml.Node, key string) (map[string]string, bool) {
-	if node == nil || node.Kind != yaml.MappingNode {
-		return nil, false
-	}
-	for i := 0; i+1 < len(node.Content); i += 2 {
-		if node.Content[i].Value == key {
-			if node.Content[i+1].Tag == "!!null" {
-				return nil, false
-			}
-			var h map[string]string
-			if errDecode := node.Content[i+1].Decode(&h); errDecode == nil {
-				return h, true
-			}
-			return nil, false
-		}
-	}
-	return nil, false
-}
-
-func resolveInheritedScalar(keyNode, groupNode *yaml.Node, field string) string {
-	if val, ok := yamlMapScalarPresent(keyNode, field); ok {
-		return val
-	}
-	if val, ok := yamlMapScalarPresent(groupNode, field); ok {
-		return val
-	}
-	return ""
-}
-
-func resolveInheritedHeaders(keyNode, groupNode *yaml.Node, field string) map[string]string {
-	if h, ok := yamlMapHeadersPresent(keyNode, field); ok {
-		return h
-	}
-	if h, ok := yamlMapHeadersPresent(groupNode, field); ok {
-		return h
-	}
-	return nil
-}
-
-func yamlMapNodePresent(node *yaml.Node, key string) *yaml.Node {
-	if node == nil || node.Kind != yaml.MappingNode {
-		return nil
-	}
-	for i := 0; i+1 < len(node.Content); i += 2 {
-		if node.Content[i].Value == key {
-			valNode := node.Content[i+1]
-			if valNode == nil || valNode.Tag == "!!null" {
-				return nil
-			}
-			return valNode
-		}
-	}
-	return nil
-}
-
-func resolveInheritedConnectionPool(keyNode, groupNode *yaml.Node) *config.ProxyConnectionPoolConfig {
-	groupPoolNode := yamlMapNodePresent(groupNode, "connection-pool")
-	keyPoolNode := yamlMapNodePresent(keyNode, "connection-pool")
-	if groupPoolNode == nil && keyPoolNode == nil {
-		return nil
-	}
-	mergedNode := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
-	if groupPoolNode != nil && groupPoolNode.Kind == yaml.MappingNode {
-		for i := 0; i+1 < len(groupPoolNode.Content); i += 2 {
-			if groupPoolNode.Content[i+1].Tag == "!!null" {
-				continue
-			}
-			mergedNode.Content = append(mergedNode.Content, groupPoolNode.Content[i], groupPoolNode.Content[i+1])
-		}
-	}
-	if keyPoolNode != nil && keyPoolNode.Kind == yaml.MappingNode {
-		for i := 0; i+1 < len(keyPoolNode.Content); i += 2 {
-			if keyPoolNode.Content[i+1].Tag == "!!null" {
-				continue
-			}
-			field := keyPoolNode.Content[i].Value
-			replaced := false
-			for j := 0; j+1 < len(mergedNode.Content); j += 2 {
-				if mergedNode.Content[j].Value == field {
-					mergedNode.Content[j+1] = keyPoolNode.Content[i+1]
-					replaced = true
-					break
-				}
-			}
-			if !replaced {
-				mergedNode.Content = append(mergedNode.Content, keyPoolNode.Content[i], keyPoolNode.Content[i+1])
-			}
-		}
-	}
-	var pool config.ProxyConnectionPoolConfig
-	if errDecode := mergedNode.Decode(&pool); errDecode != nil {
-		return nil
-	}
-	return &pool
-}
-
-func normalizeModelPrefixHelper(prefix string) string {
-	trimmed := strings.TrimSpace(prefix)
-	trimmed = strings.Trim(trimmed, "/")
-	if trimmed == "" || strings.Contains(trimmed, "/") {
-		return ""
-	}
-	return trimmed
-}
-
-func formatCredentialDedupKey(key, base, proxyURL, prefix string, headers map[string]string, pool *config.ProxyConnectionPoolConfig) string {
-	var b strings.Builder
-	b.WriteString(strings.TrimSpace(key))
-	b.WriteByte(0)
-	b.WriteString(strings.TrimSpace(base))
-	b.WriteByte(0)
-	b.WriteString(strings.TrimSpace(proxyURL))
-	b.WriteByte(0)
-	b.WriteString(normalizeModelPrefixHelper(prefix))
-	b.WriteByte(0)
-	b.WriteString(config.FormatSortedHeaders(config.NormalizeHeaders(headers)))
-	b.WriteByte(0)
-	b.WriteString(config.FormatConnectionPoolDedupID(pool))
-	return b.String()
 }
 
 func (h *Handler) injectV8APIKeyAuthIndexesLocked(root *yaml.Node, data []byte) {

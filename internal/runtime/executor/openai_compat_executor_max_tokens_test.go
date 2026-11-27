@@ -8,10 +8,10 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestOpenAICompatExecutor_MaxTokensNormalization(t *testing.T) {
@@ -43,7 +43,7 @@ func TestOpenAICompatExecutor_MaxTokensNormalization(t *testing.T) {
 	}
 
 	executor := NewOpenAICompatExecutor("openai-compatibility", cfg)
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "openai-compatibility",
 		Attributes: map[string]string{
 			"base_url":     server.URL + "/v1",
@@ -56,11 +56,11 @@ func TestOpenAICompatExecutor_MaxTokensNormalization(t *testing.T) {
 	t.Run("Execute responses request with use-max-completion-tokens=true sets max_completion_tokens", func(t *testing.T) {
 		gotBody = nil
 		payload := []byte(`{"model":"alias-new","input":[{"role":"user","content":"hi"}],"max_output_tokens":1024}`)
-		_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+		_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 			Model:   "alias-new",
 			Payload: payload,
-		}, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FromString("openai-response"),
+		}, coreexecutor.Options{
+			SourceFormat: translatorreg.FromString("openai-response"),
 			Stream:       false,
 		})
 		if err != nil {
@@ -78,11 +78,11 @@ func TestOpenAICompatExecutor_MaxTokensNormalization(t *testing.T) {
 	t.Run("Execute chat request with max_tokens and use-max-completion-tokens=true converts to max_completion_tokens", func(t *testing.T) {
 		gotBody = nil
 		payload := []byte(`{"model":"alias-new","messages":[{"role":"user","content":"hi"}],"max_tokens":512}`)
-		_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+		_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 			Model:   "alias-new",
 			Payload: payload,
-		}, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FromString("openai"),
+		}, coreexecutor.Options{
+			SourceFormat: translatorreg.FromString("openai"),
 			Stream:       false,
 		})
 		if err != nil {
@@ -100,11 +100,11 @@ func TestOpenAICompatExecutor_MaxTokensNormalization(t *testing.T) {
 	t.Run("Execute responses request with use-max-completion-tokens=false sets max_tokens", func(t *testing.T) {
 		gotBody = nil
 		payload := []byte(`{"model":"alias-legacy","input":[{"role":"user","content":"hi"}],"max_output_tokens":1024}`)
-		_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+		_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 			Model:   "alias-legacy",
 			Payload: payload,
-		}, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FromString("openai-response"),
+		}, coreexecutor.Options{
+			SourceFormat: translatorreg.FromString("openai-response"),
 			Stream:       false,
 		})
 		if err != nil {
@@ -122,11 +122,11 @@ func TestOpenAICompatExecutor_MaxTokensNormalization(t *testing.T) {
 	t.Run("Execute chat request with max_completion_tokens and use-max-completion-tokens=false converts to max_tokens", func(t *testing.T) {
 		gotBody = nil
 		payload := []byte(`{"model":"alias-legacy","messages":[{"role":"user","content":"hi"}],"max_completion_tokens":512}`)
-		_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+		_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 			Model:   "alias-legacy",
 			Payload: payload,
-		}, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FromString("openai"),
+		}, coreexecutor.Options{
+			SourceFormat: translatorreg.FromString("openai"),
 			Stream:       false,
 		})
 		if err != nil {
@@ -144,11 +144,11 @@ func TestOpenAICompatExecutor_MaxTokensNormalization(t *testing.T) {
 	t.Run("Execute responses request with max_output_tokens=null and use-max-completion-tokens=true preserves null", func(t *testing.T) {
 		gotBody = nil
 		payload := []byte(`{"model":"alias-new","input":[{"role":"user","content":"hi"}],"max_output_tokens":null}`)
-		_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+		_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 			Model:   "alias-new",
 			Payload: payload,
-		}, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FromString("openai-response"),
+		}, coreexecutor.Options{
+			SourceFormat: translatorreg.FromString("openai-response"),
 			Stream:       false,
 		})
 		if err != nil {
@@ -166,11 +166,11 @@ func TestOpenAICompatExecutor_MaxTokensNormalization(t *testing.T) {
 	t.Run("Execute responses request with max_output_tokens=null and use-max-completion-tokens=false preserves null", func(t *testing.T) {
 		gotBody = nil
 		payload := []byte(`{"model":"alias-legacy","input":[{"role":"user","content":"hi"}],"max_output_tokens":null}`)
-		_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+		_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 			Model:   "alias-legacy",
 			Payload: payload,
-		}, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FromString("openai-response"),
+		}, coreexecutor.Options{
+			SourceFormat: translatorreg.FromString("openai-response"),
 			Stream:       false,
 		})
 		if err != nil {
@@ -188,11 +188,11 @@ func TestOpenAICompatExecutor_MaxTokensNormalization(t *testing.T) {
 	t.Run("Execute chat request with max_tokens=null and use-max-completion-tokens=true preserves null", func(t *testing.T) {
 		gotBody = nil
 		payload := []byte(`{"model":"alias-new","messages":[{"role":"user","content":"hi"}],"max_tokens":null}`)
-		_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+		_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 			Model:   "alias-new",
 			Payload: payload,
-		}, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FromString("openai"),
+		}, coreexecutor.Options{
+			SourceFormat: translatorreg.FromString("openai"),
 			Stream:       false,
 		})
 		if err != nil {
@@ -210,11 +210,11 @@ func TestOpenAICompatExecutor_MaxTokensNormalization(t *testing.T) {
 	t.Run("Execute chat request with max_completion_tokens=null and use-max-completion-tokens=false preserves null", func(t *testing.T) {
 		gotBody = nil
 		payload := []byte(`{"model":"alias-legacy","messages":[{"role":"user","content":"hi"}],"max_completion_tokens":null}`)
-		_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+		_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 			Model:   "alias-legacy",
 			Payload: payload,
-		}, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FromString("openai"),
+		}, coreexecutor.Options{
+			SourceFormat: translatorreg.FromString("openai"),
 			Stream:       false,
 		})
 		if err != nil {
@@ -259,7 +259,7 @@ func TestOpenAICompatExecutor_MaxTokensNormalizationStream(t *testing.T) {
 	}
 
 	executor := NewOpenAICompatExecutor("openai-compatibility", cfg)
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "openai-compatibility",
 		Attributes: map[string]string{
 			"base_url":     server.URL + "/v1",
@@ -272,11 +272,11 @@ func TestOpenAICompatExecutor_MaxTokensNormalizationStream(t *testing.T) {
 	t.Run("ExecuteStream with use-max-completion-tokens=true emits max_completion_tokens", func(t *testing.T) {
 		gotBody = nil
 		payload := []byte(`{"model":"alias-new","messages":[{"role":"user","content":"hi"}],"max_tokens":256}`)
-		res, err := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+		res, err := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 			Model:   "alias-new",
 			Payload: payload,
-		}, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FromString("openai"),
+		}, coreexecutor.Options{
+			SourceFormat: translatorreg.FromString("openai"),
 			Stream:       true,
 		})
 		if err != nil {
@@ -296,11 +296,11 @@ func TestOpenAICompatExecutor_MaxTokensNormalizationStream(t *testing.T) {
 	t.Run("ExecuteStream with use-max-completion-tokens=false emits max_tokens", func(t *testing.T) {
 		gotBody = nil
 		payload := []byte(`{"model":"alias-legacy","messages":[{"role":"user","content":"hi"}],"max_completion_tokens":256}`)
-		res, err := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+		res, err := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 			Model:   "alias-legacy",
 			Payload: payload,
-		}, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FromString("openai"),
+		}, coreexecutor.Options{
+			SourceFormat: translatorreg.FromString("openai"),
 			Stream:       true,
 		})
 		if err != nil {
@@ -320,11 +320,11 @@ func TestOpenAICompatExecutor_MaxTokensNormalizationStream(t *testing.T) {
 	t.Run("ExecuteStream responses request with max_output_tokens=null and use-max-completion-tokens=true preserves null", func(t *testing.T) {
 		gotBody = nil
 		payload := []byte(`{"model":"alias-new","input":[{"role":"user","content":"hi"}],"max_output_tokens":null}`)
-		res, err := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+		res, err := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 			Model:   "alias-new",
 			Payload: payload,
-		}, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FromString("openai-response"),
+		}, coreexecutor.Options{
+			SourceFormat: translatorreg.FromString("openai-response"),
 			Stream:       true,
 		})
 		if err != nil {
@@ -344,11 +344,11 @@ func TestOpenAICompatExecutor_MaxTokensNormalizationStream(t *testing.T) {
 	t.Run("ExecuteStream responses request with max_output_tokens=null and use-max-completion-tokens=false preserves null", func(t *testing.T) {
 		gotBody = nil
 		payload := []byte(`{"model":"alias-legacy","input":[{"role":"user","content":"hi"}],"max_output_tokens":null}`)
-		res, err := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+		res, err := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 			Model:   "alias-legacy",
 			Payload: payload,
-		}, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FromString("openai-response"),
+		}, coreexecutor.Options{
+			SourceFormat: translatorreg.FromString("openai-response"),
 			Stream:       true,
 		})
 		if err != nil {
@@ -368,11 +368,11 @@ func TestOpenAICompatExecutor_MaxTokensNormalizationStream(t *testing.T) {
 	t.Run("ExecuteStream chat request with max_tokens=null and use-max-completion-tokens=true preserves null", func(t *testing.T) {
 		gotBody = nil
 		payload := []byte(`{"model":"alias-new","messages":[{"role":"user","content":"hi"}],"max_tokens":null}`)
-		res, err := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+		res, err := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 			Model:   "alias-new",
 			Payload: payload,
-		}, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FromString("openai"),
+		}, coreexecutor.Options{
+			SourceFormat: translatorreg.FromString("openai"),
 			Stream:       true,
 		})
 		if err != nil {
@@ -392,11 +392,11 @@ func TestOpenAICompatExecutor_MaxTokensNormalizationStream(t *testing.T) {
 	t.Run("ExecuteStream chat request with max_completion_tokens=null and use-max-completion-tokens=false preserves null", func(t *testing.T) {
 		gotBody = nil
 		payload := []byte(`{"model":"alias-legacy","messages":[{"role":"user","content":"hi"}],"max_completion_tokens":null}`)
-		res, err := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+		res, err := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 			Model:   "alias-legacy",
 			Payload: payload,
-		}, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FromString("openai"),
+		}, coreexecutor.Options{
+			SourceFormat: translatorreg.FromString("openai"),
 			Stream:       true,
 		})
 		if err != nil {

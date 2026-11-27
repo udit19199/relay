@@ -12,13 +12,13 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/claude"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/devin"
-	metaauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/meta"
-	xaiauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/xai"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
+	"github.com/udit19199/relay/internal/auth/claude"
+	"github.com/udit19199/relay/internal/auth/devin"
+	metaauth "github.com/udit19199/relay/internal/auth/meta"
+	xaiauth "github.com/udit19199/relay/internal/auth/xai"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
@@ -658,30 +658,30 @@ type recordingRefreshVerifyExecutor struct {
 }
 
 func (e *recordingRefreshVerifyExecutor) Identifier() string { return "xai" }
-func (e *recordingRefreshVerifyExecutor) Execute(_ context.Context, _ *coreauth.Auth, req cliproxyexecutor.Request, _ cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
+func (e *recordingRefreshVerifyExecutor) Execute(_ context.Context, _ *coreauth.Auth, req coreexecutor.Request, _ coreexecutor.Options) (coreexecutor.Response, error) {
 	e.calls++
 	e.lastModel = req.Model
 	if e.err != nil {
-		return cliproxyexecutor.Response{}, e.err
+		return coreexecutor.Response{}, e.err
 	}
-	return cliproxyexecutor.Response{Payload: []byte(`{"id":"resp_ok"}`)}, nil
+	return coreexecutor.Response{Payload: []byte(`{"id":"resp_ok"}`)}, nil
 }
-func (e *recordingRefreshVerifyExecutor) ExecuteStream(_ context.Context, _ *coreauth.Auth, req cliproxyexecutor.Request, _ cliproxyexecutor.Options) (*cliproxyexecutor.StreamResult, error) {
+func (e *recordingRefreshVerifyExecutor) ExecuteStream(_ context.Context, _ *coreauth.Auth, req coreexecutor.Request, _ coreexecutor.Options) (*coreexecutor.StreamResult, error) {
 	e.calls++
 	e.lastModel = req.Model
 	if e.err != nil {
 		return nil, e.err
 	}
-	ch := make(chan cliproxyexecutor.StreamChunk, 1)
-	ch <- cliproxyexecutor.StreamChunk{Payload: []byte("data: {\"type\":\"response.completed\"}\n\n")}
+	ch := make(chan coreexecutor.StreamChunk, 1)
+	ch <- coreexecutor.StreamChunk{Payload: []byte("data: {\"type\":\"response.completed\"}\n\n")}
 	close(ch)
-	return &cliproxyexecutor.StreamResult{Chunks: ch}, nil
+	return &coreexecutor.StreamResult{Chunks: ch}, nil
 }
 func (e *recordingRefreshVerifyExecutor) Refresh(_ context.Context, auth *coreauth.Auth) (*coreauth.Auth, error) {
 	return auth, nil
 }
-func (e *recordingRefreshVerifyExecutor) CountTokens(context.Context, *coreauth.Auth, cliproxyexecutor.Request, cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
-	return cliproxyexecutor.Response{}, nil
+func (e *recordingRefreshVerifyExecutor) CountTokens(context.Context, *coreauth.Auth, coreexecutor.Request, coreexecutor.Options) (coreexecutor.Response, error) {
+	return coreexecutor.Response{}, nil
 }
 func (e *recordingRefreshVerifyExecutor) HttpRequest(context.Context, *coreauth.Auth, *http.Request) (*http.Response, error) {
 	return nil, nil

@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/MoeForge/moego/ojson"
-	applypatch "github.com/router-for-me/CLIProxyAPI/v8/internal/client/codex/apply-patch"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
+	applypatch "github.com/udit19199/relay/internal/client/codex/apply-patch"
+	"github.com/udit19199/relay/internal/util"
 )
 
 // NormalizeApplyPatchResponsesRequest adapts declarations and explicit custom patch history.

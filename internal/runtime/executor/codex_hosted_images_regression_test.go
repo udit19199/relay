@@ -13,11 +13,11 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gorilla/websocket"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/registry"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 type codexHostedImageCapturedRequest struct {
@@ -72,7 +72,7 @@ func newCodexHostedImageTestServer(t *testing.T, transport string) (*httptest.Se
 
 func assertCodexHostedImageRequestError(t *testing.T, err error) {
 	t.Helper()
-	var scoped cliproxyexecutor.RequestScopedError
+	var scoped coreexecutor.RequestScopedError
 	var status interface{ StatusCode() int }
 	if !errors.As(err, &scoped) || !scoped.IsRequestScoped() || !errors.As(err, &status) || status.StatusCode() != http.StatusBadRequest {
 		t.Fatalf("expected request-scoped HTTP 400, got %v", err)
@@ -89,7 +89,7 @@ func TestCodexHostedImageRejectionDoesNotRotateCooldownOrHideModel(t *testing.T)
 				t.Run(transport+"/"+model+map[bool]string{false: "/execute", true: "/stream"}[stream], func(t *testing.T) {
 					server, _, calls := newCodexHostedImageTestServer(t, transport)
 					cfg := &config.Config{}
-					m := cliproxyauth.NewManager(nil, nil, nil)
+					m := coreauth.NewManager(nil, nil, nil)
 					m.SetConfig(cfg)
 					m.SetRetryConfig(3, time.Second, 0)
 					if transport == "websocket" {
@@ -100,8 +100,8 @@ func TestCodexHostedImageRejectionDoesNotRotateCooldownOrHideModel(t *testing.T)
 					reg := registry.GetGlobalRegistry()
 					authIDs := []string{t.Name() + "/a", t.Name() + "/b"}
 					for _, id := range authIDs {
-						auth := &cliproxyauth.Auth{
-							ID: id, Provider: "codex", Status: cliproxyauth.StatusActive,
+						auth := &coreauth.Auth{
+							ID: id, Provider: "codex", Status: coreauth.StatusActive,
 							Attributes: map[string]string{"base_url": server.URL, "plan_type": "pro"},
 							Metadata:   map[string]any{"access_token": "test-token", "account_id": "test-account"},
 						}
@@ -113,11 +113,11 @@ func TestCodexHostedImageRejectionDoesNotRotateCooldownOrHideModel(t *testing.T)
 					}
 					doc := ojson.NewDocString(`{"input":"draw a cat","tools":[{"type":"image_generation"}],"tool_choice":{"type":"image_generation"}}`)
 					_ = doc.Set("model", model)
-					req := cliproxyexecutor.Request{Model: model, Payload: doc.Bytes()}
+					req := coreexecutor.Request{Model: model, Payload: doc.Bytes()}
 					selected := 0
-					opts := cliproxyexecutor.Options{
-						Stream: stream, SourceFormat: sdktranslator.FormatOpenAIResponse,
-						Metadata: map[string]any{cliproxyexecutor.SelectedAuthCallbackMetadataKey: func(string) { selected++ }},
+					opts := coreexecutor.Options{
+						Stream: stream, SourceFormat: translatorreg.FormatOpenAIResponse,
+						Metadata: map[string]any{coreexecutor.SelectedAuthCallbackMetadataKey: func(string) { selected++ }},
 					}
 					var errExecute error
 					if stream {
@@ -131,7 +131,7 @@ func TestCodexHostedImageRejectionDoesNotRotateCooldownOrHideModel(t *testing.T)
 					}
 					for _, id := range authIDs {
 						auth, ok := m.GetByID(id)
-						if !ok || auth.Unavailable || !auth.NextRetryAfter.IsZero() || len(auth.ModelStates) != 0 || len(cliproxyauth.CooldownSnapshotForAuth(auth, time.Now())) != 0 {
+						if !ok || auth.Unavailable || !auth.NextRetryAfter.IsZero() || len(auth.ModelStates) != 0 || len(coreauth.CooldownSnapshotForAuth(auth, time.Now())) != 0 {
 							t.Fatalf("request rejection changed credential availability: %#v", auth)
 						}
 						if reg.IsModelSuspendedForClient(id, model) {
@@ -188,28 +188,28 @@ func TestCodexHostedImageContinuationRejectsBeforeWritingUpstream(t *testing.T) 
 	defer server.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	input := make(chan cliproxyexecutor.WebsocketInput, 1)
-	ctx = cliproxyexecutor.WithWebsocketInput(cliproxyexecutor.WithDownstreamWebsocket(ctx), input)
+	input := make(chan coreexecutor.WebsocketInput, 1)
+	ctx = coreexecutor.WithWebsocketInput(coreexecutor.WithDownstreamWebsocket(ctx), input)
 	cfg := &config.Config{}
 	cfg.Codex.ResponseSteering = true
 	cfg.CodexResponseSteering = true
 	exec := NewCodexWebsocketsExecutor(cfg)
 	exec.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
-	m := cliproxyauth.NewManager(nil, &cliproxyauth.FillFirstSelector{}, nil)
+	m := coreauth.NewManager(nil, &coreauth.FillFirstSelector{}, nil)
 	m.SetConfig(cfg)
 	m.SetRetryConfig(3, time.Second, 0)
 	m.RegisterExecutor(exec)
 	reg := registry.GetGlobalRegistry()
 	authIDs := []string{t.Name() + "/a", t.Name() + "/b"}
 	for _, id := range authIDs {
-		auth := &cliproxyauth.Auth{ID: id, Provider: "codex", Status: cliproxyauth.StatusActive, Attributes: map[string]string{"base_url": server.URL, "websockets": "true"}, Metadata: map[string]any{"access_token": "test-token", "account_id": "test-account"}}
+		auth := &coreauth.Auth{ID: id, Provider: "codex", Status: coreauth.StatusActive, Attributes: map[string]string{"base_url": server.URL, "websockets": "true"}, Metadata: map[string]any{"access_token": "test-token", "account_id": "test-account"}}
 		if _, errRegister := m.Register(ctx, auth); errRegister != nil {
 			t.Fatal(errRegister)
 		}
 		reg.RegisterClient(id, "codex", []*registry.ModelInfo{{ID: "gpt-6-sol"}})
 		t.Cleanup(func() { reg.UnregisterClient(id) })
 	}
-	result, errStream := m.ExecuteStream(ctx, []string{"codex"}, cliproxyexecutor.Request{Model: "gpt-6-sol", Payload: []byte(`{"model":"gpt-6-sol","input":[]}`)}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatCodex, Metadata: map[string]any{cliproxyexecutor.ExecutionSessionMetadataKey: t.Name()}})
+	result, errStream := m.ExecuteStream(ctx, []string{"codex"}, coreexecutor.Request{Model: "gpt-6-sol", Payload: []byte(`{"model":"gpt-6-sol","input":[]}`)}, coreexecutor.Options{SourceFormat: translatorreg.FormatCodex, Metadata: map[string]any{coreexecutor.ExecutionSessionMetadataKey: t.Name()}})
 	if errStream != nil {
 		t.Fatal(errStream)
 	}
@@ -222,7 +222,7 @@ func TestCodexHostedImageContinuationRejectsBeforeWritingUpstream(t *testing.T) 
 		}
 		if !completed && ojson.GetBytes(chunk.Payload, "type").String() == "response.completed" {
 			completed = true
-			input <- cliproxyexecutor.WebsocketInput{Payload: []byte(`{"type":"response.create","previous_response_id":"started","input":[],"tools":[{"type":"image_generation"}],"tool_choice":{"type":"image_generation"}}`)}
+			input <- coreexecutor.WebsocketInput{Payload: []byte(`{"type":"response.create","previous_response_id":"started","input":[],"tools":[{"type":"image_generation"}],"tool_choice":{"type":"image_generation"}}`)}
 		}
 	}
 	if !completed {
@@ -239,7 +239,7 @@ func TestCodexHostedImageContinuationRejectsBeforeWritingUpstream(t *testing.T) 
 	}
 	for _, id := range authIDs {
 		auth, _ := m.GetByID(id)
-		if auth.Unavailable || len(cliproxyauth.CooldownSnapshotForAuth(auth, time.Now())) != 0 || reg.IsModelSuspendedForClient(id, "gpt-6-sol") {
+		if auth.Unavailable || len(coreauth.CooldownSnapshotForAuth(auth, time.Now())) != 0 || reg.IsModelSuspendedForClient(id, "gpt-6-sol") {
 			t.Fatalf("rejected continuation changed credential availability: %#v", auth)
 		}
 	}
@@ -297,7 +297,7 @@ func TestCodexHostedImageValidationUsesFinalPayload(t *testing.T) {
 				t.Run(tc.name+"/"+transport+map[bool]string{false: "/execute", true: "/stream"}[stream], func(t *testing.T) {
 					server, captured, calls := newCodexHostedImageTestServer(t, transport)
 					cfg := tc.cfg
-					var exec cliproxyauth.ProviderExecutor = NewCodexExecutor(&cfg)
+					var exec coreauth.ProviderExecutor = NewCodexExecutor(&cfg)
 					if transport == "websocket" {
 						exec = NewCodexWebsocketsExecutor(&cfg)
 					}
@@ -311,16 +311,16 @@ func TestCodexHostedImageValidationUsesFinalPayload(t *testing.T) {
 					}
 					doc := ojson.NewDocString(body)
 					_ = doc.Set("model", model)
-					req := cliproxyexecutor.Request{Model: model, Payload: doc.Bytes()}
-					auth := &cliproxyauth.Auth{ID: t.Name(), Provider: "codex", Attributes: map[string]string{"base_url": server.URL, "plan_type": "pro"}, Metadata: map[string]any{"access_token": "test-token", "account_id": "test-account"}}
+					req := coreexecutor.Request{Model: model, Payload: doc.Bytes()}
+					auth := &coreauth.Auth{ID: t.Name(), Provider: "codex", Attributes: map[string]string{"base_url": server.URL, "plan_type": "pro"}, Metadata: map[string]any{"access_token": "test-token", "account_id": "test-account"}}
 					for key, value := range tc.attrs {
 						auth.Attributes[key] = value
 					}
 					finalized := 0
-					opts := cliproxyexecutor.Options{Stream: stream, SourceFormat: sdktranslator.FormatOpenAIResponse, Headers: tc.headers, Metadata: map[string]any{cliproxyexecutor.FinalizedResponseFormatCallbackMetadataKey: func(string) { finalized++ }}}
+					opts := coreexecutor.Options{Stream: stream, SourceFormat: translatorreg.FormatOpenAIResponse, Headers: tc.headers, Metadata: map[string]any{coreexecutor.FinalizedResponseFormatCallbackMetadataKey: func(string) { finalized++ }}}
 					var errExecute error
 					if stream {
-						var result *cliproxyexecutor.StreamResult
+						var result *coreexecutor.StreamResult
 						result, errExecute = exec.ExecuteStream(context.Background(), auth, req, opts)
 						if result != nil {
 							for chunk := range result.Chunks {

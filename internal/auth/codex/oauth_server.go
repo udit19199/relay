@@ -1,6 +1,6 @@
 package codex
 
-import "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/oauthcallback"
+import "github.com/udit19199/relay/internal/auth/oauthcallback"
 
 // OAuthServer handles the local HTTP server for OAuth callbacks.
 type OAuthServer = oauthcallback.Server

@@ -13,16 +13,16 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/google/uuid"
-	xaiauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/xai"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	xaiauth "github.com/udit19199/relay/internal/auth/xai"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/registry"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestXAISpeechRequestURLStaysOnOfficialAPI(t *testing.T) {
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Attributes: map[string]string{
 			"auth_kind": "oauth",
 			"base_url":  xaiauth.CLIChatProxyBaseURL,
@@ -37,7 +37,7 @@ func TestXAISpeechRequestURLStaysOnOfficialAPI(t *testing.T) {
 		t.Fatalf("speech URL pinned to CLI chat proxy: %s", got)
 	}
 
-	custom := &cliproxyauth.Auth{Attributes: map[string]string{"base_url": "https://gateway.example/v1"}}
+	custom := &coreauth.Auth{Attributes: map[string]string{"base_url": "https://gateway.example/v1"}}
 	if got := xaiSpeechRequestURL(custom); got != "https://gateway.example/v1/tts" {
 		t.Fatalf("custom speech URL = %q", got)
 	}
@@ -70,7 +70,7 @@ func TestXAIExecutorExecuteSpeechPostsAudioRequest(t *testing.T) {
 	defer server.Close()
 
 	exec := NewXAIExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "xai",
 		Attributes: map[string]string{
 			"base_url":  server.URL + "/v1",
@@ -78,11 +78,11 @@ func TestXAIExecutorExecuteSpeechPostsAudioRequest(t *testing.T) {
 		},
 		Metadata: map[string]any{"access_token": "xai-token"},
 	}
-	resp, err := exec.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	resp, err := exec.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "grok-tts",
 		Payload: []byte(body),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-speech"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-speech"),
 	})
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -115,8 +115,8 @@ func TestXAIExecutorExecuteSpeechPostsAudioRequest(t *testing.T) {
 
 func TestXAIExecutorExecuteStreamRejectsSpeech(t *testing.T) {
 	exec := NewXAIExecutor(&config.Config{})
-	_, err := exec.ExecuteStream(context.Background(), &cliproxyauth.Auth{}, cliproxyexecutor.Request{}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString(xaiSpeechHandlerType),
+	_, err := exec.ExecuteStream(context.Background(), &coreauth.Auth{}, coreexecutor.Request{}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString(xaiSpeechHandlerType),
 	})
 	if err == nil || !strings.Contains(err.Error(), "streaming not supported") {
 		t.Fatalf("error = %v", err)
@@ -146,7 +146,7 @@ func TestXAIExecutorExecuteSpeechPayloadRulesMatchOpenAIProtocol(t *testing.T) {
 		Params: map[string]any{"voice_id": "ara", "language": "en"},
 	}}}}
 	exec := NewXAIExecutor(cfg)
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "xai",
 		Attributes: map[string]string{
 			"base_url":  server.URL + "/v1",
@@ -154,11 +154,11 @@ func TestXAIExecutorExecuteSpeechPayloadRulesMatchOpenAIProtocol(t *testing.T) {
 		},
 		Metadata: map[string]any{"access_token": "xai-token"},
 	}
-	_, err := exec.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, err := exec.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "grok-tts",
 		Payload: []byte(body),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString(xaiSpeechHandlerType),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString(xaiSpeechHandlerType),
 	})
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -208,7 +208,7 @@ func TestXAIExecutorExecuteSpeechUpstreamErrorScope(t *testing.T) {
 			defer server.Close()
 
 			exec := NewXAIExecutor(&config.Config{})
-			auth := &cliproxyauth.Auth{
+			auth := &coreauth.Auth{
 				Provider: "xai",
 				Attributes: map[string]string{
 					"base_url":  server.URL + "/v1",
@@ -216,11 +216,11 @@ func TestXAIExecutorExecuteSpeechUpstreamErrorScope(t *testing.T) {
 				},
 				Metadata: map[string]any{"access_token": "xai-token"},
 			}
-			_, err := exec.Execute(context.Background(), auth, cliproxyexecutor.Request{
+			_, err := exec.Execute(context.Background(), auth, coreexecutor.Request{
 				Model:   "grok-tts",
 				Payload: []byte(`{"text":"hello","voice_id":"nope","language":"auto"}`),
-			}, cliproxyexecutor.Options{
-				SourceFormat: sdktranslator.FromString(xaiSpeechHandlerType),
+			}, coreexecutor.Options{
+				SourceFormat: translatorreg.FromString(xaiSpeechHandlerType),
 			})
 			if err == nil {
 				t.Fatal("Execute() error = nil, want upstream error")
@@ -235,33 +235,33 @@ func TestXAIExecutorExecuteSpeechUpstreamErrorScope(t *testing.T) {
 			if tt.wantScoped {
 				assertRequestScopedTestError(t, err)
 				if !isRequestScopedExecutorError(err) {
-					t.Fatalf("error %T is not recognized as cliproxyexecutor.RequestScopedError", err)
+					t.Fatalf("error %T is not recognized as coreexecutor.RequestScopedError", err)
 				}
 				return
 			}
 			assertNotRequestScopedTestError(t, err)
 			if isRequestScopedExecutorError(err) {
-				t.Fatalf("error %T unexpectedly recognized as cliproxyexecutor.RequestScopedError", err)
+				t.Fatalf("error %T unexpectedly recognized as coreexecutor.RequestScopedError", err)
 			}
 		})
 	}
 }
 
 func isRequestScopedExecutorError(err error) bool {
-	var requestErr cliproxyexecutor.RequestScopedError
+	var requestErr coreexecutor.RequestScopedError
 	return errors.As(err, &requestErr) && requestErr.IsRequestScoped()
 }
 
-func newXAISpeechScopeManager(t *testing.T, baseURL string, count int) (*cliproxyauth.Manager, []string) {
+func newXAISpeechScopeManager(t *testing.T, baseURL string, count int) (*coreauth.Manager, []string) {
 	t.Helper()
-	manager := cliproxyauth.NewManager(nil, nil, nil)
+	manager := coreauth.NewManager(nil, nil, nil)
 	manager.SetRetryConfig(0, 0, 0)
 	manager.RegisterExecutor(NewXAIExecutor(&config.Config{}))
 
 	reg := registry.GetGlobalRegistry()
 	authIDs := make([]string, 0, count)
 	for i := 0; i < count; i++ {
-		auth := &cliproxyauth.Auth{
+		auth := &coreauth.Auth{
 			ID:       uuid.NewString() + "-xai-speech-scope",
 			Provider: "xai",
 			Attributes: map[string]string{
@@ -294,10 +294,10 @@ func TestXAIExecutorSpeechUnknownVoiceDoesNotRotateOrCoolCredentials(t *testing.
 	manager, authIDs := newXAISpeechScopeManager(t, server.URL, 2)
 	reg := registry.GetGlobalRegistry()
 
-	_, err := manager.Execute(context.Background(), []string{"xai"}, cliproxyexecutor.Request{
+	_, err := manager.Execute(context.Background(), []string{"xai"}, coreexecutor.Request{
 		Model:   "grok-tts",
 		Payload: []byte(`{"text":"hello","voice_id":"nope","language":"auto"}`),
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString(xaiSpeechHandlerType)})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FromString(xaiSpeechHandlerType)})
 	if err == nil {
 		t.Fatal("Execute() error = nil, want upstream 404")
 	}
@@ -335,10 +335,10 @@ func TestXAIExecutorSpeechModelNotFoundRotatesCredentials(t *testing.T) {
 
 	manager, _ := newXAISpeechScopeManager(t, server.URL, 2)
 
-	_, err := manager.Execute(context.Background(), []string{"xai"}, cliproxyexecutor.Request{
+	_, err := manager.Execute(context.Background(), []string{"xai"}, coreexecutor.Request{
 		Model:   "grok-tts",
 		Payload: []byte(`{"text":"hello","voice_id":"eve","language":"auto"}`),
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString(xaiSpeechHandlerType)})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FromString(xaiSpeechHandlerType)})
 	if err == nil {
 		t.Fatal("Execute() error = nil, want upstream 404")
 	}

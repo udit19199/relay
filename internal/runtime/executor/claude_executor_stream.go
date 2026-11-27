@@ -11,17 +11,17 @@ import (
 	"strings"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/clienterror"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/thinking"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
 	log "github.com/sirupsen/logrus"
+	"github.com/udit19199/relay/internal/clienterror"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	"github.com/udit19199/relay/internal/thinking"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
+	"github.com/udit19199/relay/internal/util"
 )
 
-func (e *ClaudeExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (_ *cliproxyexecutor.StreamResult, err error) {
+func (e *ClaudeExecutor) ExecuteStream(ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) (_ *coreexecutor.StreamResult, err error) {
 	ctx = helps.EnsureSessionContext(ctx, opts, req.Payload)
 	if errExpand := expandClaudeResponsesCompaction(&req, &opts); errExpand != nil {
 		return nil, statusErr{code: http.StatusBadRequest, msg: errExpand.Error()}
@@ -54,8 +54,8 @@ func (e *ClaudeExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.A
 	}
 	from := opts.SourceFormat
 	ctx, req, opts = e.applyNativeToolSearchFallback(ctx, auth, from, upstreamModel, req, opts)
-	responseFormat := cliproxyexecutor.ResponseFormatOrSource(opts)
-	to := sdktranslator.FromString("claude")
+	responseFormat := coreexecutor.ResponseFormatOrSource(opts)
+	to := translatorreg.FromString("claude")
 	var replayScope claudeThinkingReplayScope
 	if claudeThinkingReplayEnabled(auth, req, opts) {
 		req, replayScope = prepareClaudeThinkingReplayRequest(ctx, auth, req, opts)
@@ -345,7 +345,7 @@ func (e *ClaudeExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.A
 		}
 		return nil, wrapClaudeFastRequestError(fastRequest, httpResp.StatusCode, err)
 	}
-	out := make(chan cliproxyexecutor.StreamChunk, 1)
+	out := make(chan coreexecutor.StreamChunk, 1)
 	go func() {
 		defer close(out)
 		defer func() {
@@ -361,7 +361,7 @@ func (e *ClaudeExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.A
 				helps.RecordAPIResponseError(ctx, e.cfg, cancelErr)
 				streamUsage.PublishFailure(ctx, reporter, cancelErr)
 				select {
-				case out <- cliproxyexecutor.StreamChunk{Err: cancelErr}:
+				case out <- coreexecutor.StreamChunk{Err: cancelErr}:
 				default:
 				}
 				return true
@@ -382,7 +382,7 @@ func (e *ClaudeExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.A
 			helps.RecordAPIResponseError(ctx, e.cfg, errResponse)
 			streamUsage.PublishFailure(ctx, reporter, errResponse)
 			select {
-			case out <- cliproxyexecutor.StreamChunk{Err: errResponse}:
+			case out <- coreexecutor.StreamChunk{Err: errResponse}:
 			case <-ctx.Done():
 			}
 		}
@@ -404,7 +404,7 @@ func (e *ClaudeExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.A
 				cloned := bytes.Clone(event.Bytes())
 				event.Reset()
 				select {
-				case out <- cliproxyexecutor.StreamChunk{Payload: cloned}:
+				case out <- coreexecutor.StreamChunk{Payload: cloned}:
 					return true
 				case <-ctx.Done():
 					return false
@@ -453,7 +453,7 @@ func (e *ClaudeExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.A
 					helps.RecordAPIResponseError(ctx, e.cfg, errScan)
 					streamUsage.PublishFailure(ctx, reporter, errScan)
 					select {
-					case out <- cliproxyexecutor.StreamChunk{Err: errScan}:
+					case out <- coreexecutor.StreamChunk{Err: errScan}:
 					case <-ctx.Done():
 					}
 					return
@@ -494,7 +494,7 @@ func (e *ClaudeExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.A
 			}
 			line = e.restoreResponseModel(restoredLine, req.Model)
 			helps.RecordClaudeWebSearchResultsContext(ctx, webSearchSessionKey, line, webSearchTTL, webSearchLimit)
-			chunks := sdktranslator.TranslateStream(
+			chunks := translatorreg.TranslateStream(
 				ctx,
 				to,
 				responseFormat,
@@ -504,7 +504,7 @@ func (e *ClaudeExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.A
 				bytes.Clone(line),
 				&param,
 			)
-			if responseFormat == sdktranslator.FormatOpenAIResponse && helps.ApplyPatchTranslationError(param) == nil {
+			if responseFormat == translatorreg.FormatOpenAIResponse && helps.ApplyPatchTranslationError(param) == nil {
 				for i, chunk := range chunks {
 					chunks[i] = helps.EnsureResponsesUsageDetails(chunk)
 				}
@@ -512,7 +512,7 @@ func (e *ClaudeExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.A
 			helps.RecordApplyPatchStreamFailure(ctx, param, reporter, statusErr{code: http.StatusBadGateway, msg: helps.ApplyPatchUpstreamErrorMessage})
 			for i := range chunks {
 				select {
-				case out <- cliproxyexecutor.StreamChunk{Payload: chunks[i]}:
+				case out <- coreexecutor.StreamChunk{Payload: chunks[i]}:
 				case <-ctx.Done():
 					if eventBuf.Len() > 0 {
 						observeClaudeSSEEvent(eventBuf.Bytes(), &upstreamMessageID, &upstreamCompleted, &upstreamStreamErr)
@@ -556,7 +556,7 @@ func (e *ClaudeExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.A
 				helps.RecordAPIResponseError(ctx, e.cfg, errScan)
 				streamUsage.PublishFailure(ctx, reporter, errScan)
 				select {
-				case out <- cliproxyexecutor.StreamChunk{Err: errScan}:
+				case out <- coreexecutor.StreamChunk{Err: errScan}:
 				case <-ctx.Done():
 				}
 				return
@@ -567,7 +567,7 @@ func (e *ClaudeExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.A
 			e.rememberClaudeOAuthToolAliases(body, oauthToolNamesReverseMap, upstreamMessageID)
 		}
 	}()
-	result := &cliproxyexecutor.StreamResult{Headers: httpResp.Header.Clone(), Chunks: out}
+	result := &coreexecutor.StreamResult{Headers: httpResp.Header.Clone(), Chunks: out}
 	if replayScope.valid() {
 		result = wrapClaudeThinkingReplayStream(ctx, result, replayScope)
 	}

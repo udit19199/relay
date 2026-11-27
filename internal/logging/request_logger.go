@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/interfaces"
+	"github.com/udit19199/relay/internal/interfaces"
 )
 
 const (

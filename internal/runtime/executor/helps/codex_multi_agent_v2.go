@@ -5,16 +5,16 @@ import (
 	"net/http"
 
 	"github.com/MoeForge/moego/ojson"
-	multiagentv2 "github.com/router-for-me/CLIProxyAPI/v8/internal/client/codex/optimize-multi-agent-v2"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/thinking"
-	openaichatclaude "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/claude/openai/chat-completions"
-	responsesclaude "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/claude/openai/responses"
-	codexclaude "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/codex/claude"
-	interactionsclaude "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/interactions/claude"
-	openaiclaude "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/openai/claude"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	multiagentv2 "github.com/udit19199/relay/internal/client/codex/optimize-multi-agent-v2"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	"github.com/udit19199/relay/internal/thinking"
+	openaichatclaude "github.com/udit19199/relay/internal/translator/claude/openai/chat-completions"
+	responsesclaude "github.com/udit19199/relay/internal/translator/claude/openai/responses"
+	codexclaude "github.com/udit19199/relay/internal/translator/codex/claude"
+	interactionsclaude "github.com/udit19199/relay/internal/translator/interactions/claude"
+	openaiclaude "github.com/udit19199/relay/internal/translator/openai/claude"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 // RewriteCodexMultiAgentV2InputDoc converts official Codex multi-agent input into
@@ -31,7 +31,7 @@ func RewriteCodexOrphanDelegationInputDoc(doc *ojson.Doc, ctx context.Context, h
 
 // TranslateRequestWithCodexMultiAgentV2 normalizes official Codex multi-agent
 // input before translating it to a non-Codex target protocol.
-func TranslateRequestWithCodexMultiAgentV2(ctx context.Context, headers http.Header, cfg *config.Config, from, to sdktranslator.Format, model string, payload []byte, stream bool) []byte {
+func TranslateRequestWithCodexMultiAgentV2(ctx context.Context, headers http.Header, cfg *config.Config, from, to translatorreg.Format, model string, payload []byte, stream bool) []byte {
 	if IsCodexUserAgent(headers) {
 		payload = NormalizeCodexToolIntegerTypes(payload, headers)
 	}
@@ -40,7 +40,7 @@ func TranslateRequestWithCodexMultiAgentV2(ctx context.Context, headers http.Hea
 
 // TranslateRequestEnvelopeWithCodexMultiAgentV2 normalizes official Codex
 // multi-agent input while preserving the complete request envelope.
-func TranslateRequestEnvelopeWithCodexMultiAgentV2(ctx context.Context, headers http.Header, cfg *config.Config, from, to sdktranslator.Format, req sdktranslator.RequestEnvelope) sdktranslator.RequestEnvelope {
+func TranslateRequestEnvelopeWithCodexMultiAgentV2(ctx context.Context, headers http.Header, cfg *config.Config, from, to translatorreg.Format, req translatorreg.RequestEnvelope) translatorreg.RequestEnvelope {
 	return multiagentv2.TranslateRequestEnvelopeWithCodexMultiAgentV2(ctx, headers, cfg, from, to, req)
 }
 
@@ -50,8 +50,8 @@ func TranslateRequestEnvelopeWithCodexMultiAgentV2(ctx context.Context, headers 
 // same input is translated once, then copied into a
 // separate working buffer. This avoids a full
 // extra pass over payloads that can reach tens of megabytes.
-func TranslateRequestPairWithCodexMultiAgentV2(ctx context.Context, headers http.Header, cfg *config.Config, from, to sdktranslator.Format, model string, originalPayload, requestPayload []byte, stream bool) (original, working []byte) {
-	req := sdktranslator.RequestEnvelope{Format: from, Model: model, Stream: stream}
+func TranslateRequestPairWithCodexMultiAgentV2(ctx context.Context, headers http.Header, cfg *config.Config, from, to translatorreg.Format, model string, originalPayload, requestPayload []byte, stream bool) (original, working []byte) {
+	req := translatorreg.RequestEnvelope{Format: from, Model: model, Stream: stream}
 	original, working, _ = TranslateRequestEnvelopePairWithCodexMultiAgentV2(ctx, headers, cfg, from, to, req, originalPayload, requestPayload)
 	return original, working
 }
@@ -60,7 +60,7 @@ func TranslateRequestPairWithCodexMultiAgentV2(ctx context.Context, headers http
 // working payload while preserving request-scoped metadata in req. The returned
 // error is the one for the working payload, which is the payload sent upstream;
 // a failure of the baseline alone never rejects a working payload that translated.
-func TranslateRequestEnvelopePairWithCodexMultiAgentV2(ctx context.Context, headers http.Header, cfg *config.Config, from, to sdktranslator.Format, req sdktranslator.RequestEnvelope, originalPayload, requestPayload []byte) (original, working []byte, err error) {
+func TranslateRequestEnvelopePairWithCodexMultiAgentV2(ctx context.Context, headers http.Header, cfg *config.Config, from, to translatorreg.Format, req translatorreg.RequestEnvelope, originalPayload, requestPayload []byte) (original, working []byte, err error) {
 	originalReq := req
 	originalReq.Body = originalPayload
 	originalTranslated := TranslateRequestEnvelopeWithCodexMultiAgentV2(ctx, headers, cfg, from, to, originalReq)
@@ -91,17 +91,17 @@ func sameByteSlice(a, b []byte) bool {
 
 // TranslateRequestPairWithAPIKeyModelCompatibility avoids translating identical
 // inputs twice while retaining separate buffers.
-func TranslateRequestPairWithAPIKeyModelCompatibility(ctx context.Context, headers http.Header, cfg *config.Config, from, to sdktranslator.Format, model string, originalPayload, requestPayload []byte, stream, isCompat bool) (original, working []byte) {
+func TranslateRequestPairWithAPIKeyModelCompatibility(ctx context.Context, headers http.Header, cfg *config.Config, from, to translatorreg.Format, model string, originalPayload, requestPayload []byte, stream, isCompat bool) (original, working []byte) {
 	original, working, _ = translateRequestPairWithAPIKeyModelCompatibility(ctx, headers, cfg, from, to, model, originalPayload, requestPayload, stream, isCompat)
 	return original, working
 }
 
 // TranslateRequestPairReturningError reports a content part the target cannot represent.
-func TranslateRequestPairReturningError(ctx context.Context, headers http.Header, cfg *config.Config, from, to sdktranslator.Format, model string, originalPayload, requestPayload []byte, stream, isCompat bool) ([]byte, []byte, error) {
+func TranslateRequestPairReturningError(ctx context.Context, headers http.Header, cfg *config.Config, from, to translatorreg.Format, model string, originalPayload, requestPayload []byte, stream, isCompat bool) ([]byte, []byte, error) {
 	return translateRequestPairWithAPIKeyModelCompatibility(ctx, headers, cfg, from, to, model, originalPayload, requestPayload, stream, isCompat)
 }
 
-func translateRequestPairWithAPIKeyModelCompatibility(ctx context.Context, headers http.Header, cfg *config.Config, from, to sdktranslator.Format, model string, originalPayload, requestPayload []byte, stream, isCompat bool) (original, working []byte, err error) {
+func translateRequestPairWithAPIKeyModelCompatibility(ctx context.Context, headers http.Header, cfg *config.Config, from, to translatorreg.Format, model string, originalPayload, requestPayload []byte, stream, isCompat bool) (original, working []byte, err error) {
 	original, err = translateRequestWithAPIKeyModelCompatibilityForExecutor(ctx, headers, cfg, "", from, to, model, originalPayload, stream, isCompat)
 	if sameByteSlice(originalPayload, requestPayload) {
 		// A single translation serves both payloads, so its error is the working error.
@@ -114,29 +114,29 @@ func translateRequestPairWithAPIKeyModelCompatibility(ctx context.Context, heade
 
 // TranslateRequestWithAPIKeyModelCompatibility applies compatibility-aware
 // request translators when a configured API-key model enables compatibility mode.
-func TranslateRequestWithAPIKeyModelCompatibility(ctx context.Context, headers http.Header, cfg *config.Config, from, to sdktranslator.Format, model string, payload []byte, stream, isCompat bool) []byte {
+func TranslateRequestWithAPIKeyModelCompatibility(ctx context.Context, headers http.Header, cfg *config.Config, from, to translatorreg.Format, model string, payload []byte, stream, isCompat bool) []byte {
 	return TranslateRequestWithAPIKeyModelCompatibilityForExecutor(ctx, headers, cfg, "", from, to, model, payload, stream, isCompat)
 }
 
 // TranslateRequestWithAPIKeyModelCompatibilityForExecutor applies compatibility-aware
 // request translation while preserving the actual target executor's schema policy.
-func TranslateRequestWithAPIKeyModelCompatibilityForExecutor(ctx context.Context, headers http.Header, cfg *config.Config, targetExecutor string, from, to sdktranslator.Format, model string, payload []byte, stream, isCompat bool) []byte {
+func TranslateRequestWithAPIKeyModelCompatibilityForExecutor(ctx context.Context, headers http.Header, cfg *config.Config, targetExecutor string, from, to translatorreg.Format, model string, payload []byte, stream, isCompat bool) []byte {
 	body, _ := translateRequestWithAPIKeyModelCompatibilityForExecutor(ctx, headers, cfg, targetExecutor, from, to, model, payload, stream, isCompat)
 	return body
 }
 
 // TranslateRequestReturningError reports a content part the target cannot represent.
-func TranslateRequestReturningError(ctx context.Context, headers http.Header, cfg *config.Config, from, to sdktranslator.Format, model string, payload []byte, stream, isCompat bool) ([]byte, error) {
+func TranslateRequestReturningError(ctx context.Context, headers http.Header, cfg *config.Config, from, to translatorreg.Format, model string, payload []byte, stream, isCompat bool) ([]byte, error) {
 	return TranslateRequestReturningErrorForExecutor(ctx, headers, cfg, "", from, to, model, payload, stream, isCompat)
 }
 
 // TranslateRequestReturningErrorForExecutor reports a content part the target
 // cannot represent while preserving the actual target executor's schema policy.
-func TranslateRequestReturningErrorForExecutor(ctx context.Context, headers http.Header, cfg *config.Config, targetExecutor string, from, to sdktranslator.Format, model string, payload []byte, stream, isCompat bool) ([]byte, error) {
+func TranslateRequestReturningErrorForExecutor(ctx context.Context, headers http.Header, cfg *config.Config, targetExecutor string, from, to translatorreg.Format, model string, payload []byte, stream, isCompat bool) ([]byte, error) {
 	return translateRequestWithAPIKeyModelCompatibilityForExecutor(ctx, headers, cfg, targetExecutor, from, to, model, payload, stream, isCompat)
 }
 
-func translateRequestWithAPIKeyModelCompatibilityForExecutor(ctx context.Context, headers http.Header, cfg *config.Config, targetExecutor string, from, to sdktranslator.Format, model string, payload []byte, stream, isCompat bool) ([]byte, error) {
+func translateRequestWithAPIKeyModelCompatibilityForExecutor(ctx context.Context, headers http.Header, cfg *config.Config, targetExecutor string, from, to translatorreg.Format, model string, payload []byte, stream, isCompat bool) ([]byte, error) {
 	needsIntNorm := IsCodexUserAgent(headers) && !isCodexTargetExecutor(targetExecutor)
 	if !isCompat {
 		if needsIntNorm {
@@ -144,7 +144,7 @@ func translateRequestWithAPIKeyModelCompatibilityForExecutor(ctx context.Context
 		}
 		return translateRequestWithCodexMultiAgentV2Checked(ctx, headers, cfg, from, to, model, payload, stream)
 	}
-	if from == sdktranslator.FormatOpenAIResponse {
+	if from == translatorreg.FormatOpenAIResponse {
 		if len(payload) > 0 {
 			doc := ojson.NewDoc(payload)
 			changed := false
@@ -154,7 +154,7 @@ func translateRequestWithAPIKeyModelCompatibilityForExecutor(ctx context.Context
 			if RewriteCodexOrphanDelegationInputDoc(doc, ctx, headers, cfg) {
 				changed = true
 			}
-			if to != sdktranslator.FormatCodex && to != sdktranslator.FormatOpenAIResponse {
+			if to != translatorreg.FormatCodex && to != translatorreg.FormatOpenAIResponse {
 				if multiagentv2.RewriteCodexMultiAgentV2InputDoc(doc, ctx, headers, cfg, isCompat) {
 					changed = true
 				}
@@ -170,15 +170,15 @@ func translateRequestWithAPIKeyModelCompatibilityForExecutor(ctx context.Context
 	var translated []byte
 	var convertErr error
 	switch {
-	case from == sdktranslator.FormatClaude && to == sdktranslator.FormatCodex:
+	case from == translatorreg.FormatClaude && to == translatorreg.FormatCodex:
 		translated, convertErr = codexclaude.ConvertClaudeRequestToCodexWithCompatContext(ctx, model, payload, stream)
-	case from == sdktranslator.FormatClaude && to == sdktranslator.FormatInteractions:
+	case from == translatorreg.FormatClaude && to == translatorreg.FormatInteractions:
 		translated, convertErr = interactionsclaude.ConvertClaudeRequestToInteractionsWithCompat(model, payload, stream)
-	case from == sdktranslator.FormatClaude && to == sdktranslator.FormatOpenAI:
+	case from == translatorreg.FormatClaude && to == translatorreg.FormatOpenAI:
 		translated, convertErr = openaiclaude.ConvertClaudeRequestToOpenAIWithCompat(model, payload, stream)
-	case from == sdktranslator.FormatOpenAI && to == sdktranslator.FormatClaude:
+	case from == translatorreg.FormatOpenAI && to == translatorreg.FormatClaude:
 		translated, convertErr = openaichatclaude.ConvertOpenAIRequestToClaudeWithCompat(model, payload, stream)
-	case from == sdktranslator.FormatOpenAIResponse && to == sdktranslator.FormatClaude:
+	case from == translatorreg.FormatOpenAIResponse && to == translatorreg.FormatClaude:
 		translated, convertErr = responsesclaude.ConvertOpenAIResponsesRequestToClaudeWithCompatContext(ctx, model, payload, stream)
 	default:
 		return translateRequestWithCodexMultiAgentV2Checked(ctx, headers, cfg, from, to, model, payload, stream)
@@ -189,51 +189,20 @@ func translateRequestWithAPIKeyModelCompatibilityForExecutor(ctx context.Context
 	return translated, convertErr
 }
 
-// HasCodexMultiAgentV2NamespaceConflict reports whether the request defines
-// the reserved optimized namespace, which must remain untouched.
-func HasCodexMultiAgentV2NamespaceConflict(payload []byte) bool {
-	return multiagentv2.HasCodexMultiAgentV2NamespaceConflict(payload)
-}
-
 // HasCodexMultiAgentV2NamespaceConflictDoc reports whether doc defines
 // the reserved optimized namespace, which must remain untouched.
 func HasCodexMultiAgentV2NamespaceConflictDoc(doc *ojson.Doc) bool {
 	return multiagentv2.HasCodexMultiAgentV2NamespaceConflictDoc(doc)
 }
 
-// OptimizeCodexMultiAgentV2Request rewrites an eligible spawn_agent request and
-// reports whether the collaboration namespace was renamed for upstream use.
-func OptimizeCodexMultiAgentV2Request(ctx context.Context, headers http.Header, payload []byte, cfg *config.Config) ([]byte, bool) {
-	return multiagentv2.OptimizeCodexMultiAgentV2Request(ctx, headers, payload, cfg)
-}
-
-// OptimizeCodexMultiAgentV2RequestDoc rewrites an eligible spawn_agent request in place on doc
-// and reports whether the collaboration namespace was renamed for upstream use.
-func OptimizeCodexMultiAgentV2RequestDoc(doc *ojson.Doc, ctx context.Context, headers http.Header, cfg *config.Config) bool {
-	return multiagentv2.OptimizeCodexMultiAgentV2RequestDoc(doc, ctx, headers, cfg)
-}
-
-// OptimizeCodexMultiAgentV2RequestForAuth applies the standard Codex MultiAgentV2
-// request optimization and uses the execution attempt's resolved compatibility
-// flag to convert agent_message items into portable message/user input,
-// proactively stripping author, recipient, and internal passthrough metadata.
-func OptimizeCodexMultiAgentV2RequestForAuth(ctx context.Context, headers http.Header, payload []byte, cfg *config.Config, auth *cliproxyauth.Auth, isCompat bool) ([]byte, bool) {
-	if len(payload) == 0 {
-		return payload, false
-	}
-	doc := ojson.NewDoc(payload)
-	optimized := OptimizeCodexMultiAgentV2RequestForAuthDoc(doc, ctx, headers, cfg, auth, isCompat)
-	return doc.Bytes(), optimized
-}
-
 // OptimizeCodexMultiAgentV2RequestForAuthDoc applies the standard Codex MultiAgentV2
 // request optimization in place on doc and reports whether the collaboration namespace
 // was renamed for upstream use.
-func OptimizeCodexMultiAgentV2RequestForAuthDoc(doc *ojson.Doc, ctx context.Context, headers http.Header, cfg *config.Config, auth *cliproxyauth.Auth, isCompat bool) bool {
+func OptimizeCodexMultiAgentV2RequestForAuthDoc(doc *ojson.Doc, ctx context.Context, headers http.Header, cfg *config.Config, auth *coreauth.Auth, isCompat bool) bool {
 	if doc == nil || doc.Len() == 0 {
 		return false
 	}
-	if auth != nil && auth.AuthKind() == cliproxyauth.AuthKindAPIKey {
+	if auth != nil && auth.AuthKind() == coreauth.AuthKindAPIKey {
 		cfg = cfg.ForAPIKey()
 	}
 	multiagentv2.RewriteCodexOrphanDelegationInputForConfigDoc(doc, ctx, headers, cfg)
@@ -252,7 +221,7 @@ func RestoreCodexMultiAgentV2Response(payload []byte, optimized bool) []byte {
 
 // translateRequestWithCodexMultiAgentV2Checked is the multi-agent translation that
 // keeps the envelope failure instead of dropping it with the body.
-func translateRequestWithCodexMultiAgentV2Checked(ctx context.Context, headers http.Header, cfg *config.Config, from, to sdktranslator.Format, model string, payload []byte, stream bool) ([]byte, error) {
-	translated := multiagentv2.TranslateRequestEnvelopeWithCodexMultiAgentV2(ctx, headers, cfg, from, to, sdktranslator.RequestEnvelope{Format: from, Model: model, Stream: stream, Body: payload})
+func translateRequestWithCodexMultiAgentV2Checked(ctx context.Context, headers http.Header, cfg *config.Config, from, to translatorreg.Format, model string, payload []byte, stream bool) ([]byte, error) {
+	translated := multiagentv2.TranslateRequestEnvelopeWithCodexMultiAgentV2(ctx, headers, cfg, from, to, translatorreg.RequestEnvelope{Format: from, Model: model, Stream: stream, Body: payload})
 	return translated.Body, translated.Err
 }

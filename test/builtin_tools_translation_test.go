@@ -1,12 +1,10 @@
 package test
 
 import (
-	"testing"
-
-	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/translator"
-
 	"github.com/MoeForge/moego/ojson"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	_ "github.com/udit19199/relay/internal/translator"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
+	"testing"
 )
 
 func TestOpenAIToCodex_PreservesBuiltinTools(t *testing.T) {
@@ -17,7 +15,7 @@ func TestOpenAIToCodex_PreservesBuiltinTools(t *testing.T) {
 		"tool_choice":{"type":"web_search"}
 	}`)
 
-	out := sdktranslator.TranslateRequest(sdktranslator.FormatOpenAI, sdktranslator.FormatCodex, "gpt-5", in, false)
+	out := translatorreg.TranslateRequest(translatorreg.FormatOpenAI, translatorreg.FormatCodex, "gpt-5", in, false)
 
 	if got := ojson.GetBytesNoCopy(out, "tools.#").Int(); got != 1 {
 		t.Fatalf("expected 1 tool, got %d: %s", got, string(out))
@@ -40,7 +38,7 @@ func TestOpenAIResponsesToOpenAI_IgnoresBuiltinTools(t *testing.T) {
 		"tools":[{"type":"web_search","search_context_size":"low"}]
 	}`)
 
-	out := sdktranslator.TranslateRequest(sdktranslator.FormatOpenAIResponse, sdktranslator.FormatOpenAI, "gpt-5", in, false)
+	out := translatorreg.TranslateRequest(translatorreg.FormatOpenAIResponse, translatorreg.FormatOpenAI, "gpt-5", in, false)
 
 	if got := ojson.GetBytesNoCopy(out, "tools.#").Int(); got != 0 {
 		t.Fatalf("expected 0 tools (builtin tools not supported in Chat Completions), got %d: %s", got, string(out))

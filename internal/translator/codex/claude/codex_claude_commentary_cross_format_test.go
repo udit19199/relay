@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	interactionsclaude "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/interactions/claude"
-	openaiclaude "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/openai/claude"
+	interactionsclaude "github.com/udit19199/relay/internal/translator/interactions/claude"
+	openaiclaude "github.com/udit19199/relay/internal/translator/openai/claude"
 )
 
 // A client may replay CPA-relayed commentary history to a non-Codex upstream.

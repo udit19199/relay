@@ -1,6 +1,8 @@
 package codex
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestCredentialRefreshPatchChecksPartitionsIndependently(t *testing.T) {
 	for _, rotated := range []string{"outer", "siwc"} {

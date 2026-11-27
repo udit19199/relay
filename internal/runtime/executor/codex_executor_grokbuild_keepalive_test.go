@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/translator"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	_ "github.com/udit19199/relay/internal/translator"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestCodexExecutorExecuteStream_GrokBuildConvertsKeepaliveToSSEComment(t *testing.T) {
@@ -30,7 +30,7 @@ func TestCodexExecutorExecuteStream_GrokBuildConvertsKeepaliveToSSEComment(t *te
 	defer server.Close()
 
 	executor := NewCodexExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"base_url": server.URL,
 		"api_key":  "test",
 	}}
@@ -55,11 +55,11 @@ func TestCodexExecutorExecuteStream_GrokBuildConvertsKeepaliveToSSEComment(t *te
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			res, err := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+			res, err := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 				Model:   "gpt-5.6-luna",
 				Payload: []byte(`{"model":"gpt-5.6-luna","input":"test"}`),
-			}, cliproxyexecutor.Options{
-				SourceFormat: sdktranslator.FromString("openai-response"),
+			}, coreexecutor.Options{
+				SourceFormat: translatorreg.FromString("openai-response"),
 				Stream:       true,
 				Headers:      http.Header{"User-Agent": []string{tc.userAgent}},
 			})
@@ -115,16 +115,16 @@ func TestCodexExecutorExecuteStream_GrokBuildWithBuffering(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Codex.StreamBootstrapBuffering = true
 	executor := NewCodexExecutor(cfg)
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"base_url": server.URL,
 		"api_key":  "test",
 	}}
 
-	res, err := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	res, err := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "gpt-5.6-luna",
 		Payload: []byte(`{"model":"gpt-5.6-luna","input":"test"}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-response"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-response"),
 		Stream:       true,
 		Headers:      http.Header{"User-Agent": []string{"grok-shell/1.0.5"}},
 	})
@@ -173,7 +173,7 @@ func TestCodexExecutorExecuteStream_GrokBuildDetectedFromGinContext(t *testing.T
 	defer server.Close()
 
 	executor := NewCodexExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"base_url": server.URL,
 		"api_key":  "test",
 	}}
@@ -185,11 +185,11 @@ func TestCodexExecutorExecuteStream_GrokBuildDetectedFromGinContext(t *testing.T
 	c.Request.Header.Set("User-Agent", "grok-pager/1.0.5")
 	ctx := context.WithValue(context.Background(), "gin", c)
 
-	res, err := executor.ExecuteStream(ctx, auth, cliproxyexecutor.Request{
+	res, err := executor.ExecuteStream(ctx, auth, coreexecutor.Request{
 		Model:   "gpt-5.6-luna",
 		Payload: []byte(`{"model":"gpt-5.6-luna","input":"test"}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-response"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-response"),
 		Stream:       true,
 	})
 	if err != nil {
@@ -237,16 +237,16 @@ func TestCodexExecutorExecuteStream_NonGrokClientKeepsVerbatim(t *testing.T) {
 	defer server.Close()
 
 	executor := NewCodexExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"base_url": server.URL,
 		"api_key":  "test",
 	}}
 
-	res, err := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	res, err := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "gpt-5.6-luna",
 		Payload: []byte(`{"model":"gpt-5.6-luna","input":"test"}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-response"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-response"),
 		Stream:       true,
 		Headers:      http.Header{"User-Agent": []string{"curl/8.7.1"}},
 	})

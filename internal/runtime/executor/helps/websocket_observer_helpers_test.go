@@ -5,25 +5,25 @@ import (
 	"context"
 	"testing"
 
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestEmitWebSocketResponseEvent(t *testing.T) {
-	var received []cliproxyexecutor.WebSocketResponseEvent
-	opts := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatOpenAI,
+	var received []coreexecutor.WebSocketResponseEvent
+	opts := coreexecutor.Options{
+		SourceFormat: translatorreg.FormatOpenAI,
 		Metadata: map[string]any{
 			"request_id": "test-req-1",
 			"trace_id":   "test-trace-1",
 		},
-		WebSocketResponseObserver: func(_ context.Context, ev cliproxyexecutor.WebSocketResponseEvent) {
+		WebSocketResponseObserver: func(_ context.Context, ev coreexecutor.WebSocketResponseEvent) {
 			received = append(received, ev)
 		},
 	}
 
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:       "auth-123",
 		Label:    "primary-auth",
 		Provider: "codex",
@@ -66,7 +66,7 @@ func TestEmitWebSocketResponseEvent(t *testing.T) {
 }
 
 func TestEmitWebSocketResponseEventNilObserverNoOp(t *testing.T) {
-	opts := cliproxyexecutor.Options{}
+	opts := coreexecutor.Options{}
 	payload := []byte(`{"type":"codex.rate_limits"}`)
 	// Should not panic
 	EmitWebSocketResponseEvent(context.Background(), opts, nil, "codex", "gpt-5.3-codex", payload)

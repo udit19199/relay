@@ -9,9 +9,9 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gorilla/websocket"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 type codexWebsocketHintFrame struct {
@@ -78,13 +78,13 @@ func TestCodexWebsocketsFastToggleKeepsIncrementalConnection(t *testing.T) {
 	t.Cleanup(func() { exec.CloseExecutionSession(executionSessionID) })
 	auth := codexOAuthTestAuth(server.URL)
 	auth.ID = "codex-oauth-test"
-	opts := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-response"),
-		Metadata:     map[string]any{cliproxyexecutor.ExecutionSessionMetadataKey: executionSessionID},
+	opts := coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-response"),
+		Metadata:     map[string]any{coreexecutor.ExecutionSessionMetadataKey: executionSessionID},
 	}
 	execute := func(payload string) {
 		t.Helper()
-		if _, err := exec.Execute(context.Background(), auth, cliproxyexecutor.Request{Model: "gpt-5.5", Payload: []byte(payload)}, opts); err != nil {
+		if _, err := exec.Execute(context.Background(), auth, coreexecutor.Request{Model: "gpt-5.5", Payload: []byte(payload)}, opts); err != nil {
 			t.Fatalf("Execute(%s) error: %v", payload, err)
 		}
 	}
@@ -149,10 +149,10 @@ func TestCodexWebsocketsRoutingHintDynamicOperatorRule(t *testing.T) {
 				clientHeaders.Set("X-Operator-Hint", tc.operatorHint)
 			}
 
-			_, err := exec.Execute(context.Background(), auth, cliproxyexecutor.Request{
+			_, err := exec.Execute(context.Background(), auth, coreexecutor.Request{
 				Model:   "gpt-5.5",
 				Payload: []byte(`{"model":"gpt-5.4-client","service_tier":"priority","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"hi"}]}]}`),
-			}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString("openai-response"), Headers: clientHeaders})
+			}, coreexecutor.Options{SourceFormat: translatorreg.FromString("openai-response"), Headers: clientHeaders})
 			if err != nil {
 				t.Fatalf("Execute error: %v", err)
 			}
@@ -190,11 +190,11 @@ func TestCodexWebsocketsRoutingHintOverridesForwardedClientHint(t *testing.T) {
 	clientHeaders.Set("X-OpenAI-Internal-Codex-Responses-Lite", "true")
 	clientHeaders.Set(codexRoutingHintHeader, "model=gpt-5.4-client")
 
-	_, err := exec.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, err := exec.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "gpt-5.5(low)",
 		Payload: []byte(`{"model":"gpt-5.4-client","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"hi"}]}]}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-response"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-response"),
 		Headers:      clientHeaders,
 	})
 	if err != nil {
@@ -222,10 +222,10 @@ func TestCodexWebsocketsStreamRoutingHintMatchesBodyModel(t *testing.T) {
 	exec := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
 	auth := codexOAuthTestAuth(server.URL)
 	auth.ID = "codex-oauth-stream-test"
-	result, err := exec.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	result, err := exec.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "gpt-5.5(low)",
 		Payload: []byte(`{"model":"client-alias","service_tier":"priority","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"hi"}]}]}`),
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString("openai-response"), Stream: true})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FromString("openai-response"), Stream: true})
 	if err != nil {
 		t.Fatalf("ExecuteStream error: %v", err)
 	}

@@ -8,10 +8,10 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 // responsesMidSessionPayload is a Responses request whose developer item
@@ -24,7 +24,7 @@ func responsesMidSessionPayload(model string) []byte {
 		`{"role":"user","content":[{"type":"input_text","text":"go"}]}]}`)
 }
 
-func responsesPlacementAuth(attributes map[string]string) *cliproxyauth.Auth {
+func responsesPlacementAuth(attributes map[string]string) *coreauth.Auth {
 	auth := midSystemAuth()
 	for key, value := range attributes {
 		auth.Attributes[key] = value
@@ -32,19 +32,19 @@ func responsesPlacementAuth(attributes map[string]string) *cliproxyauth.Auth {
 	return auth
 }
 
-type responsesPlacementCall func(t *testing.T, ex *ClaudeExecutor, ctx context.Context, auth *cliproxyauth.Auth, model string, payload []byte) error
+type responsesPlacementCall func(t *testing.T, ex *ClaudeExecutor, ctx context.Context, auth *coreauth.Auth, model string, payload []byte) error
 
 var responsesPlacementCalls = map[string]responsesPlacementCall{
-	"execute": func(t *testing.T, ex *ClaudeExecutor, ctx context.Context, auth *cliproxyauth.Auth, model string, payload []byte) error {
+	"execute": func(t *testing.T, ex *ClaudeExecutor, ctx context.Context, auth *coreauth.Auth, model string, payload []byte) error {
 		t.Helper()
-		_, err := ex.Execute(ctx, auth, cliproxyexecutor.Request{Model: model, Payload: payload},
-			cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse})
+		_, err := ex.Execute(ctx, auth, coreexecutor.Request{Model: model, Payload: payload},
+			coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse})
 		return err
 	},
-	"stream": func(t *testing.T, ex *ClaudeExecutor, ctx context.Context, auth *cliproxyauth.Auth, model string, payload []byte) error {
+	"stream": func(t *testing.T, ex *ClaudeExecutor, ctx context.Context, auth *coreauth.Auth, model string, payload []byte) error {
 		t.Helper()
-		result, err := ex.ExecuteStream(ctx, auth, cliproxyexecutor.Request{Model: model, Payload: payload},
-			cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse})
+		result, err := ex.ExecuteStream(ctx, auth, coreexecutor.Request{Model: model, Payload: payload},
+			coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse})
 		if err != nil {
 			return err
 		}
@@ -55,10 +55,10 @@ var responsesPlacementCalls = map[string]responsesPlacementCall{
 		}
 		return nil
 	},
-	"count_tokens": func(t *testing.T, ex *ClaudeExecutor, ctx context.Context, auth *cliproxyauth.Auth, model string, payload []byte) error {
+	"count_tokens": func(t *testing.T, ex *ClaudeExecutor, ctx context.Context, auth *coreauth.Auth, model string, payload []byte) error {
 		t.Helper()
-		_, err := ex.CountTokens(ctx, auth, cliproxyexecutor.Request{Model: model, Payload: payload},
-			cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse})
+		_, err := ex.CountTokens(ctx, auth, coreexecutor.Request{Model: model, Payload: payload},
+			coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse})
 		return err
 	},
 }
@@ -213,8 +213,8 @@ func TestResponsesMidSessionSystemItemLocalCountTokensKeepsTopLevel(t *testing.T
 		upstream := &midSystemUpstream{}
 		ex := NewClaudeExecutor(midSystemConfig())
 		auth := responsesPlacementAuth(attributes)
-		resp, err := ex.CountTokens(upstream.context(t, nil), auth, cliproxyexecutor.Request{Model: model, Payload: responsesMidSessionPayload(model)},
-			cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse})
+		resp, err := ex.CountTokens(upstream.context(t, nil), auth, coreexecutor.Request{Model: model, Payload: responsesMidSessionPayload(model)},
+			coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse})
 		if err != nil {
 			t.Fatalf("CountTokens(%v) error = %v, want a local estimate", attributes, err)
 		}

@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 const (
@@ -20,55 +20,55 @@ func TestTranslateRequestReturningErrorRefusesEmptiedAttachmentTurns(t *testing.
 	ctx := context.Background()
 	routes := []struct {
 		name     string
-		from, to sdktranslator.Format
+		from, to translatorreg.Format
 		refused  string
 		wantType string
 		accepted string
 	}{
 		{
 			name:     "openai chat to codex",
-			from:     sdktranslator.FormatOpenAI,
-			to:       sdktranslator.FormatCodex,
+			from:     translatorreg.FormatOpenAI,
+			to:       translatorreg.FormatCodex,
 			refused:  `{"model":"m","messages":[` + chatHistory + `,{"role":"user","content":[{"type":"file","file":{"filename":"a.pdf"}}]}]}`,
 			accepted: `{"model":"m","messages":[` + chatHistory + `,{"role":"user","content":[{"type":"file","file":{"file_id":"file-1"}}]}]}`,
 			wantType: "file",
 		},
 		{
 			name:     "openai chat to interactions",
-			from:     sdktranslator.FormatOpenAI,
-			to:       sdktranslator.FormatInteractions,
+			from:     translatorreg.FormatOpenAI,
+			to:       translatorreg.FormatInteractions,
 			refused:  `{"model":"m","messages":[` + chatHistory + `,{"role":"user","content":[{"type":"file","file":{"file_id":"file-1"}}]}]}`,
 			accepted: `{"model":"m","messages":[` + chatHistory + `,{"role":"user","content":[{"type":"file","file":{"file_data":"data:application/pdf;base64,JVBERi0xLjQK","filename":"a.pdf"}}]}]}`,
 			wantType: "file",
 		},
 		{
 			name:     "responses to openai chat",
-			from:     sdktranslator.FormatOpenAIResponse,
-			to:       sdktranslator.FormatOpenAI,
+			from:     translatorreg.FormatOpenAIResponse,
+			to:       translatorreg.FormatOpenAI,
 			refused:  `{"model":"m","input":[` + responsesHistory + `,{"type":"message","role":"user","content":[{"type":"input_file","file_url":"https://example.test/a.pdf"}]}]}`,
 			accepted: `{"model":"m","input":[` + responsesHistory + `,{"type":"message","role":"user","content":[{"type":"input_file","file_id":"file-1"}]}]}`,
 			wantType: "input_file",
 		},
 		{
 			name:     "responses to gemini",
-			from:     sdktranslator.FormatOpenAIResponse,
-			to:       sdktranslator.FormatClaude,
+			from:     translatorreg.FormatOpenAIResponse,
+			to:       translatorreg.FormatClaude,
 			refused:  `{"model":"m","input":[` + responsesHistory + `,{"type":"message","role":"user","content":[{"type":"input_file","file_id":"file-1"}]}]}`,
 			accepted: `{"model":"m","input":[` + responsesHistory + `,{"type":"message","role":"user","content":[{"type":"input_file","file_data":"data:application/pdf;base64,JVBERi0xLjQK"}]}]}`,
 			wantType: "input_file",
 		},
 		{
 			name:     "responses to antigravity",
-			from:     sdktranslator.FormatOpenAIResponse,
-			to:       sdktranslator.FormatClaude,
+			from:     translatorreg.FormatOpenAIResponse,
+			to:       translatorreg.FormatClaude,
 			refused:  `{"model":"m","input":[` + responsesHistory + `,{"type":"message","role":"user","content":[{"type":"input_file","file_id":"file-1"}]}]}`,
 			accepted: `{"model":"m","input":[` + responsesHistory + `,{"type":"message","role":"user","content":[{"type":"input_file","file_data":"data:application/pdf;base64,JVBERi0xLjQK"}]}]}`,
 			wantType: "input_file",
 		},
 		{
 			name:     "responses to interactions",
-			from:     sdktranslator.FormatOpenAIResponse,
-			to:       sdktranslator.FormatInteractions,
+			from:     translatorreg.FormatOpenAIResponse,
+			to:       translatorreg.FormatInteractions,
 			refused:  `{"model":"m","input":[` + responsesHistory + `,{"type":"message","role":"user","content":[{"type":"input_file","file_id":"file-1"}]}]}`,
 			accepted: `{"model":"m","input":[` + responsesHistory + `,{"type":"message","role":"user","content":[{"type":"input_audio","input_audio":{"data":"UklGRg==","format":"wav"}}]}]}`,
 			wantType: "input_file",

@@ -9,10 +9,10 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 // TestClaudeExecutor_SubagentPreserves1hTTLAndExtendedCacheBetaWhenRequested verifies
@@ -35,7 +35,7 @@ func TestClaudeExecutor_SubagentPreserves1hTTLAndExtendedCacheBetaWhenRequested(
 			APIKey: "sk-ant-oat-subagent-preserve-test",
 		}},
 	}
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:       "auth-subagent-preserve-test",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
@@ -59,11 +59,11 @@ func TestClaudeExecutor_SubagentPreserves1hTTLAndExtendedCacheBetaWhenRequested(
 	incomingHeaders.Set("X-Claude-Code-Agent-Id", "agent-sub-123")
 	incomingHeaders.Set("Anthropic-Beta", "claude-code-20250219,oauth-2025-04-20,extended-cache-ttl-2025-04-11")
 
-	_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-sonnet-5",
 		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatClaude,
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FormatClaude,
 		Headers:      incomingHeaders,
 	})
 	if err != nil {
@@ -111,7 +111,7 @@ func TestClaudeExecutor_SubagentPreserves1hTTLAndExtendedCacheBetaWhenRequested_
 			APIKey: "sk-ant-oat-subagent-preserve-stream-test",
 		}},
 	}
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:       "auth-subagent-preserve-stream-test",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
@@ -136,11 +136,11 @@ func TestClaudeExecutor_SubagentPreserves1hTTLAndExtendedCacheBetaWhenRequested_
 	incomingHeaders.Set("X-Claude-Code-Agent-Id", "agent-sub-stream-456")
 	incomingHeaders.Set("Anthropic-Beta", "claude-code-20250219,oauth-2025-04-20,extended-cache-ttl-2025-04-11")
 
-	result, err := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	result, err := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-sonnet-5",
 		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatClaude,
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FormatClaude,
 		Headers:      incomingHeaders,
 	})
 	if err != nil {
@@ -182,7 +182,7 @@ func TestClaudeExecutor_SubagentWithout1hKeepsDefault5m(t *testing.T) {
 			APIKey: "sk-ant-oat-subagent-5m-test",
 		}},
 	}
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:       "auth-subagent-5m-test",
 		Metadata: claudeOAuthTestMetadata(),
 		Attributes: map[string]string{
@@ -206,11 +206,11 @@ func TestClaudeExecutor_SubagentWithout1hKeepsDefault5m(t *testing.T) {
 	incomingHeaders.Set("X-Claude-Code-Agent-Id", "agent-sub-default-789")
 	incomingHeaders.Set("Anthropic-Beta", "claude-code-20250219,oauth-2025-04-20")
 
-	_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-sonnet-5",
 		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatClaude,
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FormatClaude,
 		Headers:      incomingHeaders,
 	})
 	if err != nil {
@@ -249,7 +249,7 @@ func TestClaudeExecutor_APIKeySubagentPreserves1hTTLAndInjectsBeta(t *testing.T)
 			APIKey: "sk-ant-api03-subagent-key-test",
 		}},
 	}
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID: "auth-subagent-key-test",
 		Attributes: map[string]string{
 			"api_key":  "sk-ant-api03-subagent-key-test",
@@ -272,11 +272,11 @@ func TestClaudeExecutor_APIKeySubagentPreserves1hTTLAndInjectsBeta(t *testing.T)
 	incomingHeaders.Set("X-Claude-Code-Agent-Id", "agent-sub-apikey-101")
 	incomingHeaders.Set("Anthropic-Beta", "claude-code-20250219") // Note: NO extended-cache-ttl beta in incoming header
 
-	_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-sonnet-5",
 		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatClaude,
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FormatClaude,
 		Headers:      incomingHeaders,
 	})
 	if err != nil {
@@ -314,7 +314,7 @@ func TestClaudeExecutor_APIKeySubagentPreserves1hTTLAndInjectsBeta_Stream(t *tes
 			APIKey: "sk-ant-api03-subagent-stream-key-test",
 		}},
 	}
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID: "auth-subagent-stream-key-test",
 		Attributes: map[string]string{
 			"api_key":  "sk-ant-api03-subagent-stream-key-test",
@@ -338,11 +338,11 @@ func TestClaudeExecutor_APIKeySubagentPreserves1hTTLAndInjectsBeta_Stream(t *tes
 	incomingHeaders.Set("X-Claude-Code-Agent-Id", "agent-sub-apikey-stream-202")
 	incomingHeaders.Set("Anthropic-Beta", "claude-code-20250219") // Note: NO extended-cache-ttl beta in incoming header
 
-	result, err := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	result, err := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-sonnet-5",
 		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatClaude,
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FormatClaude,
 		Headers:      incomingHeaders,
 	})
 	if err != nil {

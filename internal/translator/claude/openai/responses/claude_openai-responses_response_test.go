@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
+	"github.com/udit19199/relay/internal/util"
 )
 
 func parseClaudeResponsesSSEEvent(t *testing.T, chunk []byte) (string, ojson.Result) {
@@ -67,7 +67,7 @@ func translateClaudeResponsesStreamThroughRegistry(chunks [][]byte) [][]byte {
 	var param any
 	var outputs [][]byte
 	for _, chunk := range chunks {
-		outputs = append(outputs, sdktranslator.TranslateStream(context.Background(), sdktranslator.FormatClaude, sdktranslator.FormatOpenAIResponse, "claude-test", nil, nil, chunk, &param)...)
+		outputs = append(outputs, translatorreg.TranslateStream(context.Background(), translatorreg.FormatClaude, translatorreg.FormatOpenAIResponse, "claude-test", nil, nil, chunk, &param)...)
 	}
 	return outputs
 }

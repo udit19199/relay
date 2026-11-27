@@ -1,12 +1,12 @@
 package grokbuild
 
 import (
-	"bytes"
 	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"bytes"
 	"github.com/gin-gonic/gin"
 )
 

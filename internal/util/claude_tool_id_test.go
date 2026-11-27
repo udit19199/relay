@@ -1,6 +1,8 @@
 package util
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestGeminiClaudeToolUseIDStableAndBound(t *testing.T) {
 	args := `{"file_path":"/tmp/a","old_string":"x","new_string":"y"}`

@@ -10,12 +10,12 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gorilla/websocket"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/usage"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	"github.com/udit19199/relay/internal/service/usage"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestPayloadBarrierCodexImageFilter(t *testing.T) {
@@ -60,13 +60,13 @@ func TestPayloadBarrierCodexImageFilter(t *testing.T) {
 					}))
 					defer server.Close()
 					cfg := &config.Config{Payload: config.PayloadConfig{Filter: []config.PayloadFilterRule{{Models: []config.PayloadModelRule{{Name: "gpt-5.4"}, {Name: "gpt-6-astra"}}, Params: []string{`tools.#(type=="image_generation")#`, "instructions", "prompt_cache_key"}}}}}
-					var executor cliproxyauth.ProviderExecutor = NewCodexExecutor(cfg)
+					var executor coreauth.ProviderExecutor = NewCodexExecutor(cfg)
 					if transport == "websocket" {
 						executor = NewCodexWebsocketsExecutor(cfg)
 					}
-					auth := &cliproxyauth.Auth{ID: t.Name(), Provider: "codex", Attributes: map[string]string{"api_key": "test", "base_url": server.URL, "plan_type": "pro"}}
-					req := cliproxyexecutor.Request{Model: model, Payload: []byte(`{"input":"hello","prompt_cache_key":"injected-cache"}`)}
-					opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse}
+					auth := &coreauth.Auth{ID: t.Name(), Provider: "codex", Attributes: map[string]string{"api_key": "test", "base_url": server.URL, "plan_type": "pro"}}
+					req := coreexecutor.Request{Model: model, Payload: []byte(`{"input":"hello","prompt_cache_key":"injected-cache"}`)}
+					opts := coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse}
 					if stream {
 						result, errStream := executor.ExecuteStream(context.Background(), auth, req, opts)
 						if errStream != nil {
@@ -100,9 +100,9 @@ func TestPayloadBarrierXAIWebsocketRetry(t *testing.T) {
 		Override: []config.PayloadRule{{Models: []config.PayloadModelRule{{Name: "*"}}, Params: map[string]any{"store": false, "instructions": "configured"}}},
 		Filter:   []config.PayloadFilterRule{{Models: []config.PayloadModelRule{{Name: "*"}}, Params: []string{"input.0", "previous_response_id"}}},
 	}}
-	req := cliproxyexecutor.Request{Model: "grok-4.3"}
+	req := coreexecutor.Request{Model: "grok-4.3"}
 	body := []byte(`{"previous_response_id":"previous","input":[{"content":"first"},{"content":"second"}]}`)
-	finalize := helps.NewPayloadFinalizer(cfg, "xai", req.Model, "codex", "", body, req, cliproxyexecutor.Options{})
+	finalize := helps.NewPayloadFinalizer(cfg, "xai", req.Model, "codex", "", body, req, coreexecutor.Options{})
 	first := buildXAIWebsocketRequestBody(body, finalize)
 	retry := buildXAIWebsocketRequestBody(body, finalize)
 	if !bytes.Equal(first, retry) {
@@ -182,12 +182,12 @@ func TestPayloadBarrierEffectiveServiceTierUsageAfterOverride(t *testing.T) {
 				auth.ID = authID
 				executor := NewCodexExecutor(cfg)
 				ctx := usage.WithServiceTier(context.Background(), usage.AutoServiceTier)
-				req := cliproxyexecutor.Request{
+				req := coreexecutor.Request{
 					Model:   "gpt-6-astra",
 					Payload: []byte(`{"model":"gpt-6-astra","messages":[{"role":"user","content":"hi"}]}`),
 				}
-				opts := cliproxyexecutor.Options{
-					SourceFormat: sdktranslator.FormatOpenAI,
+				opts := coreexecutor.Options{
+					SourceFormat: translatorreg.FormatOpenAI,
 					Stream:       stream,
 				}
 				if stream {
@@ -240,19 +240,19 @@ func TestPayloadBarrierEffectiveServiceTierUsageAfterOverride(t *testing.T) {
 				}
 				usage.RegisterConsumer(consumer)
 
-				auth := &cliproxyauth.Auth{
+				auth := &coreauth.Auth{
 					ID:         authID,
 					Provider:   "openai-compatibility",
 					Attributes: map[string]string{"base_url": server.URL, "api_key": "sk-test"},
 				}
 				executor := NewOpenAICompatExecutor("openai-compatibility", cfg)
 				ctx := usage.WithServiceTier(context.Background(), usage.AutoServiceTier)
-				req := cliproxyexecutor.Request{
+				req := coreexecutor.Request{
 					Model:   "gpt-5.4",
 					Payload: []byte(`{"model":"gpt-5.4","messages":[{"role":"user","content":"hi"}]}`),
 				}
-				opts := cliproxyexecutor.Options{
-					SourceFormat: sdktranslator.FormatOpenAI,
+				opts := coreexecutor.Options{
+					SourceFormat: translatorreg.FormatOpenAI,
 					Stream:       stream,
 				}
 				if stream {
@@ -305,18 +305,18 @@ func TestPayloadBarrierEffectiveServiceTierUsageAfterOverride(t *testing.T) {
 				}
 				usage.RegisterConsumer(consumer)
 
-				auth := &cliproxyauth.Auth{
+				auth := &coreauth.Auth{
 					ID:         authID,
 					Provider:   "xai",
 					Attributes: map[string]string{"base_url": server.URL},
 					Metadata:   map[string]any{"access_token": "xai-token"},
 				}
 				ctx := usage.WithServiceTier(context.Background(), usage.AutoServiceTier)
-				_, errExec := executor.Execute(ctx, auth, cliproxyexecutor.Request{
+				_, errExec := executor.Execute(ctx, auth, coreexecutor.Request{
 					Model:   "grok-imagine-video",
 					Payload: []byte(tc.payload),
-				}, cliproxyexecutor.Options{
-					SourceFormat: sdktranslator.FromString("openai-video"),
+				}, coreexecutor.Options{
+					SourceFormat: translatorreg.FromString("openai-video"),
 				})
 				if errExec != nil {
 					t.Fatalf("Execute error: %v", errExec)
@@ -357,16 +357,16 @@ func TestPayloadBarrierEffectiveServiceTierUsageAfterOverride(t *testing.T) {
 				}
 				usage.RegisterConsumer(consumer)
 
-				auth := &cliproxyauth.Auth{
+				auth := &coreauth.Auth{
 					ID:         authID,
 					Provider:   "devin",
 					Attributes: map[string]string{"api_key": "test-key", "base_url": server.URL},
 				}
 				ctx := usage.WithServiceTier(context.Background(), usage.AutoServiceTier)
 				payload := []byte(`{"model":"devin/swe-2","max_tokens":64,"messages":[{"role":"user","content":"hi"}]}`)
-				req := cliproxyexecutor.Request{Model: "devin/swe-2", Payload: payload}
-				opts := cliproxyexecutor.Options{
-					SourceFormat:    sdktranslator.FormatClaude,
+				req := coreexecutor.Request{Model: "devin/swe-2", Payload: payload}
+				opts := coreexecutor.Options{
+					SourceFormat:    translatorreg.FormatClaude,
 					OriginalRequest: payload,
 					Stream:          stream,
 				}
@@ -426,8 +426,8 @@ func TestPayloadBarrierMultiExecutorSingleDocConsistency(t *testing.T) {
 	t.Run("codex cacheHelperDoc applies FinalizePayloadDoc as final barrier", func(t *testing.T) {
 		exec := NewCodexExecutor(cfg)
 		raw := []byte(`{"model":"gpt-5","filtered_out":"drop_me","input":[{"type":"message","role":"user","id":"item_1","content":[{"type":"input_text","text":"hi"}]}]}`)
-		req := cliproxyexecutor.Request{Model: "gpt-5", Payload: raw}
-		opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse}
+		req := coreexecutor.Request{Model: "gpt-5", Payload: raw}
+		opts := coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse}
 		reqCtx := helps.WithPayloadFinalizer(ctx, helps.NewPayloadFinalizer(cfg, exec.Identifier(), "gpt-5", "codex", "", raw, req, opts))
 
 		doc := ojson.NewDoc(bytes.Clone(raw))
@@ -446,8 +446,8 @@ func TestPayloadBarrierMultiExecutorSingleDocConsistency(t *testing.T) {
 	t.Run("xai prepared request doc applies FinalizeDoc as final barrier", func(t *testing.T) {
 		exec := NewXAIExecutor(cfg)
 		raw := []byte(`{"model":"grok-4","filtered_out":"drop_me","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"hi"}]}]}`)
-		req := cliproxyexecutor.Request{Model: "grok-4", Payload: raw}
-		opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse}
+		req := coreexecutor.Request{Model: "grok-4", Payload: raw}
+		opts := coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse}
 		prepared, errPrep := exec.prepareResponsesRequest(ctx, req, opts, true)
 		if errPrep != nil {
 			t.Fatalf("prepareResponsesRequest error: %v", errPrep)

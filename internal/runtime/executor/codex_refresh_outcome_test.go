@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	codexauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/codex"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	codexauth "github.com/udit19199/relay/internal/auth/codex"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 func TestCodexUnknownRefreshSurvivesForcedRefreshAndFileAlias(t *testing.T) {
@@ -32,9 +32,9 @@ func TestCodexUnknownRefreshSurvivesForcedRefreshAndFileAlias(t *testing.T) {
 	})
 	t.Cleanup(func() { http.DefaultTransport = original })
 	for _, filename := range []string{path, alias} {
-		manager := cliproxyauth.NewManager(nil, nil, nil)
+		manager := coreauth.NewManager(nil, nil, nil)
 		manager.RegisterExecutor(NewCodexExecutor(&config.Config{}))
-		auth := &cliproxyauth.Auth{ID: filename, FileName: filename, Provider: "codex", Status: cliproxyauth.StatusActive, Attributes: map[string]string{cliproxyauth.AttributePath: filename}, Metadata: map[string]any{"access_token": "valid", "refresh_token": "alias-grant", "expired": "2099-01-01T00:00:00Z"}}
+		auth := &coreauth.Auth{ID: filename, FileName: filename, Provider: "codex", Status: coreauth.StatusActive, Attributes: map[string]string{coreauth.AttributePath: filename}, Metadata: map[string]any{"access_token": "valid", "refresh_token": "alias-grant", "expired": "2099-01-01T00:00:00Z"}}
 		if _, errRegister := manager.Register(context.Background(), auth); errRegister != nil {
 			t.Fatal(errRegister)
 		}

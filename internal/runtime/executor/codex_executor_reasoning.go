@@ -12,14 +12,14 @@ import (
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	internalcache "github.com/router-for-me/CLIProxyAPI/v8/internal/cache"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/signature"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/thinking"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	internalcache "github.com/udit19199/relay/internal/cache"
+	"github.com/udit19199/relay/internal/misc"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	"github.com/udit19199/relay/internal/signature"
+	"github.com/udit19199/relay/internal/thinking"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
+	"github.com/udit19199/relay/internal/util"
 )
 
 type codexReasoningReplayScope struct {
@@ -32,12 +32,12 @@ func (s codexReasoningReplayScope) valid() bool {
 	return strings.TrimSpace(s.modelName) != "" && strings.TrimSpace(s.sessionKey) != ""
 }
 
-func applyCodexReasoningReplayCache(ctx context.Context, from sdktranslator.Format, req cliproxyexecutor.Request, opts cliproxyexecutor.Options, body []byte) ([]byte, codexReasoningReplayScope) {
+func applyCodexReasoningReplayCache(ctx context.Context, from translatorreg.Format, req coreexecutor.Request, opts coreexecutor.Options, body []byte) ([]byte, codexReasoningReplayScope) {
 	updated, scope, _ := applyCodexReasoningReplayCacheRequired(ctx, from, req, opts, body)
 	return updated, scope
 }
 
-func applyCodexReasoningReplayCacheRequired(ctx context.Context, from sdktranslator.Format, req cliproxyexecutor.Request, opts cliproxyexecutor.Options, body []byte) ([]byte, codexReasoningReplayScope, error) {
+func applyCodexReasoningReplayCacheRequired(ctx context.Context, from translatorreg.Format, req coreexecutor.Request, opts coreexecutor.Options, body []byte) ([]byte, codexReasoningReplayScope, error) {
 	doc := ojson.NewDoc(body)
 	scope, changed, errReplay := applyCodexReasoningReplayCacheRequiredDoc(ctx, from, req, opts, doc)
 	if errReplay != nil || !changed {
@@ -46,7 +46,7 @@ func applyCodexReasoningReplayCacheRequired(ctx context.Context, from sdktransla
 	return doc.Bytes(), scope, nil
 }
 
-func applyCodexReasoningReplayCacheRequiredDoc(ctx context.Context, from sdktranslator.Format, req cliproxyexecutor.Request, opts cliproxyexecutor.Options, doc *ojson.Doc) (codexReasoningReplayScope, bool, error) {
+func applyCodexReasoningReplayCacheRequiredDoc(ctx context.Context, from translatorreg.Format, req coreexecutor.Request, opts coreexecutor.Options, doc *ojson.Doc) (codexReasoningReplayScope, bool, error) {
 	scope := codexReasoningReplayScopeFromRequestDoc(ctx, from, req, opts, doc)
 	if !scope.valid() {
 		return scope, false, nil
@@ -59,7 +59,7 @@ func applyCodexReasoningReplayCacheRequiredDoc(ctx context.Context, from sdktran
 	return scope, changed, nil
 }
 
-func codexReasoningReplayScopeFromRequest(ctx context.Context, from sdktranslator.Format, req cliproxyexecutor.Request, opts cliproxyexecutor.Options, body []byte) codexReasoningReplayScope {
+func codexReasoningReplayScopeFromRequest(ctx context.Context, from translatorreg.Format, req coreexecutor.Request, opts coreexecutor.Options, body []byte) codexReasoningReplayScope {
 	if !codexReasoningReplayEnabledForSource(from) {
 		return codexReasoningReplayScope{}
 	}
@@ -75,7 +75,7 @@ func codexReasoningReplayScopeFromRequest(ctx context.Context, from sdktranslato
 	}
 }
 
-func codexReasoningReplayScopeFromRequestDoc(ctx context.Context, from sdktranslator.Format, req cliproxyexecutor.Request, opts cliproxyexecutor.Options, doc *ojson.Doc) codexReasoningReplayScope {
+func codexReasoningReplayScopeFromRequestDoc(ctx context.Context, from translatorreg.Format, req coreexecutor.Request, opts coreexecutor.Options, doc *ojson.Doc) codexReasoningReplayScope {
 	if !codexReasoningReplayEnabledForSource(from) || doc == nil {
 		return codexReasoningReplayScope{}
 	}
@@ -91,11 +91,11 @@ func codexReasoningReplayScopeFromRequestDoc(ctx context.Context, from sdktransl
 	}
 }
 
-func codexReasoningReplayEnabledForSource(from sdktranslator.Format) bool {
-	return sourceFormatEqual(from, sdktranslator.FormatClaude)
+func codexReasoningReplayEnabledForSource(from translatorreg.Format) bool {
+	return sourceFormatEqual(from, translatorreg.FormatClaude)
 }
 
-func sourceFormatEqual(from, want sdktranslator.Format) bool {
+func sourceFormatEqual(from, want translatorreg.Format) bool {
 	return strings.EqualFold(strings.TrimSpace(from.String()), want.String())
 }
 
@@ -104,19 +104,19 @@ func codexClaudeCodeReplaySessionKey(ctx context.Context, payload []byte, header
 	return sessionKey
 }
 
-func codexReasoningReplaySessionKey(ctx context.Context, from sdktranslator.Format, req cliproxyexecutor.Request, opts cliproxyexecutor.Options, body []byte) string {
+func codexReasoningReplaySessionKey(ctx context.Context, from translatorreg.Format, req coreexecutor.Request, opts coreexecutor.Options, body []byte) string {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if sourceFormatEqual(from, sdktranslator.FormatClaude) {
+	if sourceFormatEqual(from, translatorreg.FormatClaude) {
 		if sessionKey := codexClaudeCodeReplaySessionKey(ctx, req.Payload, opts.Headers); sessionKey != "" {
 			return sessionKey
 		}
 	}
-	if value := misc.MetadataString(opts.Metadata, cliproxyexecutor.ExecutionSessionMetadataKey); value != "" {
+	if value := misc.MetadataString(opts.Metadata, coreexecutor.ExecutionSessionMetadataKey); value != "" {
 		return "execution:" + value
 	}
-	if value := misc.MetadataString(req.Metadata, cliproxyexecutor.ExecutionSessionMetadataKey); value != "" {
+	if value := misc.MetadataString(req.Metadata, coreexecutor.ExecutionSessionMetadataKey); value != "" {
 		return "execution:" + value
 	}
 	if value := codexReasoningReplaySessionKeyFromPayload(body); value != "" {
@@ -133,7 +133,7 @@ func codexReasoningReplaySessionKey(ctx context.Context, from sdktranslator.Form
 			return value
 		}
 	}
-	if sourceFormatEqual(from, sdktranslator.FormatOpenAI) {
+	if sourceFormatEqual(from, translatorreg.FormatOpenAI) {
 		if apiKey := strings.TrimSpace(helps.APIKeyFromContext(ctx)); apiKey != "" {
 			return "prompt-cache:" + uuid.NewSHA1(uuid.NameSpaceOID, []byte("cli-proxy-api:codex:prompt-cache:"+apiKey)).String()
 		}
@@ -141,19 +141,19 @@ func codexReasoningReplaySessionKey(ctx context.Context, from sdktranslator.Form
 	return ""
 }
 
-func codexReasoningReplaySessionKeyDoc(ctx context.Context, from sdktranslator.Format, req cliproxyexecutor.Request, opts cliproxyexecutor.Options, doc *ojson.Doc) string {
+func codexReasoningReplaySessionKeyDoc(ctx context.Context, from translatorreg.Format, req coreexecutor.Request, opts coreexecutor.Options, doc *ojson.Doc) string {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if sourceFormatEqual(from, sdktranslator.FormatClaude) {
+	if sourceFormatEqual(from, translatorreg.FormatClaude) {
 		if sessionKey := codexClaudeCodeReplaySessionKey(ctx, req.Payload, opts.Headers); sessionKey != "" {
 			return sessionKey
 		}
 	}
-	if value := misc.MetadataString(opts.Metadata, cliproxyexecutor.ExecutionSessionMetadataKey); value != "" {
+	if value := misc.MetadataString(opts.Metadata, coreexecutor.ExecutionSessionMetadataKey); value != "" {
 		return "execution:" + value
 	}
-	if value := misc.MetadataString(req.Metadata, cliproxyexecutor.ExecutionSessionMetadataKey); value != "" {
+	if value := misc.MetadataString(req.Metadata, coreexecutor.ExecutionSessionMetadataKey); value != "" {
 		return "execution:" + value
 	}
 	if value := codexReasoningReplaySessionKeyFromDoc(doc); value != "" {
@@ -170,7 +170,7 @@ func codexReasoningReplaySessionKeyDoc(ctx context.Context, from sdktranslator.F
 			return value
 		}
 	}
-	if sourceFormatEqual(from, sdktranslator.FormatOpenAI) {
+	if sourceFormatEqual(from, translatorreg.FormatOpenAI) {
 		if apiKey := strings.TrimSpace(helps.APIKeyFromContext(ctx)); apiKey != "" {
 			return "prompt-cache:" + uuid.NewSHA1(uuid.NameSpaceOID, []byte("cli-proxy-api:codex:prompt-cache:"+apiKey)).String()
 		}
@@ -243,10 +243,6 @@ func codexReasoningReplaySessionKeyFromTurnMetadata(turnMetadata string) string 
 	return ""
 }
 
-func codexInputHasValidReasoningEncryptedContent(body []byte) bool {
-	return codexInputResultHasValidReasoningEncryptedContent(ojson.GetBytesNoCopy(body, "input"))
-}
-
 func codexInputResultHasValidReasoningEncryptedContent(input ojson.Result) bool {
 	if !input.IsArray() {
 		return false
@@ -273,14 +269,6 @@ type codexReasoningReplayTurn struct {
 	requestFingerprint   string
 	callIDs              []string
 	items                [][]byte
-}
-
-func insertCodexReasoningReplayTurns(body []byte, replayItems [][]byte) ([]byte, bool) {
-	doc := ojson.NewDoc(body)
-	if !insertCodexReasoningReplayTurnsDoc(doc, replayItems) {
-		return body, false
-	}
-	return doc.Bytes(), true
 }
 
 func insertCodexReasoningReplayTurnsDoc(doc *ojson.Doc, replayItems [][]byte) bool {
@@ -577,10 +565,6 @@ func (f *codexReplayPrefixFingerprints) at(end int) string {
 		f.sums = append(f.sums, hex.EncodeToString(f.hasher.Sum(nil)))
 	}
 	return f.sums[end]
-}
-
-func filterCodexReasoningReplayItemsForInput(body []byte, items [][]byte) [][]byte {
-	return filterCodexReasoningReplayItemsForInputResult(ojson.GetBytesNoCopy(body, "input"), items)
 }
 
 func filterCodexReasoningReplayItemsForInputResult(input ojson.Result, items [][]byte) [][]byte {

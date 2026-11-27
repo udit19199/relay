@@ -8,10 +8,10 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestClaudeExecutorUserAgentFieldsPreserveNativePayload(t *testing.T) {
@@ -74,12 +74,12 @@ func testClaudeExecutorUserAgentFields(t *testing.T, stabilize bool) {
 					headers.Set("User-Agent", testCase.userAgent)
 					headers.Set("X-App", "cli")
 					headers.Set("Anthropic-Beta", "claude-code-20250219,oauth-2025-04-20,extended-cache-ttl-2025-04-11")
-					auth := &cliproxyauth.Auth{ID: "ua-fields-" + t.Name(), Metadata: claudeOAuthTestMetadata(), Attributes: map[string]string{"api_key": "sk-ant-oat-ua-fields"}}
+					auth := &coreauth.Auth{ID: "ua-fields-" + t.Name(), Metadata: claudeOAuthTestMetadata(), Attributes: map[string]string{"api_key": "sk-ant-oat-ua-fields"}}
 					executor := NewClaudeExecutor(&config.Config{ClaudeHeaderDefaults: config.ClaudeHeaderDefaults{
 						UserAgent: "claude-cli/2.1.353 (external, cli)", StabilizeDeviceProfile: &stabilize,
 					}})
-					request := cliproxyexecutor.Request{Model: "claude-sonnet-4-6", Payload: payload}
-					options := cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude, OriginalRequest: payload, Headers: headers}
+					request := coreexecutor.Request{Model: "claude-sonnet-4-6", Payload: payload}
+					options := coreexecutor.Options{SourceFormat: translatorreg.FormatClaude, OriginalRequest: payload, Headers: headers}
 					switch path {
 					case "messages":
 						if _, errExecute := executor.Execute(ctx, auth, request, options); errExecute != nil {

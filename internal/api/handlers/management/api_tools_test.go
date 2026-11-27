@@ -17,12 +17,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	xaiauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/xai"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor"
-	sdkAuth "github.com/router-for-me/CLIProxyAPI/v8/sdk/auth"
-	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	sdkconfig "github.com/router-for-me/CLIProxyAPI/v8/sdk/config"
+	authlogin "github.com/udit19199/relay/internal/auth/login"
+	xaiauth "github.com/udit19199/relay/internal/auth/xai"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/runtime/executor"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 func TestAPICallUsesRequestProxyURL(t *testing.T) {
@@ -36,7 +35,7 @@ func TestAPICallUsesRequestProxyURL(t *testing.T) {
 
 	h := &Handler{
 		cfg: &config.Config{
-			SDKConfig: sdkconfig.SDKConfig{ProxyURL: "http://127.0.0.1:1"},
+			SDKConfig: config.SDKConfig{ProxyURL: "http://127.0.0.1:1"},
 		},
 	}
 	router := gin.New()
@@ -69,7 +68,7 @@ func TestAPICallTransportDirectBypassesGlobalProxy(t *testing.T) {
 
 	h := &Handler{
 		cfg: &config.Config{
-			SDKConfig: sdkconfig.SDKConfig{ProxyURL: "http://global-proxy.example.com:8080"},
+			SDKConfig: config.SDKConfig{ProxyURL: "http://global-proxy.example.com:8080"},
 		},
 	}
 
@@ -88,7 +87,7 @@ func TestAPICallTransportInvalidAuthFallsBackToGlobalProxy(t *testing.T) {
 
 	h := &Handler{
 		cfg: &config.Config{
-			SDKConfig: sdkconfig.SDKConfig{ProxyURL: "http://global-proxy.example.com:8080"},
+			SDKConfig: config.SDKConfig{ProxyURL: "http://global-proxy.example.com:8080"},
 		},
 	}
 
@@ -117,7 +116,7 @@ func TestAPICallTransportRequestProxyOverridesCredentialAndGlobalProxy(t *testin
 
 	h := &Handler{
 		cfg: &config.Config{
-			SDKConfig: sdkconfig.SDKConfig{ProxyURL: "http://global-proxy.example.com:8080"},
+			SDKConfig: config.SDKConfig{ProxyURL: "http://global-proxy.example.com:8080"},
 		},
 	}
 	auth := &coreauth.Auth{ProxyURL: "http://credential-proxy.example.com:8080"}
@@ -147,7 +146,7 @@ func TestAPICallTransportInvalidRequestProxyDoesNotFallBack(t *testing.T) {
 
 	h := &Handler{
 		cfg: &config.Config{
-			SDKConfig: sdkconfig.SDKConfig{ProxyURL: "http://global-proxy.example.com:8080"},
+			SDKConfig: config.SDKConfig{ProxyURL: "http://global-proxy.example.com:8080"},
 		},
 	}
 	auth := &coreauth.Auth{ProxyURL: "http://credential-proxy.example.com:8080"}
@@ -167,7 +166,7 @@ func TestAPICallTransportAPIKeyAuthFallsBackToConfigProxyURL(t *testing.T) {
 
 	h := &Handler{
 		cfg: &config.Config{
-			SDKConfig: sdkconfig.SDKConfig{ProxyURL: "http://global-proxy.example.com:8080"},
+			SDKConfig: config.SDKConfig{ProxyURL: "http://global-proxy.example.com:8080"},
 			ClaudeKey: []config.ClaudeKey{{
 				APIKey:   "claude-key",
 				ProxyURL: "http://claude-proxy.example.com:8080",
@@ -1053,7 +1052,7 @@ func TestAPICallEndToEndWithAuthFilesList(t *testing.T) {
 		t.Fatal(errWrite)
 	}
 
-	store := sdkAuth.NewFileTokenStore()
+	store := authlogin.NewFileTokenStore()
 	store.SetBaseDir(tempDir)
 
 	manager := coreauth.NewManager(store, nil, nil)

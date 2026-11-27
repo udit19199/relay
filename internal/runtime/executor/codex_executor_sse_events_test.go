@@ -11,13 +11,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
 	log "github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/registry"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func codexStreamChunks(t *testing.T, stream string, buffered bool) []string {
@@ -26,9 +26,9 @@ func codexStreamChunks(t *testing.T, stream string, buffered bool) []string {
 	cfg.Codex.StreamBootstrapBuffering = buffered
 	executor := NewCodexExecutor(cfg)
 	ctx := context.WithValue(t.Context(), "cliproxy.roundtripper", codexAllocationTransport{stream: stream})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "test"}}
-	result, err := executor.ExecuteStream(ctx, auth, cliproxyexecutor.Request{Model: "gpt-5.4", Payload: []byte(`{"model":"gpt-5.4","input":"hello"}`)},
-		cliproxyexecutor.Options{Stream: true, SourceFormat: sdktranslator.FormatOpenAIResponse})
+	auth := &coreauth.Auth{Attributes: map[string]string{"api_key": "test"}}
+	result, err := executor.ExecuteStream(ctx, auth, coreexecutor.Request{Model: "gpt-5.4", Payload: []byte(`{"model":"gpt-5.4","input":"hello"}`)},
+		coreexecutor.Options{Stream: true, SourceFormat: translatorreg.FormatOpenAIResponse})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,9 +104,9 @@ func TestCodexExecuteNonStreamReadsAnEventSplitAcrossDataLines(t *testing.T) {
 	stream := "event: response.completed\r\ndata: " + completed[:cut] + "\r\ndata: " + completed[cut:] + "\r\n\r\n"
 	executor := NewCodexExecutor(&config.Config{})
 	ctx := context.WithValue(t.Context(), "cliproxy.roundtripper", codexAllocationTransport{stream: stream})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "test"}}
-	resp, err := executor.Execute(ctx, auth, cliproxyexecutor.Request{Model: "gpt-5.4", Payload: []byte(`{"model":"gpt-5.4","input":"hello"}`)},
-		cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse})
+	auth := &coreauth.Auth{Attributes: map[string]string{"api_key": "test"}}
+	resp, err := executor.Execute(ctx, auth, coreexecutor.Request{Model: "gpt-5.4", Payload: []byte(`{"model":"gpt-5.4","input":"hello"}`)},
+		coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse})
 	if err != nil {
 		t.Fatalf("Execute error: %v", err)
 	}
@@ -198,9 +198,9 @@ func TestCodexExecuteStreamSplitHandshakeExceedingLineBudgetReleasesBootstrapWit
 	cfg.Codex.StreamBootstrapBuffering = true
 	executor := NewCodexExecutor(cfg)
 	ctx := context.WithValue(t.Context(), "cliproxy.roundtripper", codexAllocationTransport{stream: stream.String()})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "test"}}
-	result, err := executor.ExecuteStream(ctx, auth, cliproxyexecutor.Request{Model: "gpt-5.4", Payload: []byte(`{"model":"gpt-5.4","input":"hello"}`)},
-		cliproxyexecutor.Options{Stream: true, SourceFormat: sdktranslator.FormatOpenAIResponse})
+	auth := &coreauth.Auth{Attributes: map[string]string{"api_key": "test"}}
+	result, err := executor.ExecuteStream(ctx, auth, coreexecutor.Request{Model: "gpt-5.4", Payload: []byte(`{"model":"gpt-5.4","input":"hello"}`)},
+		coreexecutor.Options{Stream: true, SourceFormat: translatorreg.FormatOpenAIResponse})
 	if err != nil {
 		t.Fatalf("expected stream to be released without failover error: %v", err)
 	}
@@ -243,9 +243,9 @@ func TestCodexExecuteStreamEventExceedsBudgetWhileAssemblingReleasesStream(t *te
 	cfg.Codex.StreamBootstrapBuffering = true
 	executor := NewCodexExecutor(cfg)
 	ctx := context.WithValue(t.Context(), "cliproxy.roundtripper", codexAllocationTransport{stream: stream.String()})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "test"}}
-	result, err := executor.ExecuteStream(ctx, auth, cliproxyexecutor.Request{Model: "gpt-5.4", Payload: []byte(`{"model":"gpt-5.4","input":"hello"}`)},
-		cliproxyexecutor.Options{Stream: true, SourceFormat: sdktranslator.FormatOpenAIResponse})
+	auth := &coreauth.Auth{Attributes: map[string]string{"api_key": "test"}}
+	result, err := executor.ExecuteStream(ctx, auth, coreexecutor.Request{Model: "gpt-5.4", Payload: []byte(`{"model":"gpt-5.4","input":"hello"}`)},
+		coreexecutor.Options{Stream: true, SourceFormat: translatorreg.FormatOpenAIResponse})
 	if err != nil {
 		t.Fatalf("expected stream to be released without failover error: %v", err)
 	}
@@ -399,9 +399,9 @@ func TestCodexExecuteStreamMixedFramingCommentInsideSplitEventCountsBudget(t *te
 	cfg.Codex.StreamBootstrapBuffering = true
 	executor := NewCodexExecutor(cfg)
 	ctx := context.WithValue(t.Context(), "cliproxy.roundtripper", codexAllocationTransport{stream: stream.String()})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "test"}}
-	result, err := executor.ExecuteStream(ctx, auth, cliproxyexecutor.Request{Model: "gpt-5.4", Payload: []byte(`{"model":"gpt-5.4","input":"hello"}`)},
-		cliproxyexecutor.Options{Stream: true, SourceFormat: sdktranslator.FormatOpenAIResponse})
+	auth := &coreauth.Auth{Attributes: map[string]string{"api_key": "test"}}
+	result, err := executor.ExecuteStream(ctx, auth, coreexecutor.Request{Model: "gpt-5.4", Payload: []byte(`{"model":"gpt-5.4","input":"hello"}`)},
+		coreexecutor.Options{Stream: true, SourceFormat: translatorreg.FormatOpenAIResponse})
 	if err != nil {
 		t.Fatalf("expected stream to be released without failover error: %v", err)
 	}
@@ -436,9 +436,9 @@ func TestCodexExecuteStreamEventExceedsByteBudgetWhileAssemblingReleasesStream(t
 	cfg.Codex.StreamBootstrapBuffering = true
 	executor := NewCodexExecutor(cfg)
 	ctx := context.WithValue(t.Context(), "cliproxy.roundtripper", codexAllocationTransport{stream: stream.String()})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "test"}}
-	result, err := executor.ExecuteStream(ctx, auth, cliproxyexecutor.Request{Model: "gpt-5.4", Payload: []byte(`{"model":"gpt-5.4","input":"hello"}`)},
-		cliproxyexecutor.Options{Stream: true, SourceFormat: sdktranslator.FormatOpenAIResponse})
+	auth := &coreauth.Auth{Attributes: map[string]string{"api_key": "test"}}
+	result, err := executor.ExecuteStream(ctx, auth, coreexecutor.Request{Model: "gpt-5.4", Payload: []byte(`{"model":"gpt-5.4","input":"hello"}`)},
+		coreexecutor.Options{Stream: true, SourceFormat: translatorreg.FormatOpenAIResponse})
 	if err != nil {
 		t.Fatalf("expected stream to be released without failover error: %v", err)
 	}
@@ -489,15 +489,15 @@ func TestCodexVerifyInferenceTranslatesPayloadAndRequiresCompletedEvent_Issue578
 
 	cfg := &config.Config{}
 	executor := NewCodexExecutor(cfg)
-	manager := cliproxyauth.NewManager(nil, nil, nil)
+	manager := coreauth.NewManager(nil, nil, nil)
 	manager.RegisterExecutor(executor)
 
-	ctx := cliproxyauth.WithSkipPersist(context.WithValue(t.Context(), "cliproxy.roundtripper", rt))
-	auth := &cliproxyauth.Auth{
+	ctx := coreauth.WithSkipPersist(context.WithValue(t.Context(), "cliproxy.roundtripper", rt))
+	auth := &coreauth.Auth{
 		ID:       "codex-real-verify.json",
 		FileName: "codex-real-verify.json",
 		Provider: "codex",
-		Status:   cliproxyauth.StatusActive,
+		Status:   coreauth.StatusActive,
 		Metadata: map[string]any{
 			"type":          "codex",
 			"email":         "verify@example.com",
@@ -528,14 +528,14 @@ func TestCodexVerifyInferenceTranslatesPayloadAndRequiresCompletedEvent_Issue578
 	chatStreamRes, errChatStream := manager.ExecuteStream(
 		ctx,
 		[]string{"codex"},
-		cliproxyexecutor.Request{
+		coreexecutor.Request{
 			Model:   "gpt-5.4",
 			Payload: []byte(`{"model":"gpt-5.4","messages":[{"role":"user","content":"hello"}],"stream":true}`),
 		},
-		cliproxyexecutor.Options{
+		coreexecutor.Options{
 			Stream:         true,
-			SourceFormat:   sdktranslator.FormatOpenAI,
-			ResponseFormat: sdktranslator.FormatOpenAI,
+			SourceFormat:   translatorreg.FormatOpenAI,
+			ResponseFormat: translatorreg.FormatOpenAI,
 		},
 	)
 	if errChatStream != nil {
@@ -555,14 +555,14 @@ func TestCodexVerifyInferenceTranslatesPayloadAndRequiresCompletedEvent_Issue578
 	bufferedChatRes, errBufChat := manager.ExecuteStream(
 		ctx,
 		[]string{"codex"},
-		cliproxyexecutor.Request{
+		coreexecutor.Request{
 			Model:   "gpt-5.4",
 			Payload: []byte(`{"model":"gpt-5.4","messages":[{"role":"user","content":"hello"}],"stream":true}`),
 		},
-		cliproxyexecutor.Options{
+		coreexecutor.Options{
 			Stream:         true,
-			SourceFormat:   sdktranslator.FormatOpenAI,
-			ResponseFormat: sdktranslator.FormatOpenAI,
+			SourceFormat:   translatorreg.FormatOpenAI,
+			ResponseFormat: translatorreg.FormatOpenAI,
 		},
 	)
 	if errBufChat != nil {

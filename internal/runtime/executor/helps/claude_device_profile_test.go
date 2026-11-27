@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/kvstore"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/kvstore"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 type fakeClaudeDeviceProfileKVClient struct {
@@ -122,7 +122,7 @@ func claudeDeviceHeaders(userAgent string) http.Header {
 
 func TestResolveClaudeDeviceProfileLocalUsesBaselineForInvalidSignals(t *testing.T) {
 	ResetClaudeDeviceProfileCache()
-	auth := &cliproxyauth.Auth{ID: "auth-invalid-signals"}
+	auth := &coreauth.Auth{ID: "auth-invalid-signals"}
 	headers := claudeDeviceHeaders("claude-cli/999.0.0 (external, cli)")
 	headers.Set("X-Stainless-Package-Version", "999.0.0")
 	headers.Set("X-Stainless-Runtime-Version", "v999.0.0")
@@ -136,7 +136,7 @@ func TestResolveClaudeDeviceProfileLocalUsesBaselineForInvalidSignals(t *testing
 
 func TestResolveClaudeDeviceProfileLocalKeepsExactMeasuredSoftwareBaseline(t *testing.T) {
 	ResetClaudeDeviceProfileCache()
-	auth := &cliproxyauth.Auth{ID: "auth-newer-patch-signals"}
+	auth := &coreauth.Auth{ID: "auth-newer-patch-signals"}
 	headers := claudeDeviceHeaders("claude-cli/2.1.322 (external, cli)")
 
 	profile := resolveClaudeDeviceProfileLocal(auth, "api-key", headers, nil)
@@ -229,7 +229,7 @@ func TestApplyClaudeLegacyDeviceHeadersKeepNewerVersionsUsesConfiguredBaseline(t
 
 func TestResolveClaudeDeviceProfileRequiredKVReadWithoutCandidate(t *testing.T) {
 	client := newFakeClaudeDeviceProfileKVClient()
-	auth := &cliproxyauth.Auth{ID: "auth-1"}
+	auth := &coreauth.Auth{ID: "auth-1"}
 	key := claudeDeviceProfileKVKey(auth, "api-key", ClaudeDeviceProfile{})
 	client.values[key] = mustClaudeDeviceProfileJSON(t, claudeDeviceProfileKVValue{
 		UserAgent:      "claude-cli/2.2.0 (external, cli)",
@@ -257,7 +257,7 @@ func TestResolveClaudeDeviceProfileRequiredKVReadWithoutCandidate(t *testing.T) 
 
 func TestResolveClaudeDeviceProfileRequiredKVCandidateLocksRereadsAndWrites(t *testing.T) {
 	client := newFakeClaudeDeviceProfileKVClient()
-	auth := &cliproxyauth.Auth{ID: "auth-1"}
+	auth := &coreauth.Auth{ID: "auth-1"}
 	useFakeClaudeDeviceProfileKVClient(t, client, true, nil)
 
 	profile, errProfile := ResolveClaudeDeviceProfileRequired(context.Background(), auth, "api-key", claudeDeviceHeaders(defaultClaudeFingerprintUserAgent), nil)
@@ -280,7 +280,7 @@ func TestResolveClaudeDeviceProfileRequiredKVCandidateLocksRereadsAndWrites(t *t
 
 func TestResolveClaudeDeviceProfileRequiredKVSeparatesVSCodeAgentSDKFromCLI(t *testing.T) {
 	client := newFakeClaudeDeviceProfileKVClient()
-	auth := &cliproxyauth.Auth{ID: "auth-home-subclient-isolation"}
+	auth := &coreauth.Auth{ID: "auth-home-subclient-isolation"}
 	useFakeClaudeDeviceProfileKVClient(t, client, true, nil)
 
 	cliProfile, errCLI := ResolveClaudeDeviceProfileRequired(context.Background(), auth, "api-key", claudeDeviceHeaders(defaultClaudeFingerprintUserAgent), nil)
@@ -317,7 +317,7 @@ func TestResolveClaudeDeviceProfileRequiredKVSeparatesVSCodeAgentSDKFromCLI(t *t
 
 func TestResolveClaudeDeviceProfileRequiredKVNormalizesUnmeasuredCachedProfile(t *testing.T) {
 	client := newFakeClaudeDeviceProfileKVClient()
-	auth := &cliproxyauth.Auth{ID: "auth-1"}
+	auth := &coreauth.Auth{ID: "auth-1"}
 	key := claudeDeviceProfileKVKey(auth, "api-key", ClaudeDeviceProfile{})
 	client.values[key] = mustClaudeDeviceProfileJSON(t, claudeDeviceProfileKVValue{
 		UserAgent:      "claude-cli/2.4.0 (external, cli)",
@@ -357,7 +357,7 @@ func TestResolveClaudeDeviceProfileRequiredKVFailures(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			useFakeClaudeDeviceProfileKVClient(t, tc.client, true, nil)
-			if _, errProfile := ResolveClaudeDeviceProfileRequired(context.Background(), &cliproxyauth.Auth{ID: "auth-1"}, "api-key", tc.headers, nil); errProfile == nil {
+			if _, errProfile := ResolveClaudeDeviceProfileRequired(context.Background(), &coreauth.Auth{ID: "auth-1"}, "api-key", tc.headers, nil); errProfile == nil {
 				t.Fatalf("ResolveClaudeDeviceProfileRequired() error = nil, want error")
 			}
 		})
@@ -368,7 +368,7 @@ func TestResolveClaudeDeviceProfilePreservesConfirmedClientAtBaselineVersion(t *
 	ResetClaudeDeviceProfileCache()
 	client := newFakeClaudeDeviceProfileKVClient()
 	useFakeClaudeDeviceProfileKVClient(t, client, false, nil)
-	auth := &cliproxyauth.Auth{ID: "auth-baseline-entrypoint"}
+	auth := &coreauth.Auth{ID: "auth-baseline-entrypoint"}
 	headers := claudeDeviceHeaders("claude-cli/2.1.321 (external, cli)")
 	headers.Set("X-Stainless-Package-Version", "0.128.0")
 	headers.Set("X-Stainless-Runtime-Version", "v26.12.1")
@@ -389,7 +389,7 @@ func TestResolveClaudeDeviceProfileSeparatesVSCodeAgentSDKFromCLI(t *testing.T) 
 	ResetClaudeDeviceProfileCache()
 	client := newFakeClaudeDeviceProfileKVClient()
 	useFakeClaudeDeviceProfileKVClient(t, client, false, nil)
-	auth := &cliproxyauth.Auth{ID: "auth-subclient-isolation"}
+	auth := &coreauth.Auth{ID: "auth-subclient-isolation"}
 
 	cliHeaders := claudeDeviceHeaders("claude-cli/2.1.321 (external, cli)")
 	cliHeaders.Set("X-Stainless-Package-Version", "0.128.0")
@@ -469,7 +469,7 @@ func TestResolveClaudeDeviceProfileRequiredNonHomeKeepsLocalCache(t *testing.T) 
 	ResetClaudeDeviceProfileCache()
 	client := newFakeClaudeDeviceProfileKVClient()
 	useFakeClaudeDeviceProfileKVClient(t, client, false, nil)
-	auth := &cliproxyauth.Auth{ID: "auth-1"}
+	auth := &coreauth.Auth{ID: "auth-1"}
 	cfg := &config.Config{}
 
 	first, errFirst := ResolveClaudeDeviceProfileRequired(context.Background(), auth, "api-key", claudeDeviceHeaders(defaultClaudeFingerprintUserAgent), cfg)

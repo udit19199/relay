@@ -9,9 +9,9 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 	"google.golang.org/protobuf/encoding/protowire"
 )
 
@@ -21,8 +21,8 @@ func TestPayloadFinalizerDefaultsUseOriginalAndNormalizeBeforeRules(t *testing.T
 		Override: []config.PayloadRule{{Models: []config.PayloadModelRule{{Name: "alias"}}, Params: map[string]any{"tools.0.function.parameters.properties.count.type": "number"}}},
 		Filter:   []config.PayloadFilterRule{{Models: []config.PayloadModelRule{{Name: "alias"}}, Params: []string{"late"}}},
 	}}
-	req := cliproxyexecutor.Request{Model: "alias"}
-	opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude, Headers: http.Header{"X-Test": {"yes"}, "User-Agent": {"codex-cli/0.1"}}}
+	req := coreexecutor.Request{Model: "alias"}
+	opts := coreexecutor.Options{SourceFormat: translatorreg.FormatClaude, Headers: http.Header{"X-Test": {"yes"}, "User-Agent": {"codex-cli/0.1"}}}
 	finalize := NewPayloadFinalizer(cfg, "openai", "upstream", "openai", "", []byte(`{"present":"caller"}`), req, opts)
 	body := []byte(`{"missing":"built-in","present":"caller","late":"injected","tools":[{"type":"function","function":{"name":"f","parameters":{"type":"object","properties":{"count":{"type":"integer"}}}}}]}`)
 	out := FinalizePayload(WithPayloadFinalizer(context.Background(), finalize), body)
@@ -91,8 +91,8 @@ func TestPayloadFinalizerMultipartPreservesFiles(t *testing.T) {
 		t.Fatal(errClose)
 	}
 	cfg := &config.Config{Payload: config.PayloadConfig{Override: []config.PayloadRule{{Models: []config.PayloadModelRule{{Name: "original"}}, Params: map[string]any{"model": "configured"}}}}}
-	req := cliproxyexecutor.Request{Model: "original", Payload: buffer.Bytes()}
-	opts := cliproxyexecutor.Options{Headers: http.Header{"Content-Type": {writer.FormDataContentType()}}}
+	req := coreexecutor.Request{Model: "original", Payload: buffer.Bytes()}
+	opts := coreexecutor.Options{Headers: http.Header{"Content-Type": {writer.FormDataContentType()}}}
 	body, contentType, errFinalize := ApplyMediaPayloadConfig(cfg, "openai", "original", "openai", req.Payload, writer.FormDataContentType(), req, opts)
 	if errFinalize != nil {
 		t.Fatal(errFinalize)
@@ -140,8 +140,8 @@ func TestFinalizePayloadDocCrossMethodPipeline(t *testing.T) {
 			}},
 		},
 	}
-	req := cliproxyexecutor.Request{Model: "gpt-4o", Payload: original}
-	opts := cliproxyexecutor.Options{}
+	req := coreexecutor.Request{Model: "gpt-4o", Payload: original}
+	opts := coreexecutor.Options{}
 	ctx := WithPayloadFinalizer(context.Background(), NewPayloadFinalizer(cfg, "openai", "gpt-4o", "openai", "", original, req, opts))
 
 	doc := ojson.NewDoc([]byte(`{"model":"gpt-4o","temperature":0.7,"extra":true}`))
@@ -256,11 +256,11 @@ func TestFinalizeDocCustomWrapperCalledOnceAndPreservesOriginalFromBody(t *testi
 			}},
 		},
 	}
-	req := cliproxyexecutor.Request{
+	req := coreexecutor.Request{
 		Model:   "devin-model",
 		Payload: []byte(`{"max_tokens":2048}`),
 	}
-	opts := cliproxyexecutor.Options{}
+	opts := coreexecutor.Options{}
 
 	callCount := 0
 	wrapper := PayloadFinalizer(func(body []byte) []byte {
@@ -362,8 +362,8 @@ func TestApplyPayloadConfigDocSequentialDefaultObjectAndNestedField(t *testing.T
 func TestFinalizeDocConcurrentWithNewPayloadFinalizer(t *testing.T) {
 	builtinFinalizerCodePtr.Store(0)
 	cfg := &config.Config{}
-	req := cliproxyexecutor.Request{Model: "gpt-4o", Payload: []byte(`{"model":"gpt-4o"}`)}
-	opts := cliproxyexecutor.Options{}
+	req := coreexecutor.Request{Model: "gpt-4o", Payload: []byte(`{"model":"gpt-4o"}`)}
+	opts := coreexecutor.Options{}
 
 	var wg sync.WaitGroup
 	for i := 0; i < 8; i++ {

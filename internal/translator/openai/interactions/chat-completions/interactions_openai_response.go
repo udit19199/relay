@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/MoeForge/moego/ojson"
-	translatorcommon "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/common"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
+	translatorcommon "github.com/udit19199/relay/internal/translator/common"
+	"github.com/udit19199/relay/internal/util"
 )
 
 type openAIToInteractionsStreamState struct {
@@ -289,10 +289,6 @@ func appendInteractionsDone(out [][]byte, st *openAIToInteractionsStreamState) [
 	out = append(out, translatorcommon.SSEEventData("done", []byte("[DONE]")))
 	st.Done = true
 	return out
-}
-
-func isOpenAIStreamDone(rawJSON []byte) bool {
-	return bytes.Equal(bytes.TrimSpace(openAIChatSSEPayload(rawJSON)), []byte("[DONE]"))
 }
 
 func openAIChatSSEPayload(rawJSON []byte) []byte {

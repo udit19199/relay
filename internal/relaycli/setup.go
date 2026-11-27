@@ -237,7 +237,7 @@ func executablePath() (string, error) {
 		}
 	}
 	if strings.Contains(exe, "/go-build") {
-		return "", fmt.Errorf("relay is running from a temporary build (%s); build it first: go build -trimpath -ldflags \"-s -w\" -o ~/.local/bin/relay ./cmd/server", exe)
+		return "", fmt.Errorf("relay is running from a temporary build (%s); build it first: go build -trimpath -ldflags \"-s -w\" -o ~/.local/bin/relay ./cmd/relay", exe)
 	}
 	return exe, nil
 }

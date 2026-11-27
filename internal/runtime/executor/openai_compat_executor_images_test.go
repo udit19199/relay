@@ -10,11 +10,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	coreusage "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/usage"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	coreusage "github.com/udit19199/relay/internal/service/usage"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestOpenAICompatExecutor_ImageStreamChunkBoundaryObservability(t *testing.T) {
@@ -75,7 +75,7 @@ func TestOpenAICompatExecutor_ImageStreamChunkBoundaryObservability(t *testing.T
 					Name: "compat",
 				}},
 			})
-			auth := &cliproxyauth.Auth{
+			auth := &coreauth.Auth{
 				Provider: "openai-compatibility",
 				Attributes: map[string]string{
 					"base_url":     server.URL,
@@ -87,11 +87,11 @@ func TestOpenAICompatExecutor_ImageStreamChunkBoundaryObservability(t *testing.T
 
 			ctx := coreusage.WithRequestedModelAlias(context.Background(), alias)
 			payload := []byte(`{"model":"dall-e-3","prompt":"a sunset over mountains"}`)
-			streamRes, err := executor.ExecuteStream(ctx, auth, cliproxyexecutor.Request{
+			streamRes, err := executor.ExecuteStream(ctx, auth, coreexecutor.Request{
 				Model:   "dall-e-3",
 				Payload: payload,
-			}, cliproxyexecutor.Options{
-				SourceFormat: sdktranslator.FromString("openai-image"),
+			}, coreexecutor.Options{
+				SourceFormat: translatorreg.FromString("openai-image"),
 				Stream:       true,
 			})
 			if err != nil {
@@ -136,7 +136,7 @@ func TestOpenAICompatExecutor_ImageEndpointPath_HonorsOverriddenRequestPath_Issu
 			Name: "compat",
 		}},
 	})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "openai-compatibility",
 		Attributes: map[string]string{
 			"base_url":     server.URL,
@@ -148,13 +148,13 @@ func TestOpenAICompatExecutor_ImageEndpointPath_HonorsOverriddenRequestPath_Issu
 
 	payload := []byte(`{"model":"gpt-image-2.5","prompt":"a red apple"}`)
 	// Case 1: default inbound path is edits
-	optsEdits := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-image"),
+	optsEdits := coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-image"),
 		Metadata: map[string]any{
-			cliproxyexecutor.RequestPathMetadataKey: "/v1/images/edits",
+			coreexecutor.RequestPathMetadataKey: "/v1/images/edits",
 		},
 	}
-	if _, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	if _, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "gpt-image-2.5",
 		Payload: payload,
 	}, optsEdits); err != nil {
@@ -165,13 +165,13 @@ func TestOpenAICompatExecutor_ImageEndpointPath_HonorsOverriddenRequestPath_Issu
 	}
 
 	// Case 2: interceptor rewrites to generations
-	optsGenerations := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-image"),
+	optsGenerations := coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-image"),
 		Metadata: map[string]any{
-			cliproxyexecutor.RequestPathMetadataKey: "/v1/images/generations",
+			coreexecutor.RequestPathMetadataKey: "/v1/images/generations",
 		},
 	}
-	resp, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	resp, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "gpt-image-2.5",
 		Payload: payload,
 	}, optsGenerations)
@@ -205,16 +205,16 @@ func TestOpenAICompatImageStreamAccountsLargeCompletedEvents(t *testing.T) {
 				coreusage.RegisterNamedConsumer(t.Name(), multiProviderNoopUsageConsumer{})
 			})
 			exec := NewOpenAICompatExecutor("openai-compatibility", &config.Config{})
-			auth := &cliproxyauth.Auth{
+			auth := &coreauth.Auth{
 				Provider:   "openai-compatibility",
 				Attributes: map[string]string{"base_url": server.URL, "api_key": "test"},
 			}
 			ctx := coreusage.WithRequestedModelAlias(context.Background(), alias)
-			res, err := exec.ExecuteStream(ctx, auth, cliproxyexecutor.Request{
+			res, err := exec.ExecuteStream(ctx, auth, coreexecutor.Request{
 				Model:   "gpt-image-2",
 				Payload: []byte(`{"model":"gpt-image-2","prompt":"test"}`),
-			}, cliproxyexecutor.Options{
-				SourceFormat: sdktranslator.FromString("openai-image"),
+			}, coreexecutor.Options{
+				SourceFormat: translatorreg.FromString("openai-image"),
 				Stream:       true,
 			})
 			if err != nil {
@@ -258,22 +258,22 @@ func TestOpenAICompatAndCodexImageStreamReadFailurePreservesObservedUsage(t *tes
 				coreusage.RegisterNamedConsumer(t.Name(), multiProviderNoopUsageConsumer{})
 			})
 			ctx := coreusage.WithRequestedModelAlias(context.Background(), alias)
-			req := cliproxyexecutor.Request{
+			req := coreexecutor.Request{
 				Model:   "gpt-image-2",
 				Payload: []byte(`{"model":"gpt-image-2","prompt":"test"}`),
 			}
 			var (
-				res *cliproxyexecutor.StreamResult
+				res *coreexecutor.StreamResult
 				err error
 			)
 			if provider == "codex" {
 				res, err = NewCodexExecutor(&config.Config{}).ExecuteStream(ctx, newCodexOpenAIImageTestAuth(server.URL), req, codexOpenAIImageTestOptions(codexImagesGenerationsPath, true))
 			} else {
-				res, err = NewOpenAICompatExecutor("openai-compatibility", &config.Config{}).ExecuteStream(ctx, &cliproxyauth.Auth{
+				res, err = NewOpenAICompatExecutor("openai-compatibility", &config.Config{}).ExecuteStream(ctx, &coreauth.Auth{
 					Provider:   "openai-compatibility",
 					Attributes: map[string]string{"base_url": server.URL, "api_key": "test"},
-				}, req, cliproxyexecutor.Options{
-					SourceFormat: sdktranslator.FromString("openai-image"),
+				}, req, coreexecutor.Options{
+					SourceFormat: translatorreg.FromString("openai-image"),
 					Stream:       true,
 				})
 			}
@@ -357,16 +357,16 @@ func TestOpenAICompatMultipartImageEditExtractsRequestedImageDetails(t *testing.
 			})
 			ctx := coreusage.WithRequestedModelAlias(context.Background(), alias)
 			exec := NewOpenAICompatExecutor("openai-compatibility", &config.Config{})
-			auth := &cliproxyauth.Auth{
+			auth := &coreauth.Auth{
 				Provider:   "openai-compatibility",
 				Attributes: map[string]string{"base_url": server.URL, "api_key": "test"},
 			}
-			req := cliproxyexecutor.Request{Model: "gpt-image-2", Payload: body.Bytes()}
-			opts := cliproxyexecutor.Options{
-				SourceFormat: sdktranslator.FromString("openai-image"),
+			req := coreexecutor.Request{Model: "gpt-image-2", Payload: body.Bytes()}
+			opts := coreexecutor.Options{
+				SourceFormat: translatorreg.FromString("openai-image"),
 				Stream:       stream,
 				Headers:      http.Header{"Content-Type": []string{writer.FormDataContentType()}},
-				Metadata:     map[string]any{cliproxyexecutor.RequestPathMetadataKey: "/v1/images/edits"},
+				Metadata:     map[string]any{coreexecutor.RequestPathMetadataKey: "/v1/images/edits"},
 			}
 			if stream {
 				res, errExec := exec.ExecuteStream(ctx, auth, req, opts)
@@ -415,15 +415,15 @@ func TestOpenAICompatMultilineSSEAndXAIOutputItemDoneUsage(t *testing.T) {
 		})
 		ctx := coreusage.WithRequestedModelAlias(context.Background(), alias)
 		exec := NewOpenAICompatExecutor("openai-compatibility", &config.Config{})
-		auth := &cliproxyauth.Auth{
+		auth := &coreauth.Auth{
 			Provider:   "openai-compatibility",
 			Attributes: map[string]string{"base_url": srv.URL, "api_key": "test"},
 		}
-		res, err := exec.ExecuteStream(ctx, auth, cliproxyexecutor.Request{
+		res, err := exec.ExecuteStream(ctx, auth, coreexecutor.Request{
 			Model:   "gpt-4o",
 			Payload: []byte(`{"model":"gpt-4o","messages":[{"role":"user","content":"hi"}],"stream":true}`),
-		}, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FormatOpenAI,
+		}, coreexecutor.Options{
+			SourceFormat: translatorreg.FormatOpenAI,
 			Stream:       true,
 		})
 		if err != nil {
@@ -466,16 +466,16 @@ func TestOpenAICompatMultilineSSEAndXAIOutputItemDoneUsage(t *testing.T) {
 				})
 				ctx := coreusage.WithRequestedModelAlias(context.Background(), alias)
 				exec := NewXAIExecutor(&config.Config{})
-				auth := &cliproxyauth.Auth{
+				auth := &coreauth.Auth{
 					Provider:   "xai",
 					Attributes: map[string]string{"base_url": srv.URL, "api_key": "xai-test"},
 				}
-				req := cliproxyexecutor.Request{
+				req := coreexecutor.Request{
 					Model:   "grok-4",
 					Payload: []byte(`{"model":"grok-4","input":"hi","tools":[{"type":"function","name":"lookup","parameters":{"type":"object"}}]}`),
 				}
-				opts := cliproxyexecutor.Options{
-					SourceFormat: sdktranslator.FormatOpenAIResponse,
+				opts := coreexecutor.Options{
+					SourceFormat: translatorreg.FormatOpenAIResponse,
 					Stream:       stream,
 				}
 				if stream {

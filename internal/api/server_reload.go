@@ -5,18 +5,16 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/access"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/githubauth"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/logging"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/managementasset"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/redisqueue"
-	responsesclaude "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/claude/openai/responses"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/api/handlers/openai"
-	sdkAuth "github.com/router-for-me/CLIProxyAPI/v8/sdk/auth"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	log "github.com/sirupsen/logrus"
+	configaccess "github.com/udit19199/relay/internal/access/config_access"
+	"github.com/udit19199/relay/internal/api/handlers/openai"
+	authlogin "github.com/udit19199/relay/internal/auth/login"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/githubauth"
+	"github.com/udit19199/relay/internal/logging"
+	"github.com/udit19199/relay/internal/service/auth"
+	responsesclaude "github.com/udit19199/relay/internal/translator/claude/openai/responses"
+	"github.com/udit19199/relay/internal/util"
 	"gopkg.in/yaml.v3"
 )
 
@@ -24,7 +22,7 @@ func (s *Server) applyAccessConfig(oldCfg, newCfg *config.Config) bool {
 	if s == nil || s.accessManager == nil || newCfg == nil {
 		return false
 	}
-	if _, err := access.ApplyAccessProviders(s.accessManager, oldCfg, newCfg); err != nil {
+	if _, err := configaccess.ApplyAccessProviders(s.accessManager, oldCfg, newCfg); err != nil {
 		return false
 	}
 	return true
@@ -82,14 +80,6 @@ func (s *Server) UpdateClientsContext(ctx context.Context, cfg *config.Config) b
 		if errContext := ctx.Err(); errContext != nil {
 			return false
 		}
-	}
-
-	if oldCfg == nil || oldCfg.UsageStatisticsEnabled != cfg.UsageStatisticsEnabled {
-		redisqueue.SetUsageStatisticsEnabled(cfg.UsageStatisticsEnabled)
-	}
-
-	if oldCfg == nil || oldCfg.RedisUsageQueueRetentionSeconds != cfg.RedisUsageQueueRetentionSeconds {
-		redisqueue.SetRetentionSeconds(cfg.RedisUsageQueueRetentionSeconds)
 	}
 
 	if s.requestLogger != nil && (oldCfg == nil || oldCfg.ErrorLogsMaxFiles != cfg.ErrorLogsMaxFiles) {
@@ -154,7 +144,6 @@ func (s *Server) UpdateClientsContext(ctx context.Context, cfg *config.Config) b
 			s.managementRoutesEnabled.Store(!newSecretEmpty)
 		}
 	}
-	redisqueue.SetEnabled(s.managementRoutesEnabled.Load())
 
 	exampleAPIKeySafeModeRequired := s.exampleAPIKeySafeModeRequired(cfg)
 	if exampleAPIKeySafeModeRequired {
@@ -173,7 +162,6 @@ func (s *Server) UpdateClientsContext(ctx context.Context, cfg *config.Config) b
 		s.wsAuthChanged(oldCfg.WebsocketAuth, cfg.WebsocketAuth)
 	}
 	githubauth.SetToken(cfg.GitHubToken)
-	managementasset.SetCurrentConfig(cfg)
 	if errContext := ctx.Err(); errContext != nil {
 		return false
 	}
@@ -193,7 +181,7 @@ func (s *Server) UpdateClientsContext(ctx context.Context, cfg *config.Config) b
 	// Count client sources from configuration and auth store.
 	authEntries := 0
 	if cfg != nil {
-		tokenStore := sdkAuth.GetTokenStore()
+		tokenStore := authlogin.GetTokenStore()
 		if dirSetter, ok := tokenStore.(interface{ SetBaseDir(string) }); ok {
 			dirSetter.SetBaseDir(cfg.AuthDir)
 		}
@@ -228,20 +216,9 @@ func (s *Server) UpdateClientsContext(ctx context.Context, cfg *config.Config) b
 	return ctx.Err() == nil
 }
 
-func (s *Server) SetWebsocketAuthChangeHandler(fn func(bool, bool)) {
-	if s == nil {
-		return
-	}
-	s.wsAuthChanged = fn
-}
-
 // applyClaudeToolSearchConfig publishes upstream.claude.tool-search to the
 // Claude Responses translator, which the Claude executor and the Codex model
 // catalog also read so all three agree on it.
 func applyClaudeToolSearchConfig(cfg *config.Config) {
 	responsesclaude.SetClientToolSearchEnabled(cfg != nil && cfg.Claude.ToolSearch)
-}
-
-func configuredSignatureBypassStrict(_ *config.Config) bool {
-	return false
 }

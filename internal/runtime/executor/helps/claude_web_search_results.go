@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/cache"
-	responsesclaude "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/claude/openai/responses"
-	translatorcommon "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/common"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
 	log "github.com/sirupsen/logrus"
+	"github.com/udit19199/relay/internal/cache"
+	responsesclaude "github.com/udit19199/relay/internal/translator/claude/openai/responses"
+	translatorcommon "github.com/udit19199/relay/internal/translator/common"
+	"github.com/udit19199/relay/internal/util"
 )
 
 var (
@@ -86,12 +86,6 @@ func recordClaudeWebSearchResultBlock(ctx context.Context, sessionKey string, bl
 // left unchanged.
 func RestoreClaudeWebSearchResults(body []byte, sessionKey string, ttl ...time.Duration) []byte {
 	return RestoreClaudeWebSearchResultsContext(context.Background(), body, sessionKey, ttl...)
-}
-
-// RestoreClaudeWebSearchResultsDoc fills assistant web_search_tool_result blocks
-// in doc whose content is missing or empty with the content stored for sessionKey.
-func RestoreClaudeWebSearchResultsDoc(doc *ojson.Doc, sessionKey string, ttl ...time.Duration) bool {
-	return RestoreClaudeWebSearchResultsContextDoc(context.Background(), doc, sessionKey, ttl...)
 }
 
 // RestoreClaudeWebSearchResultsContext fills assistant web_search_tool_result

@@ -12,11 +12,11 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gorilla/websocket"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestCodexExecutorCompactAddsDefaultInstructionsWithoutInjectingImageTool(t *testing.T) {
@@ -48,16 +48,16 @@ func TestCodexExecutorCompactAddsDefaultInstructionsWithoutInjectingImageTool(t 
 			defer server.Close()
 
 			executor := NewCodexExecutor(&config.Config{})
-			auth := &cliproxyauth.Auth{Attributes: map[string]string{
+			auth := &coreauth.Auth{Attributes: map[string]string{
 				"base_url": server.URL,
 				"api_key":  "test",
 			}}
 
-			resp, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+			resp, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 				Model:   "gpt-5.4",
 				Payload: []byte(tc.payload),
-			}, cliproxyexecutor.Options{
-				SourceFormat: sdktranslator.FromString("openai-response"),
+			}, coreexecutor.Options{
+				SourceFormat: translatorreg.FromString("openai-response"),
 				Alt:          "responses/compact",
 				Stream:       false,
 			})
@@ -109,7 +109,7 @@ func TestCodexExecutorCompactUseSIWCAppliesSIWCRulesBeforePayloadFinalizer(t *te
 		},
 	}
 	executor := NewCodexExecutor(cfg)
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:       "codex-siwc-compact",
 		Provider: "codex",
 		Attributes: map[string]string{
@@ -128,11 +128,11 @@ func TestCodexExecutorCompactUseSIWCAppliesSIWCRulesBeforePayloadFinalizer(t *te
 	}
 
 	payload := `{"model":"gpt-5.4","instructions":null,"temperature":0.9,"max_output_tokens":512,"prompt_cache_retention":"in_memory","prompt_cache_options":{"ttl":60},"input":[{"type":"message","role":"user","content":"history"},{"type":"compaction_trigger"}]}`
-	_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "gpt-5.4",
 		Payload: []byte(payload),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-response"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-response"),
 		Alt:          "responses/compact",
 	})
 	if err != nil {
@@ -197,7 +197,7 @@ func TestCodexExecutorReplayedWebSearchCallHistoryEnsuresWebSearchTool_Issue6770
 		defer server.Close()
 
 		executor := NewCodexExecutor(&config.Config{Codex: config.CodexConfig{StreamBootstrapBuffering: true}})
-		auth := &cliproxyauth.Auth{
+		auth := &coreauth.Auth{
 			Provider: "codex",
 			Attributes: map[string]string{
 				"base_url":  server.URL,
@@ -206,11 +206,11 @@ func TestCodexExecutorReplayedWebSearchCallHistoryEnsuresWebSearchTool_Issue6770
 			},
 		}
 
-		streamResult, err := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+		streamResult, err := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 			Model:   "gpt-6.1-sol",
 			Payload: []byte(compactionPayloadWithEmptyTools),
-		}, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FromString("openai-response"),
+		}, coreexecutor.Options{
+			SourceFormat: translatorreg.FromString("openai-response"),
 			Stream:       true,
 		})
 		if err != nil {
@@ -241,7 +241,7 @@ func TestCodexExecutorReplayedWebSearchCallHistoryEnsuresWebSearchTool_Issue6770
 		defer server.Close()
 
 		executor := NewCodexExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
-		auth := &cliproxyauth.Auth{
+		auth := &coreauth.Auth{
 			Provider: "codex",
 			Attributes: map[string]string{
 				"base_url": server.URL,
@@ -249,11 +249,11 @@ func TestCodexExecutorReplayedWebSearchCallHistoryEnsuresWebSearchTool_Issue6770
 			},
 		}
 
-		_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+		_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 			Model:   "gpt-6.1-sol",
 			Payload: []byte(compactionPayloadWithEmptyTools),
-		}, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FromString("openai-response"),
+		}, coreexecutor.Options{
+			SourceFormat: translatorreg.FromString("openai-response"),
 		})
 		if err != nil {
 			t.Fatalf("Execute() error = %v", err)
@@ -282,7 +282,7 @@ func TestCodexExecutorReplayedWebSearchCallHistoryEnsuresWebSearchTool_Issue6770
 		defer server.Close()
 
 		executor := NewCodexExecutor(&config.Config{})
-		auth := &cliproxyauth.Auth{
+		auth := &coreauth.Auth{
 			Provider: "codex",
 			Attributes: map[string]string{
 				"base_url": server.URL,
@@ -291,11 +291,11 @@ func TestCodexExecutorReplayedWebSearchCallHistoryEnsuresWebSearchTool_Issue6770
 		}
 
 		compactPayload := `{"model":"gpt-6.1-sol","input":[{"type":"message","role":"user","content":"history"},{"id":"ws_1","type":"web_search_call","status":"completed","action":{"type":"search","query":"q"}},{"type":"compaction_trigger"}]}`
-		_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+		_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 			Model:   "gpt-6.1-sol",
 			Payload: []byte(compactPayload),
-		}, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FromString("openai-response"),
+		}, coreexecutor.Options{
+			SourceFormat: translatorreg.FromString("openai-response"),
 			Alt:          "responses/compact",
 		})
 		if err != nil {
@@ -308,7 +308,7 @@ func TestCodexExecutorReplayedWebSearchCallHistoryEnsuresWebSearchTool_Issue6770
 
 	t.Run("prepareCodexWebsocketStream injects web_search when input replays web_search_call", func(t *testing.T) {
 		wsExecutor := NewCodexWebsocketsExecutor(&config.Config{})
-		auth := &cliproxyauth.Auth{
+		auth := &coreauth.Auth{
 			Provider: "codex",
 			Attributes: map[string]string{
 				"base_url":  "http://127.0.0.1:1",
@@ -316,11 +316,11 @@ func TestCodexExecutorReplayedWebSearchCallHistoryEnsuresWebSearchTool_Issue6770
 				"plan_type": "plus",
 			},
 		}
-		prepared, err := wsExecutor.prepareCodexWebsocketStream(context.Background(), auth, cliproxyexecutor.Request{
+		prepared, err := wsExecutor.prepareCodexWebsocketStream(context.Background(), auth, coreexecutor.Request{
 			Model:   "gpt-6.1-sol",
 			Payload: []byte(compactionPayloadWithEmptyTools),
-		}, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FromString("openai-response"),
+		}, coreexecutor.Options{
+			SourceFormat: translatorreg.FromString("openai-response"),
 			Stream:       true,
 		})
 		if err != nil {
@@ -334,18 +334,18 @@ func TestCodexExecutorReplayedWebSearchCallHistoryEnsuresWebSearchTool_Issue6770
 	t.Run("existing web_search tool declaration is preserved without duplication", func(t *testing.T) {
 		payloadWithWebSearch := `{"model":"gpt-6.1-sol","input":[{"id":"ws_1","type":"web_search_call","status":"completed","action":{"type":"search","query":"q"}}],"tools":[{"type":"web_search","external_web_access":true}]}`
 		wsExecutor := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
-		auth := &cliproxyauth.Auth{
+		auth := &coreauth.Auth{
 			Provider: "codex",
 			Attributes: map[string]string{
 				"base_url": "http://127.0.0.1:1",
 				"api_key":  "test",
 			},
 		}
-		prepared, err := wsExecutor.prepareCodexWebsocketStream(context.Background(), auth, cliproxyexecutor.Request{
+		prepared, err := wsExecutor.prepareCodexWebsocketStream(context.Background(), auth, coreexecutor.Request{
 			Model:   "gpt-6.1-sol",
 			Payload: []byte(payloadWithWebSearch),
-		}, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FromString("openai-response"),
+		}, coreexecutor.Options{
+			SourceFormat: translatorreg.FromString("openai-response"),
 			Stream:       true,
 		})
 		if err != nil {
@@ -362,7 +362,7 @@ func TestCodexExecutorReplayedWebSearchCallHistoryEnsuresWebSearchTool_Issue6770
 	t.Run("Responses Lite request strips replayed web_search_call items without injecting top-level tools", func(t *testing.T) {
 		litePayload := `{"model":"gpt-6.1-sol","input":[{"type":"additional_tools","role":"developer","tools":[{"type":"namespace","name":"functions","description":"","tools":[{"type":"custom","name":"exec"}]}]},{"type":"message","role":"user","content":[{"type":"input_text","text":"search"}]},{"id":"ws_1","type":"web_search_call","status":"completed","action":{"type":"search","query":"q"}},{"id":"rs_1","type":"reasoning","summary":[]},{"type":"message","role":"assistant","content":[{"type":"output_text","text":"answer"}]},{"type":"compaction_trigger"}],"client_metadata":{"ws_request_header_x_openai_internal_codex_responses_lite":"true"}}`
 		wsExecutor := NewCodexWebsocketsExecutor(&config.Config{})
-		auth := &cliproxyauth.Auth{
+		auth := &coreauth.Auth{
 			Provider: "codex",
 			Attributes: map[string]string{
 				"base_url": "http://127.0.0.1:1",
@@ -372,11 +372,11 @@ func TestCodexExecutorReplayedWebSearchCallHistoryEnsuresWebSearchTool_Issue6770
 		headers := make(http.Header)
 		headers.Set(codexResponsesLiteHeader, "true")
 
-		prepared, err := wsExecutor.prepareCodexWebsocketStream(context.Background(), auth, cliproxyexecutor.Request{
+		prepared, err := wsExecutor.prepareCodexWebsocketStream(context.Background(), auth, coreexecutor.Request{
 			Model:   "gpt-6.1-sol",
 			Payload: []byte(litePayload),
-		}, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FromString("openai-response"),
+		}, coreexecutor.Options{
+			SourceFormat: translatorreg.FromString("openai-response"),
 			Headers:      headers,
 			Stream:       true,
 		})
@@ -419,7 +419,7 @@ func TestCodexExecutorReplayedWebSearchCallHistoryEnsuresWebSearchTool_Issue6770
 			},
 		}
 		executor := NewCodexExecutor(cfg)
-		auth := &cliproxyauth.Auth{
+		auth := &coreauth.Auth{
 			Provider: "codex",
 			Attributes: map[string]string{
 				"base_url": server.URL,
@@ -427,11 +427,11 @@ func TestCodexExecutorReplayedWebSearchCallHistoryEnsuresWebSearchTool_Issue6770
 			},
 		}
 
-		_, err := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+		_, err := executor.Execute(context.Background(), auth, coreexecutor.Request{
 			Model:   "gpt-6.1-sol",
 			Payload: []byte(compactionPayloadWithEmptyTools),
-		}, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FromString("openai-response"),
+		}, coreexecutor.Options{
+			SourceFormat: translatorreg.FromString("openai-response"),
 		})
 		if err != nil {
 			t.Fatalf("Execute() error = %v", err)
@@ -486,7 +486,7 @@ func TestCodexExecutorExpandsRecognizedCPACompactionCapsules_Issue7118(t *testin
 		defer server.Close()
 
 		executor := NewCodexExecutor(&config.Config{})
-		auth := &cliproxyauth.Auth{
+		auth := &coreauth.Auth{
 			Provider: "codex",
 			Attributes: map[string]string{
 				"base_url": server.URL,
@@ -494,11 +494,11 @@ func TestCodexExecutorExpandsRecognizedCPACompactionCapsules_Issue7118(t *testin
 			},
 		}
 
-		streamResult, err := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+		streamResult, err := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 			Model:   "gpt-6.1-sol",
 			Payload: []byte(mixedPayload),
-		}, cliproxyexecutor.Options{
-			SourceFormat:    sdktranslator.FormatOpenAIResponse,
+		}, coreexecutor.Options{
+			SourceFormat:    translatorreg.FormatOpenAIResponse,
 			OriginalRequest: []byte(mixedPayload),
 			Stream:          true,
 		})
@@ -531,7 +531,7 @@ func TestCodexExecutorExpandsRecognizedCPACompactionCapsules_Issue7118(t *testin
 		defer server.Close()
 
 		executor := NewCodexExecutor(&config.Config{})
-		auth := &cliproxyauth.Auth{
+		auth := &coreauth.Auth{
 			Provider: "codex",
 			Attributes: map[string]string{
 				"base_url": server.URL,
@@ -539,11 +539,11 @@ func TestCodexExecutorExpandsRecognizedCPACompactionCapsules_Issue7118(t *testin
 			},
 		}
 
-		_, errExec := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+		_, errExec := executor.Execute(context.Background(), auth, coreexecutor.Request{
 			Model:   "gpt-6.1-sol",
 			Payload: []byte(mixedPayload),
-		}, cliproxyexecutor.Options{
-			SourceFormat:    sdktranslator.FormatOpenAIResponse,
+		}, coreexecutor.Options{
+			SourceFormat:    translatorreg.FormatOpenAIResponse,
 			OriginalRequest: []byte(mixedPayload),
 		})
 		if errExec != nil {
@@ -551,11 +551,11 @@ func TestCodexExecutorExpandsRecognizedCPACompactionCapsules_Issue7118(t *testin
 		}
 		assertExpandedAndNativePreserved(t, gotResponsesBody)
 
-		_, errCompact := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+		_, errCompact := executor.Execute(context.Background(), auth, coreexecutor.Request{
 			Model:   "gpt-6.1-sol",
 			Payload: []byte(mixedPayload),
-		}, cliproxyexecutor.Options{
-			SourceFormat:    sdktranslator.FormatOpenAIResponse,
+		}, coreexecutor.Options{
+			SourceFormat:    translatorreg.FormatOpenAIResponse,
 			OriginalRequest: []byte(mixedPayload),
 			Alt:             "responses/compact",
 		})
@@ -567,18 +567,18 @@ func TestCodexExecutorExpandsRecognizedCPACompactionCapsules_Issue7118(t *testin
 
 	t.Run("prepareCodexWebsocketStream and CountTokens expand CPA capsule", func(t *testing.T) {
 		wsExecutor := NewCodexWebsocketsExecutor(&config.Config{})
-		auth := &cliproxyauth.Auth{
+		auth := &coreauth.Auth{
 			Provider: "codex",
 			Attributes: map[string]string{
 				"base_url": "http://127.0.0.1:1",
 				"api_key":  "test",
 			},
 		}
-		prepared, errPrep := wsExecutor.prepareCodexWebsocketStream(context.Background(), auth, cliproxyexecutor.Request{
+		prepared, errPrep := wsExecutor.prepareCodexWebsocketStream(context.Background(), auth, coreexecutor.Request{
 			Model:   "gpt-6.1-sol",
 			Payload: []byte(mixedPayload),
-		}, cliproxyexecutor.Options{
-			SourceFormat:    sdktranslator.FormatOpenAIResponse,
+		}, coreexecutor.Options{
+			SourceFormat:    translatorreg.FormatOpenAIResponse,
 			OriginalRequest: []byte(mixedPayload),
 			Stream:          true,
 		})
@@ -589,20 +589,20 @@ func TestCodexExecutorExpandsRecognizedCPACompactionCapsules_Issue7118(t *testin
 
 		executor := NewCodexExecutor(&config.Config{})
 		withoutCapsulePayload := `{"model":"gpt-6.1-sol","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"continue on GPT"}]}]}`
-		baseCountResp, errBaseCount := executor.CountTokens(context.Background(), auth, cliproxyexecutor.Request{
+		baseCountResp, errBaseCount := executor.CountTokens(context.Background(), auth, coreexecutor.Request{
 			Model:   "gpt-6.1-sol",
 			Payload: []byte(withoutCapsulePayload),
-		}, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FormatOpenAIResponse,
+		}, coreexecutor.Options{
+			SourceFormat: translatorreg.FormatOpenAIResponse,
 		})
 		if errBaseCount != nil {
 			t.Fatalf("CountTokens(base) error = %v", errBaseCount)
 		}
-		expandedCountResp, errExpandedCount := executor.CountTokens(context.Background(), auth, cliproxyexecutor.Request{
+		expandedCountResp, errExpandedCount := executor.CountTokens(context.Background(), auth, coreexecutor.Request{
 			Model:   "gpt-6.1-sol",
 			Payload: []byte(mixedPayload),
-		}, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FormatOpenAIResponse,
+		}, coreexecutor.Options{
+			SourceFormat: translatorreg.FormatOpenAIResponse,
 		})
 		if errExpandedCount != nil {
 			t.Fatalf("CountTokens(expanded) error = %v", errExpandedCount)
@@ -622,7 +622,7 @@ func TestCodexExecutorExpandsRecognizedCPACompactionCapsules_Issue7118(t *testin
 
 		executor := NewCodexExecutor(&config.Config{})
 		wsExecutor := NewCodexWebsocketsExecutor(&config.Config{})
-		auth := &cliproxyauth.Auth{
+		auth := &coreauth.Auth{
 			Provider: "codex",
 			Attributes: map[string]string{
 				"base_url": server.URL,
@@ -647,8 +647,8 @@ func TestCodexExecutorExpandsRecognizedCPACompactionCapsules_Issue7118(t *testin
 		}
 
 		for _, badPayload := range corruptedPayloads {
-			req := cliproxyexecutor.Request{Model: "gpt-6.1-sol", Payload: []byte(badPayload)}
-			opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse, OriginalRequest: []byte(badPayload)}
+			req := coreexecutor.Request{Model: "gpt-6.1-sol", Payload: []byte(badPayload)}
+			opts := coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse, OriginalRequest: []byte(badPayload)}
 
 			_, errExec := executor.Execute(context.Background(), auth, req, opts)
 			assertBadRequest(t, "Execute()", errExec)
@@ -728,7 +728,7 @@ func TestCodexExecutorExpandsRecognizedCPACompactionCapsules_Issue7118(t *testin
 		}
 		wsExec := NewCodexWebsocketsExecutor(cfg)
 		wsExec.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
-		auth := &cliproxyauth.Auth{
+		auth := &coreauth.Auth{
 			ID:       "ws-compact-auth",
 			Provider: "codex",
 			Attributes: map[string]string{
@@ -740,17 +740,17 @@ func TestCodexExecutorExpandsRecognizedCPACompactionCapsules_Issue7118(t *testin
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		inputCh := make(chan cliproxyexecutor.WebsocketInput, 4)
-		ctx = cliproxyexecutor.WithWebsocketInput(cliproxyexecutor.WithDownstreamWebsocket(ctx), inputCh)
+		inputCh := make(chan coreexecutor.WebsocketInput, 4)
+		ctx = coreexecutor.WithWebsocketInput(coreexecutor.WithDownstreamWebsocket(ctx), inputCh)
 
-		streamRes, errStream := wsExec.ExecuteStream(ctx, auth, cliproxyexecutor.Request{
+		streamRes, errStream := wsExec.ExecuteStream(ctx, auth, coreexecutor.Request{
 			Model:   "gpt-6.1-sol",
 			Payload: []byte(mixedPayload),
-		}, cliproxyexecutor.Options{
-			SourceFormat:    sdktranslator.FormatOpenAIResponse,
+		}, coreexecutor.Options{
+			SourceFormat:    translatorreg.FormatOpenAIResponse,
 			OriginalRequest: []byte(mixedPayload),
 			Stream:          true,
-			Metadata:        map[string]any{cliproxyexecutor.ExecutionSessionMetadataKey: "duplex-compact-session"},
+			Metadata:        map[string]any{coreexecutor.ExecutionSessionMetadataKey: "duplex-compact-session"},
 		})
 		if errStream != nil {
 			t.Fatalf("wsExec.ExecuteStream() error = %v", errStream)
@@ -774,9 +774,9 @@ func TestCodexExecutorExpandsRecognizedCPACompactionCapsules_Issue7118(t *testin
 			evType := ojson.GetBytes(chunk.Payload, "type").String()
 			switch evType {
 			case "response.created":
-				inputCh <- cliproxyexecutor.WebsocketInput{Payload: []byte(steerPayload)}
+				inputCh <- coreexecutor.WebsocketInput{Payload: []byte(steerPayload)}
 			case "response.completed":
-				inputCh <- cliproxyexecutor.WebsocketInput{Payload: []byte(badSteerPayload)}
+				inputCh <- coreexecutor.WebsocketInput{Payload: []byte(badSteerPayload)}
 			}
 		}
 		if !sawStreamErr {

@@ -2,14 +2,13 @@ package api
 
 import (
 	"encoding/json"
+	management "github.com/udit19199/relay/internal/api/handlers/management"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-
-	management "github.com/router-for-me/CLIProxyAPI/v8/internal/api/handlers/management"
 )
 
 func TestDevinOAuthRoutes(t *testing.T) {

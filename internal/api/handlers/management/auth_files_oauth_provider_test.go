@@ -8,8 +8,8 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gin-gonic/gin"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 func TestAuthFilesList_ReportsOAuthProvider(t *testing.T) {
@@ -152,26 +152,5 @@ func assertOAuthProviderTestFile(t *testing.T, files map[string]ojson.Result, id
 	}
 	if file.Get("type").String() != provider || file.Get("provider").String() != provider {
 		t.Errorf("%s: credential provider changed: %s", id, file.Raw)
-	}
-}
-
-func assertOAuthProviderTestAuth(t *testing.T, auth *coreauth.Auth, want string) {
-	t.Helper()
-	if auth == nil {
-		t.Fatal("missing auth")
-	}
-	if want == "" {
-		for _, key := range []string{"oauth_provider", "portal"} {
-			if value, exists := auth.Metadata[key]; exists {
-				t.Errorf("single-entry metadata must omit %s, got %#v", key, value)
-			}
-			if value, exists := auth.Attributes[key]; exists {
-				t.Errorf("single-entry attributes must omit %s, got %q", key, value)
-			}
-		}
-		return
-	}
-	if auth.Metadata["oauth_provider"] != want || auth.Attributes["oauth_provider"] != want {
-		t.Errorf("oauth_provider metadata=%#v attributes=%q, want %q", auth.Metadata["oauth_provider"], auth.Attributes["oauth_provider"], want)
 	}
 }

@@ -5,8 +5,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 func TestDetectClaudeCodeRequestAcceptsUserAgentFields(t *testing.T) {
@@ -142,7 +142,7 @@ func TestClaudeDeviceProfileUserAgentFieldsStayRequestScoped(t *testing.T) {
 			t.Cleanup(ResetClaudeDeviceProfileCache)
 			client := newFakeClaudeDeviceProfileKVClient()
 			useFakeClaudeDeviceProfileKVClient(t, client, kvMode, nil)
-			auth := &cliproxyauth.Auth{ID: "request-fields-" + name}
+			auth := &coreauth.Auth{ID: "request-fields-" + name}
 			baseUA := "claude-cli/2.1.321 (external, cli, agent-sdk/0.2.133)"
 			cronUA := "claude-cli/2.1.321 (external, cli, workload/cron, agent-sdk/0.2.133, future-feature/value)"
 			for _, testCase := range []struct{ userAgent, want string }{

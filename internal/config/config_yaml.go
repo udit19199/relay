@@ -375,7 +375,7 @@ func appendPath(path []string, key string) []string {
 // max-idle-conns-per-host: 0 all persist when the operator wrote them by hand or
 // through the v8 management API, which writes the YAML tree directly. The
 // remaining gap is a block that only exists in an in-memory Config, for example one
-// an SDK embedder adds through sdk/config.SaveConfigPreserveComments to a file that
+// code adds through SaveConfigPreserveComments to a file that
 // never carried it: pruning drops those zero-valued sub-keys. No management
 // endpoint mutates ProxyConnectionPool, so that path is reachable only from code.
 func isKnownDefaultValue(path []string, node *yaml.Node) bool {
@@ -421,8 +421,6 @@ func isKnownDefaultValue(path []string, node *yaml.Node) bool {
 		switch fullPath {
 		case "pprof.addr":
 			return node.Value == DefaultPprofAddr
-		case "remote-management.panel-github-repository":
-			return node.Value == DefaultPanelGitHubRepository
 		case "routing.strategy":
 			return node.Value == "round-robin"
 		}

@@ -3,7 +3,7 @@ package helps
 import (
 	"strings"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/thinking"
+	"github.com/udit19199/relay/internal/thinking"
 )
 
 // claudeToolSearchLegacyPrefixes and claudeToolSearchLegacyModels list the

@@ -8,7 +8,7 @@ import (
 	"math"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
+	"github.com/udit19199/relay/internal/util"
 	"google.golang.org/protobuf/encoding/protowire"
 )
 

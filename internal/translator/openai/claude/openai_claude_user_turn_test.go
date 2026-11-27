@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	translatorcommon "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/common"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	translatorcommon "github.com/udit19199/relay/internal/translator/common"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 const userTurnUpload = `{"type":"container_upload","file_id":"file-1"}`
@@ -89,16 +89,16 @@ func TestConvertClaudeRequestToOpenAI_ToolResultKeepsTurnBesideUnsendableFile(t 
 
 // claudeImageTurnToOpenAI translates a conversation of two history turns followed by a final user
 // turn holding the given content parts.
-func claudeImageTurnToOpenAI(finalContent string) sdktranslator.RequestEnvelope {
+func claudeImageTurnToOpenAI(finalContent string) translatorreg.RequestEnvelope {
 	input := `{"model":"m","messages":[{"role":"user","content":"a"},{"role":"assistant","content":"b"},{"role":"user","content":[` + finalContent + `]}]}`
-	return sdktranslator.TranslateRequestEnvelope(context.Background(), sdktranslator.FormatClaude, sdktranslator.FormatOpenAI, sdktranslator.RequestEnvelope{
-		Format: sdktranslator.FormatClaude,
+	return translatorreg.TranslateRequestEnvelope(context.Background(), translatorreg.FormatClaude, translatorreg.FormatOpenAI, translatorreg.RequestEnvelope{
+		Format: translatorreg.FormatClaude,
 		Model:  "m",
 		Body:   []byte(input),
 	})
 }
 
-func requireImageRefusal(t *testing.T, envelope sdktranslator.RequestEnvelope) {
+func requireImageRefusal(t *testing.T, envelope translatorreg.RequestEnvelope) {
 	t.Helper()
 	var unsupported *translatorcommon.UnsupportedPartError
 	if !errors.As(envelope.Err, &unsupported) || unsupported.Type != "image" || unsupported.StatusCode() != 400 {

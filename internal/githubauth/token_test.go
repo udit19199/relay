@@ -1,6 +1,8 @@
 package githubauth
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestGlobalToken(t *testing.T) {
 	t.Cleanup(func() { SetToken("") })

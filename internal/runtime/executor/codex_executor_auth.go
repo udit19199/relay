@@ -11,17 +11,17 @@ import (
 	"strings"
 	"time"
 
-	codexauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/codex"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	sdkauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/auth"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
 	log "github.com/sirupsen/logrus"
+	codexauth "github.com/udit19199/relay/internal/auth/codex"
+	authlogin "github.com/udit19199/relay/internal/auth/login"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 const defaultOpenAISIWCBaseURL = "https://api.openai.com/v1"
 
-func codexUseSIWC(auth *cliproxyauth.Auth) bool {
+func codexUseSIWC(auth *coreauth.Auth) bool {
 	if auth == nil {
 		return false
 	}
@@ -46,19 +46,15 @@ func codexUseSIWC(auth *cliproxyauth.Auth) bool {
 	return enabled
 }
 
-func codexUseSIWCForRequest(ctx context.Context, auth *cliproxyauth.Auth, clientHeaders ...http.Header) bool {
-	return cliproxyauth.IsCodexUseSIWCForRequest(ctx, auth, clientHeaders...)
+func codexUseSIWCForRequest(ctx context.Context, auth *coreauth.Auth, clientHeaders ...http.Header) bool {
+	return coreauth.IsCodexUseSIWCForRequest(ctx, auth, clientHeaders...)
 }
 
-func ensureCodexSIWCCredentials(auth *cliproxyauth.Auth, apiKey string) error {
-	return ensureCodexSIWCCredentialsForRequest(context.Background(), auth, apiKey)
-}
-
-func ensureCodexSIWCCredentialsForRequest(ctx context.Context, auth *cliproxyauth.Auth, apiKey string, clientHeaders ...http.Header) error {
+func ensureCodexSIWCCredentialsForRequest(ctx context.Context, auth *coreauth.Auth, apiKey string, clientHeaders ...http.Header) error {
 	if !codexUseSIWC(auth) {
 		return nil
 	}
-	if cliproxyauth.IsCodexClientRequest(ctx, clientHeaders...) {
+	if coreauth.IsCodexClientRequest(ctx, clientHeaders...) {
 		if strings.TrimSpace(apiKey) == "" {
 			return statusErr{code: 401, msg: "codex executor: original OAuth access_token is required for Codex client requests"}
 		}
@@ -70,7 +66,7 @@ func ensureCodexSIWCCredentialsForRequest(ctx context.Context, auth *cliproxyaut
 	return nil
 }
 
-func codexSIWCAccessToken(auth *cliproxyauth.Auth) string {
+func codexSIWCAccessToken(auth *coreauth.Auth) string {
 	if auth == nil || auth.Metadata == nil {
 		return ""
 	}
@@ -108,16 +104,16 @@ func cloneSIWCMap(src map[string]any) map[string]any {
 	return dst
 }
 
-func resolveCodexAuthDiskPath(cfg *config.Config, auth *cliproxyauth.Auth) (string, error) {
+func resolveCodexAuthDiskPath(cfg *config.Config, auth *coreauth.Auth) (string, error) {
 	if auth == nil {
 		return "", nil
 	}
 	var candidates []string
 	if len(auth.Attributes) > 0 {
-		if p := strings.TrimSpace(auth.Attributes[cliproxyauth.AttributePath]); p != "" {
+		if p := strings.TrimSpace(auth.Attributes[coreauth.AttributePath]); p != "" {
 			candidates = append(candidates, p)
 		}
-		if s := strings.TrimSpace(auth.Attributes[cliproxyauth.AttributeSource]); s != "" && !strings.Contains(s, ":") {
+		if s := strings.TrimSpace(auth.Attributes[coreauth.AttributeSource]); s != "" && !strings.Contains(s, ":") {
 			candidates = append(candidates, s)
 		}
 	}
@@ -150,7 +146,7 @@ func resolveCodexAuthDiskPath(cfg *config.Config, auth *cliproxyauth.Auth) (stri
 	return "", nil
 }
 
-func (e *CodexExecutor) Refresh(ctx context.Context, auth *cliproxyauth.Auth) (*cliproxyauth.Auth, error) {
+func (e *CodexExecutor) Refresh(ctx context.Context, auth *coreauth.Auth) (*coreauth.Auth, error) {
 	log.Debugf("codex executor: refresh called")
 	var cfg *config.Config
 	if e != nil {
@@ -165,7 +161,7 @@ func (e *CodexExecutor) Refresh(ctx context.Context, auth *cliproxyauth.Auth) (*
 		return nil, errPath
 	}
 	if diskPath != "" {
-		var outAuth *cliproxyauth.Auth
+		var outAuth *coreauth.Auth
 		errLock := codexauth.WithFileLock(diskPath, func() error {
 			var errInner error
 			outAuth, errInner = e.refreshLocked(ctx, auth, diskPath)
@@ -176,7 +172,7 @@ func (e *CodexExecutor) Refresh(ctx context.Context, auth *cliproxyauth.Auth) (*
 	return e.refreshLocked(ctx, auth, "")
 }
 
-func (e *CodexExecutor) refreshLocked(ctx context.Context, auth *cliproxyauth.Auth, diskPath string) (*cliproxyauth.Auth, error) {
+func (e *CodexExecutor) refreshLocked(ctx context.Context, auth *coreauth.Auth, diskPath string) (*coreauth.Auth, error) {
 	var cfg *config.Config
 	if e != nil {
 		cfg = e.cfg
@@ -188,8 +184,8 @@ func (e *CodexExecutor) refreshLocked(ctx context.Context, auth *cliproxyauth.Au
 	}
 
 	now := time.Now()
-	_, _, initNeedOuter := cliproxyauth.CodexOuterNeedsRefresh(auth, now)
-	_, _, initNeedSIWC := cliproxyauth.CodexSIWCNeedsRefresh(auth, now)
+	_, _, initNeedOuter := coreauth.CodexOuterNeedsRefresh(auth, now)
+	_, _, initNeedSIWC := coreauth.CodexSIWCNeedsRefresh(auth, now)
 	explicitUnscheduled := !initNeedOuter && !initNeedSIWC
 
 	diskRotatedOuter := false
@@ -265,18 +261,18 @@ func (e *CodexExecutor) refreshLocked(ctx context.Context, auth *cliproxyauth.Au
 		}
 	}
 
-	_, hasOuter, needOuter := cliproxyauth.CodexOuterNeedsRefresh(auth, now)
+	_, hasOuter, needOuter := coreauth.CodexOuterNeedsRefresh(auth, now)
 	if outerRefreshToken == "" {
 		hasOuter = false
 		needOuter = false
 	}
-	_, hasSIWC, needSIWC := cliproxyauth.CodexSIWCNeedsRefresh(auth, now)
+	_, hasSIWC, needSIWC := coreauth.CodexSIWCNeedsRefresh(auth, now)
 	if siwcRefreshToken == "" || siwcClientID == "" {
 		hasSIWC = false
 		needSIWC = false
 	}
 
-	if cliproxyauth.IsForceRefreshContext(ctx) {
+	if coreauth.IsForceRefreshContext(ctx) {
 		needOuter = hasOuter
 		needSIWC = hasSIWC
 	} else if explicitUnscheduled {
@@ -331,8 +327,8 @@ func (e *CodexExecutor) refreshLocked(ctx context.Context, auth *cliproxyauth.Au
 	if diskPath != "" && (cfg == nil || cfg.AuthDir == "") {
 		svc.SetRefreshJournal(&codexauth.FileRefreshJournal{Dir: filepath.Dir(diskPath)})
 	}
-	store := sdkauth.GetTokenStore()
-	if _, isFileStore := store.(*sdkauth.FileTokenStore); !isFileStore {
+	store := authlogin.GetTokenStore()
+	if _, isFileStore := store.(*authlogin.FileTokenStore); !isFileStore {
 		if journal, okJournal := store.(codexauth.RefreshJournal); okJournal {
 			svc.SetRefreshJournal(journal)
 		}
@@ -471,11 +467,11 @@ func (e *CodexExecutor) refreshLocked(ctx context.Context, auth *cliproxyauth.Au
 	return auth, nil
 }
 
-func codexCreds(a *cliproxyauth.Auth) (apiKey, baseURL string) {
+func codexCreds(a *coreauth.Auth) (apiKey, baseURL string) {
 	return codexCredsForRequest(context.Background(), a)
 }
 
-func codexCredsForRequest(ctx context.Context, a *cliproxyauth.Auth, clientHeaders ...http.Header) (apiKey, baseURL string) {
+func codexCredsForRequest(ctx context.Context, a *coreauth.Auth, clientHeaders ...http.Header) (apiKey, baseURL string) {
 	if a == nil {
 		return "", ""
 	}
@@ -500,14 +496,14 @@ func codexCredsForRequest(ctx context.Context, a *cliproxyauth.Auth, clientHeade
 	return
 }
 
-func (e *CodexExecutor) resolveCodexConfig(auth *cliproxyauth.Auth) *config.CodexKey {
+func (e *CodexExecutor) resolveCodexConfig(auth *coreauth.Auth) *config.CodexKey {
 	if e == nil {
 		return nil
 	}
 	return resolveCodexKeyConfig(e.cfg, auth)
 }
 
-func resolveCodexKeyConfig(cfg *config.Config, auth *cliproxyauth.Auth) *config.CodexKey {
+func resolveCodexKeyConfig(cfg *config.Config, auth *coreauth.Auth) *config.CodexKey {
 	if auth == nil || cfg == nil {
 		return nil
 	}
@@ -515,7 +511,7 @@ func resolveCodexKeyConfig(cfg *config.Config, auth *cliproxyauth.Auth) *config.
 	if auth.Attributes != nil {
 		attrKey = strings.TrimSpace(auth.Attributes["api_key"])
 		attrBase = strings.TrimSpace(auth.Attributes["base_url"])
-		if index, errIndex := strconv.Atoi(strings.TrimSpace(auth.Attributes[cliproxyauth.AttributeConfigIndex])); errIndex == nil && index >= 0 && index < len(cfg.CodexKey) {
+		if index, errIndex := strconv.Atoi(strings.TrimSpace(auth.Attributes[coreauth.AttributeConfigIndex])); errIndex == nil && index >= 0 && index < len(cfg.CodexKey) {
 			entry := &cfg.CodexKey[index]
 			cfgKey := strings.TrimSpace(entry.APIKey)
 			cfgBase := strings.TrimSpace(entry.BaseURL)
@@ -554,8 +550,8 @@ func resolveCodexKeyConfig(cfg *config.Config, auth *cliproxyauth.Auth) *config.
 	return nil
 }
 
-func (e *CodexExecutor) resolveCodexModelIsCompat(auth *cliproxyauth.Auth, req cliproxyexecutor.Request, baseModel string) bool {
-	if modelInfo, ok := cliproxyauth.ResolvedModelInfo(req); ok && modelInfo != nil {
+func (e *CodexExecutor) resolveCodexModelIsCompat(auth *coreauth.Auth, req coreexecutor.Request, baseModel string) bool {
+	if modelInfo, ok := coreauth.ResolvedModelInfo(req); ok && modelInfo != nil {
 		return modelInfo.IsCompat
 	}
 	entry := e.resolveCodexConfig(auth)
@@ -572,7 +568,7 @@ func (e *CodexExecutor) resolveCodexModelIsCompat(auth *cliproxyauth.Auth, req c
 		}
 		return false
 	}
-	if cliproxyauth.CodexAPIKeyModelIsCompat(e.cfg, auth, baseModel) || cliproxyauth.CodexAPIKeyModelIsCompat(e.cfg, auth, req.Model) {
+	if coreauth.CodexAPIKeyModelIsCompat(e.cfg, auth, baseModel) || coreauth.CodexAPIKeyModelIsCompat(e.cfg, auth, req.Model) {
 		return true
 	}
 	return false

@@ -8,9 +8,9 @@ import (
 	"sync/atomic"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 // PayloadFinalizer applies user rules to a fully prepared business payload.
@@ -48,18 +48,18 @@ func (f PayloadFinalizer) FinalizeDoc(doc *ojson.Doc) {
 }
 
 // NewPayloadFinalizer snapshots matching context before built-in request mutations.
-func NewPayloadFinalizer(cfg *config.Config, executor, model, protocol, root string, original []byte, req cliproxyexecutor.Request, opts cliproxyexecutor.Options, auths ...*cliproxyauth.Auth) PayloadFinalizer {
+func NewPayloadFinalizer(cfg *config.Config, executor, model, protocol, root string, original []byte, req coreexecutor.Request, opts coreexecutor.Options, auths ...*coreauth.Auth) PayloadFinalizer {
 	requestedModel := PayloadRequestedModel(opts, req.Model)
 	requestPath := PayloadRequestPath(opts)
 	headers := opts.Headers.Clone()
 	source := append([]byte(nil), original...)
-	var auth *cliproxyauth.Auth
+	var auth *coreauth.Auth
 	if len(auths) > 0 {
 		auth = auths[0]
 	}
 	var formatCallback func(string)
 	if opts.Metadata != nil {
-		formatCallback, _ = opts.Metadata[cliproxyexecutor.FinalizedResponseFormatCallbackMetadataKey].(func(string))
+		formatCallback, _ = opts.Metadata[coreexecutor.FinalizedResponseFormatCallbackMetadataKey].(func(string))
 	}
 	fn := PayloadFinalizer(func(body []byte) []byte {
 		if len(body) == 0 && cap(body) == 1 {

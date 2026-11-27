@@ -1,10 +1,9 @@
 package helps
 
 import (
+	"github.com/udit19199/relay/internal/config"
 	"net/http"
 	"testing"
-
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
 )
 
 // This test changes the process-wide generation and must not run in parallel.

@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/MoeForge/moego/ojson"
-	translatorcommon "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/common"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
+	translatorcommon "github.com/udit19199/relay/internal/translator/common"
+	"github.com/udit19199/relay/internal/util"
 )
 
 // Claude reports server-side web search as a pair of assistant content blocks: a
@@ -92,13 +92,6 @@ func claudeWebSearchResultsToResponses(content ojson.Result) []byte {
 	return translatorcommon.JoinRawArray(results)
 }
 
-// buildResponsesWebSearchCallItem renders the Responses item that stands for one
-// Claude server-side search. results may be nil when the upstream turn ended
-// before the result block arrived.
-func buildResponsesWebSearchCallItem(claudeToolUseID, query string, results []byte) []byte {
-	return buildResponsesWebSearchCallItemWithStatus(claudeToolUseID, query, "completed", results)
-}
-
 func buildResponsesWebSearchCallItemWithStatus(claudeToolUseID, query, status string, results []byte) []byte {
 	if status == "" {
 		status = "completed"
@@ -141,20 +134,6 @@ func lookupWebSearchResultFor(ctx context.Context, toolUseID string) []byte {
 		return nil
 	}
 	return content
-}
-
-// convertResponsesWebSearchCallToClaudeBlocks is the inverse of
-// buildResponsesWebSearchCallItem: it rebuilds the Claude block pair so a
-// replayed turn still shows that the search happened and what it returned.
-func convertResponsesWebSearchCallToClaudeBlocks(item ojson.Result) [][]byte {
-	return convertResponsesWebSearchCallToClaudeBlocksWithQuery(item, "", true)
-}
-
-// convertResponsesWebSearchCallToClaudeBlocksWithQuery rebuilds the server_tool_use
-// block, using fallbackQuery when the item carries none, and the result block
-// only when withResult is set.
-func convertResponsesWebSearchCallToClaudeBlocksWithQuery(item ojson.Result, fallbackQuery string, withResult bool) [][]byte {
-	return convertResponsesWebSearchCallToClaudeBlocksWithContext(context.Background(), item, fallbackQuery, withResult)
 }
 
 func convertResponsesWebSearchCallToClaudeBlocksWithContext(ctx context.Context, item ojson.Result, fallbackQuery string, withResult bool) [][]byte {
@@ -263,10 +242,6 @@ func scanResponsesWebSearchHistory(items []ojson.Result) responsesWebSearchHisto
 		}
 	}
 	return history
-}
-
-func (h responsesWebSearchHistory) claudeBlocks(index int, item ojson.Result) [][]byte {
-	return h.claudeBlocksWithContext(context.Background(), index, item)
 }
 
 func (h responsesWebSearchHistory) claudeBlocksWithContext(ctx context.Context, index int, item ojson.Result) [][]byte {

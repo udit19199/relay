@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	applypatch "github.com/router-for-me/CLIProxyAPI/v8/internal/client/codex/apply-patch"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
+	applypatch "github.com/udit19199/relay/internal/client/codex/apply-patch"
+	"github.com/udit19199/relay/internal/util"
 )
 
 var patchResponsesRequest = []byte(`{"tools":[{"type":"custom","name":"apply_patch"}]}`)

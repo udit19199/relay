@@ -4,9 +4,9 @@ import (
 	"strings"
 
 	"github.com/MoeForge/moego/ojson"
-	applypatch "github.com/router-for-me/CLIProxyAPI/v8/internal/client/codex/apply-patch"
-	translatorcommon "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/common"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
+	applypatch "github.com/udit19199/relay/internal/client/codex/apply-patch"
+	translatorcommon "github.com/udit19199/relay/internal/translator/common"
+	"github.com/udit19199/relay/internal/util"
 )
 
 func ConvertOpenAIResponsesRequestToInteractions(modelName string, inputRawJSON []byte, stream bool) ([]byte, error) {
@@ -951,11 +951,6 @@ func copyOptionalRawDoc(outDoc *ojson.Doc, path string, value ojson.Result) {
 	if value.Exists() {
 		_ = outDoc.SetRaw(path, value.Raw)
 	}
-}
-
-func isDevinModel(model string) bool {
-	clean := strings.ToLower(strings.TrimSpace(model))
-	return strings.HasPrefix(clean, "devin/") || clean == "devin" || strings.Contains(clean, "devin")
 }
 
 func firstExisting(values ...ojson.Result) ojson.Result {

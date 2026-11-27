@@ -1,21 +1,21 @@
 package api
 
 import (
+	"io"
+	"sync/atomic"
+	"testing"
+
 	"bytes"
 	"context"
-	"io"
+	"github.com/klauspost/compress/zstd"
+	"github.com/udit19199/relay/internal/access"
+	proxyconfig "github.com/udit19199/relay/internal/config"
 	"math"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
-	"sync/atomic"
-	"testing"
-
-	"github.com/klauspost/compress/zstd"
-	proxyconfig "github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	sdkaccess "github.com/router-for-me/CLIProxyAPI/v8/sdk/access"
 )
 
 type countingBodyReader struct {
@@ -39,16 +39,16 @@ func (p *bodyReadingAccessProvider) Identifier() string {
 	return "test:body-auth"
 }
 
-func (p *bodyReadingAccessProvider) Authenticate(_ context.Context, r *http.Request) (*sdkaccess.Result, *sdkaccess.AuthError) {
+func (p *bodyReadingAccessProvider) Authenticate(_ context.Context, r *http.Request) (*access.Result, *access.AuthError) {
 	if r == nil || r.Body == nil {
-		return nil, sdkaccess.NewNotHandledError()
+		return nil, access.NewNotHandledError()
 	}
 	body, errRead := io.ReadAll(r.Body)
 	p.readBytes.Store(int64(len(body)))
 	if errRead != nil {
-		return nil, sdkaccess.NewRequestEntityTooLargeError(errRead)
+		return nil, access.NewRequestEntityTooLargeError(errRead)
 	}
-	return nil, sdkaccess.NewNotHandledError()
+	return nil, access.NewNotHandledError()
 }
 
 func parseTestServerConfigYAML(t *testing.T, raw string) *proxyconfig.Config {

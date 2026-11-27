@@ -93,19 +93,6 @@ func (m *SensitiveWordMatcher) ObfuscateText(text string) string {
 	return m.obfuscateText(text)
 }
 
-// ObfuscateSensitiveWords processes the payload and obfuscates sensitive words
-// in system blocks and message content.
-func ObfuscateSensitiveWords(payload []byte, matcher *SensitiveWordMatcher) []byte {
-	if matcher == nil || matcher.regex == nil || len(payload) == 0 {
-		return payload
-	}
-	doc := ojson.NewDoc(payload)
-	if !ObfuscateSensitiveWordsDoc(doc, matcher) {
-		return payload
-	}
-	return doc.Bytes()
-}
-
 // ObfuscateSensitiveWordsDoc processes doc in place and obfuscates sensitive words
 // in system blocks and message content.
 func ObfuscateSensitiveWordsDoc(doc *ojson.Doc, matcher *SensitiveWordMatcher) bool {
@@ -116,61 +103,6 @@ func ObfuscateSensitiveWordsDoc(doc *ojson.Doc, matcher *SensitiveWordMatcher) b
 	if obfuscateMessagesDoc(doc, matcher) {
 		modified = true
 	}
-	return modified
-}
-
-// ObfuscateSensitiveWordsInSystemInstruction obfuscates sensitive words in a system instruction.
-func ObfuscateSensitiveWordsInSystemInstruction(payload []byte, matcher *SensitiveWordMatcher) []byte {
-	if matcher == nil || matcher.regex == nil || len(payload) == 0 {
-		return payload
-	}
-	doc := ojson.NewDoc(payload)
-	if !ObfuscateSensitiveWordsInSystemInstructionDoc(doc, matcher) {
-		return payload
-	}
-	return doc.Bytes()
-}
-
-// ObfuscateSensitiveWordsInSystemInstructionDoc obfuscates sensitive words in a system instruction in place on doc.
-func ObfuscateSensitiveWordsInSystemInstructionDoc(doc *ojson.Doc, matcher *SensitiveWordMatcher) bool {
-	if matcher == nil || matcher.regex == nil || doc == nil || doc.Len() == 0 {
-		return false
-	}
-
-	modified := false
-	for _, path := range []string{"request.systemInstruction", "request.system_instruction"} {
-		instruction := doc.Get(path)
-		if !instruction.Exists() {
-			continue
-		}
-		if instruction.Type == ojson.String {
-			text := instruction.String()
-			if obfuscated := matcher.obfuscateText(text); obfuscated != text {
-				if errSet := doc.Set(path, obfuscated); errSet == nil {
-					modified = true
-				}
-			}
-			continue
-		}
-
-		parts := instruction.Get("parts")
-		if !parts.IsArray() {
-			continue
-		}
-		parts.ForEach(func(key, part ojson.Result) bool {
-			if part.Get("text").Type != ojson.String {
-				return true
-			}
-			text := part.Get("text").String()
-			if obfuscated := matcher.obfuscateText(text); obfuscated != text {
-				if errSet := doc.Set(path+".parts."+key.String()+".text", obfuscated); errSet == nil {
-					modified = true
-				}
-			}
-			return true
-		})
-	}
-
 	return modified
 }
 

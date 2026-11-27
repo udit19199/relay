@@ -9,16 +9,16 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/registry"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestV8SharedUpstreamRequestSettingsAffectBothAuthKinds(t *testing.T) {
 	for _, provider := range []string{"codex", "xai"} {
-		for _, kind := range []string{cliproxyauth.AuthKindAPIKey, cliproxyauth.AuthKindOAuth} {
+		for _, kind := range []string{coreauth.AuthKindAPIKey, coreauth.AuthKindOAuth} {
 			for _, stream := range []bool{false, true} {
 				t.Run(fmt.Sprintf("%s/%s/stream=%t", provider, kind, stream), func(t *testing.T) {
 					captured := make(chan []byte, 1)
@@ -42,17 +42,17 @@ upstream:
 					if err != nil {
 						t.Fatal(err)
 					}
-					auth := &cliproxyauth.Auth{ID: t.Name(), Provider: provider, Status: cliproxyauth.StatusActive, ProxyURL: "direct", Attributes: map[string]string{"auth_kind": kind, "base_url": server.URL}}
-					if kind == cliproxyauth.AuthKindAPIKey {
+					auth := &coreauth.Auth{ID: t.Name(), Provider: provider, Status: coreauth.StatusActive, ProxyURL: "direct", Attributes: map[string]string{"auth_kind": kind, "base_url": server.URL}}
+					if kind == coreauth.AuthKindAPIKey {
 						auth.Attributes["api_key"] = "test-key"
 					} else {
 						auth.Metadata = map[string]any{"access_token": "test-token"}
 					}
-					var executor cliproxyauth.ProviderExecutor = NewCodexExecutor(cfg)
+					var executor coreauth.ProviderExecutor = NewCodexExecutor(cfg)
 					if provider == "xai" {
 						executor = NewXAIExecutor(cfg)
 					}
-					manager := cliproxyauth.NewManager(nil, nil, nil)
+					manager := coreauth.NewManager(nil, nil, nil)
 					manager.SetConfig(cfg)
 					manager.RegisterExecutor(executor)
 					if _, err = manager.Register(context.Background(), auth); err != nil {
@@ -60,11 +60,11 @@ upstream:
 					}
 					registry.GetGlobalRegistry().RegisterClient(auth.ID, provider, []*registry.ModelInfo{{ID: "gpt-5.4"}})
 					t.Cleanup(func() { registry.GetGlobalRegistry().UnregisterClient(auth.ID) })
-					req := cliproxyexecutor.Request{Model: "gpt-5.4", Payload: []byte(`{
+					req := coreexecutor.Request{Model: "gpt-5.4", Payload: []byte(`{
   "input":[{"type":"function_call_output","name":"create_thread","namespace":"codex_app","output":"<codex_delegation>task</codex_delegation>"}],
   "tools":[{"type":"namespace","name":"collaboration","tools":[{"type":"function","name":"spawn_agent","description":"Spawns an agent.","parameters":{"type":"object","properties":{"message":{"type":"string","encrypted":true}}}}]}]
 }`)}
-					opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse, Headers: http.Header{"User-Agent": {"codex_cli_rs/0.144.1"}, "X-Openai-Subagent": {"collab_spawn"}}}
+					opts := coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse, Headers: http.Header{"User-Agent": {"codex_cli_rs/0.144.1"}, "X-Openai-Subagent": {"collab_spawn"}}}
 					if stream {
 						_, err = manager.ExecuteStream(context.Background(), []string{provider}, req, opts)
 					} else {

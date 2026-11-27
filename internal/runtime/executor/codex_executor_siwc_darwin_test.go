@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	codexauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/codex"
+	codexauth "github.com/udit19199/relay/internal/auth/codex"
 )
 
 func TestMain(m *testing.M) {

@@ -12,11 +12,11 @@ import (
 	"testing"
 
 	"github.com/gorilla/websocket"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
 	log "github.com/sirupsen/logrus"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 // A reused upstream connection whose write fails is invalidated before any reader sees the
@@ -70,25 +70,25 @@ func TestCodexWebsocketWriteLossIsRecordedForNextContinuation(t *testing.T) {
 		t.Fatal(errClose)
 	}
 
-	auth := &cliproxyauth.Auth{ID: "auth-a", Provider: "codex", Attributes: map[string]string{"api_key": "k", "base_url": server.URL}}
-	opts := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatOpenAIResponse,
-		Metadata:     map[string]any{cliproxyexecutor.ExecutionSessionMetadataKey: sessionID},
+	auth := &coreauth.Auth{ID: "auth-a", Provider: "codex", Attributes: map[string]string{"api_key": "k", "base_url": server.URL}}
+	opts := coreexecutor.Options{
+		SourceFormat: translatorreg.FormatOpenAIResponse,
+		Metadata:     map[string]any{coreexecutor.ExecutionSessionMetadataKey: sessionID},
 	}
-	ctx := cliproxyexecutor.WithDownstreamWebsocket(context.Background())
-	_, errCreate := exec.ExecuteStream(ctx, auth, cliproxyexecutor.Request{
+	ctx := coreexecutor.WithDownstreamWebsocket(context.Background())
+	_, errCreate := exec.ExecuteStream(ctx, auth, coreexecutor.Request{
 		Model:   "gpt-5.4",
 		Payload: []byte(`{"model":"gpt-5.4","input":[{"type":"message","role":"user","content":"hi"}]}`),
 	}, opts)
-	if !cliproxyexecutor.IsUpstreamWebsocketTurnError(errCreate) {
+	if !coreexecutor.IsUpstreamWebsocketTurnError(errCreate) {
 		t.Fatalf("create error = %v, want upstream websocket turn error", errCreate)
 	}
 
-	_, errContinue := exec.ExecuteStream(cliproxyexecutor.WithRequiredUpstreamWebsocket(ctx), auth, cliproxyexecutor.Request{
+	_, errContinue := exec.ExecuteStream(coreexecutor.WithRequiredUpstreamWebsocket(ctx), auth, coreexecutor.Request{
 		Model:   "gpt-5.4",
 		Payload: []byte(`{"model":"gpt-5.4","previous_response_id":"r1","input":[{"type":"message","role":"user","content":"hi"}]}`),
 	}, opts)
-	var turnErr *cliproxyexecutor.UpstreamWebsocketTurnError
+	var turnErr *coreexecutor.UpstreamWebsocketTurnError
 	if !errors.As(errContinue, &turnErr) || !turnErr.FullContextRequired || turnErr.StatusCode() != http.StatusConflict {
 		t.Fatalf("continuation error = %v, want full context required with status 409", errContinue)
 	}
@@ -154,8 +154,8 @@ func TestCodexWebsocketInvalidatePublishesLossEpochBeforeReleasingConnLock(t *te
 
 	const sessionID = "epoch-under-lock-session"
 	var epoch atomic.Uint64
-	turn1Ctx := cliproxyexecutor.WithWebsocketInputEpoch(
-		cliproxyexecutor.WithDownstreamWebsocket(context.Background()),
+	turn1Ctx := coreexecutor.WithWebsocketInputEpoch(
+		coreexecutor.WithDownstreamWebsocket(context.Background()),
 		&epoch,
 		0,
 	)
@@ -188,17 +188,17 @@ func TestCodexWebsocketInvalidatePublishesLossEpochBeforeReleasingConnLock(t *te
 	}()
 
 	<-enteredLog
-	preLossCtx := cliproxyexecutor.WithWebsocketInputEpoch(
-		cliproxyexecutor.WithDownstreamWebsocket(context.Background()),
+	preLossCtx := coreexecutor.WithWebsocketInputEpoch(
+		coreexecutor.WithDownstreamWebsocket(context.Background()),
 		&epoch,
 		0,
 	)
-	auth := &cliproxyauth.Auth{ID: "auth-a", Provider: "codex", Attributes: map[string]string{"api_key": "k", "base_url": server.URL}}
+	auth := &coreauth.Auth{ID: "auth-a", Provider: "codex", Attributes: map[string]string{"api_key": "k", "base_url": server.URL}}
 	_, _, _, errEnsure := exec.ensureUpstreamConnWithSIWC(preLossCtx, auth, sess, "auth-a", wsURL, http.Header{}, false)
 	close(releaseLog)
 	<-invalidateDone
 
-	var turnErr *cliproxyexecutor.UpstreamWebsocketTurnError
+	var turnErr *coreexecutor.UpstreamWebsocketTurnError
 	if !errors.As(errEnsure, &turnErr) || !turnErr.NotSent {
 		t.Fatalf("ensureUpstreamConnWithSIWC error = %v, want NotSent turn error", errEnsure)
 	}

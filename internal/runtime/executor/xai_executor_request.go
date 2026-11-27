@@ -12,25 +12,25 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/google/uuid"
-	xaiauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/xai"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/signature"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/thinking"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
 	log "github.com/sirupsen/logrus"
+	xaiauth "github.com/udit19199/relay/internal/auth/xai"
+	"github.com/udit19199/relay/internal/misc"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	"github.com/udit19199/relay/internal/signature"
+	"github.com/udit19199/relay/internal/thinking"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
+	"github.com/udit19199/relay/internal/util"
 )
 
 type xaiPreparedRequest struct {
 	finalizePayload       helps.PayloadFinalizer
 	applyPatch            *helps.ApplyPatchResponsesState
 	baseModel             string
-	from                  sdktranslator.Format
-	responseFormat        sdktranslator.Format
-	to                    sdktranslator.Format
+	from                  translatorreg.Format
+	responseFormat        translatorreg.Format
+	to                    translatorreg.Format
 	originalPayload       []byte
 	body                  []byte
 	doc                   *ojson.Doc
@@ -72,22 +72,22 @@ type xaiClientToolKey struct {
 	toolType  string
 }
 
-func resolveXAISignatureTargetModel(baseModel string, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) string {
+func resolveXAISignatureTargetModel(baseModel string, req coreexecutor.Request, opts coreexecutor.Options) string {
 	if resolved := resolveResponsesSignatureTargetModel(baseModel, req, opts); signature.SignatureProviderFromModelName(resolved) == signature.SignatureProviderGrok {
 		return resolved
 	}
 	return "grok"
 }
 
-func (e *XAIExecutor) prepareResponsesRequest(ctx context.Context, req cliproxyexecutor.Request, opts cliproxyexecutor.Options, stream bool) (*xaiPreparedRequest, error) {
-	return e.prepareResponsesRequestTo(ctx, req, opts, stream, sdktranslator.FormatCodex)
+func (e *XAIExecutor) prepareResponsesRequest(ctx context.Context, req coreexecutor.Request, opts coreexecutor.Options, stream bool) (*xaiPreparedRequest, error) {
+	return e.prepareResponsesRequestTo(ctx, req, opts, stream, translatorreg.FormatCodex)
 }
 
-func (e *XAIExecutor) prepareResponsesRequestDoc(ctx context.Context, req cliproxyexecutor.Request, opts cliproxyexecutor.Options, stream bool) (*xaiPreparedRequest, error) {
-	return e.prepareResponsesRequestToDoc(ctx, req, opts, stream, sdktranslator.FormatCodex)
+func (e *XAIExecutor) prepareResponsesRequestDoc(ctx context.Context, req coreexecutor.Request, opts coreexecutor.Options, stream bool) (*xaiPreparedRequest, error) {
+	return e.prepareResponsesRequestToDoc(ctx, req, opts, stream, translatorreg.FormatCodex)
 }
 
-func (e *XAIExecutor) prepareResponsesRequestTo(ctx context.Context, req cliproxyexecutor.Request, opts cliproxyexecutor.Options, stream bool, to sdktranslator.Format) (*xaiPreparedRequest, error) {
+func (e *XAIExecutor) prepareResponsesRequestTo(ctx context.Context, req coreexecutor.Request, opts coreexecutor.Options, stream bool, to translatorreg.Format) (*xaiPreparedRequest, error) {
 	prepared, err := e.prepareResponsesRequestToDoc(ctx, req, opts, stream, to)
 	if err != nil {
 		return nil, err
@@ -98,10 +98,10 @@ func (e *XAIExecutor) prepareResponsesRequestTo(ctx context.Context, req cliprox
 	return prepared, nil
 }
 
-func (e *XAIExecutor) prepareResponsesRequestToDoc(ctx context.Context, req cliproxyexecutor.Request, opts cliproxyexecutor.Options, stream bool, to sdktranslator.Format) (*xaiPreparedRequest, error) {
+func (e *XAIExecutor) prepareResponsesRequestToDoc(ctx context.Context, req coreexecutor.Request, opts coreexecutor.Options, stream bool, to translatorreg.Format) (*xaiPreparedRequest, error) {
 	baseModel := thinking.ParseSuffix(req.Model).ModelName
 	from := opts.SourceFormat
-	responseFormat := cliproxyexecutor.ResponseFormatOrSource(opts)
+	responseFormat := coreexecutor.ResponseFormatOrSource(opts)
 	originalPayloadSource := req.Payload
 	if len(opts.OriginalRequest) > 0 {
 		originalPayloadSource = opts.OriginalRequest
@@ -218,7 +218,7 @@ func (e *XAIExecutor) prepareResponsesRequestToDoc(ctx context.Context, req clip
 	}, nil
 }
 
-func (e *XAIExecutor) recordXAIRequest(ctx context.Context, auth *cliproxyauth.Auth, url string, headers http.Header, body []byte) {
+func (e *XAIExecutor) recordXAIRequest(ctx context.Context, auth *coreauth.Auth, url string, headers http.Header, body []byte) {
 	var authID, authLabel, authType, authValue string
 	if auth != nil {
 		authID = auth.ID
@@ -238,7 +238,7 @@ func (e *XAIExecutor) recordXAIRequest(ctx context.Context, auth *cliproxyauth.A
 	})
 }
 
-func xaiCreds(auth *cliproxyauth.Auth) (token, baseURL string) {
+func xaiCreds(auth *coreauth.Auth) (token, baseURL string) {
 	if auth == nil {
 		return "", ""
 	}
@@ -259,7 +259,7 @@ func xaiCreds(auth *cliproxyauth.Auth) (token, baseURL string) {
 
 // xaiUsingAPI reports whether this xAI auth should use the official API path
 // for HTTP chat and media. OAuth defaults to false to use Grok Build.
-func xaiUsingAPI(auth *cliproxyauth.Auth) bool {
+func xaiUsingAPI(auth *coreauth.Auth) bool {
 	if auth == nil {
 		return true
 	}
@@ -300,7 +300,7 @@ func xaiUsingAPI(auth *cliproxyauth.Auth) bool {
 // Websocket, compact, and speech intentionally do not use this helper:
 // cli-chat-proxy does not implement /responses/compact (404), websocket
 // upgrades (405), or /tts. Speech uses xaiSpeechRequestURL.
-func xaiChatBaseURL(auth *cliproxyauth.Auth) string {
+func xaiChatBaseURL(auth *coreauth.Auth) string {
 	_, baseURL := xaiCreds(auth)
 	if xaiUsingAPI(auth) {
 		if baseURL == "" {
@@ -318,7 +318,7 @@ func xaiChatBaseURL(auth *cliproxyauth.Auth) string {
 // Compact must stay on the official API (or an explicit non-CLI-proxy base_url).
 // Reusing xaiChatBaseURL would pin OAuth traffic to cli-chat-proxy, which returns
 // 404 for /responses/compact and then cools down the auth pool as not_found.
-func xaiCompactBaseURL(auth *cliproxyauth.Auth) string {
+func xaiCompactBaseURL(auth *coreauth.Auth) string {
 	_, baseURL := xaiCreds(auth)
 	if baseURL == "" || xaiIsCLIChatProxyBaseURL(baseURL) {
 		return xaiauth.DefaultAPIBaseURL
@@ -366,7 +366,7 @@ func ensureXAIUserAgent(r *http.Request, clientHeaders ...http.Header) {
 	misc.EnsureHeader(r.Header, util.ResolveClientHeaders(r, clientHeaders...), "User-Agent", xaiDefaultUserAgent())
 }
 
-func applyXAIHeaders(r *http.Request, auth *cliproxyauth.Auth, token string, stream bool, sessionID string, clientHeaders ...http.Header) {
+func applyXAIHeaders(r *http.Request, auth *coreauth.Auth, token string, stream bool, sessionID string, clientHeaders ...http.Header) {
 	applyXAIDefaultHeaders(r, token, stream, sessionID)
 	ensureXAIUserAgent(r, clientHeaders...)
 	applyXAICustomHeaders(r, auth, clientHeaders...)
@@ -390,7 +390,7 @@ func applyXAIDefaultHeaders(r *http.Request, token string, stream bool, sessionI
 	}
 }
 
-func applyXAICustomHeaders(r *http.Request, auth *cliproxyauth.Auth, clientHeaders ...http.Header) {
+func applyXAICustomHeaders(r *http.Request, auth *coreauth.Auth, clientHeaders ...http.Header) {
 	var attrs map[string]string
 	if auth != nil {
 		attrs = auth.Attributes
@@ -404,7 +404,7 @@ func applyXAICustomHeaders(r *http.Request, auth *cliproxyauth.Auth, clientHeade
 // User-Agent or falling back to the Grok workspace User-Agent). CLI chat-proxy
 // identity headers are only attached when using_api is false and the resolved
 // chat base URL is the official CLI chat-proxy endpoint.
-func applyXAIChatHeaders(r *http.Request, auth *cliproxyauth.Auth, token string, stream bool, sessionID string, clientHeaders ...http.Header) {
+func applyXAIChatHeaders(r *http.Request, auth *coreauth.Auth, token string, stream bool, sessionID string, clientHeaders ...http.Header) {
 	if xaiUsingAPI(auth) || !xaiIsCLIChatProxyBaseURL(xaiChatBaseURL(auth)) {
 		applyXAIHeaders(r, auth, token, stream, sessionID, clientHeaders...)
 		return
@@ -419,7 +419,7 @@ func applyXAIChatHeaders(r *http.Request, auth *cliproxyauth.Auth, token string,
 	applyXAICustomHeaders(r, auth, clientHeaders...)
 }
 
-func xaiResolveComposerSessionID(ctx context.Context, req cliproxyexecutor.Request, opts cliproxyexecutor.Options, baseModel string) (string, error) {
+func xaiResolveComposerSessionID(ctx context.Context, req coreexecutor.Request, opts coreexecutor.Options, baseModel string) (string, error) {
 	if sessionID := xaiExecutionSessionID(req, opts); sessionID != "" {
 		return sessionID, nil
 	}
@@ -436,11 +436,11 @@ func xaiResolveComposerSessionID(ctx context.Context, req cliproxyexecutor.Reque
 	return uuid.NewString(), nil
 }
 
-func xaiExecutionSessionID(req cliproxyexecutor.Request, opts cliproxyexecutor.Options) string {
-	if value := xaiMetadataString(opts.Metadata, cliproxyexecutor.ExecutionSessionMetadataKey); value != "" {
+func xaiExecutionSessionID(req coreexecutor.Request, opts coreexecutor.Options) string {
+	if value := xaiMetadataString(opts.Metadata, coreexecutor.ExecutionSessionMetadataKey); value != "" {
 		return value
 	}
-	if value := xaiMetadataString(req.Metadata, cliproxyexecutor.ExecutionSessionMetadataKey); value != "" {
+	if value := xaiMetadataString(req.Metadata, coreexecutor.ExecutionSessionMetadataKey); value != "" {
 		return value
 	}
 	if promptCacheKey := ojson.GetBytesNoCopy(req.Payload, "prompt_cache_key"); promptCacheKey.Exists() {
@@ -455,12 +455,12 @@ func xaiRequiresIsolatedConversation(model string) bool {
 	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(model)), xaiComposerModelPrefix)
 }
 
-func xaiImageEndpointPath(opts cliproxyexecutor.Options) string {
+func xaiImageEndpointPath(opts coreexecutor.Options) string {
 	if opts.SourceFormat.String() != xaiImageHandlerType {
 		return ""
 	}
 
-	path := xaiMetadataString(opts.Metadata, cliproxyexecutor.RequestPathMetadataKey)
+	path := xaiMetadataString(opts.Metadata, coreexecutor.RequestPathMetadataKey)
 	if strings.HasSuffix(path, "/images/edits") {
 		return xaiImagesEditsPath
 	}
@@ -483,13 +483,6 @@ func xaiBytesMayContainImageRef(b []byte) bool {
 		bytes.Contains(b, []byte(`"images"`)) ||
 		bytes.Contains(b, []byte(`"reference_images"`)) ||
 		bytes.Contains(b, []byte(`\u`))
-}
-
-func xaiStringMayContainImageRef(s string) bool {
-	return strings.Contains(s, `"image"`) ||
-		strings.Contains(s, `"images"`) ||
-		strings.Contains(s, `"reference_images"`) ||
-		strings.Contains(s, `\u`)
 }
 
 const (
@@ -1129,25 +1122,25 @@ func normalizeXAIImageRefs(body []byte) []byte {
 	return doc.Bytes()
 }
 
-func xaiIsVideoRequest(opts cliproxyexecutor.Options) bool {
+func xaiIsVideoRequest(opts coreexecutor.Options) bool {
 	return opts.SourceFormat.String() == xaiVideoHandlerType
 }
 
-func xaiIsSpeechRequest(opts cliproxyexecutor.Options) bool {
+func xaiIsSpeechRequest(opts coreexecutor.Options) bool {
 	return opts.SourceFormat.String() == xaiSpeechHandlerType
 }
 
 // xaiSpeechRequestURL stays on the official API. cli-chat-proxy does not implement /tts,
 // and a 404 there would cool the OAuth auth down as not_found.
-func xaiSpeechRequestURL(auth *cliproxyauth.Auth) string {
+func xaiSpeechRequestURL(auth *coreauth.Auth) string {
 	return strings.TrimSuffix(xaiCompactBaseURL(auth), "/") + xaiTTSPath
 }
 
-func xaiVideoEndpointPath(opts cliproxyexecutor.Options) string {
+func xaiVideoEndpointPath(opts coreexecutor.Options) string {
 	if !xaiIsVideoRequest(opts) {
 		return ""
 	}
-	path := xaiMetadataString(opts.Metadata, cliproxyexecutor.RequestPathMetadataKey)
+	path := xaiMetadataString(opts.Metadata, coreexecutor.RequestPathMetadataKey)
 	if strings.HasSuffix(path, "/videos/edits") {
 		return xaiVideosEditsPath
 	}
@@ -1178,26 +1171,18 @@ func xaiMetadataString(meta map[string]any, key string) string {
 	}
 }
 
-func preserveXAIResponsesOutputControls(body, source []byte, from sdktranslator.Format) []byte {
-	doc := ojson.NewDoc(body)
-	if !preserveXAIResponsesOutputControlsDoc(doc, source, from) {
-		return body
-	}
-	return doc.Bytes()
-}
-
-func preserveXAIResponsesOutputControlsDoc(doc *ojson.Doc, source []byte, from sdktranslator.Format) bool {
+func preserveXAIResponsesOutputControlsDoc(doc *ojson.Doc, source []byte, from translatorreg.Format) bool {
 	if doc == nil {
 		return false
 	}
 	var maxOutputTokens ojson.Result
 	switch from {
-	case sdktranslator.FormatOpenAI:
+	case translatorreg.FormatOpenAI:
 		maxOutputTokens = ojson.GetBytesNoCopy(source, "max_completion_tokens")
 		if !maxOutputTokens.Exists() || maxOutputTokens.Type == ojson.Null {
 			maxOutputTokens = ojson.GetBytesNoCopy(source, "max_tokens")
 		}
-	case sdktranslator.FormatOpenAIResponse:
+	case translatorreg.FormatOpenAIResponse:
 		maxOutputTokens = ojson.GetBytesNoCopy(source, "max_output_tokens")
 	default:
 		return false
@@ -1345,16 +1330,6 @@ func ensureXAINativeXSearchToolDoc(doc *ojson.Doc) bool {
 	return changed
 }
 
-// ensureXAINativeXSearchAllowedTools appends x_search to tool_choice.tools when
-// the choice mode is allowed_tools and x_search is not already listed.
-func ensureXAINativeXSearchAllowedTools(body []byte) []byte {
-	doc := ojson.NewDoc(body)
-	if !ensureXAINativeXSearchAllowedToolsDoc(doc) {
-		return body
-	}
-	return doc.Bytes()
-}
-
 func ensureXAINativeXSearchAllowedToolsDoc(doc *ojson.Doc) bool {
 	if doc == nil {
 		return false
@@ -1373,15 +1348,6 @@ func ensureXAINativeXSearchAllowedToolsDoc(doc *ojson.Doc) bool {
 		}
 	}
 	return doc.SetRawBytes("tool_choice.tools.-1", xaiXSearchToolJSON) == nil
-}
-
-// xaiHasClientWebSearchFunction reports whether body declares a client function
-// or custom tool named "web_search" (without namespace), excluding folded namespace dispatchers.
-func xaiHasClientWebSearchFunction(body []byte, namespaceTools map[string]xaiNamespaceToolRef) bool {
-	if !ojson.ValidBytes(body) {
-		return false
-	}
-	return xaiHasClientWebSearchFunctionResult(ojson.GetBytesNoCopy(body, "tools"), namespaceTools)
 }
 
 func xaiHasClientWebSearchFunctionDoc(doc *ojson.Doc, namespaceTools map[string]xaiNamespaceToolRef) bool {
@@ -1406,11 +1372,6 @@ func xaiHasClientWebSearchFunctionResult(tools ojson.Result, namespaceTools map[
 		}
 	}
 	return false
-}
-
-// xaiBodyHasToolNamed reports whether any tool in tools or input has the given name.
-func xaiBodyHasToolNamed(body []byte, name string) bool {
-	return xaiToolsOrInputHaveToolNamed(ojson.GetBytesNoCopy(body, "tools"), ojson.GetBytesNoCopy(body, "input"), name)
 }
 
 func xaiBodyHasToolNamedDoc(doc *ojson.Doc, name string) bool {
@@ -1445,21 +1406,6 @@ func xaiToolsOrInputHaveToolNamed(tools, input ojson.Result, name string) bool {
 	return false
 }
 
-// xaiResolveClientWebSearchAlias picks a candidate alias that does not collide
-// with any client tool already present in the request.
-func xaiResolveClientWebSearchAlias(body []byte) string {
-	candidate := xaiClientWebSearchAlias
-	if !xaiBodyHasToolNamed(body, candidate) {
-		return candidate
-	}
-	for i := 1; ; i++ {
-		next := fmt.Sprintf("%s_%d", xaiClientWebSearchAlias, i)
-		if !xaiBodyHasToolNamed(body, next) {
-			return next
-		}
-	}
-}
-
 func xaiResolveClientWebSearchAliasDoc(doc *ojson.Doc) string {
 	candidate := xaiClientWebSearchAlias
 	if !xaiBodyHasToolNamedDoc(doc, candidate) {
@@ -1471,19 +1417,6 @@ func xaiResolveClientWebSearchAliasDoc(doc *ojson.Doc) string {
 			return next
 		}
 	}
-}
-
-// aliasXAIClientWebSearchInput renames client-declared function calls named
-// "web_search" to alias in replayed input history.
-func aliasXAIClientWebSearchInput(body []byte, alias string, namespaceTools map[string]xaiNamespaceToolRef) []byte {
-	if !ojson.ValidBytes(body) || alias == "" {
-		return body
-	}
-	doc := ojson.NewDoc(body)
-	if !aliasXAIClientWebSearchInputDoc(doc, alias, namespaceTools) {
-		return body
-	}
-	return doc.Bytes()
 }
 
 func aliasXAIClientWebSearchInputDoc(doc *ojson.Doc, alias string, namespaceTools map[string]xaiNamespaceToolRef) bool {
@@ -1510,21 +1443,6 @@ func aliasXAIClientWebSearchInputDoc(doc *ojson.Doc, alias string, namespaceTool
 		}
 	}
 	return changed
-}
-
-// aliasXAIClientWebSearchFunction renames client-declared function tools named
-// "web_search" to a non-colliding alias in tools declarations, tool_choice,
-// and replayed input history to prevent xAI from hijacking them into hosted
-// server-side search. Namespace dispatcher tools named "web_search" are untouched.
-func aliasXAIClientWebSearchFunction(body []byte, alias string, namespaceTools map[string]xaiNamespaceToolRef) []byte {
-	if !ojson.ValidBytes(body) || alias == "" {
-		return body
-	}
-	doc := ojson.NewDoc(body)
-	if !aliasXAIClientWebSearchFunctionDoc(doc, alias, namespaceTools) {
-		return body
-	}
-	return doc.Bytes()
 }
 
 func aliasXAIClientWebSearchFunctionDoc(doc *ojson.Doc, alias string, namespaceTools map[string]xaiNamespaceToolRef) bool {
@@ -1603,40 +1521,12 @@ func aliasXAIClientWebSearchFunctionDoc(doc *ojson.Doc, alias string, namespaceT
 	return changed
 }
 
-// normalizeXAIForcedWebSearchToolChoice rewrites web_search choices into a
-// ModelToolChoice variant accepted by xAI chat-proxy.
-func normalizeXAIForcedWebSearchToolChoice(body []byte) []byte {
-	return normalizeXAIForcedHostedToolChoice(body, xaiWebSearchToolType)
-}
-
 func normalizeXAIForcedWebSearchToolChoiceDoc(doc *ojson.Doc) bool {
 	return normalizeXAIForcedHostedToolChoiceDoc(doc, xaiWebSearchToolType)
 }
 
-// normalizeXAIForcedImageGenerationToolChoice rewrites image_generation choices
-// into a ModelToolChoice variant accepted by xAI chat-proxy.
-func normalizeXAIForcedImageGenerationToolChoice(body []byte) []byte {
-	return normalizeXAIForcedHostedToolChoice(body, xaiImageGenerationToolType)
-}
-
 func normalizeXAIForcedImageGenerationToolChoiceDoc(doc *ojson.Doc) bool {
 	return normalizeXAIForcedHostedToolChoiceDoc(doc, xaiImageGenerationToolType)
-}
-
-// normalizeXAIForcedHostedToolChoice rewrites choices for a hosted tool (web_search
-// or image_generation) into a ModelToolChoice variant accepted by xAI chat-proxy.
-// `{type: <toolType>}` becomes the string "required" and the tools list is reduced
-// to that hosted tool so later x_search injection cannot broaden the restriction.
-// An allowed_tools list that only names that hosted tool becomes the original mode
-// ("auto" or "required") and is likewise reduced to that hosted tool. Mixed lists
-// drop the hosted tool entry so the remaining hosted/function choices can still
-// deserialize.
-func normalizeXAIForcedHostedToolChoice(body []byte, toolType string) []byte {
-	doc := ojson.NewDoc(body)
-	if !normalizeXAIForcedHostedToolChoiceDoc(doc, toolType) {
-		return body
-	}
-	return doc.Bytes()
 }
 
 func normalizeXAIForcedHostedToolChoiceDoc(doc *ojson.Doc, toolType string) bool {
@@ -1686,14 +1576,6 @@ func normalizeXAIForcedHostedToolChoiceDoc(doc *ojson.Doc, toolType string) bool
 		return changed
 	}
 	return doc.SetRawBytes("tool_choice.tools", helps.JoinRawJSONArray(filtered)) == nil
-}
-
-func xaiKeepOnlyHostedTools(body []byte, toolType string) []byte {
-	doc := ojson.NewDoc(body)
-	if !xaiKeepOnlyHostedToolsDoc(doc, toolType) {
-		return body
-	}
-	return doc.Bytes()
 }
 
 func xaiKeepOnlyHostedToolsDoc(doc *ojson.Doc, toolType string) bool {
@@ -1764,14 +1646,6 @@ func xaiToolChoiceRequiresHostedToolOnlyAnyDoc(doc *ojson.Doc) bool {
 		xaiToolChoiceRequiresHostedToolOnlyDoc(doc, xaiWebSearchToolType)
 }
 
-func xaiSetToolChoiceString(body []byte, value string) []byte {
-	updated, errSet := ojson.SetBytes(body, "tool_choice", value)
-	if errSet != nil {
-		return body
-	}
-	return updated
-}
-
 // pruneXAIOrphanedToolChoice removes tool_choice entries that no longer match
 // any remaining tool after normalizeXAITools filtering. Forced choices that
 // reference a deleted tool are dropped entirely; allowed_tools lists keep only
@@ -1818,14 +1692,6 @@ func pruneXAIOrphanedToolChoiceDoc(doc *ojson.Doc) bool {
 	}
 }
 
-func pruneXAIAllowedToolsChoice(body []byte, available map[xaiToolChoiceKey]struct{}) []byte {
-	doc := ojson.NewDoc(body)
-	if !pruneXAIAllowedToolsChoiceDoc(doc, available) {
-		return body
-	}
-	return doc.Bytes()
-}
-
 func pruneXAIAllowedToolsChoiceDoc(doc *ojson.Doc, available map[xaiToolChoiceKey]struct{}) bool {
 	if doc == nil {
 		return false
@@ -1859,10 +1725,6 @@ func pruneXAIAllowedToolsChoiceDoc(doc *ojson.Doc, available map[xaiToolChoiceKe
 type xaiToolChoiceKey struct {
 	toolType string
 	name     string
-}
-
-func collectXAIAvailableToolChoiceKeys(body []byte) map[xaiToolChoiceKey]struct{} {
-	return collectXAIAvailableToolChoiceKeysResults(ojson.GetBytesNoCopy(body, "tools"), ojson.GetBytesNoCopy(body, "input"))
 }
 
 func collectXAIAvailableToolChoiceKeysDoc(doc *ojson.Doc) map[xaiToolChoiceKey]struct{} {
@@ -1964,10 +1826,6 @@ func xaiCountFlattenedToolsWithSeen(tools ojson.Result, seenFunctionNames map[st
 	return count
 }
 
-func xaiCountFlattenedTools(tools ojson.Result) int {
-	return xaiCountFlattenedToolsWithSeen(tools, make(map[string]struct{}))
-}
-
 func xaiTotalFlattenedToolsCount(body []byte, willInjectXSearch bool) int {
 	seenFunctionNames := make(map[string]struct{})
 	count := xaiCountFlattenedToolsWithSeen(ojson.GetBytesNoCopy(body, "tools"), seenFunctionNames)
@@ -2011,10 +1869,6 @@ func xaiShouldFoldNamespaceTools(body []byte, willInjectXSearch bool) bool {
 
 func xaiShouldFoldNamespaceToolsDoc(doc *ojson.Doc, willInjectXSearch bool) bool {
 	return xaiTotalFlattenedToolsCountDoc(doc, willInjectXSearch) > xaiMaxTools
-}
-
-func collectXAINamespaceDeclarationsByName(body []byte) map[string][]ojson.Result {
-	return collectXAINamespaceDeclarationsByNameResults(ojson.GetBytesNoCopy(body, "tools"), ojson.GetBytesNoCopy(body, "input"))
 }
 
 func collectXAINamespaceDeclarationsByNameDoc(doc *ojson.Doc) map[string][]ojson.Result {
@@ -2181,10 +2035,6 @@ func normalizeXAITools(body []byte) []byte {
 	return normalizeXAIToolsWithFold(body, xaiShouldFoldNamespaceTools(body, false))
 }
 
-func normalizeXAIToolsDoc(doc *ojson.Doc) bool {
-	return normalizeXAIToolsWithFoldDoc(doc, xaiShouldFoldNamespaceToolsDoc(doc, false))
-}
-
 func normalizeXAIToolsWithFold(body []byte, shouldFold bool) []byte {
 	if !ojson.ValidBytes(body) {
 		return body
@@ -2248,10 +2098,6 @@ func normalizeXAIToolsWithFoldDoc(doc *ojson.Doc, shouldFold bool) bool {
 		}
 	}
 	return true
-}
-
-func xaiHasFunctionToolNamed(body []byte, name string) bool {
-	return xaiHasFunctionToolNamedResults(ojson.GetBytesNoCopy(body, "tools"), ojson.GetBytesNoCopy(body, "input"), name)
 }
 
 func xaiHasFunctionToolNamedDoc(doc *ojson.Doc, name string) bool {
@@ -2436,10 +2282,6 @@ func promoteXAIAdditionalToolsDoc(doc *ojson.Doc) bool {
 	return true
 }
 
-func normalizeXAIToolArray(tools ojson.Result, keepImageGeneration, shouldFold bool) ([]byte, bool, bool) {
-	return normalizeXAIToolArrayWithNamespaces(tools, keepImageGeneration, shouldFold, nil)
-}
-
 func normalizeXAIToolArrayWithNamespaces(tools ojson.Result, keepImageGeneration, shouldFold bool, namespaceDecls map[string][]ojson.Result) ([]byte, bool, bool) {
 	toolItems := tools.Array()
 	filtered := make([][]byte, 0, len(toolItems))
@@ -2559,10 +2401,6 @@ func normalizeXAINamespaceToolChoice(body []byte) []byte {
 	return normalizeXAINamespaceToolChoiceWithFold(body, xaiShouldFoldNamespaceTools(body, false))
 }
 
-func normalizeXAINamespaceToolChoiceDoc(doc *ojson.Doc) bool {
-	return normalizeXAINamespaceToolChoiceWithFoldDoc(doc, xaiShouldFoldNamespaceToolsDoc(doc, false))
-}
-
 func normalizeXAINamespaceToolChoiceWithFold(body []byte, shouldFold bool) []byte {
 	if !ojson.ValidBytes(body) {
 		return body
@@ -2640,20 +2478,6 @@ func normalizeXAINamespaceToolChoiceWithFoldDoc(doc *ojson.Doc, shouldFold bool)
 // xAI Responses API rejects with "Argument not supported". Options xAI accepts,
 // such as filters, user_location and search_content_types, are forwarded as is.
 var xaiUnsupportedWebSearchFields = [...]string{"external_web_access", "search_context_size"}
-
-// stripUnsupportedXAIWebSearchFields removes web_search options that xAI rejects
-// and reports which ones were removed.
-func stripUnsupportedXAIWebSearchFields(raw []byte) ([]byte, []string, bool) {
-	doc := ojson.NewDoc(raw)
-	removed, ok := stripUnsupportedXAIWebSearchFieldsDoc(doc)
-	if !ok {
-		return nil, nil, false
-	}
-	if len(removed) == 0 {
-		return raw, nil, true
-	}
-	return doc.Bytes(), removed, true
-}
 
 func stripUnsupportedXAIWebSearchFieldsDoc(doc *ojson.Doc) ([]string, bool) {
 	if doc == nil {

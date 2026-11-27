@@ -13,15 +13,15 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	coreusage "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/usage"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	coreusage "github.com/udit19199/relay/internal/service/usage"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
-func newCodexOpenAIImageTestAuth(serverURL string) *cliproxyauth.Auth {
-	return &cliproxyauth.Auth{
+func newCodexOpenAIImageTestAuth(serverURL string) *coreauth.Auth {
+	return &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"base_url": serverURL,
@@ -30,12 +30,12 @@ func newCodexOpenAIImageTestAuth(serverURL string) *cliproxyauth.Auth {
 	}
 }
 
-func codexOpenAIImageTestOptions(path string, stream bool) cliproxyexecutor.Options {
-	return cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString(codexOpenAIImageSourceFormat),
+func codexOpenAIImageTestOptions(path string, stream bool) coreexecutor.Options {
+	return coreexecutor.Options{
+		SourceFormat: translatorreg.FromString(codexOpenAIImageSourceFormat),
 		Stream:       stream,
 		Metadata: map[string]any{
-			cliproxyexecutor.RequestPathMetadataKey: path,
+			coreexecutor.RequestPathMetadataKey: path,
 		},
 	}
 }
@@ -43,7 +43,7 @@ func codexOpenAIImageTestOptions(path string, stream bool) cliproxyexecutor.Opti
 func TestCodexImagePayloadPreservesResolvedAlias(t *testing.T) {
 	for _, stream := range []bool{false, true} {
 		t.Run(fmt.Sprintf("stream=%v", stream), func(t *testing.T) {
-			req := cliproxyexecutor.Request{
+			req := coreexecutor.Request{
 				Model:   "openai/gpt-image-2-cpr",
 				Payload: []byte(`{"model":"gpt-image-2","prompt":"diagnostic"}`),
 			}
@@ -127,7 +127,7 @@ func TestCodexImageResolvedModelOnWire(t *testing.T) {
 						path, wantPath = codexImagesEditsPath, "/images/edits"
 					}
 					opts := codexOpenAIImageTestOptions(path, stream)
-					opts.Metadata[cliproxyexecutor.RequestedModelMetadataKey] = tc.requested
+					opts.Metadata[coreexecutor.RequestedModelMetadataKey] = tc.requested
 					payload, errMarshal := json.Marshal(map[string]any{
 						"model": tc.requested, "prompt": "diagnostic", "stream": !stream,
 						"images": []map[string]string{{"file_id": "source-image"}},
@@ -156,7 +156,7 @@ func TestCodexImageResolvedModelOnWire(t *testing.T) {
 						payload = form.Bytes()
 						opts.Headers = http.Header{"Content-Type": []string{writer.FormDataContentType()}}
 					}
-					req := cliproxyexecutor.Request{Model: tc.resolved, Payload: payload}
+					req := coreexecutor.Request{Model: tc.resolved, Payload: payload}
 					executor := NewCodexExecutor(cfg)
 					auth := newCodexOpenAIImageTestAuth(server.URL)
 					if stream {
@@ -244,7 +244,7 @@ func TestCodexExecutorDirectOpenAIImageGenerationUsesImagesEndpoint(t *testing.T
 		"Originator":            "Codex Desktop",
 	})
 	executor := NewCodexExecutor(&config.Config{})
-	resp, errExecute := executor.Execute(ctx, newCodexOpenAIImageTestAuth(server.URL), cliproxyexecutor.Request{
+	resp, errExecute := executor.Execute(ctx, newCodexOpenAIImageTestAuth(server.URL), coreexecutor.Request{
 		Model:   "codex/gpt-image-1.5",
 		Payload: []byte(`{"model":"codex/gpt-image-1.5","prompt":"A cute baby sea otter","n":1,"size":"1024x1024","quality":"high","background":"opaque","output_format":"jpeg","output_compression":70,"moderation":"low","extra":{"preserve":true},"stream":false}`),
 	}, codexOpenAIImageTestOptions(codexImagesGenerationsPath, false))
@@ -312,7 +312,7 @@ func TestCodexExecutorDirectOpenAIImageGenerationStreamsImagesEndpoint(t *testin
 	defer server.Close()
 
 	executor := NewCodexExecutor(&config.Config{})
-	stream, errStream := executor.ExecuteStream(context.Background(), newCodexOpenAIImageTestAuth(server.URL), cliproxyexecutor.Request{
+	stream, errStream := executor.ExecuteStream(context.Background(), newCodexOpenAIImageTestAuth(server.URL), coreexecutor.Request{
 		Model:   "gpt-image-2",
 		Payload: []byte(`{"model":"gpt-image-2","prompt":"A cute baby sea otter","partial_images":2}`),
 	}, codexOpenAIImageTestOptions(codexImagesGenerationsPath, true))
@@ -362,7 +362,7 @@ func TestCodexExecutorDirectOpenAIImageEditUsesImagesEditEndpointForJSON(t *test
 	defer server.Close()
 
 	executor := NewCodexExecutor(&config.Config{})
-	_, errExecute := executor.Execute(context.Background(), newCodexOpenAIImageTestAuth(server.URL), cliproxyexecutor.Request{
+	_, errExecute := executor.Execute(context.Background(), newCodexOpenAIImageTestAuth(server.URL), coreexecutor.Request{
 		Model:   "gpt-image-2",
 		Payload: []byte(`{"model":"gpt-image-2","prompt":"Replace the background","images":[{"file_id":"file-abc123"}],"mask":{"file_id":"file-mask123"},"size":"1024x1024","quality":"high","output_format":"png","output_compression":100,"stream":false}`),
 	}, codexOpenAIImageTestOptions(codexImagesEditsPath, false))
@@ -442,7 +442,7 @@ func TestCodexExecutorDirectOpenAIImageEditUsesImagesEditEndpointForMultipart(t 
 	opts := codexOpenAIImageTestOptions(codexImagesEditsPath, false)
 	opts.Headers = http.Header{"Content-Type": []string{writer.FormDataContentType()}}
 	executor := NewCodexExecutor(&config.Config{})
-	_, errExecute := executor.Execute(context.Background(), newCodexOpenAIImageTestAuth(server.URL), cliproxyexecutor.Request{
+	_, errExecute := executor.Execute(context.Background(), newCodexOpenAIImageTestAuth(server.URL), coreexecutor.Request{
 		Model:   "codex/gpt-image-1.5",
 		Payload: body.Bytes(),
 	}, opts)
@@ -526,7 +526,7 @@ func TestCodexExecutorDirectOpenAIImage25And26Models(t *testing.T) {
 			defer server.Close()
 
 			executor := NewCodexExecutor(&config.Config{})
-			_, errExecute := executor.Execute(context.Background(), newCodexOpenAIImageTestAuth(server.URL), cliproxyexecutor.Request{
+			_, errExecute := executor.Execute(context.Background(), newCodexOpenAIImageTestAuth(server.URL), coreexecutor.Request{
 				Model:   model,
 				Payload: []byte(`{"model":"` + model + `","prompt":"draw something"}`),
 			}, codexOpenAIImageTestOptions(codexImagesGenerationsPath, false))
@@ -559,7 +559,7 @@ func TestCodexExecutorDirectOpenAIImage25And26Models(t *testing.T) {
 			defer server.Close()
 
 			executor := NewCodexExecutor(&config.Config{})
-			_, errExecute := executor.Execute(context.Background(), newCodexOpenAIImageTestAuth(server.URL), cliproxyexecutor.Request{
+			_, errExecute := executor.Execute(context.Background(), newCodexOpenAIImageTestAuth(server.URL), coreexecutor.Request{
 				Model:   model,
 				Payload: []byte(`{"model":"` + model + `","prompt":"edit something","images":[{"file_id":"f1"}]}`),
 			}, codexOpenAIImageTestOptions(codexImagesEditsPath, false))
@@ -592,7 +592,7 @@ func TestCodexExecutorDirectOpenAIImage25And26Models(t *testing.T) {
 			defer server.Close()
 
 			executor := NewCodexExecutor(&config.Config{})
-			stream, errStream := executor.ExecuteStream(context.Background(), newCodexOpenAIImageTestAuth(server.URL), cliproxyexecutor.Request{
+			stream, errStream := executor.ExecuteStream(context.Background(), newCodexOpenAIImageTestAuth(server.URL), coreexecutor.Request{
 				Model:   model,
 				Payload: []byte(`{"model":"` + model + `","prompt":"stream something"}`),
 			}, codexOpenAIImageTestOptions(codexImagesGenerationsPath, true))
@@ -634,7 +634,7 @@ func TestCodexDirectOpenAIImageStreamAccountsLargeCompletedEvents(t *testing.T) 
 				coreusage.RegisterNamedConsumer(t.Name(), multiProviderNoopUsageConsumer{})
 			})
 			ctx := coreusage.WithRequestedModelAlias(context.Background(), alias)
-			res, err := NewCodexExecutor(&config.Config{}).ExecuteStream(ctx, newCodexOpenAIImageTestAuth(server.URL), cliproxyexecutor.Request{
+			res, err := NewCodexExecutor(&config.Config{}).ExecuteStream(ctx, newCodexOpenAIImageTestAuth(server.URL), coreexecutor.Request{
 				Model:   "gpt-image-2",
 				Payload: []byte(`{"model":"gpt-image-2","prompt":"test"}`),
 			}, codexOpenAIImageTestOptions(codexImagesGenerationsPath, true))

@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	translatorcommon "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/common"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	translatorcommon "github.com/udit19199/relay/internal/translator/common"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 const userTurnUpload = `{"type":"container_upload","file_id":"file-1"}`
@@ -111,10 +111,10 @@ func TestConvertClaudeRequestToCodex_NonEmptyTextBesideAttachmentStillSucceeds(t
 
 // claudeImageTurnToCodex translates a conversation of two history turns followed by
 // a final user turn holding the given content parts.
-func claudeImageTurnToCodex(finalContent string) sdktranslator.RequestEnvelope {
+func claudeImageTurnToCodex(finalContent string) translatorreg.RequestEnvelope {
 	input := `{"model":"m","messages":[{"role":"user","content":"a"},{"role":"assistant","content":"b"},{"role":"user","content":[` + finalContent + `]}]}`
-	return sdktranslator.TranslateRequestEnvelope(context.Background(), sdktranslator.FormatClaude, sdktranslator.FormatCodex, sdktranslator.RequestEnvelope{
-		Format: sdktranslator.FormatClaude,
+	return translatorreg.TranslateRequestEnvelope(context.Background(), translatorreg.FormatClaude, translatorreg.FormatCodex, translatorreg.RequestEnvelope{
+		Format: translatorreg.FormatClaude,
 		Model:  "m",
 		Body:   []byte(input),
 	})

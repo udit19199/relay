@@ -4,7 +4,7 @@ import (
 	"sync"
 	"testing"
 
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 // These tests use the process-wide pool and must not run in parallel.
@@ -33,19 +33,19 @@ func TestProxyPoolSettingsAndConcurrentBuild(t *testing.T) {
 	}
 	wg.Wait()
 	for _, raw := range []string{"0s", "-1s"} {
-		zero := poolAuth("zero", &cliproxyauth.ProxyConnectionPoolOverride{IdleConnTimeout: raw})
+		zero := poolAuth("zero", &coreauth.ProxyConnectionPoolOverride{IdleConnTimeout: raw})
 		if got := pooledProxyTransport("direct", cfg, zero); got == nil || !got.DisableKeepAlives {
 			t.Fatalf("%s must disable keep-alives", raw)
 		}
 	}
 	for _, max := range []int{0, -1} {
 		val := max
-		capped := poolAuth("max", &cliproxyauth.ProxyConnectionPoolOverride{MaxIdleConnsPerHost: &val})
+		capped := poolAuth("max", &coreauth.ProxyConnectionPoolOverride{MaxIdleConnsPerHost: &val})
 		if got := pooledProxyTransport("direct", cfg, capped); got == nil || !got.DisableKeepAlives {
 			t.Fatalf("max %d must disable keep-alives", max)
 		}
 	}
-	invalid := poolAuth("invalid", &cliproxyauth.ProxyConnectionPoolOverride{IdleConnTimeout: "invalid"})
+	invalid := poolAuth("invalid", &coreauth.ProxyConnectionPoolOverride{IdleConnTimeout: "invalid"})
 	bad := pooledProxyTransport("direct", cfg, invalid)
 	if bad == nil || bad.IdleConnTimeout != proxyPoolDefaultIdleConnTimeout || pooledProxyTransport("direct", cfg, invalid) != bad {
 		t.Fatal("invalid duration must use cached default")

@@ -1,11 +1,10 @@
 package api
 
 import (
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/githubauth"
+	"github.com/udit19199/relay/internal/util"
 	"testing"
-
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/githubauth"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
 )
 
 func TestServerGitHubTokenReload(t *testing.T) {

@@ -1,11 +1,10 @@
 package helps
 
 import (
+	"github.com/MoeForge/moego/ojson"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 	"net/http"
 	"testing"
-
-	"github.com/MoeForge/moego/ojson"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
 )
 
 func TestApplyPayloadConfigWithTrackedPathsForExecutorCodexIntegerNormalizationUsesExecutor(t *testing.T) {
@@ -19,8 +18,8 @@ func TestApplyPayloadConfigWithTrackedPathsForExecutorCodexIntegerNormalizationU
 		protocol string
 		wantType string
 	}{
-		{name: "Codex executor with another protocol keeps number", executor: "codex", protocol: sdktranslator.FormatOpenAIResponse.String(), wantType: "number"},
-		{name: "xAI executor with Codex protocol normalizes", executor: "xai", protocol: sdktranslator.FormatCodex.String(), wantType: "integer"},
+		{name: "Codex executor with another protocol keeps number", executor: "codex", protocol: translatorreg.FormatOpenAIResponse.String(), wantType: "number"},
+		{name: "xAI executor with Codex protocol normalizes", executor: "xai", protocol: translatorreg.FormatCodex.String(), wantType: "integer"},
 	}
 
 	for _, tt := range tests {

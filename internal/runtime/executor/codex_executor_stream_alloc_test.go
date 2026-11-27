@@ -10,10 +10,10 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func codexAllocationStream(deltas, deltaSize int) string {
@@ -43,14 +43,14 @@ func TestCodexStreamChunksRemainOwnedAfterScannerAdvances(t *testing.T) {
 	const deltas = 48
 	const deltaSize = 512
 	for _, buffered := range []bool{false, true} {
-		for _, format := range []sdktranslator.Format{sdktranslator.FormatClaude, sdktranslator.FormatOpenAIResponse, "test-codex-raw-ownership"} {
+		for _, format := range []translatorreg.Format{translatorreg.FormatClaude, translatorreg.FormatOpenAIResponse, "test-codex-raw-ownership"} {
 			t.Run(fmt.Sprintf("buffered=%t/%s", buffered, format), func(t *testing.T) {
 				cfg := &config.Config{}
 				cfg.Codex.StreamBootstrapBuffering = buffered
 				executor := NewCodexExecutor(cfg)
 				ctx := context.WithValue(t.Context(), "cliproxy.roundtripper", codexAllocationTransport{stream: codexAllocationStream(deltas, deltaSize)})
-				auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "test"}}
-				result, err := executor.ExecuteStream(ctx, auth, cliproxyexecutor.Request{Model: "gpt-5.4", Payload: []byte(`{"model":"gpt-5.4","input":"hello"}`)}, cliproxyexecutor.Options{Stream: true, SourceFormat: sdktranslator.FormatOpenAIResponse, ResponseFormat: format})
+				auth := &coreauth.Auth{Attributes: map[string]string{"api_key": "test"}}
+				result, err := executor.ExecuteStream(ctx, auth, coreexecutor.Request{Model: "gpt-5.4", Payload: []byte(`{"model":"gpt-5.4","input":"hello"}`)}, coreexecutor.Options{Stream: true, SourceFormat: translatorreg.FormatOpenAIResponse, ResponseFormat: format})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -98,16 +98,16 @@ func TestCodexStreamChunksRemainOwnedAfterScannerAdvances(t *testing.T) {
 
 func BenchmarkCodexExecuteStreamAllocations(b *testing.B) {
 	for _, buffered := range []bool{false, true} {
-		for _, format := range []sdktranslator.Format{sdktranslator.FormatClaude, sdktranslator.FormatOpenAIResponse} {
+		for _, format := range []translatorreg.Format{translatorreg.FormatClaude, translatorreg.FormatOpenAIResponse} {
 			b.Run(fmt.Sprintf("buffered=%t/%s", buffered, format), func(b *testing.B) {
 				stream := codexAllocationStream(256, 1024)
 				cfg := &config.Config{}
 				cfg.Codex.StreamBootstrapBuffering = buffered
 				executor := NewCodexExecutor(cfg)
 				ctx := context.WithValue(b.Context(), "cliproxy.roundtripper", codexAllocationTransport{stream: stream})
-				auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "test"}}
-				request := cliproxyexecutor.Request{Model: "gpt-5.4", Payload: []byte(`{"model":"gpt-5.4","input":"hello"}`)}
-				opts := cliproxyexecutor.Options{Stream: true, SourceFormat: sdktranslator.FormatOpenAIResponse, ResponseFormat: format}
+				auth := &coreauth.Auth{Attributes: map[string]string{"api_key": "test"}}
+				request := coreexecutor.Request{Model: "gpt-5.4", Payload: []byte(`{"model":"gpt-5.4","input":"hello"}`)}
+				opts := coreexecutor.Options{Stream: true, SourceFormat: translatorreg.FormatOpenAIResponse, ResponseFormat: format}
 				b.ReportAllocs()
 				b.SetBytes(int64(len(stream)))
 				b.ResetTimer()

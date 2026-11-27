@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 // TestIssue6193_Sonnet55ToolChangeBeta verifies that Sonnet 5.5 receives the
@@ -71,7 +71,7 @@ func TestIssue6193_Sonnet55ToolChangeBeta(t *testing.T) {
 		]
 	}`)
 
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:       "test-oauth",
 		Metadata: map[string]any{"access_token": "sk-ant-oat-issue-6193"},
 	}

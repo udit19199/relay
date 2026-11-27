@@ -6,14 +6,12 @@ import (
 	"testing"
 	"time"
 
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 // These tests share the process-wide pool and must not run in parallel.
 
 func boolPtr(v bool) *bool { return &v }
-
-func intPtr(v int) *int { return &v }
 
 // TestProxyPoolRequiresCredentialOptIn pins the per-api-key switch: there is no global
 // switch, so only a credential carrying a connection-pool block is pooled.
@@ -23,7 +21,7 @@ func TestProxyPoolRequiresCredentialOptIn(t *testing.T) {
 
 	cfg := testConfig()
 	optedIn := poolOptInAuth("ollama-key")
-	plain := &cliproxyauth.Auth{ID: "other-key"}
+	plain := &coreauth.Auth{ID: "other-key"}
 
 	pooled := pooledProxyTransport("direct", cfg, optedIn)
 	if pooled == nil {
@@ -54,7 +52,7 @@ func TestProxyPoolExplicitDisable(t *testing.T) {
 	ResetProxyTransports()
 	t.Cleanup(ResetProxyTransports)
 
-	optedOut := poolAuth("no-pool", &cliproxyauth.ProxyConnectionPoolOverride{Enabled: boolPtr(false)})
+	optedOut := poolAuth("no-pool", &coreauth.ProxyConnectionPoolOverride{Enabled: boolPtr(false)})
 	first := pooledProxyTransport("direct", testConfig(), optedOut)
 	second := pooledProxyTransport("direct", testConfig(), optedOut)
 	if first == nil || second == nil {
@@ -73,7 +71,7 @@ func TestProxyPoolPartialSettings(t *testing.T) {
 	ResetProxyTransports()
 	t.Cleanup(ResetProxyTransports)
 
-	partial := poolAuth("partial", &cliproxyauth.ProxyConnectionPoolOverride{IdleConnTimeout: "45s"})
+	partial := poolAuth("partial", &coreauth.ProxyConnectionPoolOverride{IdleConnTimeout: "45s"})
 	tr := pooledProxyTransport("direct", testConfig(), partial)
 	if tr == nil {
 		t.Fatal("pooled transport missing")
@@ -85,7 +83,7 @@ func TestProxyPoolPartialSettings(t *testing.T) {
 		t.Fatalf("MaxIdleConnsPerHost = %d, want the default %d", tr.MaxIdleConnsPerHost, proxyPoolDefaultMaxIdleConnsPerHost)
 	}
 
-	other := poolAuth("partial-2", &cliproxyauth.ProxyConnectionPoolOverride{IdleConnTimeout: "60s"})
+	other := poolAuth("partial-2", &coreauth.ProxyConnectionPoolOverride{IdleConnTimeout: "60s"})
 	if pooledProxyTransport("direct", testConfig(), other) == tr {
 		t.Fatal("different settings shared one pool")
 	}
@@ -110,7 +108,7 @@ func TestProxyPoolCredentialOptInWithoutProxyURL(t *testing.T) {
 		t.Fatal("inherited pool not reused")
 	}
 	// A credential without the block keeps the shared default transport.
-	if tr := pooledProxyTransport("", cfg, &cliproxyauth.Auth{ID: "plain"}); tr != nil {
+	if tr := pooledProxyTransport("", cfg, &coreauth.Auth{ID: "plain"}); tr != nil {
 		t.Fatal("unopted credential must keep using http.DefaultTransport")
 	}
 	// The generic client must wire the pooled transport in.
@@ -130,14 +128,14 @@ func TestProxyPoolCredentialOptInWithoutProxyURL(t *testing.T) {
 	// transport with DisableKeepAlives=true rather than nil (which would fall back
 	// to http.DefaultTransport and keep pooling).
 	for _, raw := range []string{"0s", "-1s"} {
-		zeroIdle := poolAuth("zero-no-proxy", &cliproxyauth.ProxyConnectionPoolOverride{IdleConnTimeout: raw})
+		zeroIdle := poolAuth("zero-no-proxy", &coreauth.ProxyConnectionPoolOverride{IdleConnTimeout: raw})
 		if got := pooledProxyTransport("", cfg, zeroIdle); got == nil || !got.DisableKeepAlives {
 			t.Fatalf("empty proxy-url with idle %s must disable keep-alives, got %+v", raw, got)
 		}
 	}
 	for _, max := range []int{0, -1} {
 		val := max
-		zeroMax := poolAuth("max-no-proxy", &cliproxyauth.ProxyConnectionPoolOverride{MaxIdleConnsPerHost: &val})
+		zeroMax := poolAuth("max-no-proxy", &coreauth.ProxyConnectionPoolOverride{MaxIdleConnsPerHost: &val})
 		if got := pooledProxyTransport("", cfg, zeroMax); got == nil || !got.DisableKeepAlives {
 			t.Fatalf("empty proxy-url with max %d must disable keep-alives, got %+v", max, got)
 		}

@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	sdkauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/auth"
-	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	authlogin "github.com/udit19199/relay/internal/auth/login"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 // An external edit is read and queued; when the queue applies it, an in-place rewrite of the
@@ -36,7 +36,7 @@ func TestAddOrUpdateClientDiscardedSnapshotResentAfterInPlaceRewrite(t *testing.
 			if errWrite := os.WriteFile(path, []byte(initial), 0o600); errWrite != nil {
 				t.Fatal(errWrite)
 			}
-			store := sdkauth.NewFileTokenStore()
+			store := authlogin.NewFileTokenStore()
 			store.SetBaseDir(dir)
 			manager := coreauth.NewManager(store, nil, nil)
 			w := &Watcher{authDir: dir, config: &config.Config{AuthDir: dir}, authQueue: make(chan AuthUpdate, 1)}
@@ -118,7 +118,7 @@ func TestRereadDiscardedFileSnapshotPreservesKnownFileForRemoveEvent(t *testing.
 	if errWrite := os.WriteFile(path, []byte(initial), 0o600); errWrite != nil {
 		t.Fatal(errWrite)
 	}
-	store := sdkauth.NewFileTokenStore()
+	store := authlogin.NewFileTokenStore()
 	store.SetBaseDir(dir)
 	manager := coreauth.NewManager(store, nil, nil)
 	w := &Watcher{authDir: dir, config: &config.Config{AuthDir: dir}, authQueue: make(chan AuthUpdate, 1)}

@@ -5,13 +5,13 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
-	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/translator"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/translator/common"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/usage"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	"github.com/udit19199/relay/internal/service/usage"
+	_ "github.com/udit19199/relay/internal/translator"
+	"github.com/udit19199/relay/internal/translator/common"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
+	"time"
 )
 
 func TestApplyPatchTranslationError(t *testing.T) {
@@ -28,10 +28,10 @@ func TestApplyPatchTranslationError(t *testing.T) {
 
 func TestApplyPatchFinalizeOptionalCanonicalState(t *testing.T) {
 	original := []byte(`{"tools":[{"type":"custom","name":"apply_patch"}]}`)
-	for _, source := range []sdktranslator.Format{sdktranslator.FormatOpenAI, sdktranslator.FormatClaude, sdktranslator.FormatClaude, sdktranslator.FormatInteractions} {
+	for _, source := range []translatorreg.Format{translatorreg.FormatOpenAI, translatorreg.FormatClaude, translatorreg.FormatClaude, translatorreg.FormatInteractions} {
 		t.Run(source.String(), func(t *testing.T) {
 			var param any
-			InitializeApplyPatchStream(context.Background(), source, sdktranslator.FormatOpenAIResponse, "model", original, original, &param)
+			InitializeApplyPatchStream(context.Background(), source, translatorreg.FormatOpenAIResponse, "model", original, original, &param)
 			frames := FinalizeApplyPatchStream(param)
 			if len(frames) != 1 || ApplyPatchTranslationError(param) == nil || !bytes.Contains(frames[0], []byte(`"type":"response.failed"`)) {
 				t.Fatalf("EOF did not fail canonically: %s", frames)
@@ -40,10 +40,10 @@ func TestApplyPatchFinalizeOptionalCanonicalState(t *testing.T) {
 				t.Fatal("EOF failure emitted twice")
 			}
 			late := []byte(`data: {"type":"message_stop","event_type":"interaction.completed","candidates":[{"finishReason":"STOP"}],"choices":[{"delta":{},"finish_reason":"stop"}]}`)
-			if len(sdktranslator.TranslateStream(context.Background(), source, sdktranslator.FormatOpenAIResponse, "model", original, original, late, &param)) != 0 {
+			if len(translatorreg.TranslateStream(context.Background(), source, translatorreg.FormatOpenAIResponse, "model", original, original, late, &param)) != 0 {
 				t.Fatal("EOF failure reopened into success")
 			}
-			if len(sdktranslator.TranslateStream(context.Background(), source, sdktranslator.FormatOpenAIResponse, "model", original, original, []byte("[DONE]"), &param)) != 0 {
+			if len(translatorreg.TranslateStream(context.Background(), source, translatorreg.FormatOpenAIResponse, "model", original, original, []byte("[DONE]"), &param)) != 0 {
 				t.Fatal("failure forwarded transport success")
 			}
 		})
@@ -56,8 +56,8 @@ func TestApplyPatchFinalizeOptionalCanonicalState(t *testing.T) {
 func TestApplyPatchTokenUsageHelperRetainsFailureState(t *testing.T) {
 	original := []byte(`{"tools":[{"type":"custom","name":"apply_patch"}]}`)
 	var param any
-	tokens := NewClaudeInputTokenState(sdktranslator.FormatOpenAIResponse, sdktranslator.FormatOpenAI, sdktranslator.FormatOpenAIResponse, original)
-	chunks := TranslateStreamWithClaudeInputTokens(context.Background(), sdktranslator.FormatOpenAI, sdktranslator.FormatOpenAIResponse, "model", original, original, []byte(`data: {"id":"r","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"c","function":{"name":"apply_patch","arguments":"{\"input\":7}"}}]}}]}`), &param, tokens)
+	tokens := NewClaudeInputTokenState(translatorreg.FormatOpenAIResponse, translatorreg.FormatOpenAI, translatorreg.FormatOpenAIResponse, original)
+	chunks := TranslateStreamWithClaudeInputTokens(context.Background(), translatorreg.FormatOpenAI, translatorreg.FormatOpenAIResponse, "model", original, original, []byte(`data: {"id":"r","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"c","function":{"name":"apply_patch","arguments":"{\"input\":7}"}}]}}]}`), &param, tokens)
 	if ApplyPatchTranslationError(param) == nil {
 		t.Fatal("token helper discarded the same retained error state")
 	}
@@ -78,7 +78,7 @@ func TestApplyPatchTokenUsageHelperRetainsFailureState(t *testing.T) {
 func TestApplyPatchInteractionsOnlyValidSourceDoneClosesTransport(t *testing.T) {
 	var param any
 	translate := func(payload string) [][]byte {
-		return sdktranslator.TranslateStream(context.Background(), sdktranslator.FormatInteractions, sdktranslator.FormatOpenAIResponse, "model", nil, nil, []byte(payload), &param)
+		return translatorreg.TranslateStream(context.Background(), translatorreg.FormatInteractions, translatorreg.FormatOpenAIResponse, "model", nil, nil, []byte(payload), &param)
 	}
 	_ = translate(`{"event_type":"interaction.completed","interaction":{"id":"r"}}`)
 	if chunks := translate(`{"event_type":"done",`); len(chunks) != 0 {
@@ -106,11 +106,11 @@ func TestApplyPatchCanceledEOFStillRecordsFailure(t *testing.T) {
 	usage.RegisterNamedConsumer("task6-canceled-eof", capture)
 	var param any
 	original := []byte(`{"tools":[{"type":"custom","name":"apply_patch"}]}`)
-	InitializeApplyPatchStream(context.Background(), sdktranslator.FormatClaude, sdktranslator.FormatOpenAIResponse, "m", original, original, &param)
+	InitializeApplyPatchStream(context.Background(), translatorreg.FormatClaude, translatorreg.FormatOpenAIResponse, "m", original, original, &param)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	reporter := NewUsageReporter(ctx, "task6-canceled-eof", "m", nil)
-	out := make(chan cliproxyexecutor.StreamChunk)
+	out := make(chan coreexecutor.StreamChunk)
 	if !EndApplyPatchStream(ctx, param, reporter, out, errors.New("clean failure")) {
 		t.Fatal("EOF failure was discarded")
 	}

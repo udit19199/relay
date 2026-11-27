@@ -3,9 +3,9 @@ package api
 import (
 	"testing"
 
-	proxyconfig "github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	responsesclaude "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/claude/openai/responses"
-	sdkconfig "github.com/router-for-me/CLIProxyAPI/v8/sdk/config"
+	"github.com/udit19199/relay/internal/config"
+	proxyconfig "github.com/udit19199/relay/internal/config"
+	responsesclaude "github.com/udit19199/relay/internal/translator/claude/openai/responses"
 )
 
 // setClaudeToolSearchForTest sets upstream.claude.tool-search for one test.
@@ -20,7 +20,7 @@ func setClaudeToolSearchForTest(t *testing.T, enabled bool) {
 // startup and on every config reload.
 func TestServerAppliesClaudeToolSearchSwitch(t *testing.T) {
 	setClaudeToolSearchForTest(t, false)
-	cfg := &proxyconfig.Config{SDKConfig: sdkconfig.SDKConfig{APIKeys: []string{"test-key"}}}
+	cfg := &proxyconfig.Config{SDKConfig: config.SDKConfig{APIKeys: []string{"test-key"}}}
 	cfg.Claude.ToolSearch = true
 	server := newTestServerWithConfig(t, cfg)
 	if !responsesclaude.ClientToolSearchEnabled() {

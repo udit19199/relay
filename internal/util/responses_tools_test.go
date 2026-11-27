@@ -1,11 +1,11 @@
 package util
 
 import (
-	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
+	"reflect"
+	"strings"
 )
 
 func TestCollectResponsesToolDescriptors_PriorityAndNamespace(t *testing.T) {

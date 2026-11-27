@@ -4,15 +4,15 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	cliproxysession "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/session"
+	"github.com/udit19199/relay/internal/misc"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	coresession "github.com/udit19199/relay/internal/service/session"
 )
 
 // DerivedSessionID returns the first context-derived session identity in metadata order.
 func DerivedSessionID(metadataSets ...map[string]any) string {
 	for _, metadata := range metadataSets {
-		if derivedID := cliproxysession.DerivedID(metadata); derivedID != "" {
+		if derivedID := coresession.DerivedID(metadata); derivedID != "" {
 			return derivedID
 		}
 	}
@@ -27,7 +27,7 @@ func DerivedSessionUUID(provider string, metadataSets ...map[string]any) string 
 // ProviderSessionUUID prefers a long-lived execution session and falls back to the derived identity.
 func ProviderSessionUUID(provider string, metadataSets ...map[string]any) string {
 	for _, metadata := range metadataSets {
-		if executionID := misc.MetadataString(metadata, cliproxyexecutor.ExecutionSessionMetadataKey); executionID != "" {
+		if executionID := misc.MetadataString(metadata, coreexecutor.ExecutionSessionMetadataKey); executionID != "" {
 			return stableProviderSessionUUID(provider, "execution-session", executionID)
 		}
 	}

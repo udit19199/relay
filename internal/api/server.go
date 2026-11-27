@@ -18,18 +18,16 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	managementHandlers "github.com/router-for-me/CLIProxyAPI/v8/internal/api/handlers/management"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/api/middleware"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/githubauth"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/logging"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/managementasset"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/redisqueue"
-	sdkaccess "github.com/router-for-me/CLIProxyAPI/v8/sdk/access"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/api/handlers"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/api/handlers/openai"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	log "github.com/sirupsen/logrus"
+	"github.com/udit19199/relay/internal/access"
+	"github.com/udit19199/relay/internal/api/handlers"
+	managementHandlers "github.com/udit19199/relay/internal/api/handlers/management"
+	"github.com/udit19199/relay/internal/api/handlers/openai"
+	"github.com/udit19199/relay/internal/api/middleware"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/githubauth"
+	"github.com/udit19199/relay/internal/logging"
+	"github.com/udit19199/relay/internal/service/auth"
 	"golang.org/x/net/http2"
 	"gopkg.in/yaml.v3"
 )
@@ -43,13 +41,6 @@ type Server struct {
 	// server is the underlying HTTP server.
 	server *http.Server
 
-	// muxBaseListener is the shared TCP listener used to serve both HTTP and Redis protocol traffic.
-	listenerMu      sync.Mutex
-	muxBaseListener net.Listener
-
-	// muxHTTPListener receives HTTP connections selected by the multiplexer.
-	muxHTTPListener *muxListener
-
 	// handlers contains the API handlers for processing requests.
 	handlers *handlers.BaseAPIHandler
 
@@ -62,7 +53,7 @@ type Server struct {
 	oldConfigYaml []byte
 
 	// accessManager handles request authentication providers.
-	accessManager *sdkaccess.Manager
+	accessManager *access.Manager
 
 	// requestLogger is the request logger instance for dynamic configuration updates.
 	requestLogger logging.RequestLogger
@@ -74,8 +65,6 @@ type Server struct {
 	// currentPath is the absolute path to the current working directory.
 	currentPath string
 
-	// wsRoutes tracks registered websocket upgrade paths.
-	wsRouteMu     sync.Mutex
 	wsRoutes      map[string]struct{}
 	wsAuthChanged func(bool, bool)
 	wsAuthEnabled atomic.Bool
@@ -113,7 +102,7 @@ type Server struct {
 //
 // Returns:
 //   - *Server: A new server instance
-func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdkaccess.Manager, configFilePath string, opts ...ServerOption) *Server {
+func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *access.Manager, configFilePath string, opts ...ServerOption) *Server {
 	if cfg != nil {
 		cfg = cfg.CloneForRuntime()
 	}
@@ -203,7 +192,6 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 		authManager.SetRetryConfig(cfg.RequestRetry, time.Duration(cfg.MaxRetryInterval)*time.Second, cfg.MaxRetryCredentials)
 	}
 	githubauth.SetToken(cfg.GitHubToken)
-	managementasset.SetCurrentConfig(cfg)
 	auth.SetQuotaCooldownDisabled(cfg.DisableCooling)
 	auth.SetTransientErrorCooldownSeconds(cfg.TransientErrorCooldownSeconds)
 	auth.SetCredentialQuotaProbeIntervalSeconds(cfg.QuotaProbeIntervalSeconds)
@@ -238,7 +226,6 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 	// or when a local management password is provided (e.g. TUI mode).
 	hasManagementSecret := cfg.RemoteManagement.SecretKey != "" || envManagementSecret || s.localPassword != ""
 	s.managementRoutesEnabled.Store(hasManagementSecret)
-	redisqueue.SetEnabled(hasManagementSecret)
 	if hasManagementSecret {
 		s.registerManagementRoutes()
 	}
@@ -251,7 +238,7 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 	s.server = &http.Server{
 		Addr:              fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
 		Handler:           wrapUnconsumedRequestBodyHandler(engine),
-		ReadHeaderTimeout: muxSniffDeadline,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	return s
@@ -323,74 +310,11 @@ func (s *Server) Start() error {
 		log.Debugf("Starting API server on %s", addr)
 	}
 
-	httpListener := newMuxListener(listener.Addr(), 1024)
-	s.listenerMu.Lock()
-	s.muxBaseListener = listener
-	s.muxHTTPListener = httpListener
-	s.listenerMu.Unlock()
-
-	httpErrCh := make(chan error, 1)
-	acceptErrCh := make(chan error, 1)
-
-	go func() {
-		httpErrCh <- s.server.Serve(httpListener)
-	}()
-	go func() {
-		acceptErrCh <- s.acceptMuxConnections(listener, httpListener)
-	}()
-
-	select {
-	case errServe := <-httpErrCh:
-		s.listenerMu.Lock()
-		muxBase := s.muxBaseListener
-		muxHTTP := s.muxHTTPListener
-		s.muxBaseListener = nil
-		s.muxHTTPListener = nil
-		s.listenerMu.Unlock()
-		if muxBase != nil {
-			if errClose := muxBase.Close(); errClose != nil && !errors.Is(errClose, net.ErrClosed) {
-				log.Debugf("failed to close shared listener after HTTP serve exit: %v", errClose)
-			}
-		}
-		if muxHTTP != nil {
-			_ = muxHTTP.Close()
-		}
-		errAccept := <-acceptErrCh
-		errServe = normalizeHTTPServeError(errServe)
-		errAccept = normalizeListenerError(errAccept)
-		if errServe != nil {
-			return fmt.Errorf("failed to start HTTP server: %v", errServe)
-		}
-		if errAccept != nil {
-			return fmt.Errorf("failed to start HTTP server: %v", errAccept)
-		}
-		return nil
-	case errAccept := <-acceptErrCh:
-		s.listenerMu.Lock()
-		muxHTTP := s.muxHTTPListener
-		muxBase := s.muxBaseListener
-		s.muxHTTPListener = nil
-		s.muxBaseListener = nil
-		s.listenerMu.Unlock()
-		if muxHTTP != nil {
-			_ = muxHTTP.Close()
-		}
-		if muxBase != nil {
-			if errClose := muxBase.Close(); errClose != nil && !errors.Is(errClose, net.ErrClosed) {
-				log.Debugf("failed to close shared listener after accept loop exit: %v", errClose)
-			}
-		}
-		errServe := <-httpErrCh
-		errServe = normalizeHTTPServeError(errServe)
-		errAccept = normalizeListenerError(errAccept)
-		if errAccept != nil {
-			return fmt.Errorf("failed to start HTTP server: %v", errAccept)
-		}
-		if errServe != nil {
-			return fmt.Errorf("failed to start HTTP server: %v", errServe)
-		}
+	errServe := s.server.Serve(listener)
+	if errServe == nil || errors.Is(errServe, http.ErrServerClosed) || errors.Is(errServe, net.ErrClosed) {
 		return nil
 	}
+	return fmt.Errorf("failed to start HTTP server: %v", errServe)
 }
 
 // Stop closes listeners and immediately shuts down the API server without waiting for active connections.
@@ -407,22 +331,6 @@ func (s *Server) Stop(ctx context.Context) error {
 		select {
 		case s.keepAliveStop <- struct{}{}:
 		default:
-		}
-	}
-
-	s.listenerMu.Lock()
-	muxHTTP := s.muxHTTPListener
-	s.muxHTTPListener = nil
-	muxBase := s.muxBaseListener
-	s.muxBaseListener = nil
-	s.listenerMu.Unlock()
-
-	if muxHTTP != nil {
-		_ = muxHTTP.Close()
-	}
-	if muxBase != nil {
-		if errCloseBase := muxBase.Close(); errCloseBase != nil && !errors.Is(errCloseBase, net.ErrClosed) {
-			log.Debugf("failed to close shared listener: %v", errCloseBase)
 		}
 	}
 

@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/codex"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	sdkAuth "github.com/router-for-me/CLIProxyAPI/v8/sdk/auth"
 	log "github.com/sirupsen/logrus"
+	"github.com/udit19199/relay/internal/auth/codex"
+	authlogin "github.com/udit19199/relay/internal/auth/login"
+	"github.com/udit19199/relay/internal/config"
 )
 
 // LoginOptions contains options for the login processes.
@@ -47,7 +47,7 @@ func DoCodexLogin(cfg *config.Config, options *LoginOptions) {
 
 	manager := newAuthManager()
 
-	authOpts := &sdkAuth.LoginOptions{
+	authOpts := &authlogin.LoginOptions{
 		NoBrowser:    options.NoBrowser,
 		CallbackPort: options.CallbackPort,
 		ProxyURL:     options.ProxyURL,

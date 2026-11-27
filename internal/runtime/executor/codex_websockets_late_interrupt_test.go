@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 // A completion arriving while credential validation is in progress must be
@@ -62,7 +62,7 @@ func TestInterruptExecutionSessionCompletesDuringAuthCheck(t *testing.T) {
 	sess.configureConn(client)
 	readCh := sess.activate(client)
 	go exec.readUpstreamLoop(sess, client)
-	ctx := cliproxyexecutor.WithWebsocketAuthCheck(context.Background(), func(string) bool {
+	ctx := coreexecutor.WithWebsocketAuthCheck(context.Background(), func(string) bool {
 		close(complete)
 		select {
 		case event := <-readCh:
@@ -169,7 +169,7 @@ func TestInterruptExecutionSessionAfterTerminal(t *testing.T) {
 				}
 			}
 			unknown := []byte(`{"type":"response.interrupt","response_id":"unknown"}`)
-			if errUnknown := exec.InterruptExecutionSession(context.Background(), sessionID, unknown); !errors.Is(errUnknown, cliproxyexecutor.ErrNoActiveUpstreamWebsocket) {
+			if errUnknown := exec.InterruptExecutionSession(context.Background(), sessionID, unknown); !errors.Is(errUnknown, coreexecutor.ErrNoActiveUpstreamWebsocket) {
 				t.Fatalf("unknown idle interrupt = %v, want ErrNoActiveUpstreamWebsocket for local HTTP fallback", errUnknown)
 			}
 			readCh = sess.activate(client)
@@ -194,7 +194,7 @@ func TestInterruptExecutionSessionAfterTerminal(t *testing.T) {
 			case <-time.After(3 * time.Second):
 				t.Fatal("real disconnect was not reported")
 			}
-			if errDisconnected := exec.InterruptExecutionSession(context.Background(), sessionID, []byte(`{"type":"response.interrupt","response_id":"r2"}`)); !errors.Is(errDisconnected, cliproxyexecutor.ErrNoActiveUpstreamWebsocket) {
+			if errDisconnected := exec.InterruptExecutionSession(context.Background(), sessionID, []byte(`{"type":"response.interrupt","response_id":"r2"}`)); !errors.Is(errDisconnected, coreexecutor.ErrNoActiveUpstreamWebsocket) {
 				t.Fatalf("disconnected interrupt = %v, want ErrNoActiveUpstreamWebsocket", errDisconnected)
 			}
 		})

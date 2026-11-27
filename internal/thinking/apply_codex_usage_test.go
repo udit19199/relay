@@ -1,17 +1,17 @@
 package thinking_test
 
 import (
-	"bytes"
 	"testing"
 
+	"bytes"
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/thinking"
-	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/thinking/provider/codex"
-	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/thinking/provider/openai"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
 	log "github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
+	"github.com/udit19199/relay/internal/registry"
+	"github.com/udit19199/relay/internal/thinking"
+	_ "github.com/udit19199/relay/internal/thinking/provider/codex"
+	_ "github.com/udit19199/relay/internal/thinking/provider/openai"
+	"github.com/udit19199/relay/internal/util"
 )
 
 func TestExtractCodexReasoningEffortWithConfigurationUpdate(t *testing.T) {

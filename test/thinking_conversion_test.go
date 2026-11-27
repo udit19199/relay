@@ -1,23 +1,22 @@
 package test
 
 import (
-	"fmt"
-	"testing"
-	"time"
-
-	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/translator"
+	_ "github.com/udit19199/relay/internal/translator"
 
 	// Import provider packages to trigger init() registration of ProviderAppliers
-	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/thinking/provider/claude"
-	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/thinking/provider/codex"
-	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/thinking/provider/interactions"
-	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/thinking/provider/openai"
-	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/thinking/provider/xai"
+	_ "github.com/udit19199/relay/internal/thinking/provider/claude"
+	_ "github.com/udit19199/relay/internal/thinking/provider/codex"
+	_ "github.com/udit19199/relay/internal/thinking/provider/interactions"
+	_ "github.com/udit19199/relay/internal/thinking/provider/openai"
+	_ "github.com/udit19199/relay/internal/thinking/provider/xai"
 
+	"fmt"
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/thinking"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/registry"
+	"github.com/udit19199/relay/internal/thinking"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
+	"testing"
+	"time"
 )
 
 // thinkingTestCase represents a common test case structure for both suffix and body tests.
@@ -1670,9 +1669,9 @@ func runThinkingTests(t *testing.T, cases []thinkingTestCase) {
 				translateTo = "codex"
 			}
 
-			body := sdktranslator.TranslateRequest(
-				sdktranslator.FromString(tc.from),
-				sdktranslator.FromString(translateTo),
+			body := translatorreg.TranslateRequest(
+				translatorreg.FromString(tc.from),
+				translatorreg.FromString(translateTo),
 				baseModel,
 				[]byte(tc.inputJSON),
 				true,

@@ -119,7 +119,6 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/MoeForge/moego/ojson"
 	"google.golang.org/protobuf/encoding/protowire"
 )
 
@@ -232,42 +231,6 @@ func stripClaudeSignaturePrefix(rawSignature string) string {
 	return sig
 }
 
-// ValidateClaudeThinkingSignatures validates every thinking block signature in a
-// Claude messages payload.
-func ValidateClaudeThinkingSignatures(inputRawJSON []byte, opts ...ClaudeSignatureValidationOptions) error {
-	messages := ojson.GetBytesNoCopy(inputRawJSON, "messages")
-	if !messages.IsArray() {
-		return nil
-	}
-
-	opt := claudeSignatureValidationOptions(opts)
-	messageResults := messages.Array()
-	for i := 0; i < len(messageResults); i++ {
-		contentResults := messageResults[i].Get("content")
-		if !contentResults.IsArray() {
-			continue
-		}
-		parts := contentResults.Array()
-		for j := 0; j < len(parts); j++ {
-			part := parts[j]
-			if part.Get("type").String() != "thinking" {
-				continue
-			}
-
-			rawSignature := strings.TrimSpace(part.Get("signature").String())
-			if rawSignature == "" {
-				return fmt.Errorf("messages[%d].content[%d]: missing thinking signature", i, j)
-			}
-
-			if _, err := NormalizeClaudeThinkingSignature(rawSignature, opt); err != nil {
-				return fmt.Errorf("messages[%d].content[%d]: %w", i, j, err)
-			}
-		}
-	}
-
-	return nil
-}
-
 // NormalizeClaudeThinkingSignature strips any cache prefix, validates the
 // signature, and returns the double-layer R or Q form expected by Antigravity.
 // Q envelopes always require structural validation, even in shallow modes.
@@ -371,39 +334,6 @@ func validateClaudeSingleLayerSignatureContent(sig string, encodingLayers int, o
 	}
 	_, err = InspectClaudeSignaturePayload(decoded, encodingLayers)
 	return err
-}
-
-// InspectClaudeDoubleLayerSignature decodes and inspects a double-layer Claude
-// thinking signature.
-func InspectClaudeDoubleLayerSignature(sig string) (*ClaudeSignatureTree, error) {
-	decoded, err := base64.StdEncoding.DecodeString(sig)
-	if err != nil {
-		return nil, fmt.Errorf("invalid double-layer signature: base64 decode failed: %w", err)
-	}
-	if len(decoded) == 0 {
-		return nil, fmt.Errorf("invalid double-layer signature: empty after decode")
-	}
-	if decoded[0] != 'E' {
-		return nil, fmt.Errorf("invalid double-layer signature: inner does not start with 'E', got 0x%02x", decoded[0])
-	}
-	return inspectClaudeSingleLayerSignatureWithLayers(string(decoded), 2)
-}
-
-// InspectClaudeSingleLayerSignature decodes and inspects a single-layer Claude
-// thinking signature.
-func InspectClaudeSingleLayerSignature(sig string) (*ClaudeSignatureTree, error) {
-	return inspectClaudeSingleLayerSignatureWithLayers(sig, 1)
-}
-
-func inspectClaudeSingleLayerSignatureWithLayers(sig string, encodingLayers int) (*ClaudeSignatureTree, error) {
-	decoded, err := base64.StdEncoding.DecodeString(sig)
-	if err != nil {
-		return nil, fmt.Errorf("invalid single-layer signature: base64 decode failed: %w", err)
-	}
-	if len(decoded) == 0 {
-		return nil, fmt.Errorf("invalid single-layer signature: empty after decode")
-	}
-	return InspectClaudeSignaturePayload(decoded, encodingLayers)
 }
 
 // InspectClaudeSignaturePayload inspects the decoded Claude thinking signature

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 // claudeCode2_1_220WireHeaderOrder is the header name sequence captured from a
@@ -42,7 +42,7 @@ var claudeCode2_1_220WireHeaderOrder = []string{
 
 func newClaudeWireProbeRequest(t *testing.T, rawURL string) *http.Request {
 	t.Helper()
-	auth := &cliproxyauth.Auth{ID: "wire", Metadata: map[string]any{"access_token": "sk-ant-oat01-wire"}}
+	auth := &coreauth.Auth{ID: "wire", Metadata: map[string]any{"access_token": "sk-ant-oat01-wire"}}
 	req := httptest.NewRequest(http.MethodPost, rawURL, strings.NewReader("{}"))
 	req.Header = http.Header{}
 	body := []byte(`{"model":"claude-opus-5","messages":[{"role":"user","content":"hi"}]}`)
@@ -59,7 +59,7 @@ func newClaudeWireProbeRequest(t *testing.T, rawURL string) *http.Request {
 // applyClaudeHeaders would make these headers invisible to Header.Get for the
 // rest of the pipeline, which is how the first attempt broke ten other tests.
 func TestApplyClaudeHeaders_LeavesHeadersCanonicalForThePipeline(t *testing.T) {
-	auth := &cliproxyauth.Auth{ID: "wire", Metadata: map[string]any{"access_token": "sk-ant-oat01-wire"}}
+	auth := &coreauth.Auth{ID: "wire", Metadata: map[string]any{"access_token": "sk-ant-oat01-wire"}}
 	req := httptest.NewRequest(http.MethodPost, "https://api.anthropic.com/v1/messages?beta=true", strings.NewReader("{}"))
 	req.Header = http.Header{}
 	body := []byte(`{"model":"claude-opus-5","messages":[{"role":"user","content":"hi"}]}`)

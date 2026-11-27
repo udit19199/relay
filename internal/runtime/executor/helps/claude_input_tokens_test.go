@@ -14,7 +14,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/tiktoken-go/tokenizer"
 
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 type failingClaudeInputCodec struct{}
@@ -197,15 +197,15 @@ func TestCountClaudeInputTokensExcludesMultimediaAndControlFields(t *testing.T) 
 }
 
 func TestTranslateStreamWithClaudeInputTokensPatchesMessageStartOnce(t *testing.T) {
-	upstreamFormat := sdktranslator.Format("claude-input-token-test-upstream")
-	sdktranslator.Register(sdktranslator.FormatClaude, upstreamFormat, nil, sdktranslator.ResponseTransform{
+	upstreamFormat := translatorreg.Format("claude-input-token-test-upstream")
+	translatorreg.Register(translatorreg.FormatClaude, upstreamFormat, nil, translatorreg.ResponseTransform{
 		Stream: func(_ context.Context, _ string, _, _, rawJSON []byte, _ *any) [][]byte {
 			return [][]byte{rawJSON}
 		},
 	})
 
 	originalRequest := []byte(`{"system":"System text.","messages":[{"role":"user","content":"Hello."}]}`)
-	state := NewClaudeInputTokenState(sdktranslator.FormatClaude, upstreamFormat, sdktranslator.FormatClaude, originalRequest)
+	state := NewClaudeInputTokenState(translatorreg.FormatClaude, upstreamFormat, translatorreg.FormatClaude, originalRequest)
 	var param any
 	combined := []byte("event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":0,\"output_tokens\":0}}}\n\n" +
 		"event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0}\n\n")
@@ -213,7 +213,7 @@ func TestTranslateStreamWithClaudeInputTokensPatchesMessageStartOnce(t *testing.
 	got := TranslateStreamWithClaudeInputTokens(
 		context.Background(),
 		upstreamFormat,
-		sdktranslator.FormatClaude,
+		translatorreg.FormatClaude,
 		"claude-test",
 		originalRequest,
 		nil,
@@ -238,7 +238,7 @@ data: {"type":"message_start","message":{"usage":{"input_tokens":0}}}
 	gotSecond := TranslateStreamWithClaudeInputTokens(
 		context.Background(),
 		upstreamFormat,
-		sdktranslator.FormatClaude,
+		translatorreg.FormatClaude,
 		"claude-test",
 		originalRequest,
 		nil,
@@ -253,7 +253,7 @@ data: {"type":"message_start","message":{"usage":{"input_tokens":0}}}
 
 func TestClaudeInputTokenStatePreservesCRLFAndNonTargetEvents(t *testing.T) {
 	originalRequest := []byte(`{"messages":[{"role":"user","content":"Hello."}]}`)
-	state := NewClaudeInputTokenState(sdktranslator.FormatClaude, sdktranslator.FormatOpenAI, sdktranslator.FormatClaude, originalRequest)
+	state := NewClaudeInputTokenState(translatorreg.FormatClaude, translatorreg.FormatOpenAI, translatorreg.FormatClaude, originalRequest)
 	chunk := []byte("event: message_start\r\ndata:  {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":0,\"output_tokens\":0}}}  \r\n\r\n" +
 		"event: ping\r\ndata: {\"type\":\"ping\",\"value\":\"keep\"}\r\n\r\n")
 
@@ -273,7 +273,7 @@ func TestClaudeInputTokenStatePatchesMissingAndPreservesNonZero(t *testing.T) {
 	originalRequest := []byte(`{"messages":[{"role":"user","content":"Hello."}]}`)
 
 	t.Run("missing", func(t *testing.T) {
-		state := NewClaudeInputTokenState(sdktranslator.FormatClaude, sdktranslator.FormatOpenAI, sdktranslator.FormatClaude, originalRequest)
+		state := NewClaudeInputTokenState(translatorreg.FormatClaude, translatorreg.FormatOpenAI, translatorreg.FormatClaude, originalRequest)
 		chunks := [][]byte{[]byte("data: {\"type\":\"message_start\",\"message\":{\"usage\":{\"output_tokens\":0}}}\n\n")}
 		got := state.apply(context.Background(), chunks)
 		if tokens := messageStartInputTokens(got); tokens <= 0 {
@@ -282,7 +282,7 @@ func TestClaudeInputTokenStatePatchesMissingAndPreservesNonZero(t *testing.T) {
 	})
 
 	t.Run("non-zero", func(t *testing.T) {
-		state := NewClaudeInputTokenState(sdktranslator.FormatClaude, sdktranslator.FormatOpenAI, sdktranslator.FormatClaude, []byte(`not valid json`))
+		state := NewClaudeInputTokenState(translatorreg.FormatClaude, translatorreg.FormatOpenAI, translatorreg.FormatClaude, []byte(`not valid json`))
 		chunks := [][]byte{[]byte("data: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":73}}}\n\n")}
 		got := state.apply(context.Background(), chunks)
 		if tokens := messageStartInputTokens(got); tokens != 73 {
@@ -298,12 +298,12 @@ func TestClaudeInputTokenStateSkipsUnsupportedFlows(t *testing.T) {
 	originalRequest := []byte(`{"messages":[{"role":"user","content":"Hello."}]}`)
 	testCases := []struct {
 		name           string
-		sourceFormat   sdktranslator.Format
-		upstreamFormat sdktranslator.Format
-		responseFormat sdktranslator.Format
+		sourceFormat   translatorreg.Format
+		upstreamFormat translatorreg.Format
+		responseFormat translatorreg.Format
 	}{
-		{name: "Claude passthrough", sourceFormat: sdktranslator.FormatClaude, upstreamFormat: sdktranslator.FormatClaude, responseFormat: sdktranslator.FormatClaude},
-		{name: "non-Claude response", sourceFormat: sdktranslator.FormatClaude, upstreamFormat: sdktranslator.FormatOpenAI, responseFormat: sdktranslator.FormatOpenAI},
+		{name: "Claude passthrough", sourceFormat: translatorreg.FormatClaude, upstreamFormat: translatorreg.FormatClaude, responseFormat: translatorreg.FormatClaude},
+		{name: "non-Claude response", sourceFormat: translatorreg.FormatClaude, upstreamFormat: translatorreg.FormatOpenAI, responseFormat: translatorreg.FormatOpenAI},
 	}
 
 	for _, tc := range testCases {
@@ -327,9 +327,9 @@ func TestClaudeInputTokenStateCountErrorKeepsZero(t *testing.T) {
 	defer log.SetOutput(originalLogOutput)
 
 	state := NewClaudeInputTokenState(
-		sdktranslator.FormatClaude,
-		sdktranslator.FormatOpenAI,
-		sdktranslator.FormatClaude,
+		translatorreg.FormatClaude,
+		translatorreg.FormatOpenAI,
+		translatorreg.FormatClaude,
 		[]byte(`{"messages":[{"role":"user","content":"Hello."}]}`),
 	)
 	state.codec = failingClaudeInputCodec{}
@@ -352,9 +352,9 @@ func TestClaudeInputTokenStateInvalidJSONKeepsZeroWithoutLoggingRequest(t *testi
 
 	const sensitiveRequest = `{"messages":["sensitive-original-request"`
 	state := NewClaudeInputTokenState(
-		sdktranslator.FormatClaude,
-		sdktranslator.FormatOpenAI,
-		sdktranslator.FormatClaude,
+		translatorreg.FormatClaude,
+		translatorreg.FormatOpenAI,
+		translatorreg.FormatClaude,
 		[]byte(sensitiveRequest),
 	)
 	chunks := [][]byte{[]byte("data: {\"type\":\"message_start\",\"message\":{\"usage\":{\"input_tokens\":0}}}\n\n")}

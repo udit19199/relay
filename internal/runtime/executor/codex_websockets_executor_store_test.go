@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 func TestCodexWebsocketsExecutor_CloseAllReleasesSessions(t *testing.T) {
@@ -30,7 +30,7 @@ func TestCodexWebsocketsExecutor_CloseAllReleasesSessions(t *testing.T) {
 		t.Fatalf("expected the same session instance across executors")
 	}
 
-	exec1.CloseExecutionSession(cliproxyauth.CloseAllExecutionSessionsID)
+	exec1.CloseExecutionSession(coreauth.CloseAllExecutionSessionsID)
 
 	globalCodexWebsocketSessionStore.mu.Lock()
 	_, stillPresent := globalCodexWebsocketSessionStore.sessions[sessionID]
@@ -46,37 +46,37 @@ func TestManagerRegisterExecutor_PreservesSharedWebsocketSessionsAcrossExecutorR
 	tests := []struct {
 		name                string
 		store               *codexWebsocketSessionStore
-		newExecutor         func(*config.Config) cliproxyauth.ProviderExecutor
-		newIsolatedExecutor func(*config.Config) cliproxyauth.ProviderExecutor
-		getSession          func(cliproxyauth.ProviderExecutor, string) *codexWebsocketSession
+		newExecutor         func(*config.Config) coreauth.ProviderExecutor
+		newIsolatedExecutor func(*config.Config) coreauth.ProviderExecutor
+		getSession          func(coreauth.ProviderExecutor, string) *codexWebsocketSession
 	}{
 		{
 			name:  "CodexAutoExecutor",
 			store: globalCodexWebsocketSessionStore,
-			newExecutor: func(cfg *config.Config) cliproxyauth.ProviderExecutor {
+			newExecutor: func(cfg *config.Config) coreauth.ProviderExecutor {
 				return NewCodexAutoExecutor(cfg)
 			},
-			newIsolatedExecutor: func(cfg *config.Config) cliproxyauth.ProviderExecutor {
+			newIsolatedExecutor: func(cfg *config.Config) coreauth.ProviderExecutor {
 				exec := NewCodexAutoExecutor(cfg)
 				exec.wsExec.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
 				return exec
 			},
-			getSession: func(exec cliproxyauth.ProviderExecutor, sessionID string) *codexWebsocketSession {
+			getSession: func(exec coreauth.ProviderExecutor, sessionID string) *codexWebsocketSession {
 				return exec.(*CodexAutoExecutor).wsExec.getOrCreateSession(sessionID)
 			},
 		},
 		{
 			name:  "XAIAutoExecutor",
 			store: globalXAIWebsocketSessionStore,
-			newExecutor: func(cfg *config.Config) cliproxyauth.ProviderExecutor {
+			newExecutor: func(cfg *config.Config) coreauth.ProviderExecutor {
 				return NewXAIAutoExecutor(cfg)
 			},
-			newIsolatedExecutor: func(cfg *config.Config) cliproxyauth.ProviderExecutor {
+			newIsolatedExecutor: func(cfg *config.Config) coreauth.ProviderExecutor {
 				exec := NewXAIAutoExecutor(cfg)
 				exec.wsExec.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
 				return exec
 			},
-			getSession: func(exec cliproxyauth.ProviderExecutor, sessionID string) *codexWebsocketSession {
+			getSession: func(exec coreauth.ProviderExecutor, sessionID string) *codexWebsocketSession {
 				return exec.(*XAIAutoExecutor).wsExec.getOrCreateSession(sessionID)
 			},
 		},
@@ -93,7 +93,7 @@ func TestManagerRegisterExecutor_PreservesSharedWebsocketSessionsAcrossExecutorR
 			defer server.Close()
 			wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
 
-			manager := cliproxyauth.NewManager(nil, nil, nil)
+			manager := coreauth.NewManager(nil, nil, nil)
 			exec1 := tt.newExecutor(&config.Config{})
 			manager.RegisterExecutor(exec1)
 			t.Cleanup(func() { manager.CloseExecutionSession(sessionID) })
@@ -137,17 +137,17 @@ func TestManagerRemove_ClosesOnlyRemovedAuthWebsocketSessions(t *testing.T) {
 		name        string
 		provider    string
 		store       *codexWebsocketSessionStore
-		newExecutor func(*config.Config) cliproxyauth.ProviderExecutor
-		getSession  func(cliproxyauth.ProviderExecutor, string) *codexWebsocketSession
+		newExecutor func(*config.Config) coreauth.ProviderExecutor
+		getSession  func(coreauth.ProviderExecutor, string) *codexWebsocketSession
 	}{
 		{
 			name:     "CodexAutoExecutor",
 			provider: "codex",
 			store:    globalCodexWebsocketSessionStore,
-			newExecutor: func(cfg *config.Config) cliproxyauth.ProviderExecutor {
+			newExecutor: func(cfg *config.Config) coreauth.ProviderExecutor {
 				return NewCodexAutoExecutor(cfg)
 			},
-			getSession: func(exec cliproxyauth.ProviderExecutor, sessionID string) *codexWebsocketSession {
+			getSession: func(exec coreauth.ProviderExecutor, sessionID string) *codexWebsocketSession {
 				return exec.(*CodexAutoExecutor).wsExec.getOrCreateSession(sessionID)
 			},
 		},
@@ -155,10 +155,10 @@ func TestManagerRemove_ClosesOnlyRemovedAuthWebsocketSessions(t *testing.T) {
 			name:     "XAIAutoExecutor",
 			provider: "xai",
 			store:    globalXAIWebsocketSessionStore,
-			newExecutor: func(cfg *config.Config) cliproxyauth.ProviderExecutor {
+			newExecutor: func(cfg *config.Config) coreauth.ProviderExecutor {
 				return NewXAIAutoExecutor(cfg)
 			},
-			getSession: func(exec cliproxyauth.ProviderExecutor, sessionID string) *codexWebsocketSession {
+			getSession: func(exec coreauth.ProviderExecutor, sessionID string) *codexWebsocketSession {
 				return exec.(*XAIAutoExecutor).wsExec.getOrCreateSession(sessionID)
 			},
 		},
@@ -177,7 +177,7 @@ func TestManagerRemove_ClosesOnlyRemovedAuthWebsocketSessions(t *testing.T) {
 			defer server.Close()
 			wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
 
-			manager := cliproxyauth.NewManager(nil, nil, nil)
+			manager := coreauth.NewManager(nil, nil, nil)
 			exec := tt.newExecutor(&config.Config{})
 			manager.RegisterExecutor(exec)
 			t.Cleanup(func() {
@@ -185,8 +185,8 @@ func TestManagerRemove_ClosesOnlyRemovedAuthWebsocketSessions(t *testing.T) {
 				manager.CloseExecutionSession(sessDropID)
 			})
 
-			authKeep := &cliproxyauth.Auth{ID: "auth-keep-" + tt.provider, Provider: tt.provider, Status: cliproxyauth.StatusActive}
-			authDrop := &cliproxyauth.Auth{ID: "auth-drop-" + tt.provider, Provider: tt.provider, Status: cliproxyauth.StatusActive}
+			authKeep := &coreauth.Auth{ID: "auth-keep-" + tt.provider, Provider: tt.provider, Status: coreauth.StatusActive}
+			authDrop := &coreauth.Auth{ID: "auth-drop-" + tt.provider, Provider: tt.provider, Status: coreauth.StatusActive}
 			if _, errReg := manager.Register(t.Context(), authKeep); errReg != nil {
 				t.Fatalf("register authKeep: %v", errReg)
 			}

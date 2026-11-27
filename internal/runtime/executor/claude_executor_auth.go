@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	claudeauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/claude"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	log "github.com/sirupsen/logrus"
+	claudeauth "github.com/udit19199/relay/internal/auth/claude"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 const (
@@ -17,9 +17,9 @@ const (
 	claudeAccountProfileTimeout      = 10 * time.Second
 )
 
-type claudeOAuthProfileFetcher func(context.Context, *cliproxyauth.Auth, string) (*claudeauth.OAuthProfile, error)
+type claudeOAuthProfileFetcher func(context.Context, *coreauth.Auth, string) (*claudeauth.OAuthProfile, error)
 
-func (e *ClaudeExecutor) ShouldPrepareRequestAuth(auth *cliproxyauth.Auth) bool {
+func (e *ClaudeExecutor) ShouldPrepareRequestAuth(auth *coreauth.Auth) bool {
 	apiKey, _ := claudeCreds(auth)
 	if !isClaudeOAuthToken(apiKey) || auth == nil {
 		return false
@@ -30,7 +30,7 @@ func (e *ClaudeExecutor) ShouldPrepareRequestAuth(auth *cliproxyauth.Auth) bool 
 	return helps.ClaudeCredentialAccountUUID(auth) == ""
 }
 
-func isClaudeSetupToken(auth *cliproxyauth.Auth, apiKey string) bool {
+func isClaudeSetupToken(auth *coreauth.Auth, apiKey string) bool {
 	if !isClaudeOAuthToken(apiKey) || auth == nil {
 		return false
 	}
@@ -72,7 +72,7 @@ func isClaudeOAuthScope403(err error) bool {
 		strings.Contains(msg, "user:office")
 }
 
-func (e *ClaudeExecutor) PrepareRequestAuth(ctx context.Context, auth *cliproxyauth.Auth) (*cliproxyauth.Auth, error) {
+func (e *ClaudeExecutor) PrepareRequestAuth(ctx context.Context, auth *coreauth.Auth) (*coreauth.Auth, error) {
 	if auth == nil || !e.ShouldPrepareRequestAuth(auth) {
 		return auth, nil
 	}
@@ -130,7 +130,7 @@ func (e *ClaudeExecutor) PrepareRequestAuth(ctx context.Context, auth *cliproxya
 	return auth, nil
 }
 
-func (e *ClaudeExecutor) fetchClaudeOAuthProfile(ctx context.Context, auth *cliproxyauth.Auth, apiKey string) (*claudeauth.OAuthProfile, error) {
+func (e *ClaudeExecutor) fetchClaudeOAuthProfile(ctx context.Context, auth *coreauth.Auth, apiKey string) (*claudeauth.OAuthProfile, error) {
 	if e == nil {
 		return nil, fmt.Errorf("fetch Claude OAuth profile: executor is nil")
 	}
@@ -146,7 +146,7 @@ func (e *ClaudeExecutor) fetchClaudeOAuthProfile(ctx context.Context, auth *clip
 	return service.FetchOAuthProfile(profileCtx, apiKey)
 }
 
-func (e *ClaudeExecutor) Refresh(ctx context.Context, auth *cliproxyauth.Auth) (*cliproxyauth.Auth, error) {
+func (e *ClaudeExecutor) Refresh(ctx context.Context, auth *coreauth.Auth) (*coreauth.Auth, error) {
 	log.Debugf("claude executor: refresh called")
 	if auth == nil {
 		return nil, fmt.Errorf("claude executor: auth is nil")

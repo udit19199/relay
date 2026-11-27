@@ -17,13 +17,13 @@ import (
 	"unicode/utf8"
 
 	"github.com/MoeForge/moego/ojson"
-	claudeauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/claude"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	log "github.com/sirupsen/logrus"
+	claudeauth "github.com/udit19199/relay/internal/auth/claude"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/registry"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	"github.com/udit19199/relay/internal/util"
 
 	"github.com/gin-gonic/gin"
 )
@@ -56,7 +56,7 @@ func getWorkloadFromContext(ctx context.Context) string {
 // falling back to its stored metadata (the raw OAuth/token JSON). Returns
 // (cloakMode, strictMode, sensitiveWords, cacheUserID); an empty cloakMode means
 // the credential did not explicitly configure a mode.
-func getCloakConfigFromAuth(auth *cliproxyauth.Auth) (cloakMode string, strictMode bool, sensitiveWords []string, cacheUserID bool) {
+func getCloakConfigFromAuth(auth *coreauth.Auth) (cloakMode string, strictMode bool, sensitiveWords []string, cacheUserID bool) {
 	if auth == nil {
 		return "", false, nil, false
 	}
@@ -92,20 +92,6 @@ func getCloakConfigFromAuth(auth *cliproxyauth.Auth) (cloakMode string, strictMo
 	cacheUserID = strings.EqualFold(lookupCloakAttr("cloak_cache_user_id"), "true")
 
 	return cloakMode, strictMode, sensitiveWords, cacheUserID
-}
-
-// injectFakeUserID generates and injects a fake user ID into the request metadata.
-// When useCache is false, a new user ID is generated for every call.
-func injectFakeUserID(ctx context.Context, payload []byte, apiKey string, useCache bool) ([]byte, error) {
-	doc := ojson.NewDoc(payload)
-	changed, errInject := injectFakeUserIDDoc(ctx, doc, apiKey, useCache)
-	if errInject != nil {
-		return nil, errInject
-	}
-	if !changed {
-		return payload, nil
-	}
-	return doc.Bytes(), nil
 }
 
 func injectFakeUserIDDoc(ctx context.Context, doc *ojson.Doc, apiKey string, useCache bool) (bool, error) {
@@ -214,7 +200,7 @@ func generateBillingHeader(cchSigning bool, version, messageText, entrypoint, wo
 func resolveClaudeContinuityTags(
 	ctx context.Context,
 	cfg *config.Config,
-	auth *cliproxyauth.Auth,
+	auth *coreauth.Auth,
 	incomingHeaders http.Header,
 	payload []byte,
 	confirmedClaudeCode bool,
@@ -274,7 +260,7 @@ func resolveClaudeContinuityTags(
 func resolveClaudeContinuityTagsDoc(
 	ctx context.Context,
 	cfg *config.Config,
-	auth *cliproxyauth.Auth,
+	auth *coreauth.Auth,
 	incomingHeaders http.Header,
 	doc *ojson.Doc,
 	confirmedClaudeCode bool,
@@ -385,32 +371,6 @@ func claudeBillingFingerprintMessageTextDoc(doc *ojson.Doc) string {
 		return messageText
 	}
 	return ""
-}
-
-func claudeCCHFallbackBillingHeader(ctx context.Context, cfg *config.Config, payload []byte, entrypoint string) string {
-	isProbeOrHelper := helps.IsClaudeProbeOrHelperRequest(payload)
-	prevReq, promptID := helps.ExtractClaudeBillingTags(payload)
-	if !isProbeOrHelper {
-		continuityCtx := helps.ClaudeContinuityContextFromContext(ctx)
-		if prevReq == "" && continuityCtx != nil {
-			prevReq = continuityCtx.PreviousRequestID
-		}
-		if promptID == "" && continuityCtx != nil {
-			promptID = continuityCtx.PromptID
-		}
-	}
-	incomingHeaders := resolveIncomingClaudeHeaders(ctx, helps.IncomingHeadersFromContext(ctx))
-	isSubagent := helps.IsClaudeSubagentRequest(incomingHeaders, payload)
-	return generateBillingHeader(
-		true,
-		helps.DefaultClaudeVersion(cfg),
-		claudeBillingFingerprintMessageText(payload),
-		entrypoint,
-		getWorkloadFromContext(ctx),
-		isSubagent,
-		prevReq,
-		promptID,
-	)
 }
 
 func claudeCCHFallbackBillingHeaderDoc(ctx context.Context, cfg *config.Config, doc *ojson.Doc, entrypoint string) string {
@@ -1052,16 +1012,6 @@ func validateClaudeMidSystemMessageModel(payload []byte, confirmedClaudeCode, fi
 	return newClaudeMidSystemMessageModelError(strings.Clone(ojson.GetBytesNoCopy(payload, "model").String()))
 }
 
-func validateClaudeMidSystemMessageModelDoc(doc *ojson.Doc, confirmedClaudeCode, firstPartyAnthropic bool) error {
-	if doc == nil || confirmedClaudeCode || !firstPartyAnthropic {
-		return nil
-	}
-	if !claudeUsesLegacySystemReminderDoc(doc) || !claudeDocHasMidSystemMessage(doc) {
-		return nil
-	}
-	return newClaudeMidSystemMessageModelError(strings.Clone(doc.Get("model").String()))
-}
-
 // validateClaudeCallerSystemBlocks rejects caller system content that cannot keep
 // its operator authority. Verified against api.anthropic.com on 2026-08-03: the
 // top-level system field answers "system.<i>.type: Input should be 'text'" for
@@ -1231,15 +1181,6 @@ func claudeCallerSystemReminder(text string) string {
 	return reminder.String()
 }
 
-// claudeHistoryHasAdvisorCallOrResult reports whether messages contains an advisor
-// tool invocation (server_tool_use) or advisor result (advisor_tool_result /
-// advisor_redacted_result). Anthropic cryptographically binds the encrypted
-// advisor result to the conversation layout; any mid-conversation system splice
-// shifts message indices and causes upstream 400 errors.
-func claudeHistoryHasAdvisorCallOrResult(payload []byte) bool {
-	return claudeMessagesHaveAdvisorCallOrResult(ojson.GetBytesNoCopy(payload, "messages"))
-}
-
 func claudeHistoryHasAdvisorCallOrResultDoc(doc *ojson.Doc) bool {
 	if doc == nil {
 		return false
@@ -1308,21 +1249,6 @@ func isClaudeSystemDirectiveMessage(message ojson.Result) bool {
 	return message.Get("role").String() == "system" &&
 		message.Get("output_config").Exists() &&
 		content.IsArray() && len(content.Array()) == 0
-}
-
-func claudeMidConversationSystemMessagesAtEnd(payload []byte) bool {
-	firstUserIdx := firstClaudeUserMessageIndex(payload)
-	if firstUserIdx < 0 {
-		return false
-	}
-
-	messages := ojson.GetBytesNoCopy(payload, "messages")
-	if !messages.IsArray() {
-		return false
-	}
-	messageBlocks := messages.Array()
-	insertAt := claudeLeadingUserRunEnd(messageBlocks, firstUserIdx)
-	return insertAt == len(messageBlocks) || insertAt > firstUserIdx+1
 }
 
 func claudeMidConversationSystemMessagesAtEndDoc(doc *ojson.Doc) bool {
@@ -1433,65 +1359,6 @@ type claudeCodeSystemPlacementState struct {
 	texts       []string
 }
 
-type claudeCodeSystemPlacementBeforeSnapshot struct {
-	legacy       bool
-	texts        []string
-	messagesLen  int
-	firstUserIdx int
-	insertAt     int
-}
-
-func captureClaudeCodeSystemPlacementBeforeDoc(doc *ojson.Doc) claudeCodeSystemPlacementBeforeSnapshot {
-	if doc == nil || claudeUsesLegacySystemReminderDoc(doc) {
-		return claudeCodeSystemPlacementBeforeSnapshot{legacy: true}
-	}
-	texts := collectForwardedClaudeSystemPromptBlocks(doc.Get("system"))
-	if len(texts) == 0 {
-		return claudeCodeSystemPlacementBeforeSnapshot{}
-	}
-	beforeMessages := doc.Get("messages").Array()
-	firstUserIdx := firstClaudeUserMessageIndexDoc(doc)
-	if firstUserIdx < 0 {
-		return claudeCodeSystemPlacementBeforeSnapshot{}
-	}
-	insertAt := claudeLeadingUserRunEnd(beforeMessages, firstUserIdx)
-	return claudeCodeSystemPlacementBeforeSnapshot{
-		texts:        texts,
-		messagesLen:  len(beforeMessages),
-		firstUserIdx: firstUserIdx,
-		insertAt:     insertAt,
-	}
-}
-
-func captureClaudeCodeSystemPlacementAfterDoc(before claudeCodeSystemPlacementBeforeSnapshot, afterDoc *ojson.Doc, cloaked bool) claudeCodeSystemPlacementState {
-	if !cloaked || before.legacy || len(before.texts) == 0 || before.firstUserIdx < 0 || afterDoc == nil {
-		return claudeCodeSystemPlacementState{}
-	}
-	wantLen := before.messagesLen + len(before.texts)
-	if wantLen <= 0 || before.insertAt+len(before.texts) > wantLen {
-		return claudeCodeSystemPlacementState{}
-	}
-	var scanner claudeStreamDocScanner
-	scanner.scan(afterDoc, false, false)
-	if !scanner.messagesIsArray || scanner.messagesLen != wantLen {
-		return claudeCodeSystemPlacementState{}
-	}
-	insertedRaw := make([]string, len(before.texts))
-	for rel, text := range before.texts {
-		idx := before.insertAt + rel
-		message := afterDoc.Get("messages." + strconv.Itoa(idx))
-		if message.Get("role").String() != "system" || claudeMessageContentText(message.Get("content")) != text {
-			return claudeCodeSystemPlacementState{}
-		}
-		insertedRaw[rel] = strings.Clone(message.Raw)
-	}
-	return claudeCodeSystemPlacementState{
-		insertAt:    before.insertAt,
-		insertedRaw: insertedRaw,
-		texts:       append([]string(nil), before.texts...),
-	}
-}
-
 // captureClaudeCodeSystemPlacement records CPA's modern-model system placement
 // immediately after cloaking. The message-count increase is part of the proof:
 // insertClaudeMidConversationSystemMessages returns without inserting when the
@@ -1534,84 +1401,10 @@ func captureClaudeCodeSystemPlacement(before, after []byte, cloaked bool) claude
 	}
 }
 
-// reconcileClaudeCodeSystemPlacementAfterPayload repairs an otherwise stale
-// placement decision when payload rules change the final model from modern to
-// legacy. It removes only the exact contiguous turns captured above and replays
-// their text through the existing legacy <system-reminder> path. If any payload
-// rule also changed those messages, reconciliation fails closed and leaves the
-// final validation guard to return 400.
-func reconcileClaudeCodeSystemPlacementAfterPayload(payload []byte, state claudeCodeSystemPlacementState) []byte {
-	doc := ojson.NewDoc(payload)
-	if !reconcileClaudeCodeSystemPlacementAfterPayloadDoc(doc, state) {
-		return payload
-	}
-	return doc.Bytes()
-}
-
-func reconcileClaudeCodeSystemPlacementAfterPayloadDoc(doc *ojson.Doc, state claudeCodeSystemPlacementState) bool {
-	if doc == nil || len(state.insertedRaw) == 0 || !claudeUsesLegacySystemReminderDoc(doc) {
-		return false
-	}
-	messages := doc.Get("messages").Array()
-	if state.insertAt < 0 || state.insertAt+len(state.insertedRaw) > len(messages) {
-		return false
-	}
-	for idx, raw := range state.insertedRaw {
-		if messages[state.insertAt+idx].Raw != raw {
-			return false
-		}
-	}
-
-	rawMessages := make([]string, 0, len(messages)-len(state.insertedRaw))
-	for idx, message := range messages {
-		if idx >= state.insertAt && idx < state.insertAt+len(state.insertedRaw) {
-			continue
-		}
-		rawMessages = append(rawMessages, message.Raw)
-	}
-	if errSet := doc.SetRawBytes("messages", []byte("["+strings.Join(rawMessages, ",")+"]")); errSet != nil {
-		return false
-	}
-	blocks := make([]forwardedClaudeSystemPromptBlock, 0, len(state.texts))
-	for _, text := range state.texts {
-		blocks = append(blocks, forwardedClaudeSystemPromptBlock{Text: text})
-	}
-	prependClaudeSystemReminderBlocksToFirstUserMessageDoc(doc, blocks, false)
-	return true
-}
-
 type claudeCodeFableState struct {
 	injectedFallbacks bool
 	injectedDisplay   bool
 	injectedReporting bool
-}
-
-type claudeCodeFableBeforeSnapshot struct {
-	hasFallbacks bool
-	hasDisplay   bool
-	hasReporting bool
-}
-
-func captureClaudeCodeFableBeforeDoc(doc *ojson.Doc) claudeCodeFableBeforeSnapshot {
-	if doc == nil {
-		return claudeCodeFableBeforeSnapshot{}
-	}
-	return claudeCodeFableBeforeSnapshot{
-		hasFallbacks: doc.Get("fallbacks").Exists(),
-		hasDisplay:   doc.Get("thinking.display").Exists(),
-		hasReporting: hasFableReportingBlockDoc(doc),
-	}
-}
-
-func captureClaudeCodeFableAfterDoc(before claudeCodeFableBeforeSnapshot, afterDoc *ojson.Doc, cloaked bool) claudeCodeFableState {
-	if !cloaked || afterDoc == nil {
-		return claudeCodeFableState{}
-	}
-	return claudeCodeFableState{
-		injectedFallbacks: !before.hasFallbacks && afterDoc.Get("fallbacks").Exists(),
-		injectedDisplay:   !before.hasDisplay && afterDoc.Get("thinking.display").Exists(),
-		injectedReporting: !before.hasReporting && hasFableReportingBlockDoc(afterDoc),
-	}
 }
 
 func hasFableReportingBlock(body []byte) bool {
@@ -1846,16 +1639,16 @@ func claudeCodeLocalDate(now time.Time) string {
 	return fmt.Sprintf("%04d-%02d-%02d", year, int(month), day)
 }
 
-var claudeCodeCurrentTimeFunc func(cfg *config.Config, auth *cliproxyauth.Auth) time.Time
+var claudeCodeCurrentTimeFunc func(cfg *config.Config, auth *coreauth.Auth) time.Time
 
-func claudeCodeCurrentTime(cfg *config.Config, auth *cliproxyauth.Auth) time.Time {
+func claudeCodeCurrentTime(cfg *config.Config, auth *coreauth.Auth) time.Time {
 	if claudeCodeCurrentTimeFunc != nil {
 		return claudeCodeCurrentTimeFunc(cfg, auth)
 	}
 	return time.Now().In(claudeCodeTimezone(cfg, auth))
 }
 
-func claudeCodeTimezone(cfg *config.Config, auth *cliproxyauth.Auth) *time.Location {
+func claudeCodeTimezone(cfg *config.Config, auth *coreauth.Auth) *time.Location {
 	if timezone := claudeCredentialTimezone(auth); timezone != "" {
 		if location, errLocation := time.LoadLocation(timezone); errLocation == nil {
 			return location
@@ -1875,7 +1668,7 @@ func claudeCodeTimezone(cfg *config.Config, auth *cliproxyauth.Auth) *time.Locat
 	return location
 }
 
-func claudeCredentialTimezone(auth *cliproxyauth.Auth) string {
+func claudeCredentialTimezone(auth *coreauth.Auth) string {
 	if auth == nil {
 		return ""
 	}
@@ -2056,7 +1849,7 @@ func stripFirstUserClaudeCodeCurrentDateReminderDoc(doc *ojson.Doc) bool {
 // cannot rewrite the established conversation prefix.
 func resolveClaudeSessionPinnedDate(
 	cfg *config.Config,
-	auth *cliproxyauth.Auth,
+	auth *coreauth.Auth,
 	payload []byte,
 	continuityKey string,
 	sessionID string,
@@ -2082,7 +1875,7 @@ func resolveClaudeSessionPinnedDate(
 
 func resolveClaudeSessionPinnedDateDoc(
 	cfg *config.Config,
-	auth *cliproxyauth.Auth,
+	auth *coreauth.Auth,
 	doc *ojson.Doc,
 	continuityKey string,
 	sessionID string,
@@ -2186,24 +1979,6 @@ func injectClaudeCodeCurrentDateInternalDoc(doc *ojson.Doc, date string, isExpli
 // so replicating the client's exact value cannot produce upstream behaviour the
 // real client does not already get.
 const claudeCodeContextManagement = `{"edits":[{"type":"clear_thinking_20251015","keep":"all"}]}`
-
-// claudeThinkingAcceptsClearThinking reports whether the payload's thinking
-// value allows the clear_thinking_20251015 strategy. Anthropic rejects the
-// request outright otherwise:
-//
-//	`clear_thinking_20251015` strategy requires `thinking` to be enabled or adaptive
-//
-// An absent thinking field is therefore just as ineligible as an explicit
-// {"type":"disabled"}, which is why this checks for the accepted values rather
-// than excluding the disabled one.
-func claudeThinkingAcceptsClearThinking(payload []byte) bool {
-	switch ojson.GetBytesNoCopy(payload, "thinking.type").String() {
-	case "enabled", "adaptive":
-		return true
-	default:
-		return false
-	}
-}
 
 func claudeThinkingAcceptsClearThinkingDoc(doc *ojson.Doc) bool {
 	if doc == nil {
@@ -2322,14 +2097,6 @@ func isEffectiveConfirmedClaudeCode(detection helps.ClaudeCodeRequestDetection, 
 	return !policy.Cloak && policy.ExplicitNever && detection.ConfirmedShape
 }
 
-func stripClaudeCodeSystemBlocks(payload []byte) []byte {
-	doc := ojson.NewDoc(payload)
-	if !stripClaudeCodeSystemBlocksDoc(doc) {
-		return payload
-	}
-	return doc.Bytes()
-}
-
 func stripClaudeCodeSystemBlocksDoc(doc *ojson.Doc) bool {
 	if doc == nil {
 		return false
@@ -2378,14 +2145,6 @@ func stripClaudeCodeSystemBlocksDoc(doc *ojson.Doc) bool {
 	return changed
 }
 
-func uncloakClaudeCodePayload(payload []byte, confirmedClaudeCode bool) []byte {
-	doc := ojson.NewDoc(payload)
-	if !uncloakClaudeCodePayloadDoc(doc, confirmedClaudeCode) {
-		return payload
-	}
-	return doc.Bytes()
-}
-
 func uncloakClaudeCodePayloadDoc(doc *ojson.Doc, confirmedClaudeCode bool) bool {
 	if doc == nil {
 		return false
@@ -2409,8 +2168,8 @@ func uncloakClaudeCodePayloadDoc(doc *ojson.Doc, confirmedClaudeCode bool) bool 
 	return changed
 }
 
-func resolveClaudeWirePolicy(cfg *config.Config, auth *cliproxyauth.Auth, apiKey string, confirmedClaudeCode bool) (claudeWirePolicy, claudeCloakSettings) {
-	if auth != nil && auth.AuthKind() == cliproxyauth.AuthKindAPIKey {
+func resolveClaudeWirePolicy(cfg *config.Config, auth *coreauth.Auth, apiKey string, confirmedClaudeCode bool) (claudeWirePolicy, claudeCloakSettings) {
+	if auth != nil && auth.AuthKind() == coreauth.AuthKindAPIKey {
 		cfg = cfg.ForAPIKey()
 	}
 	cloakCfg := resolveClaudeKeyCloakConfig(cfg, auth)
@@ -2482,7 +2241,7 @@ func resolveClaudeWirePolicy(cfg *config.Config, auth *cliproxyauth.Auth, apiKey
 func applyCloaking(
 	ctx context.Context,
 	cfg *config.Config,
-	auth *cliproxyauth.Auth,
+	auth *coreauth.Auth,
 	payload []byte,
 	apiKey string,
 	confirmedClaudeCode bool,
@@ -2494,7 +2253,7 @@ func applyCloaking(
 func applyCloakingInternal(
 	ctx context.Context,
 	cfg *config.Config,
-	auth *cliproxyauth.Auth,
+	auth *coreauth.Auth,
 	payload []byte,
 	apiKey string,
 	confirmedClaudeCode bool,
@@ -2516,7 +2275,7 @@ func applyCloakingInternal(
 func applyCloakingInternalDoc(
 	ctx context.Context,
 	cfg *config.Config,
-	auth *cliproxyauth.Auth,
+	auth *coreauth.Auth,
 	doc *ojson.Doc,
 	apiKey string,
 	confirmedClaudeCode bool,
@@ -2812,14 +2571,6 @@ func materializeTopLevelCacheControlDoc(doc *ojson.Doc) (bool, bool) {
 	}
 
 	return false, false
-}
-
-// claudePayloadHasCacheableSystem reports whether the payload has a system prompt
-// that injectSystemCacheControl can actually host a breakpoint on. An absent key, an
-// empty array, an array of only empty/whitespace text blocks, and an empty string
-// all leave the tools prefix uncovered.
-func claudePayloadHasCacheableSystem(payload []byte) bool {
-	return claudeSystemHasCacheableBlocks(ojson.GetBytesNoCopy(payload, "system"))
 }
 
 func claudeDocHasCacheableSystem(doc *ojson.Doc) bool {
@@ -3755,45 +3506,6 @@ func forEachClaudeCacheControlPathDoc(doc *ojson.Doc, visit func(path string, ca
 	}
 }
 
-// forEachClaudeCacheControlBlock walks every block that can carry cache_control
-// in Anthropic's evaluation order: tools, then system, then messages.
-func forEachClaudeCacheControlBlock(payload []byte, visit func(path string, block ojson.Result)) {
-	forEachClaudeCacheControlBlockResult(
-		ojson.GetBytesNoCopy(payload, "tools"),
-		ojson.GetBytesNoCopy(payload, "system"),
-		ojson.GetBytesNoCopy(payload, "messages"),
-		visit,
-	)
-}
-
-func forEachClaudeCacheControlBlockResult(tools, system, messages ojson.Result, visit func(path string, block ojson.Result)) {
-	if tools.IsArray() {
-		tools.ForEach(func(idx, item ojson.Result) bool {
-			visit(fmt.Sprintf("tools.%d", int(idx.Int())), item)
-			return true
-		})
-	}
-	if system.IsArray() {
-		system.ForEach(func(idx, item ojson.Result) bool {
-			visit(fmt.Sprintf("system.%d", int(idx.Int())), item)
-			return true
-		})
-	}
-	if messages.IsArray() {
-		messages.ForEach(func(msgIdx, message ojson.Result) bool {
-			content := message.Get("content")
-			if !content.IsArray() {
-				return true
-			}
-			content.ForEach(func(itemIdx, item ojson.Result) bool {
-				visit(fmt.Sprintf("messages.%d.content.%d", int(msgIdx.Int()), int(itemIdx.Int())), item)
-				return true
-			})
-			return true
-		})
-	}
-}
-
 // isExplicitPromptCacheMode reports whether any of the candidate payloads
 // specifies prompt_cache_options.mode as "explicit" (case-insensitive).
 func isExplicitPromptCacheMode(payloads ...[]byte) bool {
@@ -4156,76 +3868,6 @@ func injectMessagesCacheControlDoc(doc *ojson.Doc) bool {
 	return false
 }
 
-func isEmptyClaudeTextBlock(block ojson.Result) bool {
-	return block.IsObject() &&
-		block.Get("type").String() == "text" &&
-		strings.TrimSpace(block.Get("text").String()) == ""
-}
-
-func claudeContentBlockCanHostCacheControl(block ojson.Result) bool {
-	if !block.IsObject() {
-		return false
-	}
-	switch block.Get("type").String() {
-	case "", "thinking", "redacted_thinking":
-		return false
-	case "text":
-		return strings.TrimSpace(block.Get("text").String()) != ""
-	default:
-		return true
-	}
-}
-
-func lastCacheableClaudeMessageContentBlockIndex(message ojson.Result) int {
-	content := message.Get("content")
-	if !content.IsArray() {
-		return -1
-	}
-	blocks := content.Array()
-	if len(blocks) == 0 {
-		return -1
-	}
-	isAssistant := message.Get("role").String() == "assistant"
-	for i := len(blocks) - 1; i >= 0; i-- {
-		block := blocks[i]
-		if isEmptyClaudeTextBlock(block) {
-			continue
-		}
-		if isAssistant {
-			switch block.Get("type").String() {
-			case "thinking", "redacted_thinking":
-				return -1
-			}
-		}
-		if claudeContentBlockCanHostCacheControl(block) {
-			return i
-		}
-	}
-	return -1
-}
-
-// claudeMessageEligibleForRollingCache reports whether the native selector would
-// consider this user/assistant turn as a rolling breakpoint host. Native rejects
-// an assistant turn whose last content block is thinking-like, because a thinking
-// block cannot host the marker, and Anthropic rejects cache_control on empty text blocks.
-func claudeMessageEligibleForRollingCache(message ojson.Result) bool {
-	content := message.Get("content")
-	if content.Type == ojson.String {
-		return strings.TrimSpace(content.String()) != ""
-	}
-	return lastCacheableClaudeMessageContentBlockIndex(message) >= 0
-}
-
-// injectClaudeFinalSystemCacheControl reproduces the native final-system special
-// case, which replaces the string content with a single marked text block.
-func injectClaudeFinalSystemCacheControl(payload []byte, messageIndex int, text string) []byte {
-	doc := ojson.NewDoc(payload)
-	if !injectClaudeFinalSystemCacheControlDoc(doc, messageIndex, text) {
-		return payload
-	}
-	return doc.Bytes()
-}
-
 func injectClaudeFinalSystemCacheControlDoc(doc *ojson.Doc, messageIndex int, text string) bool {
 	if doc == nil {
 		return false
@@ -4237,21 +3879,6 @@ func injectClaudeFinalSystemCacheControlDoc(doc *ojson.Doc, messageIndex int, te
 		return false
 	}
 	return true
-}
-
-func messageContentHasCacheControl(content ojson.Result) bool {
-	if content.IsArray() {
-		found := false
-		content.ForEach(func(_, item ojson.Result) bool {
-			if isValidClaudeCacheControl(item.Get("cache_control")) {
-				found = true
-				return false
-			}
-			return true
-		})
-		return found
-	}
-	return false
 }
 
 // injectToolsCacheControl adds cache_control to the last non-deferred tool in the tools array.

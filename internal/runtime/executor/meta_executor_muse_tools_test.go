@@ -9,10 +9,10 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 // Model the tool-bearing rejection observed on the live Meta endpoint. Testing
@@ -45,9 +45,9 @@ func TestMetaExecutor_MuseToolsReachUpstream(t *testing.T) {
 					payload = []byte(`{"model":"muse-wonder-full-1.0-contributor","messages":[{"role":"user","content":"hello"}],"tools":[{"type":"function","function":{"name":"client_lookup","parameters":{"type":"object","properties":{"query":{"type":"string"}}}}}]}`)
 				}
 				exec := NewMetaExecutor(&config.Config{})
-				auth := &cliproxyauth.Auth{Provider: "meta", Attributes: map[string]string{"api_key": "test-key", "base_url": server.URL}}
-				req := cliproxyexecutor.Request{Model: "muse-wonder-full-1.0-contributor", Payload: payload}
-				opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString(format), Stream: stream}
+				auth := &coreauth.Auth{Provider: "meta", Attributes: map[string]string{"api_key": "test-key", "base_url": server.URL}}
+				req := coreexecutor.Request{Model: "muse-wonder-full-1.0-contributor", Payload: payload}
+				opts := coreexecutor.Options{SourceFormat: translatorreg.FromString(format), Stream: stream}
 				if stream {
 					result, err := exec.ExecuteStream(context.Background(), auth, req, opts)
 					if err != nil {
@@ -92,9 +92,9 @@ func TestMetaExecutor_MuseToolsPayloadRulesRemainFinal(t *testing.T) {
 				}))
 				defer server.Close()
 				exec := NewMetaExecutor(cfg)
-				auth := &cliproxyauth.Auth{Provider: "meta", Attributes: map[string]string{"api_key": "test-key", "base_url": server.URL}}
-				req := cliproxyexecutor.Request{Model: "muse-wonder-full-1.0", Payload: []byte(`{"input":"hello","tools":[{"type":"function","name":"lookup","parameters":{"type":"object"}}]}`)}
-				opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString("codex"), Stream: stream}
+				auth := &coreauth.Auth{Provider: "meta", Attributes: map[string]string{"api_key": "test-key", "base_url": server.URL}}
+				req := coreexecutor.Request{Model: "muse-wonder-full-1.0", Payload: []byte(`{"input":"hello","tools":[{"type":"function","name":"lookup","parameters":{"type":"object"}}]}`)}
+				opts := coreexecutor.Options{SourceFormat: translatorreg.FromString("codex"), Stream: stream}
 				if stream {
 					result, err := exec.ExecuteStream(context.Background(), auth, req, opts)
 					if err != nil {

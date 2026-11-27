@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	sdkauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/auth"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	authlogin "github.com/udit19199/relay/internal/auth/login"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 func TestCodexRefreshWithExplicitFilePathStore(t *testing.T) {
@@ -27,10 +27,10 @@ func TestCodexRefreshWithExplicitFilePathStore(t *testing.T) {
 		return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{"access_token":"new-access","refresh_token":"new-refresh","expires_in":3600}`)), Request: req}, nil
 	})
 	t.Cleanup(func() { http.DefaultTransport = original })
-	store := sdkauth.NewFileTokenStore()
-	manager := cliproxyauth.NewManager(store, nil, nil)
+	store := authlogin.NewFileTokenStore()
+	manager := coreauth.NewManager(store, nil, nil)
 	manager.RegisterExecutor(NewCodexExecutor(&config.Config{AuthDir: dir}))
-	auth := &cliproxyauth.Auth{ID: path, FileName: path, Provider: "codex", Status: cliproxyauth.StatusActive, Attributes: map[string]string{cliproxyauth.AttributePath: path}, Metadata: map[string]any{"access_token": "valid", "refresh_token": "explicit-file-grant", "expired": "2099-01-01T00:00:00Z"}}
+	auth := &coreauth.Auth{ID: path, FileName: path, Provider: "codex", Status: coreauth.StatusActive, Attributes: map[string]string{coreauth.AttributePath: path}, Metadata: map[string]any{"access_token": "valid", "refresh_token": "explicit-file-grant", "expired": "2099-01-01T00:00:00Z"}}
 	if _, errRegister := manager.Register(context.Background(), auth); errRegister != nil {
 		t.Fatal(errRegister)
 	}

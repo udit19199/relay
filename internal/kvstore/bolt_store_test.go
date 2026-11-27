@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"github.com/udit19199/relay/internal/config"
+	"go.etcd.io/bbolt"
 	"math"
 	"os"
 	"path/filepath"
@@ -14,9 +16,6 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"go.etcd.io/bbolt"
 )
 
 func TestResolvePath_DefaultRelativeTildeAndAbsolute(t *testing.T) {
@@ -79,7 +78,7 @@ func TestResolvePath_DefaultRelativeTildeAndAbsolute(t *testing.T) {
 	if errDefaultAuth != nil {
 		t.Fatalf("ResolvePathWithAuthDir('', '') error = %v", errDefaultAuth)
 	}
-	wantDefaultAuth := filepath.Clean(filepath.Join(homeDir, ".cli-proxy-api", config.DefaultKVStorePath))
+	wantDefaultAuth := filepath.Clean(filepath.Join(homeDir, ".relay", "auths", config.DefaultKVStorePath))
 	if gotDefaultAuth != wantDefaultAuth {
 		t.Fatalf("ResolvePathWithAuthDir('', '') = %q, want %q", gotDefaultAuth, wantDefaultAuth)
 	}

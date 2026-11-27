@@ -17,13 +17,13 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gorilla/websocket"
-	xaiauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/xai"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
 	log "github.com/sirupsen/logrus"
+	xaiauth "github.com/udit19199/relay/internal/auth/xai"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	"github.com/udit19199/relay/internal/util"
 )
 
 // XAIWebsocketsExecutor executes xAI Responses requests using a WebSocket transport.
@@ -158,17 +158,6 @@ func (s *xaiWebsocketIDState) snapshotTranscriptInput() []byte {
 	return xaiMarshalRawMessages(s.transcriptInput)
 }
 
-func (s *xaiWebsocketIDState) prependTranscriptInput(payload []byte) []byte {
-	if s == nil || len(payload) == 0 {
-		return payload
-	}
-	doc := ojson.NewDoc(payload)
-	if !s.prependTranscriptInputDoc(doc) {
-		return payload
-	}
-	return doc.Bytes()
-}
-
 func (s *xaiWebsocketIDState) prependTranscriptInputDoc(doc *ojson.Doc) bool {
 	if s == nil || doc == nil {
 		return false
@@ -223,17 +212,6 @@ func (s *xaiWebsocketIDState) replaceTranscriptWithItems(items ...[]byte) {
 	s.transcriptInput = next
 	s.replayCompactedTranscriptOnReset = len(next) > 0
 	s.mu.Unlock()
-}
-
-func (s *xaiWebsocketIDState) prependCompactedTranscriptOnReset(payload []byte) ([]byte, bool) {
-	if s == nil || len(payload) == 0 {
-		return payload, false
-	}
-	doc := ojson.NewDoc(payload)
-	if !s.prependCompactedTranscriptOnResetDoc(doc) {
-		return payload, false
-	}
-	return doc.Bytes(), true
 }
 
 func (s *xaiWebsocketIDState) prependCompactedTranscriptOnResetDoc(doc *ojson.Doc) bool {
@@ -433,14 +411,14 @@ func rewriteXAIWebsocketDownstreamIDString(value string, key string, upstreamRes
 	return value
 }
 
-func (e *XAIWebsocketsExecutor) Execute(ctx context.Context, auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
+func (e *XAIWebsocketsExecutor) Execute(ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) (coreexecutor.Response, error) {
 	if e == nil || e.XAIExecutor == nil {
-		return cliproxyexecutor.Response{}, fmt.Errorf("xai websockets executor: executor is nil")
+		return coreexecutor.Response{}, fmt.Errorf("xai websockets executor: executor is nil")
 	}
 	return e.XAIExecutor.Execute(ctx, auth, req, opts)
 }
 
-func (e *XAIWebsocketsExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (_ *cliproxyexecutor.StreamResult, err error) {
+func (e *XAIWebsocketsExecutor) ExecuteStream(ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) (_ *coreexecutor.StreamResult, err error) {
 	if e == nil || e.XAIExecutor == nil {
 		return nil, fmt.Errorf("xai websockets executor: executor is nil")
 	}
@@ -468,8 +446,8 @@ func (e *XAIWebsocketsExecutor) ExecuteStream(ctx context.Context, auth *cliprox
 		}
 	}()
 	if xaiInputHasItemType(req.Payload, "compaction_trigger") {
-		if cliproxyexecutor.RequiredUpstreamWebsocket(ctx) {
-			return nil, cliproxyexecutor.NewUpstreamWebsocketReplayRequiredError()
+		if coreexecutor.RequiredUpstreamWebsocket(ctx) {
+			return nil, coreexecutor.NewUpstreamWebsocketReplayRequiredError()
 		}
 		if executionSessionID != "" {
 			sess := e.getOrCreateSession(executionSessionID)
@@ -566,11 +544,11 @@ func (e *XAIWebsocketsExecutor) ExecuteStream(ctx context.Context, auth *cliprox
 	var closer *websocketConnectionCloser
 	var respHS *http.Response
 	var errDial error
-	if cliproxyexecutor.RequiredUpstreamWebsocket(ctx) {
+	if coreexecutor.RequiredUpstreamWebsocket(ctx) {
 		conn, closer = existingWebsocketSessionConn(sess, authID, wsURL, executionProxyURL(ctx, sessCfg, auth))
 		if conn == nil {
 			unlockStreamSession()
-			return nil, cliproxyexecutor.NewUpstreamWebsocketReplayRequiredError()
+			return nil, coreexecutor.NewUpstreamWebsocketReplayRequiredError()
 		}
 	} else {
 		conn, closer, respHS, errDial = e.ensureUpstreamConn(ctx, auth, sess, authID, wsURL, wsHeaders)
@@ -609,19 +587,19 @@ func (e *XAIWebsocketsExecutor) ExecuteStream(ctx context.Context, auth *cliprox
 		readCh = sess.activate(conn)
 	}
 
-	cliproxyexecutor.MarkUpstreamAttempt(ctx)
+	coreexecutor.MarkUpstreamAttempt(ctx)
 	if errSend := writeWebsocketPayloadMessage("xai", sess, conn, wsReqBody); errSend != nil {
 		errSend = mapXAIWebsocketWriteError(sess, conn, errSend)
 		helps.RecordAPIWebsocketError(ctx, e.cfg, "send", errSend)
 		if sess != nil && !isEphemeralSession {
-			if cliproxyexecutor.RequiredUpstreamWebsocket(ctx) {
+			if coreexecutor.RequiredUpstreamWebsocket(ctx) {
 				e.invalidateUpstreamConnWithoutDisconnectNotify(sess, conn, "send_error", errSend)
 				sess.clearActive(conn, readCh)
 				sess.reqMu.Unlock()
 				if !shouldRetryXAIWebsocketSend(errSend) {
 					return nil, errSend
 				}
-				return nil, cliproxyexecutor.NewUpstreamWebsocketReplayRequiredError()
+				return nil, coreexecutor.NewUpstreamWebsocketReplayRequiredError()
 			}
 			e.invalidateUpstreamConn(sess, conn, "send_error", errSend)
 			if !shouldRetryXAIWebsocketSend(errSend) {
@@ -666,7 +644,7 @@ func (e *XAIWebsocketsExecutor) ExecuteStream(ctx context.Context, auth *cliprox
 			logXAIWebsocketRequest(executionSessionID, authID, wsURL, wsReqBodyRetry)
 			recordAPIWebsocketHandshake(ctx, e.cfg, respHSRetry)
 			reporter.StartResponseTTFT()
-			cliproxyexecutor.MarkUpstreamAttempt(ctx)
+			coreexecutor.MarkUpstreamAttempt(ctx)
 			if errSendRetry := writeWebsocketPayloadMessage("xai", sess, conn, wsReqBodyRetry); errSendRetry != nil {
 				errSendRetry = mapXAIWebsocketWriteError(sess, connRetry, errSendRetry)
 				helps.RecordAPIWebsocketError(ctx, e.cfg, "send_retry", errSendRetry)
@@ -693,7 +671,7 @@ func (e *XAIWebsocketsExecutor) ExecuteStream(ctx context.Context, auth *cliprox
 		}
 	}
 
-	out := make(chan cliproxyexecutor.StreamChunk)
+	out := make(chan coreexecutor.StreamChunk)
 	if stateRequestLocked {
 		stateRequestLockTransferred = true
 	}
@@ -720,7 +698,7 @@ func (e *XAIWebsocketsExecutor) ExecuteStream(ctx context.Context, auth *cliprox
 			}
 		}()
 
-		send := func(chunk cliproxyexecutor.StreamChunk) bool {
+		send := func(chunk coreexecutor.StreamChunk) bool {
 			if ctx == nil {
 				out <- chunk
 				return true
@@ -757,7 +735,7 @@ func (e *XAIWebsocketsExecutor) ExecuteStream(ctx context.Context, auth *cliprox
 			if ctx != nil && ctx.Err() != nil {
 				terminateReason = "context_done"
 				terminateErr = ctx.Err()
-				_ = send(cliproxyexecutor.StreamChunk{Err: ctx.Err()})
+				_ = send(coreexecutor.StreamChunk{Err: ctx.Err()})
 				return
 			}
 			msgType, payload, errRead := readXAIWebsocketMessage(ctx, sess, conn, readCh)
@@ -765,7 +743,7 @@ func (e *XAIWebsocketsExecutor) ExecuteStream(ctx context.Context, auth *cliprox
 				if sess != nil && ctx != nil && ctx.Err() != nil {
 					terminateReason = "context_done"
 					terminateErr = ctx.Err()
-					_ = send(cliproxyexecutor.StreamChunk{Err: ctx.Err()})
+					_ = send(coreexecutor.StreamChunk{Err: ctx.Err()})
 					return
 				}
 				if ctx == nil || ctx.Err() == nil {
@@ -774,13 +752,13 @@ func (e *XAIWebsocketsExecutor) ExecuteStream(ctx context.Context, auth *cliprox
 						errBridge = statusErr{code: http.StatusBadGateway, msg: helps.ApplyPatchUpstreamErrorMessage}
 						invalidatePatchAttempt()
 						for _, event := range events {
-							if cliproxyexecutor.DownstreamWebsocket(ctx) {
-								_ = send(cliproxyexecutor.StreamChunk{Payload: event})
+							if coreexecutor.DownstreamWebsocket(ctx) {
+								_ = send(coreexecutor.StreamChunk{Payload: event})
 							} else {
-								_ = send(cliproxyexecutor.StreamChunk{Payload: encodeCodexWebsocketAsSSE(event)})
+								_ = send(coreexecutor.StreamChunk{Payload: encodeCodexWebsocketAsSSE(event)})
 							}
 						}
-						_ = send(cliproxyexecutor.StreamChunk{Err: errBridge})
+						_ = send(coreexecutor.StreamChunk{Err: errBridge})
 						return
 					}
 				}
@@ -789,7 +767,7 @@ func (e *XAIWebsocketsExecutor) ExecuteStream(ctx context.Context, auth *cliprox
 				terminateErr = mappedErr
 				helps.RecordAPIWebsocketError(ctx, e.cfg, "read", mappedErr)
 				reporter.PublishFailure(ctx, mappedErr)
-				_ = send(cliproxyexecutor.StreamChunk{Err: mappedErr})
+				_ = send(coreexecutor.StreamChunk{Err: mappedErr})
 				return
 			}
 			if msgType != websocket.TextMessage {
@@ -802,7 +780,7 @@ func (e *XAIWebsocketsExecutor) ExecuteStream(ctx context.Context, auth *cliprox
 					if sess != nil {
 						e.invalidateUpstreamConn(sess, conn, "unexpected_binary", errBinary)
 					}
-					_ = send(cliproxyexecutor.StreamChunk{Err: errBinary})
+					_ = send(coreexecutor.StreamChunk{Err: errBinary})
 					return
 				}
 				continue
@@ -824,7 +802,7 @@ func (e *XAIWebsocketsExecutor) ExecuteStream(ctx context.Context, auth *cliprox
 				if sess != nil {
 					e.invalidateUpstreamConnWithoutDisconnectNotify(sess, conn, "upstream_error", wsErr)
 				}
-				_ = send(cliproxyexecutor.StreamChunk{Err: wsErr})
+				_ = send(coreexecutor.StreamChunk{Err: wsErr})
 				return
 			}
 
@@ -846,14 +824,14 @@ func (e *XAIWebsocketsExecutor) ExecuteStream(ctx context.Context, auth *cliprox
 					errBridge = statusErr{code: http.StatusBadGateway, msg: helps.ApplyPatchUpstreamErrorMessage}
 					invalidatePatchAttempt()
 					for _, event := range events {
-						if cliproxyexecutor.DownstreamWebsocket(ctx) {
-							_ = send(cliproxyexecutor.StreamChunk{Payload: event})
+						if coreexecutor.DownstreamWebsocket(ctx) {
+							_ = send(coreexecutor.StreamChunk{Payload: event})
 						} else {
-							_ = send(cliproxyexecutor.StreamChunk{Payload: encodeCodexWebsocketAsSSE(event)})
+							_ = send(coreexecutor.StreamChunk{Payload: encodeCodexWebsocketAsSSE(event)})
 						}
 					}
 					reporter.PublishFailure(ctx, errBridge)
-					_ = send(cliproxyexecutor.StreamChunk{Err: errBridge})
+					_ = send(coreexecutor.StreamChunk{Err: errBridge})
 					return
 				}
 				for _, payload := range events {
@@ -891,7 +869,7 @@ func (e *XAIWebsocketsExecutor) ExecuteStream(ctx context.Context, auth *cliprox
 						}
 					}
 
-					if cliproxyexecutor.DownstreamWebsocket(ctx) {
+					if coreexecutor.DownstreamWebsocket(ctx) {
 						downstreamPayload := helps.EnsureResponsesUsageDetails(payload)
 						downstreamWarmupCompletedPayload := helps.EnsureResponsesUsageDetails(warmupCompletedPayload)
 						if idMapper != nil {
@@ -900,13 +878,13 @@ func (e *XAIWebsocketsExecutor) ExecuteStream(ctx context.Context, auth *cliprox
 								downstreamWarmupCompletedPayload = idMapper.downstreamResponsePayload(downstreamWarmupCompletedPayload)
 							}
 						}
-						if !send(cliproxyexecutor.StreamChunk{Payload: downstreamPayload}) {
+						if !send(coreexecutor.StreamChunk{Payload: downstreamPayload}) {
 							terminateReason = "context_done"
 							terminateErr = ctx.Err()
 							return
 						}
 						if len(downstreamWarmupCompletedPayload) > 0 {
-							if !send(cliproxyexecutor.StreamChunk{Payload: downstreamWarmupCompletedPayload}) {
+							if !send(coreexecutor.StreamChunk{Payload: downstreamWarmupCompletedPayload}) {
 								terminateReason = "context_done"
 								terminateErr = ctx.Err()
 								return
@@ -926,7 +904,7 @@ func (e *XAIWebsocketsExecutor) ExecuteStream(ctx context.Context, auth *cliprox
 						invalidatePatchAttempt()
 					}
 					for i := range chunks {
-						if !send(cliproxyexecutor.StreamChunk{Payload: chunks[i]}) {
+						if !send(coreexecutor.StreamChunk{Payload: chunks[i]}) {
 							terminateReason = "context_done"
 							terminateErr = ctx.Err()
 							return
@@ -944,7 +922,7 @@ func (e *XAIWebsocketsExecutor) ExecuteStream(ctx context.Context, auth *cliprox
 							invalidatePatchAttempt()
 						}
 						for i := range chunks {
-							if !send(cliproxyexecutor.StreamChunk{Payload: chunks[i]}) {
+							if !send(coreexecutor.StreamChunk{Payload: chunks[i]}) {
 								terminateReason = "context_done"
 								terminateErr = ctx.Err()
 								return
@@ -960,10 +938,10 @@ func (e *XAIWebsocketsExecutor) ExecuteStream(ctx context.Context, auth *cliprox
 			}
 		}
 	}()
-	return &cliproxyexecutor.StreamResult{Headers: upstreamHeaders, Chunks: out}, nil
+	return &coreexecutor.StreamResult{Headers: upstreamHeaders, Chunks: out}, nil
 }
 
-func (e *XAIWebsocketsExecutor) executeCompactionTriggerFromWebsocketContext(ctx context.Context, auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options, idMapper *xaiWebsocketRequestIDMapper) (*cliproxyexecutor.StreamResult, error) {
+func (e *XAIWebsocketsExecutor) executeCompactionTriggerFromWebsocketContext(ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options, idMapper *xaiWebsocketRequestIDMapper) (*coreexecutor.StreamResult, error) {
 	if idMapper == nil || idMapper.state == nil {
 		return nil, statusErr{code: http.StatusBadRequest, msg: "xai websocket compaction context is unavailable"}
 	}
@@ -1039,12 +1017,12 @@ func (e *XAIWebsocketsExecutor) executeCompactionTriggerFromWebsocketContext(ctx
 	headers.Set("Content-Type", "text/event-stream")
 
 	chunks := xaiBuildCompactionTriggerStreamChunks(prepared, data)
-	out := make(chan cliproxyexecutor.StreamChunk, len(chunks))
+	out := make(chan coreexecutor.StreamChunk, len(chunks))
 	for _, chunk := range chunks {
-		out <- cliproxyexecutor.StreamChunk{Payload: chunk}
+		out <- coreexecutor.StreamChunk{Payload: chunk}
 	}
 	close(out)
-	return &cliproxyexecutor.StreamResult{Headers: headers, Chunks: out}, nil
+	return &coreexecutor.StreamResult{Headers: headers, Chunks: out}, nil
 }
 
 func validateXAIWebsocketCompactionResponse(data []byte) (string, []byte, error) {
@@ -1161,18 +1139,7 @@ func xaiBareWebsocketErrorStatus(payload []byte) int {
 	return http.StatusInternalServerError
 }
 
-func (e *XAIWebsocketsExecutor) prepareResponsesWebsocketRequest(ctx context.Context, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (*xaiPreparedRequest, error) {
-	prepared, err := e.prepareResponsesWebsocketRequestDoc(ctx, req, opts)
-	if err != nil {
-		return nil, err
-	}
-	if prepared.doc != nil {
-		prepared.body = prepared.doc.Bytes()
-	}
-	return prepared, nil
-}
-
-func (e *XAIWebsocketsExecutor) prepareResponsesWebsocketRequestDoc(ctx context.Context, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (*xaiPreparedRequest, error) {
+func (e *XAIWebsocketsExecutor) prepareResponsesWebsocketRequestDoc(ctx context.Context, req coreexecutor.Request, opts coreexecutor.Options) (*xaiPreparedRequest, error) {
 	prepared, err := e.prepareResponsesRequestDoc(ctx, req, opts, true)
 	if err != nil {
 		return nil, err
@@ -1183,7 +1150,7 @@ func (e *XAIWebsocketsExecutor) prepareResponsesWebsocketRequestDoc(ctx context.
 	return prepared, nil
 }
 
-func (e *XAIWebsocketsExecutor) dialXAIWebsocket(ctx context.Context, auth *cliproxyauth.Auth, wsURL string, headers http.Header) (*websocket.Conn, *websocketConnectionCloser, *http.Response, error) {
+func (e *XAIWebsocketsExecutor) dialXAIWebsocket(ctx context.Context, auth *coreauth.Auth, wsURL string, headers http.Header) (*websocket.Conn, *websocketConnectionCloser, *http.Response, error) {
 	dialer := newProxyAwareWebsocketDialer(ctx, e.cfg, auth)
 	dialer.HandshakeTimeout = codexResponsesWebsocketHandshakeTO
 	dialer.EnableCompression = true
@@ -1192,7 +1159,7 @@ func (e *XAIWebsocketsExecutor) dialXAIWebsocket(ctx context.Context, auth *clip
 	}
 	conn, resp, err := dialer.DialContext(ctx, wsURL, headers)
 	if err != nil {
-		cliproxyexecutor.MarkUpstreamAttempt(ctx)
+		coreexecutor.MarkUpstreamAttempt(ctx)
 	}
 	closer := newWebsocketConnectionCloser(conn)
 	if conn != nil {
@@ -1241,7 +1208,7 @@ func (e *XAIWebsocketsExecutor) UpstreamDisconnectChan(sessionID string) <-chan 
 	return sess.upstreamDisconnectCh
 }
 
-func (e *XAIWebsocketsExecutor) ensureUpstreamConn(ctx context.Context, auth *cliproxyauth.Auth, sess *codexWebsocketSession, authID string, wsURL string, headers http.Header) (*websocket.Conn, *websocketConnectionCloser, *http.Response, error) {
+func (e *XAIWebsocketsExecutor) ensureUpstreamConn(ctx context.Context, auth *coreauth.Auth, sess *codexWebsocketSession, authID string, wsURL string, headers http.Header) (*websocket.Conn, *websocketConnectionCloser, *http.Response, error) {
 	if sess == nil {
 		return e.dialXAIWebsocket(ctx, auth, wsURL, headers)
 	}
@@ -1527,7 +1494,7 @@ func (e *XAIWebsocketsExecutor) idStateStore() *xaiWebsocketIDStateStore {
 	return globalXAIWebsocketIDStates
 }
 
-func (e *XAIWebsocketsExecutor) SharesExecutionSessionsWith(other cliproxyauth.ProviderExecutor) bool {
+func (e *XAIWebsocketsExecutor) SharesExecutionSessionsWith(other coreauth.ProviderExecutor) bool {
 	if e == nil || other == nil {
 		return false
 	}
@@ -1558,7 +1525,7 @@ func (e *XAIWebsocketsExecutor) CloseExecutionSession(sessionID string) {
 	if e == nil || sessionID == "" {
 		return
 	}
-	if sessionID == cliproxyauth.CloseAllExecutionSessionsID {
+	if sessionID == coreauth.CloseAllExecutionSessionsID {
 		e.closeAllExecutionSessions("executor_shutdown")
 		return
 	}
@@ -1686,7 +1653,7 @@ func buildXAIResponsesWebsocketURL(httpURL string) (string, error) {
 	return parsed.String(), nil
 }
 
-func applyXAIWebsocketHeaders(ctx context.Context, headers http.Header, auth *cliproxyauth.Auth, token string, sessionID string, clientHeaders ...http.Header) http.Header {
+func applyXAIWebsocketHeaders(ctx context.Context, headers http.Header, auth *coreauth.Auth, token string, sessionID string, clientHeaders ...http.Header) http.Header {
 	if headers == nil {
 		headers = http.Header{}
 	}
@@ -1879,50 +1846,50 @@ func (e *XAIAutoExecutor) UsesConfig(cfg *config.Config) bool {
 	return e != nil && e.httpExec != nil && e.httpExec.cfg == cfg
 }
 
-func (e *XAIAutoExecutor) PrepareRequest(req *http.Request, auth *cliproxyauth.Auth) error {
+func (e *XAIAutoExecutor) PrepareRequest(req *http.Request, auth *coreauth.Auth) error {
 	if e == nil || e.httpExec == nil {
 		return nil
 	}
 	return e.httpExec.PrepareRequest(req, auth)
 }
 
-func (e *XAIAutoExecutor) HttpRequest(ctx context.Context, auth *cliproxyauth.Auth, req *http.Request) (*http.Response, error) {
+func (e *XAIAutoExecutor) HttpRequest(ctx context.Context, auth *coreauth.Auth, req *http.Request) (*http.Response, error) {
 	if e == nil || e.httpExec == nil {
 		return nil, fmt.Errorf("xai auto executor: http executor is nil")
 	}
 	return e.httpExec.HttpRequest(ctx, auth, req)
 }
 
-func (e *XAIAutoExecutor) Execute(ctx context.Context, auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
+func (e *XAIAutoExecutor) Execute(ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) (coreexecutor.Response, error) {
 	if e == nil || e.httpExec == nil {
-		return cliproxyexecutor.Response{}, fmt.Errorf("xai auto executor: executor is nil")
+		return coreexecutor.Response{}, fmt.Errorf("xai auto executor: executor is nil")
 	}
 	return e.httpExec.Execute(ctx, auth, req, opts)
 }
 
-func (e *XAIAutoExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (*cliproxyexecutor.StreamResult, error) {
+func (e *XAIAutoExecutor) ExecuteStream(ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) (*coreexecutor.StreamResult, error) {
 	if e == nil || e.httpExec == nil || e.wsExec == nil {
 		return nil, fmt.Errorf("xai auto executor: executor is nil")
 	}
-	if cliproxyexecutor.DownstreamWebsocket(ctx) && xaiWebsocketsEnabled(auth) {
+	if coreexecutor.DownstreamWebsocket(ctx) && xaiWebsocketsEnabled(auth) {
 		return e.wsExec.ExecuteStream(ctx, auth, req, opts)
 	}
-	if cliproxyexecutor.RequiredUpstreamWebsocket(ctx) {
-		return nil, cliproxyexecutor.NewUpstreamWebsocketReplayRequiredError()
+	if coreexecutor.RequiredUpstreamWebsocket(ctx) {
+		return nil, coreexecutor.NewUpstreamWebsocketReplayRequiredError()
 	}
 	return e.httpExec.ExecuteStream(ctx, auth, req, opts)
 }
 
-func (e *XAIAutoExecutor) Refresh(ctx context.Context, auth *cliproxyauth.Auth) (*cliproxyauth.Auth, error) {
+func (e *XAIAutoExecutor) Refresh(ctx context.Context, auth *coreauth.Auth) (*coreauth.Auth, error) {
 	if e == nil || e.httpExec == nil {
 		return nil, fmt.Errorf("xai auto executor: http executor is nil")
 	}
 	return e.httpExec.Refresh(ctx, auth)
 }
 
-func (e *XAIAutoExecutor) CountTokens(ctx context.Context, auth *cliproxyauth.Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
+func (e *XAIAutoExecutor) CountTokens(ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) (coreexecutor.Response, error) {
 	if e == nil || e.httpExec == nil {
-		return cliproxyexecutor.Response{}, fmt.Errorf("xai auto executor: http executor is nil")
+		return coreexecutor.Response{}, fmt.Errorf("xai auto executor: http executor is nil")
 	}
 	return e.httpExec.CountTokens(ctx, auth, req, opts)
 }
@@ -1934,7 +1901,7 @@ func (e *XAIAutoExecutor) CloseExecutionSession(sessionID string) {
 	e.wsExec.CloseExecutionSession(sessionID)
 }
 
-func (e *XAIAutoExecutor) SharesExecutionSessionsWith(other cliproxyauth.ProviderExecutor) bool {
+func (e *XAIAutoExecutor) SharesExecutionSessionsWith(other coreauth.ProviderExecutor) bool {
 	if e == nil || e.wsExec == nil {
 		return false
 	}
@@ -1955,7 +1922,7 @@ func (e *XAIAutoExecutor) UpstreamDisconnectChan(sessionID string) <-chan error 
 	return e.wsExec.UpstreamDisconnectChan(sessionID)
 }
 
-func xaiWebsocketsEnabled(auth *cliproxyauth.Auth) bool {
+func xaiWebsocketsEnabled(auth *coreauth.Auth) bool {
 	if auth == nil {
 		return false
 	}

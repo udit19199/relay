@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 func TestModelQuotaObservationPayloadOmitsUnsupportedProviders(t *testing.T) {

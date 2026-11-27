@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 // An unknown-id interrupt arriving after the upstream terminal event was
@@ -90,7 +90,7 @@ func TestInterruptExecutionSessionUnknownAfterTerminalDelivery(t *testing.T) {
 	// run its deferred teardown yet, but the client has already seen
 	// response.completed and now sends an unknown interrupt.
 	errInterrupt := exec.InterruptExecutionSession(context.Background(), sessionID, []byte(`{"type":"response.interrupt","response_id":"unknown"}`))
-	if !errors.Is(errInterrupt, cliproxyexecutor.ErrUpstreamWebsocketInterruptRejected) {
+	if !errors.Is(errInterrupt, coreexecutor.ErrUpstreamWebsocketInterruptRejected) {
 		t.Fatalf("unknown interrupt after completion = %v, want ErrUpstreamWebsocketInterruptRejected", errInterrupt)
 	}
 	// A transport-order barrier avoids sleeps or assumptions about whether

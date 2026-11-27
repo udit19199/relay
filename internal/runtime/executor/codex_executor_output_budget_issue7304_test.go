@@ -13,12 +13,12 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gorilla/websocket"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/translator"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/registry"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	_ "github.com/udit19199/relay/internal/translator"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 // codexMinimumBudgetUpstream is a simplified lower-bound-only model of the ChatGPT
@@ -87,15 +87,15 @@ func TestCodexVerifyInferenceMinimumOutputBudget_Issue7304(t *testing.T) {
 	server, requests := codexMinimumBudgetUpstream(t)
 
 	executor := NewCodexExecutor(&config.Config{})
-	manager := cliproxyauth.NewManager(nil, nil, nil)
+	manager := coreauth.NewManager(nil, nil, nil)
 	manager.RegisterExecutor(executor)
 
-	ctx := cliproxyauth.WithSkipPersist(context.Background())
-	auth := &cliproxyauth.Auth{
+	ctx := coreauth.WithSkipPersist(context.Background())
+	auth := &coreauth.Auth{
 		ID:         "codex-verify-7304.json",
 		FileName:   "codex-verify-7304.json",
 		Provider:   "codex",
-		Status:     cliproxyauth.StatusActive,
+		Status:     coreauth.StatusActive,
 		Attributes: map[string]string{"base_url": server.URL},
 		Metadata: map[string]any{
 			"type":          "codex",
@@ -135,37 +135,37 @@ func TestCodexSmallOutputBudgetsAllSourceFormats_Issue7304(t *testing.T) {
 
 	cases := []struct {
 		name    string
-		from    sdktranslator.Format
+		from    translatorreg.Format
 		payload string
 		want    string
 		rules   config.PayloadConfig
 	}{
-		{name: "responses max_output_tokens 1", from: sdktranslator.FormatOpenAIResponse, payload: `{"model":"gpt-5.6-sol","max_output_tokens":1,"input":"Hi"}`, want: "16"},
-		{name: "responses max_output_tokens 15", from: sdktranslator.FormatOpenAIResponse, payload: `{"model":"gpt-5.6-sol","max_output_tokens":15,"input":"Hi"}`, want: "16"},
-		{name: "responses legacy max_completion_tokens 1", from: sdktranslator.FormatOpenAIResponse, payload: `{"model":"gpt-5.6-sol","max_completion_tokens":1,"input":"Hi"}`, want: "16"},
-		{name: "responses legacy max_tokens 1", from: sdktranslator.FormatOpenAIResponse, payload: `{"model":"gpt-5.6-sol","max_tokens":1,"input":"Hi"}`, want: "16"},
-		{name: "responses 16 unchanged", from: sdktranslator.FormatOpenAIResponse, payload: `{"model":"gpt-5.6-sol","max_output_tokens":16,"input":"Hi"}`, want: "16"},
-		{name: "responses 1024 unchanged", from: sdktranslator.FormatOpenAIResponse, payload: `{"model":"gpt-5.6-sol","max_output_tokens":1024,"input":"Hi"}`, want: "1024"},
-		{name: "responses zero untouched", from: sdktranslator.FormatOpenAIResponse, payload: `{"model":"gpt-5.6-sol","max_output_tokens":0,"input":"Hi"}`, want: "0"},
-		{name: "responses negative untouched", from: sdktranslator.FormatOpenAIResponse, payload: `{"model":"gpt-5.6-sol","max_output_tokens":-5,"input":"Hi"}`, want: "-5"},
-		{name: "responses fractional untouched", from: sdktranslator.FormatOpenAIResponse, payload: `{"model":"gpt-5.6-sol","max_output_tokens":1.5,"input":"Hi"}`, want: "1.5"},
-		{name: "responses integral float normalized", from: sdktranslator.FormatOpenAIResponse, payload: `{"model":"gpt-5.6-sol","max_output_tokens":15.0,"input":"Hi"}`, want: "16"},
-		{name: "responses scientific integral normalized", from: sdktranslator.FormatOpenAIResponse, payload: `{"model":"gpt-5.6-sol","max_output_tokens":1e1,"input":"Hi"}`, want: "16"},
-		{name: "responses string untouched", from: sdktranslator.FormatOpenAIResponse, payload: `{"model":"gpt-5.6-sol","max_output_tokens":"1","input":"Hi"}`, want: `"1"`},
-		{name: "responses absent", from: sdktranslator.FormatOpenAIResponse, payload: `{"model":"gpt-5.6-sol","input":"Hi"}`},
-		{name: "chat max_tokens 1", from: sdktranslator.FormatOpenAI, payload: `{"model":"gpt-5.6-sol","max_tokens":1,"messages":[{"role":"user","content":"Hi"}]}`, want: "16"},
-		{name: "chat max_completion_tokens 1", from: sdktranslator.FormatOpenAI, payload: `{"model":"gpt-5.6-sol","max_completion_tokens":1,"messages":[{"role":"user","content":"Hi"}]}`, want: "16"},
-		{name: "chat max_output_tokens 1", from: sdktranslator.FormatOpenAI, payload: `{"model":"gpt-5.6-sol","max_output_tokens":1,"messages":[{"role":"user","content":"Hi"}]}`, want: "16"},
-		{name: "claude max_tokens 1", from: sdktranslator.FormatClaude, payload: `{"model":"gpt-5.6-sol","max_tokens":1,"messages":[{"role":"user","content":[{"type":"text","text":"Hi"}]}]}`, want: "16"},
-		{name: "interactions max_output_tokens 1", from: sdktranslator.FormatInteractions, payload: `{"model":"gpt-5.6-sol","input":"Hi","max_output_tokens":1}`, want: "16"},
-		{name: "interactions generation_config 1", from: sdktranslator.FormatInteractions, payload: `{"model":"gpt-5.6-sol","input":"Hi","generation_config":{"max_output_tokens":1}}`, want: "16"},
+		{name: "responses max_output_tokens 1", from: translatorreg.FormatOpenAIResponse, payload: `{"model":"gpt-5.6-sol","max_output_tokens":1,"input":"Hi"}`, want: "16"},
+		{name: "responses max_output_tokens 15", from: translatorreg.FormatOpenAIResponse, payload: `{"model":"gpt-5.6-sol","max_output_tokens":15,"input":"Hi"}`, want: "16"},
+		{name: "responses legacy max_completion_tokens 1", from: translatorreg.FormatOpenAIResponse, payload: `{"model":"gpt-5.6-sol","max_completion_tokens":1,"input":"Hi"}`, want: "16"},
+		{name: "responses legacy max_tokens 1", from: translatorreg.FormatOpenAIResponse, payload: `{"model":"gpt-5.6-sol","max_tokens":1,"input":"Hi"}`, want: "16"},
+		{name: "responses 16 unchanged", from: translatorreg.FormatOpenAIResponse, payload: `{"model":"gpt-5.6-sol","max_output_tokens":16,"input":"Hi"}`, want: "16"},
+		{name: "responses 1024 unchanged", from: translatorreg.FormatOpenAIResponse, payload: `{"model":"gpt-5.6-sol","max_output_tokens":1024,"input":"Hi"}`, want: "1024"},
+		{name: "responses zero untouched", from: translatorreg.FormatOpenAIResponse, payload: `{"model":"gpt-5.6-sol","max_output_tokens":0,"input":"Hi"}`, want: "0"},
+		{name: "responses negative untouched", from: translatorreg.FormatOpenAIResponse, payload: `{"model":"gpt-5.6-sol","max_output_tokens":-5,"input":"Hi"}`, want: "-5"},
+		{name: "responses fractional untouched", from: translatorreg.FormatOpenAIResponse, payload: `{"model":"gpt-5.6-sol","max_output_tokens":1.5,"input":"Hi"}`, want: "1.5"},
+		{name: "responses integral float normalized", from: translatorreg.FormatOpenAIResponse, payload: `{"model":"gpt-5.6-sol","max_output_tokens":15.0,"input":"Hi"}`, want: "16"},
+		{name: "responses scientific integral normalized", from: translatorreg.FormatOpenAIResponse, payload: `{"model":"gpt-5.6-sol","max_output_tokens":1e1,"input":"Hi"}`, want: "16"},
+		{name: "responses string untouched", from: translatorreg.FormatOpenAIResponse, payload: `{"model":"gpt-5.6-sol","max_output_tokens":"1","input":"Hi"}`, want: `"1"`},
+		{name: "responses absent", from: translatorreg.FormatOpenAIResponse, payload: `{"model":"gpt-5.6-sol","input":"Hi"}`},
+		{name: "chat max_tokens 1", from: translatorreg.FormatOpenAI, payload: `{"model":"gpt-5.6-sol","max_tokens":1,"messages":[{"role":"user","content":"Hi"}]}`, want: "16"},
+		{name: "chat max_completion_tokens 1", from: translatorreg.FormatOpenAI, payload: `{"model":"gpt-5.6-sol","max_completion_tokens":1,"messages":[{"role":"user","content":"Hi"}]}`, want: "16"},
+		{name: "chat max_output_tokens 1", from: translatorreg.FormatOpenAI, payload: `{"model":"gpt-5.6-sol","max_output_tokens":1,"messages":[{"role":"user","content":"Hi"}]}`, want: "16"},
+		{name: "claude max_tokens 1", from: translatorreg.FormatClaude, payload: `{"model":"gpt-5.6-sol","max_tokens":1,"messages":[{"role":"user","content":[{"type":"text","text":"Hi"}]}]}`, want: "16"},
+		{name: "interactions max_output_tokens 1", from: translatorreg.FormatInteractions, payload: `{"model":"gpt-5.6-sol","input":"Hi","max_output_tokens":1}`, want: "16"},
+		{name: "interactions generation_config 1", from: translatorreg.FormatInteractions, payload: `{"model":"gpt-5.6-sol","input":"Hi","generation_config":{"max_output_tokens":1}}`, want: "16"},
 		{
-			name: "responses payload override still final", from: sdktranslator.FormatOpenAIResponse,
+			name: "responses payload override still final", from: translatorreg.FormatOpenAIResponse,
 			payload: `{"model":"gpt-5.6-sol","max_output_tokens":1,"input":"Hi"}`, want: "8",
 			rules: config.PayloadConfig{Override: []config.PayloadRule{{Models: matchedRule, Params: map[string]any{"max_output_tokens": 8}}}},
 		},
 		{
-			name: "responses payload filter still final", from: sdktranslator.FormatOpenAIResponse,
+			name: "responses payload filter still final", from: translatorreg.FormatOpenAIResponse,
 			payload: `{"model":"gpt-5.6-sol","max_output_tokens":1,"input":"Hi"}`,
 			rules:   config.PayloadConfig{Filter: []config.PayloadFilterRule{{Models: modelRule, Params: []string{"max_output_tokens"}}}},
 		},
@@ -177,12 +177,12 @@ func TestCodexSmallOutputBudgetsAllSourceFormats_Issue7304(t *testing.T) {
 				t.Run(fmt.Sprintf("%s/websocket=%t/stream=%t", tc.name, useWebsocket, stream), func(t *testing.T) {
 					server, requests := codexMinimumBudgetUpstream(t)
 					cfg := &config.Config{Payload: tc.rules}
-					var executor cliproxyauth.ProviderExecutor = NewCodexExecutor(cfg)
+					var executor coreauth.ProviderExecutor = NewCodexExecutor(cfg)
 					if useWebsocket {
 						executor = NewCodexWebsocketsExecutor(cfg)
 					}
-					req := cliproxyexecutor.Request{Model: "gpt-5.6-sol", Payload: []byte(tc.payload)}
-					opts := cliproxyexecutor.Options{SourceFormat: tc.from, Stream: stream}
+					req := coreexecutor.Request{Model: "gpt-5.6-sol", Payload: []byte(tc.payload)}
+					opts := coreexecutor.Options{SourceFormat: tc.from, Stream: stream}
 					auth := codexOAuthTestAuth(server.URL)
 					auth.ID = "codex-output-budget-7304-test"
 

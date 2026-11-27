@@ -9,11 +9,11 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/translator"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	coreusage "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/usage"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	coreusage "github.com/udit19199/relay/internal/service/usage"
+	_ "github.com/udit19199/relay/internal/translator"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestCodexExecutorExecutePublishesMainUsageBeforeImageUsage(t *testing.T) {
@@ -61,10 +61,10 @@ func TestCodexExecutorExecutePublishesMainUsageBeforeImageUsage(t *testing.T) {
 				})
 				ctx := coreusage.WithRequestedModelAlias(context.Background(), alias)
 				executor := NewCodexExecutor(&config.Config{})
-				resp, errExecute := executor.Execute(ctx, codexOAuthTestAuth(server.URL), cliproxyexecutor.Request{
+				resp, errExecute := executor.Execute(ctx, codexOAuthTestAuth(server.URL), coreexecutor.Request{
 					Model:   "gpt-5.5",
 					Payload: []byte(`{"model":"gpt-5.5","input":"hi"}`),
-				}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse})
+				}, coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse})
 				if errExecute != nil {
 					t.Fatalf("Execute: %v", errExecute)
 				}
@@ -130,10 +130,10 @@ func TestCodexExecutorExecuteRecordsFinalizedPayloadOverrideReasoningEffort(t *t
 
 	ctx := coreusage.WithRequestedModelAlias(context.Background(), alias)
 	executor := NewCodexExecutor(cfg)
-	resp, errExecute := executor.Execute(ctx, codexOAuthTestAuth(server.URL), cliproxyexecutor.Request{
+	resp, errExecute := executor.Execute(ctx, codexOAuthTestAuth(server.URL), coreexecutor.Request{
 		Model:   "gpt-5.6-luna",
 		Payload: []byte(`{"model":"gpt-5.6-luna","messages":[{"role":"user","content":"hello"}]}`),
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAI})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAI})
 	if errExecute != nil {
 		t.Fatalf("Execute: %v", errExecute)
 	}
@@ -188,10 +188,10 @@ func TestCodexExecutorExecuteStreamRecordsFinalizedPayloadOverrideReasoningEffor
 
 	ctx := coreusage.WithRequestedModelAlias(context.Background(), alias)
 	executor := NewCodexExecutor(cfg)
-	streamRes, errStream := executor.ExecuteStream(ctx, codexOAuthTestAuth(server.URL), cliproxyexecutor.Request{
+	streamRes, errStream := executor.ExecuteStream(ctx, codexOAuthTestAuth(server.URL), coreexecutor.Request{
 		Model:   "gpt-5.6-luna",
 		Payload: []byte(`{"model":"gpt-5.6-luna","messages":[{"role":"user","content":"hello"}]}`),
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAI, Stream: true})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAI, Stream: true})
 	if errStream != nil {
 		t.Fatalf("ExecuteStream: %v", errStream)
 	}
@@ -245,10 +245,10 @@ func TestCodexExecutorExecuteCompactRecordsFinalizedPayloadOverrideReasoningEffo
 
 	ctx := coreusage.WithRequestedModelAlias(context.Background(), alias)
 	executor := NewCodexExecutor(cfg)
-	resp, errExecute := executor.Execute(ctx, codexOAuthTestAuth(server.URL), cliproxyexecutor.Request{
+	resp, errExecute := executor.Execute(ctx, codexOAuthTestAuth(server.URL), coreexecutor.Request{
 		Model:   "gpt-5.6-luna",
 		Payload: []byte(`{"model":"gpt-5.6-luna","input":[{"type":"message","role":"user","content":"history"},{"type":"compaction_trigger"}]}`),
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse, Alt: "responses/compact"})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse, Alt: "responses/compact"})
 	if errExecute != nil {
 		t.Fatalf("Execute: %v", errExecute)
 	}

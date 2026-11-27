@@ -9,9 +9,9 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	xxHash64 "github.com/pierrec/xxHash/xxHash64"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	"github.com/udit19199/relay/internal/util"
 )
 
 const (
@@ -578,7 +578,7 @@ func isClaudeCCHExcludedKey(key []byte) bool {
 	}
 }
 
-func resolveClaudeKeyConfig(cfg *config.Config, auth *cliproxyauth.Auth) *config.ClaudeKey {
+func resolveClaudeKeyConfig(cfg *config.Config, auth *coreauth.Auth) *config.ClaudeKey {
 	if cfg == nil || auth == nil {
 		return nil
 	}
@@ -605,7 +605,7 @@ func resolveClaudeKeyConfig(cfg *config.Config, auth *cliproxyauth.Auth) *config
 }
 
 // resolveClaudeKeyCloakConfig finds the matching ClaudeKey config and returns its CloakConfig.
-func resolveClaudeKeyCloakConfig(cfg *config.Config, auth *cliproxyauth.Auth) *config.CloakConfig {
+func resolveClaudeKeyCloakConfig(cfg *config.Config, auth *coreauth.Auth) *config.CloakConfig {
 	entry := resolveClaudeKeyConfig(cfg, auth)
 	if entry == nil {
 		return nil
@@ -613,7 +613,7 @@ func resolveClaudeKeyCloakConfig(cfg *config.Config, auth *cliproxyauth.Auth) *c
 	return entry.Cloak
 }
 
-func rebuildMidSystemMessageEnabled(cfg *config.Config, auth *cliproxyauth.Auth) bool {
+func rebuildMidSystemMessageEnabled(cfg *config.Config, auth *coreauth.Auth) bool {
 	if auth != nil && auth.Attributes != nil && strings.EqualFold(strings.TrimSpace(auth.Attributes["rebuild_mid_system_message"]), "true") {
 		return true
 	}

@@ -10,11 +10,11 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/cache"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/cache"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 const claudeWebSearchExecutorResults = `[{"type":"web_search_result","url":"https://example.com/a","title":"A","encrypted_content":"enc-a","page_age":null},{"type":"web_search_result","url":"https://example.com/b","title":"B","encrypted_content":"enc-b","page_age":null}]`
@@ -74,7 +74,7 @@ func claudeWebSearchUpstream(t *testing.T, bodies *[][]byte, mu *sync.Mutex) htt
 type claudeWebSearchExecutorRun struct {
 	sessionID string
 	input     string
-	auth      *cliproxyauth.Auth
+	auth      *coreauth.Auth
 }
 
 func runClaudeWebSearchScenario(t *testing.T, cfg *config.Config, stream bool, runs []claudeWebSearchExecutorRun) [][]byte {
@@ -89,7 +89,7 @@ func runClaudeWebSearchScenario(t *testing.T, cfg *config.Config, stream bool, r
 	defer server.Close()
 
 	executor := NewClaudeExecutor(cfg)
-	defaultAuth := &cliproxyauth.Auth{ID: "claude-cred-default", Attributes: map[string]string{"api_key": "key-web-search", "base_url": server.URL}}
+	defaultAuth := &coreauth.Auth{ID: "claude-cred-default", Attributes: map[string]string{"api_key": "key-web-search", "base_url": server.URL}}
 	streamJSON := "false"
 	if stream {
 		streamJSON = "true"
@@ -110,15 +110,15 @@ func runClaudeWebSearchScenario(t *testing.T, cfg *config.Config, stream bool, r
 			auth = cloned
 		}
 		payload := []byte(`{"model":"claude-opus-5-5","stream":` + streamJSON + `,"input":[` + run.input + `]}`)
-		req := cliproxyexecutor.Request{Model: "claude-opus-5-5", Payload: payload}
-		opts := cliproxyexecutor.Options{
-			SourceFormat:    sdktranslator.FormatOpenAIResponse,
-			ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+		req := coreexecutor.Request{Model: "claude-opus-5-5", Payload: payload}
+		opts := coreexecutor.Options{
+			SourceFormat:    translatorreg.FormatOpenAIResponse,
+			ResponseFormat:  translatorreg.FormatOpenAIResponse,
 			Stream:          stream,
 			OriginalRequest: payload,
 		}
 		if run.sessionID != "" {
-			opts.Metadata = map[string]any{cliproxyexecutor.ExecutionSessionMetadataKey: run.sessionID}
+			opts.Metadata = map[string]any{coreexecutor.ExecutionSessionMetadataKey: run.sessionID}
 		}
 		if !stream {
 			if _, errExecute := executor.Execute(context.Background(), auth, req, opts); errExecute != nil {
@@ -303,29 +303,29 @@ func TestClaudeExecutor_CountTokensRestoresWebSearchResultsWhenEnabled(t *testin
 	server := httptest.NewServer(claudeWebSearchUpstream(t, &bodies, &mu))
 	defer server.Close()
 
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "key-web-search", "base_url": server.URL}}
+	auth := &coreauth.Auth{Attributes: map[string]string{"api_key": "key-web-search", "base_url": server.URL}}
 	enabledExec := NewClaudeExecutor(enabledClaudeWebSearchCacheConfig())
 	disabledExec := NewClaudeExecutor(&config.Config{})
 
 	firstPayload := []byte(`{"model":"claude-opus-5-5","stream":false,"input":[` + claudeWebSearchExecutorUser + `]}`)
-	firstReq := cliproxyexecutor.Request{Model: "claude-opus-5-5", Payload: firstPayload}
-	firstOpts := cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	firstReq := coreexecutor.Request{Model: "claude-opus-5-5", Payload: firstPayload}
+	firstOpts := coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		OriginalRequest: firstPayload,
-		Metadata:        map[string]any{cliproxyexecutor.ExecutionSessionMetadataKey: "session-count"},
+		Metadata:        map[string]any{coreexecutor.ExecutionSessionMetadataKey: "session-count"},
 	}
 	if _, errExec := enabledExec.Execute(context.Background(), auth, firstReq, firstOpts); errExec != nil {
 		t.Fatalf("Execute() error = %v", errExec)
 	}
 
 	historyPayload := []byte(`{"model":"claude-opus-5-5","stream":false,"input":[` + claudeWebSearchExecutorHistory + `]}`)
-	historyReq := cliproxyexecutor.Request{Model: "claude-opus-5-5", Payload: historyPayload}
-	historyOpts := cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatClaude,
+	historyReq := coreexecutor.Request{Model: "claude-opus-5-5", Payload: historyPayload}
+	historyOpts := coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatClaude,
 		OriginalRequest: historyPayload,
-		Metadata:        map[string]any{cliproxyexecutor.ExecutionSessionMetadataKey: "session-count"},
+		Metadata:        map[string]any{coreexecutor.ExecutionSessionMetadataKey: "session-count"},
 	}
 	enabledCountResp, errEnabledCount := enabledExec.CountTokens(context.Background(), auth, historyReq, historyOpts)
 	if errEnabledCount != nil {
@@ -340,7 +340,7 @@ func TestClaudeExecutor_CountTokensRestoresWebSearchResultsWhenEnabled(t *testin
 	if enabledTokens <= disabledTokens {
 		t.Fatalf("enabled input_tokens (%d) <= disabled input_tokens (%d); want restored search results counted", enabledTokens, disabledTokens)
 	}
-	otherAuth := &cliproxyauth.Auth{ID: "other-cred", Attributes: map[string]string{"api_key": "key-other", "base_url": server.URL}}
+	otherAuth := &coreauth.Auth{ID: "other-cred", Attributes: map[string]string{"api_key": "key-other", "base_url": server.URL}}
 	otherCredCountResp, errOtherCredCount := enabledExec.CountTokens(context.Background(), otherAuth, historyReq, historyOpts)
 	if errOtherCredCount != nil {
 		t.Fatalf("other credential CountTokens() error = %v", errOtherCredCount)
@@ -353,10 +353,10 @@ func TestClaudeExecutor_CountTokensRestoresWebSearchResultsWhenEnabled(t *testin
 
 func TestClaudeExecutor_WebSearchResultCacheScopesByCredential(t *testing.T) {
 	cfg := enabledClaudeWebSearchCacheConfig()
-	credA := &cliproxyauth.Auth{ID: "claude-cred-a"}
-	credB := &cliproxyauth.Auth{ID: "claude-cred-b"}
-	keyA := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "key-a"}}
-	keyB := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "key-b"}}
+	credA := &coreauth.Auth{ID: "claude-cred-a"}
+	credB := &coreauth.Auth{ID: "claude-cred-b"}
+	keyA := &coreauth.Auth{Attributes: map[string]string{"api_key": "key-a"}}
+	keyB := &coreauth.Auth{Attributes: map[string]string{"api_key": "key-b"}}
 	for _, stream := range []bool{false, true} {
 		t.Run(map[bool]string{false: "non-stream", true: "stream"}[stream], func(t *testing.T) {
 			bodies := runClaudeWebSearchScenario(t, cfg, stream, []claudeWebSearchExecutorRun{

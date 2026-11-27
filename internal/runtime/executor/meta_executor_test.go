@@ -19,17 +19,17 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/google/uuid"
-	metaauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/meta"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/translator"
-	sdkauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/auth"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	coreusage "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/usage"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
 	log "github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
+	authlogin "github.com/udit19199/relay/internal/auth/login"
+	metaauth "github.com/udit19199/relay/internal/auth/meta"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/registry"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	coreusage "github.com/udit19199/relay/internal/service/usage"
+	_ "github.com/udit19199/relay/internal/translator"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestMetaExecutor_Identifier(t *testing.T) {
@@ -41,7 +41,7 @@ func TestMetaExecutor_Identifier(t *testing.T) {
 
 func TestMetaExecutor_MetaCredsResolution(t *testing.T) {
 	t.Run("from attributes", func(t *testing.T) {
-		auth := &cliproxyauth.Auth{
+		auth := &coreauth.Auth{
 			Attributes: map[string]string{
 				"api_key":  "attr-key",
 				"base_url": "https://custom.meta.com/v1",
@@ -54,7 +54,7 @@ func TestMetaExecutor_MetaCredsResolution(t *testing.T) {
 	})
 
 	t.Run("from metadata", func(t *testing.T) {
-		auth := &cliproxyauth.Auth{
+		auth := &coreauth.Auth{
 			Metadata: map[string]any{
 				"access_token": "meta-oauth-token",
 			},
@@ -83,7 +83,7 @@ func TestMetaExecutor_MetaCredsResolution(t *testing.T) {
 		}
 
 		// empty auth should NOT bleed to env or local file
-		emptyAuth := &cliproxyauth.Auth{}
+		emptyAuth := &coreauth.Auth{}
 		_, token = metaCreds(emptyAuth)
 		if token != "" {
 			t.Errorf("expected empty token for empty auth, got %s", token)
@@ -163,19 +163,19 @@ func TestMetaExecutor_ExecuteSuccessAndRateLimit(t *testing.T) {
 	cfg := &config.Config{}
 	exec := NewMetaExecutor(cfg)
 
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Attributes: map[string]string{
 			"api_key":  "valid-token",
 			"base_url": server.URL,
 		},
 	}
 
-	req := cliproxyexecutor.Request{
+	req := coreexecutor.Request{
 		Model:   "muse-spark-1.3",
 		Payload: []byte(`{"model":"muse-spark-1.3","messages":[{"role":"user","content":"hello"}]}`),
 	}
-	opts := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai"),
+	opts := coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai"),
 	}
 
 	_, err := exec.Execute(context.Background(), auth, req, opts)
@@ -263,12 +263,12 @@ func TestMetaExecutor_Refresh_RequiresManagerAcceptance(t *testing.T) {
 
 	t.Setenv("META_MINT_URL", server.URL+"/key")
 
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:       "meta-test.json",
 		FileName: "meta-test.json",
 		Provider: "meta",
 		Attributes: map[string]string{
-			cliproxyauth.AttributePath: authFilePath,
+			coreauth.AttributePath: authFilePath,
 		},
 		Metadata: map[string]any{
 			"dca_token": "dca:initial-dca",
@@ -276,12 +276,12 @@ func TestMetaExecutor_Refresh_RequiresManagerAcceptance(t *testing.T) {
 		},
 	}
 
-	store := sdkauth.NewFileTokenStore()
+	store := authlogin.NewFileTokenStore()
 	store.SetBaseDir(tempDir)
-	manager := cliproxyauth.NewManager(store, nil, nil)
+	manager := coreauth.NewManager(store, nil, nil)
 	auth.Metadata["request-retry"] = float64(3)
 	auth.Storage = &metaauth.MetaTokenStorage{AccessToken: "dca:initial-dca", DCAToken: "dca:initial-dca", Expired: "2020-01-01T00:00:00Z"}
-	auth, errRegister := manager.Register(cliproxyauth.WithSkipPersist(context.Background()), auth)
+	auth, errRegister := manager.Register(coreauth.WithSkipPersist(context.Background()), auth)
 	if errRegister != nil {
 		t.Fatal(errRegister)
 	}
@@ -377,13 +377,13 @@ func TestMetaExecutor_PrepareConcurrentAccounts(t *testing.T) {
 
 	// 10 concurrent refreshes for account 1
 	var wg sync.WaitGroup
-	auth1 := &cliproxyauth.Auth{
+	auth1 := &coreauth.Auth{
 		ID:       "meta-acct1",
 		Provider: "meta",
 		Metadata: map[string]any{"dca_token": "dca:acct1"},
 	}
 
-	manager := cliproxyauth.NewManager(nil, nil, nil)
+	manager := coreauth.NewManager(nil, nil, nil)
 	if _, err := manager.Register(context.Background(), auth1); err != nil {
 		t.Fatal(err)
 	}
@@ -420,7 +420,7 @@ func TestMetaExecutor_PrepareConcurrentAccounts(t *testing.T) {
 	inFlight.Wait()
 
 	// A second account must complete while the first account's mint is blocked.
-	auth2 := &cliproxyauth.Auth{ID: "meta-acct2", Provider: "meta", Metadata: map[string]any{"dca_token": "dca:acct2"}}
+	auth2 := &coreauth.Auth{ID: "meta-acct2", Provider: "meta", Metadata: map[string]any{"dca_token": "dca:acct2"}}
 	if _, err := manager.Register(context.Background(), auth2); err != nil {
 		t.Fatal(err)
 	}
@@ -470,7 +470,7 @@ func TestMetaExecutor_Execute_DCARecovery(t *testing.T) {
 	exec := NewMetaExecutor(cfg)
 
 	// Auth has ONLY a DCA token
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "meta",
 		Metadata: map[string]any{
 			"dca_token": "dca:execute-recover-me",
@@ -480,12 +480,12 @@ func TestMetaExecutor_Execute_DCARecovery(t *testing.T) {
 		},
 	}
 
-	req := cliproxyexecutor.Request{
+	req := coreexecutor.Request{
 		Model:   "muse-spark-1.3",
 		Payload: []byte(`{"model":"muse-spark-1.3","messages":[{"role":"user","content":"hi"}]}`),
 	}
-	opts := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai"),
+	opts := coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai"),
 	}
 
 	resp, err := exec.Execute(context.Background(), auth, req, opts)
@@ -518,16 +518,16 @@ func TestMetaExecutorManagerRecoversUnauthorizedKey(t *testing.T) {
 	}))
 	defer server.Close()
 	t.Setenv("META_MINT_URL", server.URL+"/key")
-	manager := cliproxyauth.NewManager(nil, nil, nil)
+	manager := coreauth.NewManager(nil, nil, nil)
 	manager.RegisterExecutor(NewMetaExecutor(&config.Config{}))
-	auth := &cliproxyauth.Auth{ID: "meta-401-recovery", Provider: "meta", Metadata: map[string]any{"access_token": "LLM|revoked", "api_key": "LLM|revoked", "dca_token": "dca:valid", "auth_kind": "oauth"}, Attributes: map[string]string{"base_url": server.URL}}
+	auth := &coreauth.Auth{ID: "meta-401-recovery", Provider: "meta", Metadata: map[string]any{"access_token": "LLM|revoked", "api_key": "LLM|revoked", "dca_token": "dca:valid", "auth_kind": "oauth"}, Attributes: map[string]string{"base_url": server.URL}}
 	if _, err := manager.Register(context.Background(), auth); err != nil {
 		t.Fatal(err)
 	}
 	registry.GetGlobalRegistry().RegisterClient(auth.ID, "meta", []*registry.ModelInfo{{ID: "muse-spark-1.3"}})
 	t.Cleanup(func() { registry.GetGlobalRegistry().UnregisterClient(auth.ID) })
-	req := cliproxyexecutor.Request{Model: "muse-spark-1.3", Payload: []byte(`{"model":"muse-spark-1.3","messages":[{"role":"user","content":"hi"}]}`)}
-	_, err := manager.Execute(context.Background(), []string{"meta"}, req, cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString("openai")})
+	req := coreexecutor.Request{Model: "muse-spark-1.3", Payload: []byte(`{"model":"muse-spark-1.3","messages":[{"role":"user","content":"hi"}]}`)}
+	_, err := manager.Execute(context.Background(), []string{"meta"}, req, coreexecutor.Options{SourceFormat: translatorreg.FromString("openai")})
 	if err != nil {
 		t.Fatalf("401 recovery failed: %v", err)
 	}
@@ -548,7 +548,7 @@ func TestMetaExecutorRefreshUsesMintedBaseURL(t *testing.T) {
 			defer server.Close()
 			t.Setenv("META_MINT_URL", server.URL)
 			path := filepath.Join(t.TempDir(), "meta.json")
-			auth := &cliproxyauth.Auth{Provider: "meta", Metadata: map[string]any{"dca_token": "dca:test", "base_url": "https://previous.meta.example/v1"}, Attributes: map[string]string{"base_url": "https://previous.meta.example/v1", cliproxyauth.AttributePath: path}}
+			auth := &coreauth.Auth{Provider: "meta", Metadata: map[string]any{"dca_token": "dca:test", "base_url": "https://previous.meta.example/v1"}, Attributes: map[string]string{"base_url": "https://previous.meta.example/v1", coreauth.AttributePath: path}}
 			updated, err := NewMetaExecutor(nil).Refresh(context.Background(), auth)
 			if err != nil {
 				t.Fatal(err)
@@ -586,7 +586,7 @@ func TestMetaExecutor_ExecuteStreamRateLimit(t *testing.T) {
 	defer server.Close()
 
 	exec := NewMetaExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "meta",
 		Attributes: map[string]string{
 			"api_key":  "test-key",
@@ -594,12 +594,12 @@ func TestMetaExecutor_ExecuteStreamRateLimit(t *testing.T) {
 		},
 	}
 
-	req := cliproxyexecutor.Request{
+	req := coreexecutor.Request{
 		Model:   "muse-spark-1.3",
 		Payload: []byte(`{"model":"muse-spark-1.3","messages":[{"role":"user","content":"hi"}]}`),
 	}
 
-	_, err := exec.ExecuteStream(context.Background(), auth, req, cliproxyexecutor.Options{})
+	_, err := exec.ExecuteStream(context.Background(), auth, req, coreexecutor.Options{})
 	if err == nil {
 		t.Fatalf("expected error from 429 streaming response")
 	}
@@ -642,28 +642,28 @@ func TestMetaExecutor_RequestAuthPreparer(t *testing.T) {
 	t.Setenv("META_MINT_URL", server.URL+"/key")
 	exec := NewMetaExecutor(&config.Config{})
 
-	authWithKey := &cliproxyauth.Auth{Provider: "meta", Attributes: map[string]string{"api_key": "exists"}}
+	authWithKey := &coreauth.Auth{Provider: "meta", Attributes: map[string]string{"api_key": "exists"}}
 	if exec.ShouldPrepareRequestAuth(authWithKey) {
 		t.Errorf("ShouldPrepareRequestAuth should be false when api_key is present")
 	}
 
-	authNoDCA := &cliproxyauth.Auth{Provider: "meta"}
+	authNoDCA := &coreauth.Auth{Provider: "meta"}
 	if exec.ShouldPrepareRequestAuth(authNoDCA) {
 		t.Errorf("ShouldPrepareRequestAuth should be false when dca_token is missing")
 	}
 
-	authConfigDCA := &cliproxyauth.Auth{
+	authConfigDCA := &coreauth.Auth{
 		Provider: "meta",
 		Attributes: map[string]string{
-			"api_key":                    "dca:invalid-for-config",
-			cliproxyauth.AttributeSource: "config:meta[0]",
+			"api_key":                "dca:invalid-for-config",
+			coreauth.AttributeSource: "config:meta[0]",
 		},
 	}
 	if exec.ShouldPrepareRequestAuth(authConfigDCA) {
 		t.Errorf("ShouldPrepareRequestAuth should be false for config API key auths")
 	}
 
-	authDCAOnly := &cliproxyauth.Auth{
+	authDCAOnly := &coreauth.Auth{
 		ID:       "meta-prep-test.json",
 		Provider: "meta",
 		Metadata: map[string]any{
@@ -678,9 +678,9 @@ func TestMetaExecutor_RequestAuthPreparer(t *testing.T) {
 		t.Errorf("ShouldPrepareRequestAuth should be true when only dca_token is present")
 	}
 
-	store := sdkauth.NewFileTokenStore()
+	store := authlogin.NewFileTokenStore()
 	store.SetBaseDir(t.TempDir())
-	manager := cliproxyauth.NewManager(store, nil, nil)
+	manager := coreauth.NewManager(store, nil, nil)
 	manager.RegisterExecutor(exec)
 	if _, err := manager.Register(context.Background(), authDCAOnly); err != nil {
 		t.Fatal(err)
@@ -688,12 +688,12 @@ func TestMetaExecutor_RequestAuthPreparer(t *testing.T) {
 	registry.GetGlobalRegistry().RegisterClient(authDCAOnly.ID, "meta", []*registry.ModelInfo{{ID: "muse-spark-1.3"}})
 	t.Cleanup(func() { registry.GetGlobalRegistry().UnregisterClient(authDCAOnly.ID) })
 
-	req := cliproxyexecutor.Request{
+	req := coreexecutor.Request{
 		Model:   "muse-spark-1.3",
 		Payload: []byte(`{"model":"muse-spark-1.3","messages":[{"role":"user","content":"hi"}]}`),
 	}
 
-	resp, err := manager.Execute(context.Background(), []string{"meta"}, req, cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString("openai")})
+	resp, err := manager.Execute(context.Background(), []string{"meta"}, req, coreexecutor.Options{SourceFormat: translatorreg.FromString("openai")})
 	if err != nil {
 		t.Fatalf("execute failed: %v", err)
 	}
@@ -720,7 +720,7 @@ func TestMetaExecutor_RequestAuthPreparer(t *testing.T) {
 		t.Fatal("minted key was not persisted for restart")
 	}
 
-	_, err = manager.Execute(context.Background(), []string{"meta"}, req, cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString("openai")})
+	_, err = manager.Execute(context.Background(), []string{"meta"}, req, coreexecutor.Options{SourceFormat: translatorreg.FromString("openai")})
 	if err != nil {
 		t.Fatalf("second execute failed: %v", err)
 	}
@@ -749,11 +749,11 @@ func TestMetaMintRejectsRemovedOrReloadedCredential(t *testing.T) {
 				defer releaseOnce.Do(func() { close(release) })
 				t.Setenv("META_MINT_URL", server.URL)
 				dir := t.TempDir()
-				store := sdkauth.NewFileTokenStore()
+				store := authlogin.NewFileTokenStore()
 				store.SetBaseDir(dir)
-				manager := cliproxyauth.NewManager(store, nil, nil)
+				manager := coreauth.NewManager(store, nil, nil)
 				storage := &metaauth.MetaTokenStorage{AccessToken: "dca:initial", DCAToken: "dca:initial"}
-				auth, err := manager.Register(context.Background(), &cliproxyauth.Auth{ID: "meta-lifecycle.json", Provider: "meta", Storage: storage, Metadata: map[string]any{"type": "meta", "access_token": "dca:initial", "dca_token": "dca:initial"}})
+				auth, err := manager.Register(context.Background(), &coreauth.Auth{ID: "meta-lifecycle.json", Provider: "meta", Storage: storage, Metadata: map[string]any{"type": "meta", "access_token": "dca:initial", "dca_token": "dca:initial"}})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -779,7 +779,7 @@ func TestMetaMintRejectsRemovedOrReloadedCredential(t *testing.T) {
 						t.Fatal(err)
 					}
 				} else {
-					_, err := manager.Register(context.Background(), &cliproxyauth.Auth{ID: auth.ID, Provider: "meta", Metadata: map[string]any{"type": "meta", "api_key": "LLM|reloaded", "access_token": "LLM|reloaded", "dca_token": "dca:reloaded"}})
+					_, err := manager.Register(context.Background(), &coreauth.Auth{ID: auth.ID, Provider: "meta", Metadata: map[string]any{"type": "meta", "api_key": "LLM|reloaded", "access_token": "LLM|reloaded", "dca_token": "dca:reloaded"}})
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -837,7 +837,7 @@ func TestMetaExecutor_ExecuteShapesResponsesRequest(t *testing.T) {
 	defer server.Close()
 
 	exec := NewMetaExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "meta",
 		Attributes: map[string]string{
 			"api_key":  "meta-token",
@@ -845,11 +845,11 @@ func TestMetaExecutor_ExecuteShapesResponsesRequest(t *testing.T) {
 		},
 	}
 
-	resp, err := exec.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	resp, err := exec.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "muse-spark-1.3",
 		Payload: []byte(`{"model":"muse-spark-1.3","messages":[{"role":"user","content":"hello"}]}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai"),
 	})
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -889,7 +889,7 @@ func TestMetaExecutor_ExecuteStreamUsesResponses(t *testing.T) {
 	defer server.Close()
 
 	exec := NewMetaExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "meta",
 		Attributes: map[string]string{
 			"api_key":  "meta-token",
@@ -897,11 +897,11 @@ func TestMetaExecutor_ExecuteStreamUsesResponses(t *testing.T) {
 		},
 	}
 
-	result, err := exec.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	result, err := exec.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "muse-spark-1.3",
 		Payload: []byte(`{"model":"muse-spark-1.3","messages":[{"role":"user","content":"hello"}]}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai"),
 		Stream:       true,
 	})
 	if err != nil {
@@ -935,12 +935,12 @@ func TestMetaExecutor_PreservesPreviousResponseID(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, err := NewMetaExecutor(&config.Config{}).Execute(context.Background(), &cliproxyauth.Auth{
+	_, err := NewMetaExecutor(&config.Config{}).Execute(context.Background(), &coreauth.Auth{
 		Attributes: map[string]string{"api_key": "meta-token", "base_url": server.URL},
-	}, cliproxyexecutor.Request{
+	}, coreexecutor.Request{
 		Model:   "muse-spark-1.3",
 		Payload: []byte(`{"model":"muse-spark-1.3","input":"hello","previous_response_id":"resp_prev"}`),
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString("openai-response")})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FromString("openai-response")})
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
@@ -951,9 +951,9 @@ func TestMetaExecutor_PreservesPreviousResponseID(t *testing.T) {
 
 func TestMetaExecutor_CompactNotSupported(t *testing.T) {
 	exec := NewMetaExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{"api_key": "meta-token", "base_url": "https://api.meta.ai/v1"}}
-	req := cliproxyexecutor.Request{Model: "muse-spark-1.3", Payload: []byte(`{"model":"muse-spark-1.3"}`)}
-	opts := cliproxyexecutor.Options{Alt: "responses/compact", SourceFormat: sdktranslator.FromString("openai-response")}
+	auth := &coreauth.Auth{Attributes: map[string]string{"api_key": "meta-token", "base_url": "https://api.meta.ai/v1"}}
+	req := coreexecutor.Request{Model: "muse-spark-1.3", Payload: []byte(`{"model":"muse-spark-1.3"}`)}
+	opts := coreexecutor.Options{Alt: "responses/compact", SourceFormat: translatorreg.FromString("openai-response")}
 
 	_, err := exec.Execute(context.Background(), auth, req, opts)
 	if err == nil {
@@ -1001,7 +1001,7 @@ func TestMetaExecutor_ExecuteNonStreamMultiEventSSE_RecordsModelAndWarnsOnSubsti
 	})
 
 	exec := NewMetaExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "meta",
 		Attributes: map[string]string{
 			"api_key":  "meta-token",
@@ -1010,11 +1010,11 @@ func TestMetaExecutor_ExecuteNonStreamMultiEventSSE_RecordsModelAndWarnsOnSubsti
 	}
 
 	ctx := coreusage.WithRequestedModelAlias(context.Background(), alias)
-	resp, err := exec.Execute(ctx, auth, cliproxyexecutor.Request{
+	resp, err := exec.Execute(ctx, auth, coreexecutor.Request{
 		Model:   "muse-spark-1.3",
 		Payload: []byte(`{"model":"muse-spark-1.3","messages":[{"role":"user","content":"hello"}]}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai"),
 	})
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -1049,7 +1049,7 @@ func TestMetaExecutor_PrepareRequest_ClientIdHeader_Issue6117(t *testing.T) {
 	if errReq != nil {
 		t.Fatal(errReq)
 	}
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "meta",
 		Attributes: map[string]string{
 			"api_key": "test-key",
@@ -1077,7 +1077,7 @@ func TestMetaExecutor_ApplyMetaAPIHeaders_ClientIdHeader_Issue6117(t *testing.T)
 	if errReq != nil {
 		t.Fatal(errReq)
 	}
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "meta",
 		Attributes: map[string]string{
 			"api_key": "test-key",
@@ -1123,7 +1123,7 @@ func TestMetaExecutor_ContributorModeHeader_Issue7272(t *testing.T) {
 	defer server.Close()
 
 	exec := NewMetaExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "meta",
 		Attributes: map[string]string{
 			"api_key":  "meta-token",
@@ -1177,11 +1177,11 @@ func TestMetaExecutor_ContributorModeHeader_Issue7272(t *testing.T) {
 		t.Run("Execute/"+tc.name, func(t *testing.T) {
 			before := len(capturedHeaders)
 			payload := []byte(fmt.Sprintf(`{"model":%q,"messages":[{"role":"user","content":"hello"}]}`, tc.model))
-			_, errExec := exec.Execute(context.Background(), auth, cliproxyexecutor.Request{
+			_, errExec := exec.Execute(context.Background(), auth, coreexecutor.Request{
 				Model:   tc.model,
 				Payload: payload,
-			}, cliproxyexecutor.Options{
-				SourceFormat: sdktranslator.FromString("openai"),
+			}, coreexecutor.Options{
+				SourceFormat: translatorreg.FromString("openai"),
 			})
 			if errExec != nil {
 				t.Fatalf("Execute(%q) error = %v", tc.model, errExec)
@@ -1201,11 +1201,11 @@ func TestMetaExecutor_ContributorModeHeader_Issue7272(t *testing.T) {
 		t.Run("ExecuteStream/"+tc.name, func(t *testing.T) {
 			before := len(capturedHeaders)
 			payload := []byte(fmt.Sprintf(`{"model":%q,"messages":[{"role":"user","content":"hello"}]}`, tc.model))
-			streamRes, errStream := exec.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+			streamRes, errStream := exec.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 				Model:   tc.model,
 				Payload: payload,
-			}, cliproxyexecutor.Options{
-				SourceFormat: sdktranslator.FromString("openai"),
+			}, coreexecutor.Options{
+				SourceFormat: translatorreg.FromString("openai"),
 				Stream:       true,
 			})
 			if errStream != nil {
@@ -1246,11 +1246,11 @@ func TestMetaExecutor_ContributorModeHeader_Issue7272(t *testing.T) {
 		})
 
 		before := len(capturedHeaders)
-		_, errToContrib := overrideExec.Execute(context.Background(), auth, cliproxyexecutor.Request{
+		_, errToContrib := overrideExec.Execute(context.Background(), auth, coreexecutor.Request{
 			Model:   "muse-wonder-1.0",
 			Payload: []byte(`{"model":"muse-wonder-1.0","messages":[{"role":"user","content":"hello"}]}`),
-		}, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FromString("openai"),
+		}, coreexecutor.Options{
+			SourceFormat: translatorreg.FromString("openai"),
 		})
 		if errToContrib != nil {
 			t.Fatalf("Execute(override to contributor) error = %v", errToContrib)
@@ -1263,11 +1263,11 @@ func TestMetaExecutor_ContributorModeHeader_Issue7272(t *testing.T) {
 		}
 
 		before = len(capturedHeaders)
-		_, errToPlain := overrideExec.Execute(context.Background(), auth, cliproxyexecutor.Request{
+		_, errToPlain := overrideExec.Execute(context.Background(), auth, coreexecutor.Request{
 			Model:   "muse-wonder-1.0-contributor",
 			Payload: []byte(`{"model":"muse-wonder-1.0-contributor","messages":[{"role":"user","content":"hello"}]}`),
-		}, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FromString("openai"),
+		}, coreexecutor.Options{
+			SourceFormat: translatorreg.FromString("openai"),
 		})
 		if errToPlain != nil {
 			t.Fatalf("Execute(override to plain) error = %v", errToPlain)
@@ -1290,18 +1290,18 @@ func TestMetaExecutor_Execute_SendsClientIdHeader_Issue6117(t *testing.T) {
 	defer server.Close()
 
 	exec := NewMetaExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "meta",
 		Attributes: map[string]string{
 			"api_key":  "meta-token",
 			"base_url": server.URL,
 		},
 	}
-	_, errExec := exec.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, errExec := exec.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "muse-spark-1.3",
 		Payload: []byte(`{"model":"muse-spark-1.3","messages":[{"role":"user","content":"hello"}]}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai"),
 	})
 	if errExec != nil {
 		t.Fatalf("Execute() error = %v", errExec)
@@ -1325,7 +1325,7 @@ func TestMetaExecutor_Refresh_PreservesSubscriptionMetadata_Issue6117(t *testing
 	defer server.Close()
 	t.Setenv("META_MINT_URL", server.URL)
 
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "meta",
 		Metadata: map[string]any{
 			"dca_token": "dca:test-sub",
@@ -1365,7 +1365,7 @@ func TestMetaExecutor_Refresh_ClearsStaleSubscriptionMetadata_Issue6117(t *testi
 	defer server.Close()
 	t.Setenv("META_MINT_URL", server.URL)
 
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "meta",
 		Metadata: map[string]any{
 			"dca_token":      "dca:test-sub",
@@ -1393,9 +1393,9 @@ func TestMetaExecutor_Refresh_ClearsStaleSubscriptionMetadata_Issue6117(t *testi
 }
 
 func TestMetaExecutor_NotFoundCooldown_Shortened_Issue6117(t *testing.T) {
-	previous := cliproxyauth.QuotaCooldownDisabledForAuth(nil)
-	cliproxyauth.SetQuotaCooldownDisabled(false)
-	t.Cleanup(func() { cliproxyauth.SetQuotaCooldownDisabled(previous) })
+	previous := coreauth.QuotaCooldownDisabledForAuth(nil)
+	coreauth.SetQuotaCooldownDisabled(false)
+	t.Cleanup(func() { coreauth.SetQuotaCooldownDisabled(previous) })
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -1404,9 +1404,9 @@ func TestMetaExecutor_NotFoundCooldown_Shortened_Issue6117(t *testing.T) {
 	}))
 	defer server.Close()
 
-	manager := cliproxyauth.NewManager(nil, nil, nil)
+	manager := coreauth.NewManager(nil, nil, nil)
 	manager.RegisterExecutor(NewMetaExecutor(&config.Config{}))
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:       "meta-404-test",
 		Provider: "meta",
 		Metadata: map[string]any{
@@ -1423,12 +1423,12 @@ func TestMetaExecutor_NotFoundCooldown_Shortened_Issue6117(t *testing.T) {
 	registry.GetGlobalRegistry().RegisterClient(auth.ID, "meta", []*registry.ModelInfo{{ID: "muse-spark-1.3"}})
 	t.Cleanup(func() { registry.GetGlobalRegistry().UnregisterClient(auth.ID) })
 
-	req := cliproxyexecutor.Request{
+	req := coreexecutor.Request{
 		Model:   "muse-spark-1.3",
 		Payload: []byte(`{"model":"muse-spark-1.3","messages":[{"role":"user","content":"hi"}]}`),
 	}
-	_, _ = manager.Execute(context.Background(), []string{"meta"}, req, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai"),
+	_, _ = manager.Execute(context.Background(), []string{"meta"}, req, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai"),
 	})
 
 	updated, ok := manager.GetByID(auth.ID)
@@ -1460,7 +1460,7 @@ func TestMetaExecutor_Execute_StripsSearchContentTypesFromWebSearch(t *testing.T
 	defer server.Close()
 
 	exec := NewMetaExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "meta",
 		Attributes: map[string]string{
 			"api_key":  "meta-token",
@@ -1477,11 +1477,11 @@ func TestMetaExecutor_Execute_StripsSearchContentTypesFromWebSearch(t *testing.T
 		]
 	}`)
 
-	_, err := exec.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, err := exec.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "muse-spark-1.3-contributor",
 		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("codex"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("codex"),
 	})
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -1517,7 +1517,7 @@ func TestMetaExecutor_ExecuteStream_StripsSearchContentTypesFromWebSearch(t *tes
 	defer server.Close()
 
 	exec := NewMetaExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "meta",
 		Attributes: map[string]string{
 			"api_key":  "meta-token",
@@ -1533,11 +1533,11 @@ func TestMetaExecutor_ExecuteStream_StripsSearchContentTypesFromWebSearch(t *tes
 		]
 	}`)
 
-	streamResult, err := exec.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	streamResult, err := exec.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "muse-spark-1.3-contributor",
 		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("codex"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("codex"),
 	})
 	if err != nil {
 		t.Fatalf("ExecuteStream() error = %v", err)
@@ -1575,7 +1575,7 @@ func TestMetaExecutor_NormalizesToolFieldsForCodexUserAgent(t *testing.T) {
 	defer server.Close()
 
 	exec := NewMetaExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "meta",
 		Attributes: map[string]string{
 			"api_key":  "test-key",
@@ -1688,11 +1688,11 @@ func TestMetaExecutor_NormalizesToolFieldsForCodexUserAgent(t *testing.T) {
 
 	// 1. With non-Codex User-Agent, tool types must remain unchanged (number).
 	gotBody = nil
-	_, errExecNonCodex := exec.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, errExecNonCodex := exec.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "muse-spark-1.3",
 		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-response"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-response"),
 		Headers:      http.Header{"User-Agent": []string{"curl/8.7.1"}},
 	})
 	if errExecNonCodex != nil {
@@ -1704,11 +1704,11 @@ func TestMetaExecutor_NormalizesToolFieldsForCodexUserAgent(t *testing.T) {
 
 	// 2. With nil headers, tool types must remain unchanged (number).
 	gotBody = nil
-	_, errExecNilHeaders := exec.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, errExecNilHeaders := exec.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "muse-spark-1.3",
 		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-response"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-response"),
 	})
 	if errExecNilHeaders != nil {
 		t.Fatalf("Execute(nil headers) error = %v", errExecNilHeaders)
@@ -1719,11 +1719,11 @@ func TestMetaExecutor_NormalizesToolFieldsForCodexUserAgent(t *testing.T) {
 
 	// 3. With Codex User-Agent, specified fields must be normalized to integer.
 	gotBody = nil
-	_, errExec := exec.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, errExec := exec.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "muse-spark-1.3",
 		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-response"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-response"),
 		Headers:      http.Header{"User-Agent": []string{"codex-desktop/0.159.0"}},
 	})
 	if errExec != nil {
@@ -1764,11 +1764,11 @@ func TestMetaExecutor_NormalizesToolFieldsForCodexUserAgent(t *testing.T) {
 
 	// 4. Test ExecuteStream: verify both tools and additional_tools are normalized to integer
 	gotBody = nil
-	streamResult, errStream := exec.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	streamResult, errStream := exec.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "muse-spark-1.3",
 		Payload: payload,
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-response"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-response"),
 		Headers:      http.Header{"User-Agent": []string{"codex-desktop/0.159.0"}},
 	})
 	if errStream != nil {
@@ -1802,7 +1802,7 @@ func TestMetaExecutor_Execute_PreservesMuseReasoningEncryptedContent_Issue6450(t
 	defer server.Close()
 
 	exec := NewMetaExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "meta",
 		Attributes: map[string]string{
 			"api_key":  "meta-token",
@@ -1823,11 +1823,11 @@ func TestMetaExecutor_Execute_PreservesMuseReasoningEncryptedContent_Issue6450(t
 		`{"id":"msg_1","type":"message","role":"user","content":[{"type":"input_text","text":"hello"}]}` +
 		`]}`)
 
-	_, err := exec.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, err := exec.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "muse-spark-1.3",
 		Payload: reqPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("codex"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("codex"),
 	})
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
@@ -1852,11 +1852,11 @@ func TestMetaExecutor_Execute_PreservesMuseReasoningEncryptedContent_Issue6450(t
 	}
 
 	gotBody = nil
-	streamResult, errStream := exec.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	streamResult, errStream := exec.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "muse-spark-1.3",
 		Payload: reqPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("codex"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("codex"),
 	})
 	if errStream != nil {
 		t.Fatalf("ExecuteStream() error = %v", errStream)
@@ -1900,7 +1900,7 @@ func TestMetaExecutor_FiltersSubscriptionUsageGlobally(t *testing.T) {
 	defer server.Close()
 
 	exec := NewMetaExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "meta",
 		Attributes: map[string]string{
 			"api_key":  "meta-token",
@@ -1936,11 +1936,11 @@ func TestMetaExecutor_FiltersSubscriptionUsageGlobally(t *testing.T) {
 
 	for _, tc := range formats {
 		t.Run("stream/"+tc.format, func(t *testing.T) {
-			streamResult, errStream := exec.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+			streamResult, errStream := exec.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 				Model:   "muse-spark-1.3",
 				Payload: []byte(tc.payload),
-			}, cliproxyexecutor.Options{
-				SourceFormat: sdktranslator.FromString(tc.format),
+			}, coreexecutor.Options{
+				SourceFormat: translatorreg.FromString(tc.format),
 				Stream:       true,
 			})
 			if errStream != nil {
@@ -1966,11 +1966,11 @@ func TestMetaExecutor_FiltersSubscriptionUsageGlobally(t *testing.T) {
 		})
 
 		t.Run("nonstream/"+tc.format, func(t *testing.T) {
-			resp, errExec := exec.Execute(context.Background(), auth, cliproxyexecutor.Request{
+			resp, errExec := exec.Execute(context.Background(), auth, coreexecutor.Request{
 				Model:   "muse-spark-1.3",
 				Payload: []byte(tc.payload),
-			}, cliproxyexecutor.Options{
-				SourceFormat: sdktranslator.FromString(tc.format),
+			}, coreexecutor.Options{
+				SourceFormat: translatorreg.FromString(tc.format),
 			})
 			if errExec != nil {
 				t.Fatalf("Execute(%s) error = %v", tc.format, errExec)
@@ -2027,7 +2027,7 @@ func TestMetaExecutor_ResponsesCompactionTriggerAndReplay_Issue6781(t *testing.T
 			}},
 		},
 	})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "meta",
 		Attributes: map[string]string{
 			"api_key":  "meta-token",
@@ -2050,12 +2050,12 @@ func TestMetaExecutor_ResponsesCompactionTriggerAndReplay_Issue6781(t *testing.T
 		]
 	}`)
 
-	streamResult, errStream := exec.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	streamResult, errStream := exec.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "muse-wonder-1.0",
 		Payload: triggerPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		Stream:          true,
 		OriginalRequest: triggerPayload,
 	})
@@ -2084,12 +2084,12 @@ func TestMetaExecutor_ResponsesCompactionTriggerAndReplay_Issue6781(t *testing.T
 		t.Fatalf("cached_tokens = %d, want 3", gotCached)
 	}
 
-	nonStreamResp, errExec := exec.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	nonStreamResp, errExec := exec.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "muse-wonder-1.0",
 		Payload: triggerPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		OriginalRequest: triggerPayload,
 	})
 	if errExec != nil {
@@ -2110,12 +2110,12 @@ func TestMetaExecutor_ResponsesCompactionTriggerAndReplay_Issue6781(t *testing.T
 		]
 	}`, outputItems[0].Get("id").String(), capsule))
 
-	contStream, errCont := exec.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	contStream, errCont := exec.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "muse-wonder-1.0",
 		Payload: replayPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		Stream:          true,
 		OriginalRequest: replayPayload,
 	})
@@ -2136,12 +2136,12 @@ func TestMetaExecutor_ResponsesCompactionTriggerAndReplay_Issue6781(t *testing.T
 		t.Fatalf("expected foreign compaction item to be dropped, got: %s", lastSeen)
 	}
 
-	if _, errNonStreamReplay := exec.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	if _, errNonStreamReplay := exec.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "muse-wonder-1.0",
 		Payload: replayPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		OriginalRequest: replayPayload,
 	}); errNonStreamReplay != nil {
 		t.Fatalf("Execute(replay) error = %v", errNonStreamReplay)
@@ -2152,12 +2152,12 @@ func TestMetaExecutor_ResponsesCompactionTriggerAndReplay_Issue6781(t *testing.T
 	}
 
 	strippedTriggerPayload := []byte(`{"model":"muse-wonder-1.0","stream":false,"input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"Remember the exact test marker CPA_COMPACTION_MARKER_42."}]}]}`)
-	origOnlyResp, errOrigOnly := exec.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	origOnlyResp, errOrigOnly := exec.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "muse-wonder-1.0",
 		Payload: strippedTriggerPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		OriginalRequest: triggerPayload,
 	})
 	if errOrigOnly != nil {
@@ -2175,12 +2175,12 @@ func TestMetaExecutor_ResponsesCompactionTriggerAndReplay_Issue6781(t *testing.T
 			{"type": "message", "role": "user", "content": [{"type": "input_text", "text": "continue"}]}
 		]
 	}`)
-	_, errCorrupt := exec.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, errCorrupt := exec.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "muse-wonder-1.0",
 		Payload: corruptedPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		OriginalRequest: corruptedPayload,
 	})
 	if errCorrupt == nil {
@@ -2197,12 +2197,12 @@ func TestMetaExecutor_ResponsesCompactionTriggerAndReplay_Issue6781(t *testing.T
 			{"type": "compaction_trigger"}
 		]
 	}`, outputItems[0].Get("id").String(), capsule))
-	secondResp, errSecond := exec.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	secondResp, errSecond := exec.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "muse-wonder-1.0",
 		Payload: secondTriggerPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		OriginalRequest: secondTriggerPayload,
 	})
 	if errSecond != nil {
@@ -2220,12 +2220,12 @@ func TestMetaExecutor_ResponsesCompactionTriggerAndReplay_Issue6781(t *testing.T
 	}
 
 	returnIncomplete = true
-	_, errIncExec := exec.Execute(context.Background(), auth, cliproxyexecutor.Request{
+	_, errIncExec := exec.Execute(context.Background(), auth, coreexecutor.Request{
 		Model:   "muse-wonder-1.0",
 		Payload: triggerPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		OriginalRequest: triggerPayload,
 	})
 	if errIncExec == nil {
@@ -2233,12 +2233,12 @@ func TestMetaExecutor_ResponsesCompactionTriggerAndReplay_Issue6781(t *testing.T
 	}
 	assertStatusErr(t, errIncExec, http.StatusBadGateway)
 
-	_, errIncStream := exec.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	_, errIncStream := exec.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "muse-wonder-1.0",
 		Payload: triggerPayload,
-	}, cliproxyexecutor.Options{
-		SourceFormat:    sdktranslator.FormatOpenAIResponse,
-		ResponseFormat:  sdktranslator.FormatOpenAIResponse,
+	}, coreexecutor.Options{
+		SourceFormat:    translatorreg.FormatOpenAIResponse,
+		ResponseFormat:  translatorreg.FormatOpenAIResponse,
 		Stream:          true,
 		OriginalRequest: triggerPayload,
 	})

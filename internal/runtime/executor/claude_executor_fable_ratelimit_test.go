@@ -13,11 +13,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/registry"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestClassifyClaudeUpstreamError_FableOnlyRejectionIsModelScoped(t *testing.T) {
@@ -237,11 +237,11 @@ func TestClaudeExecutor_AuthManager_FableOnlyRejectionDoesNotBlockOpus(t *testin
 	}))
 	defer server.Close()
 
-	manager := cliproxyauth.NewManager(nil, nil, nil)
+	manager := coreauth.NewManager(nil, nil, nil)
 	manager.SetRetryConfig(0, 0, 0)
 	manager.RegisterExecutor(NewClaudeExecutor(&config.Config{DisableCooling: false}))
 
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:       uuid.NewString() + "-fable-model-scope",
 		Provider: "claude",
 		Attributes: map[string]string{
@@ -257,10 +257,10 @@ func TestClaudeExecutor_AuthManager_FableOnlyRejectionDoesNotBlockOpus(t *testin
 	}
 
 	payloadFable := []byte(`{"model":"claude-fable-5","messages":[{"role":"user","content":[{"type":"text","text":"test"}]}]}`)
-	_, errFable := manager.Execute(context.Background(), []string{"claude"}, cliproxyexecutor.Request{
+	_, errFable := manager.Execute(context.Background(), []string{"claude"}, coreexecutor.Request{
 		Model:   "claude-fable-5",
 		Payload: payloadFable,
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude})
 	if errFable == nil {
 		t.Fatal("expected Fable request to be rate limited")
 	}
@@ -282,10 +282,10 @@ func TestClaudeExecutor_AuthManager_FableOnlyRejectionDoesNotBlockOpus(t *testin
 	}
 
 	payloadOpus := []byte(`{"model":"claude-opus-5","messages":[{"role":"user","content":[{"type":"text","text":"test"}]}]}`)
-	_, errOpus := manager.Execute(context.Background(), []string{"claude"}, cliproxyexecutor.Request{
+	_, errOpus := manager.Execute(context.Background(), []string{"claude"}, coreexecutor.Request{
 		Model:   "claude-opus-5",
 		Payload: payloadOpus,
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude})
 	if errOpus != nil {
 		t.Fatalf("expected Opus to reach upstream on the same credential, got: %v", errOpus)
 	}
@@ -329,11 +329,11 @@ func TestClaudeExecutor_AuthManager_OverageSpendCapReachedDoesNotBlockOpus_Issue
 	}))
 	defer server.Close()
 
-	manager := cliproxyauth.NewManager(nil, nil, nil)
+	manager := coreauth.NewManager(nil, nil, nil)
 	manager.SetRetryConfig(0, 0, 0)
 	manager.RegisterExecutor(NewClaudeExecutor(&config.Config{DisableCooling: false}))
 
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:       uuid.NewString() + "-overage-model-scope",
 		Provider: "claude",
 		Attributes: map[string]string{
@@ -350,20 +350,20 @@ func TestClaudeExecutor_AuthManager_OverageSpendCapReachedDoesNotBlockOpus_Issue
 
 	// 1. A healthy subscription model (Opus) succeeds first.
 	payloadOpus := []byte(`{"model":"claude-opus-5","messages":[{"role":"user","content":[{"type":"text","text":"test"}]}]}`)
-	_, errOpusFirst := manager.Execute(context.Background(), []string{"claude"}, cliproxyexecutor.Request{
+	_, errOpusFirst := manager.Execute(context.Background(), []string{"claude"}, coreexecutor.Request{
 		Model:   "claude-opus-5",
 		Payload: payloadOpus,
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude})
 	if errOpusFirst != nil {
 		t.Fatalf("initial Opus request failed: %v", errOpusFirst)
 	}
 
 	// 2. An overage-only model (Fable) fails with spend cap reached.
 	payloadFable := []byte(`{"model":"claude-fable-5-1","messages":[{"role":"user","content":[{"type":"text","text":"test"}]}]}`)
-	_, errFable := manager.Execute(context.Background(), []string{"claude"}, cliproxyexecutor.Request{
+	_, errFable := manager.Execute(context.Background(), []string{"claude"}, coreexecutor.Request{
 		Model:   "claude-fable-5-1",
 		Payload: payloadFable,
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude})
 	if errFable == nil {
 		t.Fatal("expected Fable request to be rate limited")
 	}
@@ -408,10 +408,10 @@ func TestClaudeExecutor_AuthManager_OverageSpendCapReachedDoesNotBlockOpus_Issue
 	}
 
 	// 6. Verify Opus on the same credential can still be served cleanly.
-	_, errOpus := manager.Execute(context.Background(), []string{"claude"}, cliproxyexecutor.Request{
+	_, errOpus := manager.Execute(context.Background(), []string{"claude"}, coreexecutor.Request{
 		Model:   "claude-opus-5",
 		Payload: payloadOpus,
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude})
 	if errOpus != nil {
 		t.Fatalf("expected Opus to reach upstream on the same credential, got: %v", errOpus)
 	}
@@ -448,7 +448,7 @@ func TestClaudeExecutor_AuthManager_ModelLevelCoolingConfigScopesSharedRejection
 	}))
 	defer server.Close()
 
-	manager := cliproxyauth.NewManager(nil, nil, nil)
+	manager := coreauth.NewManager(nil, nil, nil)
 	manager.SetRetryConfig(0, 0, 0)
 	// Enable ModelLevelCooling on ClaudeConfig
 	manager.RegisterExecutor(NewClaudeExecutor(&config.Config{
@@ -458,7 +458,7 @@ func TestClaudeExecutor_AuthManager_ModelLevelCoolingConfigScopesSharedRejection
 		},
 	}))
 
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:       uuid.NewString() + "-claude-model-cooling-cfg",
 		Provider: "claude",
 		Attributes: map[string]string{
@@ -474,10 +474,10 @@ func TestClaudeExecutor_AuthManager_ModelLevelCoolingConfigScopesSharedRejection
 	}
 
 	payloadSonnet := []byte(`{"model":"claude-3-5-sonnet","messages":[{"role":"user","content":[{"type":"text","text":"test"}]}]}`)
-	_, errSonnet := manager.Execute(context.Background(), []string{"claude"}, cliproxyexecutor.Request{
+	_, errSonnet := manager.Execute(context.Background(), []string{"claude"}, coreexecutor.Request{
 		Model:   "claude-3-5-sonnet",
 		Payload: payloadSonnet,
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude})
 	if errSonnet == nil {
 		t.Fatal("expected Sonnet request to be rate limited")
 	}
@@ -496,10 +496,10 @@ func TestClaudeExecutor_AuthManager_ModelLevelCoolingConfigScopesSharedRejection
 
 	// Sibling Opus request still succeeds on the same credential
 	payloadOpus := []byte(`{"model":"claude-opus-5","messages":[{"role":"user","content":[{"type":"text","text":"test"}]}]}`)
-	_, errOpus := manager.Execute(context.Background(), []string{"claude"}, cliproxyexecutor.Request{
+	_, errOpus := manager.Execute(context.Background(), []string{"claude"}, coreexecutor.Request{
 		Model:   "claude-opus-5",
 		Payload: payloadOpus,
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude})
 	if errOpus != nil {
 		t.Fatalf("expected Opus to succeed when ModelLevelCooling=true, got: %v", errOpus)
 	}
@@ -526,7 +526,7 @@ func TestClaudeExecutor_ExecuteStream_OverageRejectionIsModelScoped(t *testing.T
 	defer server.Close()
 
 	executor := NewClaudeExecutor(&config.Config{DisableCooling: false})
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:       uuid.NewString() + "-stream-overage",
 		Provider: "claude",
 		Attributes: map[string]string{
@@ -536,10 +536,10 @@ func TestClaudeExecutor_ExecuteStream_OverageRejectionIsModelScoped(t *testing.T
 	}
 
 	payload := []byte(`{"model":"claude-fable-5-1","stream":true,"messages":[{"role":"user","content":[{"type":"text","text":"hi"}]}]}`)
-	_, errStream := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	_, errStream := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "claude-fable-5-1",
 		Payload: payload,
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude})
 	if errStream == nil {
 		t.Fatal("expected stream request to fail with rate limit error")
 	}
@@ -621,11 +621,11 @@ func TestClaudeExecutor_AuthManager_OverageSpendCapWithRetryAfter_Issue5920(t *t
 	}))
 	defer server.Close()
 
-	manager := cliproxyauth.NewManager(nil, nil, nil)
+	manager := coreauth.NewManager(nil, nil, nil)
 	manager.SetRetryConfig(0, 0, 0)
 	manager.RegisterExecutor(NewClaudeExecutor(&config.Config{DisableCooling: false}))
 
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:       uuid.NewString() + "-issue-5920-overage",
 		Provider: "claude",
 		Attributes: map[string]string{
@@ -642,20 +642,20 @@ func TestClaudeExecutor_AuthManager_OverageSpendCapWithRetryAfter_Issue5920(t *t
 
 	// 1. Initial healthy subscription request succeeds first.
 	payloadOpus := []byte(`{"model":"claude-opus-5","messages":[{"role":"user","content":[{"type":"text","text":"test"}]}]}`)
-	_, errOpusFirst := manager.Execute(context.Background(), []string{"claude"}, cliproxyexecutor.Request{
+	_, errOpusFirst := manager.Execute(context.Background(), []string{"claude"}, coreexecutor.Request{
 		Model:   "claude-opus-5",
 		Payload: payloadOpus,
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude})
 	if errOpusFirst != nil {
 		t.Fatalf("initial Opus request failed: %v", errOpusFirst)
 	}
 
 	// 2. Fable request fails with 429 carrying Retry-After: 97273.
 	payloadFable := []byte(`{"model":"claude-fable-5-1","messages":[{"role":"user","content":[{"type":"text","text":"test"}]}]}`)
-	_, errFable := manager.Execute(context.Background(), []string{"claude"}, cliproxyexecutor.Request{
+	_, errFable := manager.Execute(context.Background(), []string{"claude"}, coreexecutor.Request{
 		Model:   "claude-fable-5-1",
 		Payload: payloadFable,
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude})
 	if errFable == nil {
 		t.Fatal("expected Fable request to be rate limited")
 	}
@@ -688,10 +688,10 @@ func TestClaudeExecutor_AuthManager_OverageSpendCapWithRetryAfter_Issue5920(t *t
 	}
 
 	// 5. Verify sibling Opus request still succeeds on the same credential.
-	_, errOpus := manager.Execute(context.Background(), []string{"claude"}, cliproxyexecutor.Request{
+	_, errOpus := manager.Execute(context.Background(), []string{"claude"}, coreexecutor.Request{
 		Model:   "claude-opus-5",
 		Payload: payloadOpus,
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude})
 	if errOpus != nil {
 		t.Fatalf("expected Opus to succeed on the same credential, got: %v", errOpus)
 	}
@@ -736,11 +736,11 @@ func TestClaudeExecutor_AuthManager_OverageSpendCapFirstRequestAllowsOpus_Issue5
 	}))
 	defer server.Close()
 
-	manager := cliproxyauth.NewManager(nil, nil, nil)
+	manager := coreauth.NewManager(nil, nil, nil)
 	manager.SetRetryConfig(0, 0, 0)
 	manager.RegisterExecutor(NewClaudeExecutor(&config.Config{DisableCooling: false}))
 
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:       uuid.NewString() + "-issue-5920-first-fable",
 		Provider: "claude",
 		Attributes: map[string]string{
@@ -758,10 +758,10 @@ func TestClaudeExecutor_AuthManager_OverageSpendCapFirstRequestAllowsOpus_Issue5
 	// 1. Initial request on the fresh credential is for the overage-only model (Fable).
 	// No prior Opus request has created any active model state.
 	payloadFable := []byte(`{"model":"claude-fable-5-1","messages":[{"role":"user","content":[{"type":"text","text":"test"}]}]}`)
-	_, errFable := manager.Execute(context.Background(), []string{"claude"}, cliproxyexecutor.Request{
+	_, errFable := manager.Execute(context.Background(), []string{"claude"}, coreexecutor.Request{
 		Model:   "claude-fable-5-1",
 		Payload: payloadFable,
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude})
 	if errFable == nil {
 		t.Fatal("expected Fable request to be rate limited")
 	}
@@ -787,10 +787,10 @@ func TestClaudeExecutor_AuthManager_OverageSpendCapFirstRequestAllowsOpus_Issue5
 
 	// 3. Subsequent Opus request on the same credential can still be served cleanly.
 	payloadOpus := []byte(`{"model":"claude-opus-5","messages":[{"role":"user","content":[{"type":"text","text":"test"}]}]}`)
-	_, errOpus := manager.Execute(context.Background(), []string{"claude"}, cliproxyexecutor.Request{
+	_, errOpus := manager.Execute(context.Background(), []string{"claude"}, coreexecutor.Request{
 		Model:   "claude-opus-5",
 		Payload: payloadOpus,
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude})
 	if errOpus != nil {
 		t.Fatalf("expected Opus to succeed on the same credential, got: %v", errOpus)
 	}
@@ -843,11 +843,11 @@ func TestClaudeExecutor_AuthManager_FableOnlyRejectionWithout5hHeadersAllowsOpus
 	}))
 	defer server.Close()
 
-	manager := cliproxyauth.NewManager(nil, nil, nil)
+	manager := coreauth.NewManager(nil, nil, nil)
 	manager.SetRetryConfig(0, 0, 0)
 	manager.RegisterExecutor(NewClaudeExecutor(&config.Config{DisableCooling: false}))
 
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:       uuid.NewString() + "-issue-7197-no-5h",
 		Provider: "claude",
 		Attributes: map[string]string{
@@ -863,10 +863,10 @@ func TestClaudeExecutor_AuthManager_FableOnlyRejectionWithout5hHeadersAllowsOpus
 	}
 
 	payloadFable := []byte(`{"model":"claude-fable-5-1","messages":[{"role":"user","content":[{"type":"text","text":"test"}]}]}`)
-	_, errFable := manager.Execute(context.Background(), []string{"claude"}, cliproxyexecutor.Request{
+	_, errFable := manager.Execute(context.Background(), []string{"claude"}, coreexecutor.Request{
 		Model:   "claude-fable-5-1",
 		Payload: payloadFable,
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude})
 	if errFable == nil {
 		t.Fatal("expected Fable request to be rate limited")
 	}
@@ -894,10 +894,10 @@ func TestClaudeExecutor_AuthManager_FableOnlyRejectionWithout5hHeadersAllowsOpus
 	}
 
 	payloadOpus := []byte(`{"model":"claude-opus-5-5","messages":[{"role":"user","content":[{"type":"text","text":"test"}]}]}`)
-	_, errOpus := manager.Execute(context.Background(), []string{"claude"}, cliproxyexecutor.Request{
+	_, errOpus := manager.Execute(context.Background(), []string{"claude"}, coreexecutor.Request{
 		Model:   "claude-opus-5-5",
 		Payload: payloadOpus,
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FormatClaude})
 	if errOpus != nil {
 		t.Fatalf("expected Opus to succeed on the same credential, got: %v", errOpus)
 	}

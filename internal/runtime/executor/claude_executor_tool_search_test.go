@@ -7,12 +7,12 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	responsesclaude "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/claude/openai/responses"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	responsesclaude "github.com/udit19199/relay/internal/translator/claude/openai/responses"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 // nativeToolSearchResponsesPayload is a Codex Responses turn after one client
@@ -38,27 +38,27 @@ func enableClaudeToolSearchForTest(t *testing.T, enabled bool) {
 	t.Cleanup(func() { responsesclaude.SetClientToolSearchEnabled(previous) })
 }
 
-func nativeToolSearchAuth(attrs map[string]string) *cliproxyauth.Auth {
+func nativeToolSearchAuth(attrs map[string]string) *coreauth.Auth {
 	out := map[string]string{"api_key": "key-123", "cloak_mode": "never"}
 	for key, value := range attrs {
 		out[key] = value
 	}
-	return &cliproxyauth.Auth{Attributes: out}
+	return &coreauth.Auth{Attributes: out}
 }
 
-type nativeToolSearchSend func(t *testing.T, ex *ClaudeExecutor, ctx context.Context, auth *cliproxyauth.Auth, model string, payload, original []byte) error
+type nativeToolSearchSend func(t *testing.T, ex *ClaudeExecutor, ctx context.Context, auth *coreauth.Auth, model string, payload, original []byte) error
 
-func sendNativeToolSearchExecute(t *testing.T, ex *ClaudeExecutor, ctx context.Context, auth *cliproxyauth.Auth, model string, payload, original []byte) error {
+func sendNativeToolSearchExecute(t *testing.T, ex *ClaudeExecutor, ctx context.Context, auth *coreauth.Auth, model string, payload, original []byte) error {
 	t.Helper()
-	_, err := ex.Execute(ctx, auth, cliproxyexecutor.Request{Model: model, Payload: payload},
-		cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse, OriginalRequest: original})
+	_, err := ex.Execute(ctx, auth, coreexecutor.Request{Model: model, Payload: payload},
+		coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse, OriginalRequest: original})
 	return err
 }
 
-func sendNativeToolSearchStream(t *testing.T, ex *ClaudeExecutor, ctx context.Context, auth *cliproxyauth.Auth, model string, payload, original []byte) error {
+func sendNativeToolSearchStream(t *testing.T, ex *ClaudeExecutor, ctx context.Context, auth *coreauth.Auth, model string, payload, original []byte) error {
 	t.Helper()
-	result, err := ex.ExecuteStream(ctx, auth, cliproxyexecutor.Request{Model: model, Payload: payload},
-		cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse, OriginalRequest: original})
+	result, err := ex.ExecuteStream(ctx, auth, coreexecutor.Request{Model: model, Payload: payload},
+		coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse, OriginalRequest: original})
 	if err != nil {
 		return err
 	}
@@ -70,15 +70,15 @@ func sendNativeToolSearchStream(t *testing.T, ex *ClaudeExecutor, ctx context.Co
 	return nil
 }
 
-func sendNativeToolSearchCountTokens(t *testing.T, ex *ClaudeExecutor, ctx context.Context, auth *cliproxyauth.Auth, model string, payload, original []byte) error {
+func sendNativeToolSearchCountTokens(t *testing.T, ex *ClaudeExecutor, ctx context.Context, auth *coreauth.Auth, model string, payload, original []byte) error {
 	t.Helper()
-	_, err := ex.CountTokens(ctx, auth, cliproxyexecutor.Request{Model: model, Payload: payload},
-		cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse, OriginalRequest: original})
+	_, err := ex.CountTokens(ctx, auth, coreexecutor.Request{Model: model, Payload: payload},
+		coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse, OriginalRequest: original})
 	return err
 }
 
 // captureNativeToolSearchBody sends one request and returns the upstream body.
-func captureNativeToolSearchBody(t *testing.T, cfg *config.Config, send nativeToolSearchSend, auth *cliproxyauth.Auth, model string, payload, original []byte) []byte {
+func captureNativeToolSearchBody(t *testing.T, cfg *config.Config, send nativeToolSearchSend, auth *coreauth.Auth, model string, payload, original []byte) []byte {
 	t.Helper()
 	upstream := &midSystemUpstream{}
 	if errSend := send(t, NewClaudeExecutor(cfg), upstream.context(t, nil), auth, model, payload, original); errSend != nil {
@@ -139,7 +139,7 @@ func TestClaudeExecutor_SupportsNativeToolSearch(t *testing.T) {
 			if cfg == nil {
 				cfg = &config.Config{}
 			}
-			auth := &cliproxyauth.Auth{Attributes: tc.attrs}
+			auth := &coreauth.Auth{Attributes: tc.attrs}
 			if got := NewClaudeExecutor(cfg).SupportsNativeToolSearch(auth, tc.model); got != tc.want {
 				t.Fatalf("SupportsNativeToolSearch() = %v, want %v", got, tc.want)
 			}
@@ -174,7 +174,7 @@ func TestClaudeExecutor_NativeToolSearchFallbackMatchesDev(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
 		send     nativeToolSearchSend
-		auth     *cliproxyauth.Auth
+		auth     *coreauth.Auth
 		model    string
 		original bool
 	}{
@@ -212,8 +212,8 @@ func TestClaudeExecutor_NativeToolSearchCountTokensLocalFallback(t *testing.T) {
 	auth := nativeToolSearchAuth(map[string]string{"base_url": nativeToolSearchGateway})
 	count := func(body []byte) string {
 		t.Helper()
-		resp, err := NewClaudeExecutor(&config.Config{}).CountTokens(context.Background(), auth, cliproxyexecutor.Request{Model: "claude-sonnet-4-5", Payload: body},
-			cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse})
+		resp, err := NewClaudeExecutor(&config.Config{}).CountTokens(context.Background(), auth, coreexecutor.Request{Model: "claude-sonnet-4-5", Payload: body},
+			coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse})
 		if err != nil {
 			t.Fatalf("CountTokens: %v", err)
 		}
@@ -243,7 +243,7 @@ func TestClaudeExecutor_NativeToolSearchPayloadRuleIsFinal(t *testing.T) {
 
 func TestClaudeExecutor_NativeToolSearchOAuthAliasesReferences(t *testing.T) {
 	enableClaudeToolSearchForTest(t, true)
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Attributes: map[string]string{"api_key": "sk-ant-oat-test"},
 		Metadata:   map[string]any{"account_uuid": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"},
 	}
@@ -287,7 +287,7 @@ func TestClaudeExecutor_NativeToolSearchOAuthAliasesRenamedReferences(t *testing
 		`{"type":"function","name":"exec_command","description":"Run a command.","strict":false,"parameters":{"type":"object","properties":{"cmd":{"type":"string"}},"required":["cmd"]}},` +
 		`{"type":"tool_search","execution":"client","description":"Search deferred tools.","parameters":{"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}}` +
 		`],"stream":false}`)
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Attributes: map[string]string{"api_key": "sk-ant-oat-test"},
 		Metadata:   map[string]any{"account_uuid": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"},
 	}

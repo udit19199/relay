@@ -8,11 +8,11 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/translator"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	_ "github.com/udit19199/relay/internal/translator"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 type capturedCodexRequest struct {
@@ -42,16 +42,16 @@ func newCodexRoutingHintServer(t *testing.T, captured *capturedCodexRequest) *ht
 	}))
 }
 
-func codexOAuthTestAuth(baseURL string) *cliproxyauth.Auth {
-	return &cliproxyauth.Auth{
+func codexOAuthTestAuth(baseURL string) *coreauth.Auth {
+	return &coreauth.Auth{
 		Provider:   "codex",
 		Attributes: map[string]string{"base_url": baseURL},
 		Metadata:   map[string]any{"type": "codex", "access_token": "oauth-token", "account_id": "acct"},
 	}
 }
 
-func codexAPIKeyTestAuth(baseURL string) *cliproxyauth.Auth {
-	return &cliproxyauth.Auth{
+func codexAPIKeyTestAuth(baseURL string) *coreauth.Auth {
+	return &coreauth.Auth{
 		Provider:   "codex",
 		Attributes: map[string]string{"base_url": baseURL, "api_key": "sk-test"},
 	}
@@ -96,8 +96,8 @@ func TestCodexExecutorRoutingHintCarriesRequestedTier(t *testing.T) {
 			if model == "" {
 				model = "gpt-5.5"
 			}
-			req := cliproxyexecutor.Request{Model: model, Payload: []byte(tc.payload)}
-			opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString("claude"), Stream: tc.stream}
+			req := coreexecutor.Request{Model: model, Payload: []byte(tc.payload)}
+			opts := coreexecutor.Options{SourceFormat: translatorreg.FromString("claude"), Stream: tc.stream}
 
 			if tc.stream {
 				result, err := executor.ExecuteStream(context.Background(), auth, req, opts)
@@ -140,11 +140,11 @@ func TestCodexExecutorCompactRoutingHintCarriesRequestedTier(t *testing.T) {
 	defer server.Close()
 
 	executor := NewCodexExecutor(&config.Config{})
-	_, err := executor.Execute(context.Background(), codexOAuthTestAuth(server.URL), cliproxyexecutor.Request{
+	_, err := executor.Execute(context.Background(), codexOAuthTestAuth(server.URL), coreexecutor.Request{
 		Model:   "gpt-5.5(low)",
 		Payload: []byte(`{"model":"client-alias","service_tier":"priority","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"hi"}]}]}`),
-	}, cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FromString("openai-response"),
+	}, coreexecutor.Options{
+		SourceFormat: translatorreg.FromString("openai-response"),
 		Alt:          "responses/compact",
 	})
 	if err != nil {
@@ -174,10 +174,10 @@ func TestCodexExecutorOperatorRoutingHintRuleWins(t *testing.T) {
 	clientHeaders := http.Header{}
 	clientHeaders.Set(codexRoutingHintHeader, "model=gpt-5.4-client")
 	executor := NewCodexExecutor(&config.Config{})
-	result, err := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+	result, err := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model:   "gpt-5.5",
 		Payload: []byte(`{"model":"gpt-5.5","max_tokens":64,"speed":"fast","messages":[{"role":"user","content":"hi"}]}`),
-	}, cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString("claude"), Stream: true, Headers: clientHeaders})
+	}, coreexecutor.Options{SourceFormat: translatorreg.FromString("claude"), Stream: true, Headers: clientHeaders})
 	if err != nil {
 		t.Fatalf("ExecuteStream error: %v", err)
 	}

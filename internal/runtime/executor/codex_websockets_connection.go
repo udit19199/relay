@@ -15,13 +15,12 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gorilla/websocket"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/proxyutil"
 	log "github.com/sirupsen/logrus"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/proxyutil"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 	"golang.org/x/net/proxy"
 )
 
@@ -31,7 +30,7 @@ const (
 	codexResponsesWebsocketHandshakeTO     = 30 * time.Second
 )
 
-func (e *CodexWebsocketsExecutor) dialCodexWebsocket(ctx context.Context, auth *cliproxyauth.Auth, wsURL string, headers http.Header) (*websocket.Conn, *websocketConnectionCloser, *http.Response, error) {
+func (e *CodexWebsocketsExecutor) dialCodexWebsocket(ctx context.Context, auth *coreauth.Auth, wsURL string, headers http.Header) (*websocket.Conn, *websocketConnectionCloser, *http.Response, error) {
 	dialer := newProxyAwareWebsocketDialer(ctx, e.cfg, auth)
 	dialer.HandshakeTimeout = codexResponsesWebsocketHandshakeTO
 	dialer.EnableCompression = true
@@ -40,7 +39,7 @@ func (e *CodexWebsocketsExecutor) dialCodexWebsocket(ctx context.Context, auth *
 	}
 	conn, resp, err := dialer.DialContext(ctx, wsURL, headers)
 	if err != nil {
-		cliproxyexecutor.MarkUpstreamAttempt(ctx)
+		coreexecutor.MarkUpstreamAttempt(ctx)
 	}
 	closer := newWebsocketConnectionCloser(conn)
 	if conn != nil {
@@ -105,7 +104,7 @@ func shouldRetryCodexWebsocketSend(err error) bool {
 	if err == nil {
 		return false
 	}
-	var requestErr cliproxyexecutor.RequestScopedError
+	var requestErr coreexecutor.RequestScopedError
 	return !errors.As(err, &requestErr) || !requestErr.IsRequestScoped()
 }
 
@@ -135,7 +134,7 @@ func mapCodexWebsocketReadError(err error) error {
 // the turn error that keeps the downstream websocket open. Status, policy and other
 // close codes are returned unchanged and keep ending the downstream socket.
 func codexWebsocketTurnTransportError(err error) error {
-	if err == nil || cliproxyexecutor.IsUpstreamWebsocketTurnError(err) {
+	if err == nil || coreexecutor.IsUpstreamWebsocketTurnError(err) {
 		return err
 	}
 	var status interface{ StatusCode() int }
@@ -153,26 +152,18 @@ func codexWebsocketTurnTransportError(err error) error {
 		!errors.Is(err, syscall.EPIPE) {
 		return err
 	}
-	return &cliproxyexecutor.UpstreamWebsocketTurnError{Cause: err}
+	return &coreexecutor.UpstreamWebsocketTurnError{Cause: err}
 }
 
 // codexWebsocketTurnEventID lets a lost turn's error carry the create's event_id.
 func codexWebsocketTurnEventID(err error, payload []byte) error {
-	var turnErr *cliproxyexecutor.UpstreamWebsocketTurnError
+	var turnErr *coreexecutor.UpstreamWebsocketTurnError
 	if !errors.As(err, &turnErr) || turnErr.EventID != "" {
 		return err
 	}
 	withID := *turnErr
 	withID.EventID = strings.Clone(ojson.GetBytesNoCopy(payload, "event_id").String())
 	return &withID
-}
-
-func normalizeCodexWebsocketParallelToolCalls(body []byte, headers http.Header) []byte {
-	if !util.IsCodexResponsesLiteRequest(body, headers) {
-		return body
-	}
-	body = helps.SetBoolIfDifferent(body, "parallel_tool_calls", false)
-	return body
 }
 
 func normalizeCodexWebsocketParallelToolCallsDoc(doc *ojson.Doc, headers http.Header) bool {
@@ -232,8 +223,8 @@ func readCodexWebsocketMessage(ctx context.Context, sess *codexWebsocketSession,
 	}
 }
 
-func executionProxyURL(ctx context.Context, cfg *config.Config, auth *cliproxyauth.Auth) string {
-	proxyURL := cliproxyexecutor.RequestProxyURL(ctx)
+func executionProxyURL(ctx context.Context, cfg *config.Config, auth *coreauth.Auth) string {
+	proxyURL := coreexecutor.RequestProxyURL(ctx)
 	if proxyURL == "" && auth != nil {
 		proxyURL = strings.TrimSpace(auth.ProxyURL)
 	}
@@ -243,7 +234,7 @@ func executionProxyURL(ctx context.Context, cfg *config.Config, auth *cliproxyau
 	return proxyURL
 }
 
-func newProxyAwareWebsocketDialer(ctx context.Context, cfg *config.Config, auth *cliproxyauth.Auth) *websocket.Dialer {
+func newProxyAwareWebsocketDialer(ctx context.Context, cfg *config.Config, auth *coreauth.Auth) *websocket.Dialer {
 	dialer := &websocket.Dialer{
 		Proxy:             http.ProxyFromEnvironment,
 		HandshakeTimeout:  codexResponsesWebsocketHandshakeTO,

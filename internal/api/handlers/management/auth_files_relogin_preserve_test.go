@@ -12,12 +12,12 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/claude"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/codex"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/xai"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	sdkAuth "github.com/router-for-me/CLIProxyAPI/v8/sdk/auth"
-	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
+	"github.com/udit19199/relay/internal/auth/claude"
+	"github.com/udit19199/relay/internal/auth/codex"
+	authlogin "github.com/udit19199/relay/internal/auth/login"
+	"github.com/udit19199/relay/internal/auth/xai"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 func TestSaveTokenRecord_PostPersistHookReceivesCanonicalClaudeOAuth(t *testing.T) {
@@ -482,7 +482,7 @@ func TestPatchAuthFileFields_DeletesCredentialFields(t *testing.T) {
 		t.Fatalf("write error: %v", errWrite)
 	}
 
-	store := sdkAuth.NewFileTokenStore()
+	store := authlogin.NewFileTokenStore()
 	store.SetBaseDir(authDir)
 	manager := coreauth.NewManager(store, nil, nil)
 	record := &coreauth.Auth{

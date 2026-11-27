@@ -13,13 +13,13 @@ import (
 	"time"
 
 	tls "github.com/refraction-networking/utls"
-	internalcache "github.com/router-for-me/CLIProxyAPI/v8/internal/cache"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/httpwire"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/httptransport"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/proxyutil"
 	log "github.com/sirupsen/logrus"
+	internalcache "github.com/udit19199/relay/internal/cache"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/httptransport"
+	"github.com/udit19199/relay/internal/httpwire"
+	"github.com/udit19199/relay/internal/proxyutil"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/proxy"
 )
@@ -352,7 +352,7 @@ func claudeCodeDialer(proxyURL string) proxy.Dialer {
 // shared per-proxy transport. Per credential pooling matters here because this
 // transport is otherwise shared by every key that uses the same proxy, which mixes
 // distinct identities on one connection and ignores the key's pool settings.
-func pooledClaudeCodeTransport(proxyURL string, cfg *config.Config, auth *cliproxyauth.Auth) *http.Transport {
+func pooledClaudeCodeTransport(proxyURL string, cfg *config.Config, auth *coreauth.Auth) *http.Transport {
 	tr, pooled := pooledTransport(proxyPoolKindClaudeCode, proxyURL, cfg, auth, func() (*http.Transport, error) {
 		return newClaudeCodeRoundTripperForDialer(claudeCodeDialer(proxyURL)), nil
 	})
@@ -480,7 +480,7 @@ func (f *fallbackRoundTripper) RoundTrip(req *http.Request) (*http.Response, err
 // fingerprints for protected hosts. It uses Claude Code's Node/OpenSSL profile
 // for Anthropic and a Chrome profile for ChatGPT, with a standard-transport
 // fallback for other hosts.
-func NewUtlsHTTPClient(ctx context.Context, cfg *config.Config, auth *cliproxyauth.Auth, timeout time.Duration) (clientOut *http.Client) {
+func NewUtlsHTTPClient(ctx context.Context, cfg *config.Config, auth *coreauth.Auth, timeout time.Duration) (clientOut *http.Client) {
 	// Carry the opt-in TLS establishment bound (requests
 	// tls-handshake-timeout-seconds) on a request-scoped wrapper. This
 	// client is shared, so the bound intentionally reaches both the Claude

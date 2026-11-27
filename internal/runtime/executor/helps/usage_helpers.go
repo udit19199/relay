@@ -18,14 +18,14 @@ import (
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/clienterror"
-	internallogging "github.com/router-for-me/CLIProxyAPI/v8/internal/logging"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/thinking"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/usage"
 	log "github.com/sirupsen/logrus"
+	"github.com/udit19199/relay/internal/clienterror"
+	internallogging "github.com/udit19199/relay/internal/logging"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	"github.com/udit19199/relay/internal/service/usage"
+	"github.com/udit19199/relay/internal/thinking"
+	"github.com/udit19199/relay/internal/util"
 )
 
 type UsageReporter struct {
@@ -79,7 +79,7 @@ type usageExecutor interface {
 	Identifier() string
 }
 
-func NewExecutorUsageReporter(ctx context.Context, executor usageExecutor, model string, auth *cliproxyauth.Auth) *UsageReporter {
+func NewExecutorUsageReporter(ctx context.Context, executor usageExecutor, model string, auth *coreauth.Auth) *UsageReporter {
 	provider := ""
 	if executor != nil {
 		provider = executor.Identifier()
@@ -89,7 +89,7 @@ func NewExecutorUsageReporter(ctx context.Context, executor usageExecutor, model
 	return reporter
 }
 
-func NewUsageReporter(ctx context.Context, provider, model string, auth *cliproxyauth.Auth) *UsageReporter {
+func NewUsageReporter(ctx context.Context, provider, model string, auth *coreauth.Auth) *UsageReporter {
 	apiKey := APIKeyFromContext(ctx)
 	accessProvider := AccessProviderFromContext(ctx)
 	isNativeKey := false
@@ -151,7 +151,7 @@ func NewUsageReporter(ctx context.Context, provider, model string, auth *cliprox
 	if auth != nil {
 		reporter.authID = auth.ID
 		reporter.authIndex = auth.EnsureIndex()
-		reporter.accessTokenHash = cliproxyauth.AccessTokenSHA256(auth)
+		reporter.accessTokenHash = coreauth.AccessTokenSHA256(auth)
 	}
 	return reporter
 }
@@ -196,12 +196,12 @@ func isHierarchyParent(primary, parent string) bool {
 }
 
 // UpdateAccessTokenFingerprint records the token version actually used upstream.
-func (r *UsageReporter) UpdateAccessTokenFingerprint(auth *cliproxyauth.Auth) {
+func (r *UsageReporter) UpdateAccessTokenFingerprint(auth *coreauth.Auth) {
 	if r == nil {
 		return
 	}
 	r.authMu.Lock()
-	r.accessTokenHash = cliproxyauth.AccessTokenSHA256(auth)
+	r.accessTokenHash = coreauth.AccessTokenSHA256(auth)
 	r.authMu.Unlock()
 }
 
@@ -730,9 +730,9 @@ func failFromErrors(errs ...error) usage.Failure {
 			Body:       body,
 			StatusCode: clienterror.HTTPStatusFromError(err),
 		}
-		if truncatedErr, ok := errors.AsType[cliproxyexecutor.StreamTruncatedError](err); ok && truncatedErr != nil && truncatedErr.IsStreamTruncated() {
+		if truncatedErr, ok := errors.AsType[coreexecutor.StreamTruncatedError](err); ok && truncatedErr != nil && truncatedErr.IsStreamTruncated() {
 			fail.Code = usage.FailureStreamTruncatedCode
-		} else if requestErr, ok := errors.AsType[cliproxyexecutor.RequestScopedError](err); ok && requestErr != nil && requestErr.IsRequestScoped() {
+		} else if requestErr, ok := errors.AsType[coreexecutor.RequestScopedError](err); ok && requestErr != nil && requestErr.IsRequestScoped() {
 			fail.Code = usage.FailureRequestScopedCode
 		}
 		return fail
@@ -791,7 +791,7 @@ type usageTTFTRoundTripper struct {
 }
 
 func (t usageTTFTRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	cliproxyexecutor.MarkUpstreamAttempt(req.Context())
+	coreexecutor.MarkUpstreamAttempt(req.Context())
 	t.reporter.StartResponseTTFT()
 	resp, errRoundTrip := t.base.RoundTrip(req)
 	if errRoundTrip != nil {
@@ -874,7 +874,7 @@ func AccessProviderFromContext(ctx context.Context) string {
 	return ""
 }
 
-func resolveUsageSource(auth *cliproxyauth.Auth, ctxAPIKey string) string {
+func resolveUsageSource(auth *coreauth.Auth, ctxAPIKey string) string {
 	if auth != nil {
 		if _, value := auth.AccountInfo(); value != "" {
 			return strings.TrimSpace(value)
@@ -898,7 +898,7 @@ func resolveUsageSource(auth *cliproxyauth.Auth, ctxAPIKey string) string {
 	return ""
 }
 
-func resolveUsageAuthType(auth *cliproxyauth.Auth) string {
+func resolveUsageAuthType(auth *coreauth.Auth) string {
 	if auth == nil {
 		return ""
 	}
@@ -3393,8 +3393,6 @@ func invalidUsageTokenBreakdown(total int64) usage.TokenBreakdown {
 		UnclassifiedTokens: total,
 	}
 }
-
-var finishReasonMarker = []byte(`"finishReason"`)
 
 func JSONPayload(line []byte) []byte {
 	return jsonPayload(line)

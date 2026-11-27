@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	coreusage "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/usage"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	coreusage "github.com/udit19199/relay/internal/service/usage"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 	"google.golang.org/protobuf/encoding/protowire"
 )
 
@@ -54,7 +54,7 @@ func TestClaudeUsageRecordCarriesResponseModel(t *testing.T) {
 	})
 
 	ctx := coreusage.WithRequestedModelAlias(context.Background(), alias)
-	auth := &cliproxyauth.Auth{ID: "claude-auth-1", Index: "auth-claude-1", Provider: "claude"}
+	auth := &coreauth.Auth{ID: "claude-auth-1", Index: "auth-claude-1", Provider: "claude"}
 	reporter := helps.NewExecutorUsageReporter(ctx, NewClaudeExecutor(&config.Config{}), "claude-opus-5", auth)
 
 	reporter.ObserveResponseModel([]byte(`data: {"type":"message_start","message":{"id":"msg_1","type":"message","role":"assistant","model":"claude-sonnet-5"}}`))
@@ -78,7 +78,7 @@ func TestOpenAICompatUsageRecordCarriesResponseModel(t *testing.T) {
 	})
 
 	ctx := coreusage.WithRequestedModelAlias(context.Background(), alias)
-	auth := &cliproxyauth.Auth{ID: "openai-auth-1", Index: "auth-openai-1", Provider: "openai"}
+	auth := &coreauth.Auth{ID: "openai-auth-1", Index: "auth-openai-1", Provider: "openai"}
 	reporter := helps.NewExecutorUsageReporter(ctx, NewOpenAICompatExecutor("openai", &config.Config{}), "gpt-4o", auth)
 
 	reporter.ObserveResponseModel([]byte(`{"id":"chatcmpl-1","object":"chat.completion","model":"gpt-4o-2024-08-06","choices":[]}`))
@@ -102,7 +102,7 @@ func TestDevinStreamRecordsResponseModelFromUsage(t *testing.T) {
 	})
 
 	ctx := coreusage.WithRequestedModelAlias(context.Background(), alias)
-	auth := &cliproxyauth.Auth{ID: "devin-auth-1", Index: "auth-devin-1", Provider: "devin"}
+	auth := &coreauth.Auth{ID: "devin-auth-1", Index: "auth-devin-1", Provider: "devin"}
 	exec := NewDevinExecutor(&config.Config{})
 	reporter := helps.NewExecutorUsageReporter(ctx, exec, "devin/swe-2", auth)
 
@@ -122,9 +122,9 @@ func TestDevinStreamRecordsResponseModelFromUsage(t *testing.T) {
 	buf.Write(helps.WrapConnectEnvelope(f1))
 	buf.Write(helps.WrapConnectEnvelopeWithFlag(helps.ConnectFlagEndStream, []byte(`{}`)))
 
-	out := make(chan cliproxyexecutor.StreamChunk, 20)
-	opts := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatInteractions,
+	out := make(chan coreexecutor.StreamChunk, 20)
+	opts := coreexecutor.Options{
+		SourceFormat: translatorreg.FormatInteractions,
 	}
 
 	go func() {
@@ -132,10 +132,10 @@ func TestDevinStreamRecordsResponseModelFromUsage(t *testing.T) {
 		exec.streamDevinFrames(
 			ctx,
 			&buf,
-			cliproxyexecutor.Request{Model: "devin/swe-2"},
+			coreexecutor.Request{Model: "devin/swe-2"},
 			opts,
 			"swe-2-high",
-			sdktranslator.FormatInteractions,
+			translatorreg.FormatInteractions,
 			reporter,
 			out,
 		)
@@ -162,7 +162,7 @@ func TestDevinStreamEmptyWhenNoModelNameInUsage(t *testing.T) {
 	})
 
 	ctx := coreusage.WithRequestedModelAlias(context.Background(), alias)
-	auth := &cliproxyauth.Auth{ID: "devin-auth-2", Index: "auth-devin-2", Provider: "devin"}
+	auth := &coreauth.Auth{ID: "devin-auth-2", Index: "auth-devin-2", Provider: "devin"}
 	exec := NewDevinExecutor(&config.Config{})
 	reporter := helps.NewExecutorUsageReporter(ctx, exec, "devin/swe-2", auth)
 
@@ -180,9 +180,9 @@ func TestDevinStreamEmptyWhenNoModelNameInUsage(t *testing.T) {
 	buf.Write(helps.WrapConnectEnvelope(f1))
 	buf.Write(helps.WrapConnectEnvelopeWithFlag(helps.ConnectFlagEndStream, []byte(`{}`)))
 
-	out := make(chan cliproxyexecutor.StreamChunk, 20)
-	opts := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatInteractions,
+	out := make(chan coreexecutor.StreamChunk, 20)
+	opts := coreexecutor.Options{
+		SourceFormat: translatorreg.FormatInteractions,
 	}
 
 	go func() {
@@ -190,10 +190,10 @@ func TestDevinStreamEmptyWhenNoModelNameInUsage(t *testing.T) {
 		exec.streamDevinFrames(
 			ctx,
 			&buf,
-			cliproxyexecutor.Request{Model: "devin/swe-2"},
+			coreexecutor.Request{Model: "devin/swe-2"},
 			opts,
 			"swe-2-high",
-			sdktranslator.FormatInteractions,
+			translatorreg.FormatInteractions,
 			reporter,
 			out,
 		)
@@ -217,7 +217,7 @@ func TestDevinNonStreamRecordsResponseModelFromUsage(t *testing.T) {
 	})
 
 	ctx := coreusage.WithRequestedModelAlias(context.Background(), alias)
-	auth := &cliproxyauth.Auth{ID: "devin-auth-3", Index: "auth-devin-3", Provider: "devin"}
+	auth := &coreauth.Auth{ID: "devin-auth-3", Index: "auth-devin-3", Provider: "devin"}
 	exec := NewDevinExecutor(&config.Config{})
 	reporter := helps.NewExecutorUsageReporter(ctx, exec, "devin/swe-2", auth)
 

@@ -14,12 +14,12 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gin-gonic/gin"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	responsesclaude "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/claude/openai/responses"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	responsesclaude "github.com/udit19199/relay/internal/translator/claude/openai/responses"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 // toolSearchExecutorGoldenPayload is a Codex Responses turn with a client
@@ -49,7 +49,7 @@ func renderToolSearchExecutorGolden(t *testing.T) map[string]string {
 	t.Helper()
 	helps.ResetClaudeDiagnosticsForTest()
 	t.Cleanup(helps.ResetClaudeDiagnosticsForTest)
-	claudeCodeCurrentTimeFunc = func(*config.Config, *cliproxyauth.Auth) time.Time {
+	claudeCodeCurrentTimeFunc = func(*config.Config, *coreauth.Auth) time.Time {
 		return toolSearchExecutorGoldenDate
 	}
 	t.Cleanup(func() { claudeCodeCurrentTimeFunc = nil })
@@ -59,12 +59,12 @@ func renderToolSearchExecutorGolden(t *testing.T) map[string]string {
 		"gateway":  {"api_key": "key-123", "cloak_mode": "never", "base_url": "https://gateway.example.com", "native_tool_search": "true"},
 		"oauth":    {"api_key": "sk-ant-oat-test"},
 	}
-	opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse, OriginalRequest: payload}
-	request := cliproxyexecutor.Request{Model: "claude-sonnet-4-5", Payload: payload}
+	opts := coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse, OriginalRequest: payload}
+	request := coreexecutor.Request{Model: "claude-sonnet-4-5", Payload: payload}
 	golden := make(map[string]string)
 	for authName, attrs := range auths {
 		for _, path := range []string{"execute", "stream", "count_tokens"} {
-			auth := &cliproxyauth.Auth{Attributes: attrs, Metadata: map[string]any{"account_uuid": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}}
+			auth := &coreauth.Auth{Attributes: attrs, Metadata: map[string]any{"account_uuid": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}}
 			upstream := &midSystemUpstream{}
 			ctx := upstream.context(t, nil)
 			ex := NewClaudeExecutor(&config.Config{})
@@ -183,7 +183,7 @@ func toolSearchReloadContext(t *testing.T, flipTo bool) (context.Context, *[]byt
 func TestClaudeExecutor_ToolSearchSwitchIsPinnedPerRequest(t *testing.T) {
 	payload := []byte(nativeToolSearchResponsesPayload)
 	auth := nativeToolSearchAuth(nil)
-	opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse, OriginalRequest: payload}
+	opts := coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse, OriginalRequest: payload}
 	for _, tc := range []struct {
 		name      string
 		start     bool
@@ -196,7 +196,7 @@ func TestClaudeExecutor_ToolSearchSwitchIsPinnedPerRequest(t *testing.T) {
 		t.Run(tc.name+" execute", func(t *testing.T) {
 			enableClaudeToolSearchForTest(t, tc.start)
 			ctx, sent := toolSearchReloadContext(t, !tc.start)
-			resp, errExecute := NewClaudeExecutor(&config.Config{}).Execute(ctx, auth, cliproxyexecutor.Request{Model: "claude-sonnet-4-5", Payload: payload}, opts)
+			resp, errExecute := NewClaudeExecutor(&config.Config{}).Execute(ctx, auth, coreexecutor.Request{Model: "claude-sonnet-4-5", Payload: payload}, opts)
 			if errExecute != nil {
 				t.Fatalf("Execute: %v", errExecute)
 			}
@@ -210,7 +210,7 @@ func TestClaudeExecutor_ToolSearchSwitchIsPinnedPerRequest(t *testing.T) {
 		t.Run(tc.name+" stream", func(t *testing.T) {
 			enableClaudeToolSearchForTest(t, tc.start)
 			ctx, sent := toolSearchReloadContext(t, !tc.start)
-			result, errStream := NewClaudeExecutor(&config.Config{}).ExecuteStream(ctx, auth, cliproxyexecutor.Request{Model: "claude-sonnet-4-5", Payload: payload}, opts)
+			result, errStream := NewClaudeExecutor(&config.Config{}).ExecuteStream(ctx, auth, coreexecutor.Request{Model: "claude-sonnet-4-5", Payload: payload}, opts)
 			if errStream != nil {
 				t.Fatalf("ExecuteStream: %v", errStream)
 			}
@@ -246,7 +246,7 @@ func TestClaudeExecutor_ToolSearchFallbackPinsTranslation(t *testing.T) {
 	for _, tc := range []struct {
 		name          string
 		start         bool
-		auth          *cliproxyauth.Auth
+		auth          *coreauth.Auth
 		wantToolNames map[string]bool
 	}{
 		// Native: the client search tool stays and hosted search is dropped.
@@ -259,11 +259,11 @@ func TestClaudeExecutor_ToolSearchFallbackPinsTranslation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			enableClaudeToolSearchForTest(t, tc.start)
 			ex := NewClaudeExecutor(&config.Config{})
-			req := cliproxyexecutor.Request{Model: "claude-sonnet-4-5", Payload: payload}
-			opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatOpenAIResponse, OriginalRequest: payload}
-			ctx, req, _ := ex.applyNativeToolSearchFallback(context.Background(), tc.auth, sdktranslator.FormatOpenAIResponse, "claude-sonnet-4-5", req, opts)
+			req := coreexecutor.Request{Model: "claude-sonnet-4-5", Payload: payload}
+			opts := coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse, OriginalRequest: payload}
+			ctx, req, _ := ex.applyNativeToolSearchFallback(context.Background(), tc.auth, translatorreg.FormatOpenAIResponse, "claude-sonnet-4-5", req, opts)
 			responsesclaude.SetClientToolSearchEnabled(!tc.start)
-			body, errTranslate := helps.TranslateRequestReturningError(ctx, nil, &config.Config{}, sdktranslator.FormatOpenAIResponse, sdktranslator.FormatClaude, "claude-sonnet-4-5", req.Payload, false, false)
+			body, errTranslate := helps.TranslateRequestReturningError(ctx, nil, &config.Config{}, translatorreg.FormatOpenAIResponse, translatorreg.FormatClaude, "claude-sonnet-4-5", req.Payload, false, false)
 			if errTranslate != nil {
 				t.Fatalf("translate: %v", errTranslate)
 			}

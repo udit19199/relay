@@ -20,18 +20,17 @@ import (
 	gin "github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
-	managementHandlers "github.com/router-for-me/CLIProxyAPI/v8/internal/api/handlers/management"
-	claudemodels "github.com/router-for-me/CLIProxyAPI/v8/internal/client/claude/models"
-	proxyconfig "github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	internallogging "github.com/router-for-me/CLIProxyAPI/v8/internal/logging"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/redisqueue"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor"
-	runtimehelps "github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	sdkaccess "github.com/router-for-me/CLIProxyAPI/v8/sdk/access"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	coreexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdkconfig "github.com/router-for-me/CLIProxyAPI/v8/sdk/config"
+	"github.com/udit19199/relay/internal/access"
+	managementHandlers "github.com/udit19199/relay/internal/api/handlers/management"
+	claudemodels "github.com/udit19199/relay/internal/client/claude/models"
+	"github.com/udit19199/relay/internal/config"
+	proxyconfig "github.com/udit19199/relay/internal/config"
+	internallogging "github.com/udit19199/relay/internal/logging"
+	"github.com/udit19199/relay/internal/registry"
+	"github.com/udit19199/relay/internal/runtime/executor"
+	runtimehelps "github.com/udit19199/relay/internal/runtime/executor/helps"
+	"github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 type codexSearchCaptureExecutor struct {
@@ -141,56 +140,6 @@ func (e *codexSearchCaptureExecutor) HttpRequest(_ context.Context, selected *au
 	}, nil
 }
 
-type trackedSearchResponseBody struct {
-	io.Reader
-	closed atomic.Bool
-}
-
-func (b *trackedSearchResponseBody) Close() error {
-	b.closed.Store(true)
-	return nil
-}
-
-type errorSearchResponseBody struct {
-	payload []byte
-	read    atomic.Bool
-	closed  atomic.Bool
-}
-
-func (b *errorSearchResponseBody) Read(p []byte) (int, error) {
-	if !b.read.CompareAndSwap(false, true) {
-		return 0, io.EOF
-	}
-	return copy(p, b.payload), io.ErrUnexpectedEOF
-}
-
-func (b *errorSearchResponseBody) Close() error {
-	b.closed.Store(true)
-	return nil
-}
-
-type drainAwareSearchResponseBody struct {
-	started   chan struct{}
-	closed    chan struct{}
-	startOnce sync.Once
-	closeOnce sync.Once
-}
-
-func newDrainAwareSearchResponseBody() *drainAwareSearchResponseBody {
-	return &drainAwareSearchResponseBody{started: make(chan struct{}), closed: make(chan struct{})}
-}
-
-func (b *drainAwareSearchResponseBody) Read([]byte) (int, error) {
-	b.startOnce.Do(func() { close(b.started) })
-	<-b.closed
-	return 0, io.EOF
-}
-
-func (b *drainAwareSearchResponseBody) Close() error {
-	b.closeOnce.Do(func() { close(b.closed) })
-	return nil
-}
-
 func newTestServer(t *testing.T) *Server {
 	t.Helper()
 	return newTestServerWithOptions(t)
@@ -199,7 +148,7 @@ func newTestServer(t *testing.T) *Server {
 func newTestServerWithOptions(t *testing.T, opts ...ServerOption) *Server {
 	t.Helper()
 	cfg := &proxyconfig.Config{
-		SDKConfig: sdkconfig.SDKConfig{
+		SDKConfig: config.SDKConfig{
 			APIKeys: []string{"test-key"},
 		},
 	}
@@ -224,7 +173,7 @@ func newTestServerWithConfig(t *testing.T, cfg *proxyconfig.Config, opts ...Serv
 	cfg.UsageStatisticsEnabled = false
 
 	authManager := auth.NewManager(nil, nil, nil)
-	accessManager := sdkaccess.NewManager()
+	accessManager := access.NewManager()
 
 	configPath := filepath.Join(tmpDir, "config.yaml")
 	return NewServer(cfg, authManager, accessManager, configPath, opts...)
@@ -866,68 +815,6 @@ func TestOAuthCallbackRouteSkipsManagementKeyMiddleware(t *testing.T) {
 	}
 }
 
-func TestManagementUsageRequiresManagementAuthAndPopsArray(t *testing.T) {
-	t.Setenv("MANAGEMENT_PASSWORD", "test-management-key")
-
-	prevQueueEnabled := redisqueue.Enabled()
-	redisqueue.SetEnabled(false)
-	t.Cleanup(func() {
-		redisqueue.SetEnabled(false)
-		redisqueue.SetEnabled(prevQueueEnabled)
-	})
-
-	server := newTestServer(t)
-
-	redisqueue.Enqueue([]byte(`{"id":1}`))
-	redisqueue.Enqueue([]byte(`{"id":2}`))
-
-	missingKeyReq := httptest.NewRequest(http.MethodGet, "/v0/management/usage-queue?count=2", nil)
-	missingKeyRR := httptest.NewRecorder()
-	server.engine.ServeHTTP(missingKeyRR, missingKeyReq)
-	if missingKeyRR.Code != http.StatusUnauthorized {
-		t.Fatalf("missing key status = %d, want %d body=%s", missingKeyRR.Code, http.StatusUnauthorized, missingKeyRR.Body.String())
-	}
-
-	legacyReq := httptest.NewRequest(http.MethodGet, "/v0/management/usage?count=2", nil)
-	legacyReq.Header.Set("Authorization", "Bearer test-management-key")
-	legacyRR := httptest.NewRecorder()
-	server.engine.ServeHTTP(legacyRR, legacyReq)
-	if legacyRR.Code != http.StatusNotFound {
-		t.Fatalf("legacy usage status = %d, want %d body=%s", legacyRR.Code, http.StatusNotFound, legacyRR.Body.String())
-	}
-
-	authReq := httptest.NewRequest(http.MethodGet, "/v0/management/usage-queue?count=2", nil)
-	authReq.Header.Set("Authorization", "Bearer test-management-key")
-	authRR := httptest.NewRecorder()
-	server.engine.ServeHTTP(authRR, authReq)
-	if authRR.Code != http.StatusOK {
-		t.Fatalf("authenticated status = %d, want %d body=%s", authRR.Code, http.StatusOK, authRR.Body.String())
-	}
-
-	var payload []json.RawMessage
-	if errUnmarshal := json.Unmarshal(authRR.Body.Bytes(), &payload); errUnmarshal != nil {
-		t.Fatalf("unmarshal response: %v body=%s", errUnmarshal, authRR.Body.String())
-	}
-	if len(payload) != 2 {
-		t.Fatalf("response records = %d, want 2", len(payload))
-	}
-	for i, raw := range payload {
-		var record struct {
-			ID int `json:"id"`
-		}
-		if errUnmarshal := json.Unmarshal(raw, &record); errUnmarshal != nil {
-			t.Fatalf("unmarshal record %d: %v", i, errUnmarshal)
-		}
-		if record.ID != i+1 {
-			t.Fatalf("record %d id = %d, want %d", i, record.ID, i+1)
-		}
-	}
-
-	if remaining := redisqueue.PopOldest(1); len(remaining) != 0 {
-		t.Fatalf("remaining queue = %q, want empty", remaining)
-	}
-}
-
 func TestVideosRoutesKeepXAINativeAndExposeOpenAIPrefix(t *testing.T) {
 	server := newTestServer(t)
 
@@ -969,18 +856,13 @@ func TestVideosRoutesKeepXAINativeAndExposeOpenAIPrefix(t *testing.T) {
 
 func TestExampleAPIKeySafeModeShowsWarningAndKeepsManagement(t *testing.T) {
 	t.Setenv("MANAGEMENT_PASSWORD", "test-management-key")
-	staticDir := t.TempDir()
-	t.Setenv("MANAGEMENT_STATIC_PATH", staticDir)
-	if err := os.WriteFile(filepath.Join(staticDir, "management.html"), []byte("<html>management app</html>"), 0o600); err != nil {
-		t.Fatalf("failed to write management asset: %v", err)
-	}
 
 	server := newTestServerWithOptions(t, WithExampleAPIKeySafeMode())
 	cfg := *server.cfg
 	cfg.APIKeys = []string{"your-api-key-1"}
 	server.UpdateClients(&cfg)
 
-	t.Run("root warning page includes management link", func(t *testing.T) {
+	t.Run("root warning page points to the config file", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rr := httptest.NewRecorder()
 		server.engine.ServeHTTP(rr, req)
@@ -988,49 +870,10 @@ func TestExampleAPIKeySafeModeShowsWarningAndKeepsManagement(t *testing.T) {
 			t.Fatalf("status = %d, want %d body=%s", rr.Code, http.StatusOK, rr.Body.String())
 		}
 		body := rr.Body.String()
-		for _, want := range []string{"Example API key detected", "Open Management", `href="/management.html?safe-mode=configure"`} {
+		for _, want := range []string{"Example API key detected", "~/.relay/config.yaml"} {
 			if !strings.Contains(body, want) {
 				t.Fatalf("warning page missing %q: %s", want, body)
 			}
-		}
-	})
-
-	t.Run("management html defaults to warning page", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/management.html", nil)
-		rr := httptest.NewRecorder()
-		server.engine.ServeHTTP(rr, req)
-		if rr.Code != http.StatusOK {
-			t.Fatalf("status = %d, want %d body=%s", rr.Code, http.StatusOK, rr.Body.String())
-		}
-		if !strings.Contains(rr.Body.String(), "Example API key detected") {
-			t.Fatalf("management.html did not show warning page: %s", rr.Body.String())
-		}
-	})
-
-	t.Run("management html head stops at warning page", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodHead, "/management.html", nil)
-		rr := httptest.NewRecorder()
-		server.engine.ServeHTTP(rr, req)
-		if rr.Code != http.StatusOK {
-			t.Fatalf("status = %d, want %d body=%s", rr.Code, http.StatusOK, rr.Body.String())
-		}
-		if rr.Body.Len() != 0 {
-			t.Fatalf("HEAD body length = %d, want 0", rr.Body.Len())
-		}
-		if got := rr.Header().Get("Cache-Control"); got != "no-store" {
-			t.Fatalf("Cache-Control = %q, want no-store", got)
-		}
-	})
-
-	t.Run("management button query opens control panel", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/management.html?safe-mode=configure", nil)
-		rr := httptest.NewRecorder()
-		server.engine.ServeHTTP(rr, req)
-		if rr.Code != http.StatusOK {
-			t.Fatalf("status = %d, want %d body=%s", rr.Code, http.StatusOK, rr.Body.String())
-		}
-		if !strings.Contains(rr.Body.String(), "management app") {
-			t.Fatalf("management panel body missing: %s", rr.Body.String())
 		}
 	})
 
@@ -1050,8 +893,8 @@ func TestExampleAPIKeySafeModeShowsWarningAndKeepsManagement(t *testing.T) {
 		if strings.Contains(rr.Body.String(), "management_url") {
 			t.Fatalf("body should not include management_url field: %s", rr.Body.String())
 		}
-		if !strings.Contains(rr.Body.String(), "/management.html?safe-mode=configure") {
-			t.Fatalf("body missing management link in message: %s", rr.Body.String())
+		if !strings.Contains(rr.Body.String(), "~/.relay/config.yaml") {
+			t.Fatalf("body missing config hint in message: %s", rr.Body.String())
 		}
 		if got := rr.Header().Get(internallogging.CPATraceIDHeader); got != "" {
 			t.Fatalf("trace ID = %q, want empty before auth selection", got)
@@ -1300,7 +1143,7 @@ func TestModelsWithClientVersionReturnsCodexCatalog(t *testing.T) {
 		modelRegistry.UnregisterClient(clientID)
 	})
 
-	cfg := &proxyconfig.Config{SDKConfig: sdkconfig.SDKConfig{APIKeys: []string{"test-key"}}}
+	cfg := &proxyconfig.Config{SDKConfig: config.SDKConfig{APIKeys: []string{"test-key"}}}
 	cfg.Client.Codex.EnableApplyPatch = true
 	server := newTestServerWithConfig(t, cfg)
 	server.handlers.AuthManager.RegisterExecutor(executor.NewCodexAutoExecutor(&proxyconfig.Config{}))
@@ -2145,13 +1988,6 @@ func assertSerializedCPAWebSearch(t *testing.T, model map[string]any, want bool)
 	}
 }
 
-// modelCatalogUnknownExecutor implements only the mandatory provider contract.
-type modelCatalogUnknownExecutor struct{ auth.ProviderExecutor }
-
-type modelCatalogUnsupportedExecutor struct{ auth.ProviderExecutor }
-
-func (modelCatalogUnsupportedExecutor) SupportsApplyPatch() bool { return false }
-
 func TestModelsWithClientVersionApplyPatchRequiresExecutor(t *testing.T) {
 	modelRegistry := registry.GetGlobalRegistry()
 	clientID := "http-patch-missing-executor"
@@ -2206,7 +2042,7 @@ func (p *revocableServerAccessProvider) Identifier() string {
 	return "revocable-test-provider"
 }
 
-func (p *revocableServerAccessProvider) Authenticate(_ context.Context, r *http.Request) (*sdkaccess.Result, *sdkaccess.AuthError) {
+func (p *revocableServerAccessProvider) Authenticate(_ context.Context, r *http.Request) (*access.Result, *access.AuthError) {
 	var body []byte
 	if r != nil && r.Body != nil {
 		body, _ = io.ReadAll(r.Body)
@@ -2223,12 +2059,12 @@ func (p *revocableServerAccessProvider) Authenticate(_ context.Context, r *http.
 		p.mu.Unlock()
 	}
 	if r == nil || r.Header.Get("Authorization") != "Bearer key-1" {
-		return nil, sdkaccess.NewNoCredentialsError()
+		return nil, access.NewNoCredentialsError()
 	}
 	if p.revoked.Load() {
-		return nil, sdkaccess.NewInvalidCredentialError()
+		return nil, access.NewInvalidCredentialError()
 	}
-	return &sdkaccess.Result{
+	return &access.Result{
 		Provider:  p.Identifier(),
 		Principal: "key-1",
 	}, nil
@@ -2271,7 +2107,7 @@ func (e *serverResponsesWebsocketCaptureExecutor) HttpRequest(context.Context, *
 func TestServerResponsesWebsocketReauthorizesEachTurn(t *testing.T) {
 	server := newTestServer(t)
 	provider := &revocableServerAccessProvider{}
-	server.accessManager.SetProviders([]sdkaccess.Provider{provider})
+	server.accessManager.SetProviders([]access.Provider{provider})
 
 	wsExec := &serverResponsesWebsocketCaptureExecutor{}
 	server.handlers.AuthManager.RegisterExecutor(wsExec)

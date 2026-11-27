@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/thinking"
-	_ "github.com/router-for-me/CLIProxyAPI/v8/internal/thinking/provider/claude"
+	"github.com/udit19199/relay/internal/registry"
+	"github.com/udit19199/relay/internal/thinking"
+	_ "github.com/udit19199/relay/internal/thinking/provider/claude"
 )
 
 func TestResolveModelInfoUsesSuffixFreeStaticCapabilities(t *testing.T) {

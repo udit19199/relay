@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/MoeForge/moego/ojson"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 func TestCodexMultipartImageEditAppendsExistingImages(t *testing.T) {
@@ -153,7 +153,7 @@ func TestExecutorPayloadSingleDocPipelinesByteConsistency(t *testing.T) {
 
 	t.Run("codex doc pipeline matches byte pipeline", func(t *testing.T) {
 		raw := []byte(`{"model":"gpt-5","instructions":null,"parallel_tool_calls":true,"temperature":0.7,"input":[{"type":"reasoning","id":"rs_1","content":[{"type":"reasoning_text","text":"step 1"}],"encrypted_content":"invalid"},{"type":"web_search_call","id":"ws_1"},{"type":"message","role":"user","content":[{"type":"input_text","text":"hi"}]}]}`)
-		opts := cliproxyexecutor.Options{}
+		opts := coreexecutor.Options{}
 
 		byteOut := bytes.Clone(raw)
 		byteOut = normalizeCodexInstructions(byteOut)

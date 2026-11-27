@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/MoeForge/moego/ojson"
-	kvstore "github.com/router-for-me/CLIProxyAPI/v8/internal/kvstore"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/signature"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
 	log "github.com/sirupsen/logrus"
+	kvstore "github.com/udit19199/relay/internal/kvstore"
+	"github.com/udit19199/relay/internal/signature"
+	"github.com/udit19199/relay/internal/util"
 )
 
 const (
@@ -294,14 +294,6 @@ func GetCodexReasoningReplayItemsRequired(ctx context.Context, modelName, sessio
 	entry.Timestamp = now
 	codexReasoningReplayEntries[key] = entry
 	return cloneCodexReasoningReplayItems(entry.Items), true, nil
-}
-
-// DeleteCodexReasoningReplayItem removes one replay item after upstream rejects
-// it or the caller otherwise knows it is stale.
-func DeleteCodexReasoningReplayItem(modelName, sessionKey string) {
-	if errDelete := DeleteCodexReasoningReplayItemRequired(context.Background(), modelName, sessionKey); errDelete != nil {
-		return
-	}
 }
 
 // DeleteCodexReasoningReplayItemRequired removes one replay item for request-time paths.

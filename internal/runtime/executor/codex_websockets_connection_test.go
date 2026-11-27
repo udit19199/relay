@@ -13,9 +13,9 @@ import (
 	"testing"
 
 	"github.com/gorilla/websocket"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	log "github.com/sirupsen/logrus"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 // compressionFrameRecorder observes the first WebSocket frame after HTTP hijacking.
@@ -84,7 +84,7 @@ func TestWebsocketCompressionRoundTrip(t *testing.T) {
 				}))
 				defer server.Close()
 				wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
-				auth := &cliproxyauth.Auth{ProxyURL: "direct"}
+				auth := &coreauth.Auth{ProxyURL: "direct"}
 				var conn *websocket.Conn
 				var closer *websocketConnectionCloser
 				var response *http.Response

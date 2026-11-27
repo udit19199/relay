@@ -4,11 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestDevinExecutorUsesClaudeEffortDirective(t *testing.T) {
@@ -30,8 +30,8 @@ func TestDevinExecutorUsesClaudeEffortDirective(t *testing.T) {
 	}
 
 	exec := NewDevinExecutor(&config.Config{})
-	auth := &cliproxyauth.Auth{ID: "devin-effort-directive", Provider: "devin", Attributes: map[string]string{"api_key": "test-key"}}
-	opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FormatClaude}
+	auth := &coreauth.Auth{ID: "devin-effort-directive", Provider: "devin", Attributes: map[string]string{"api_key": "test-key"}}
+	opts := coreexecutor.Options{SourceFormat: translatorreg.FormatClaude}
 	for _, tc := range []struct {
 		name    string
 		model   string
@@ -44,7 +44,7 @@ func TestDevinExecutorUsesClaudeEffortDirective(t *testing.T) {
 		{name: "disabled thinking keeps a historical directive from selecting a variant", model: model, payload: disabledWithDirective, want: wantNone},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			req := cliproxyexecutor.Request{Model: tc.model, Payload: []byte(tc.payload)}
+			req := coreexecutor.Request{Model: tc.model, Payload: []byte(tc.payload)}
 			_, chatModelUID, _, err := exec.prepareDevinHTTPRequest(context.Background(), auth, req, opts)
 			if err != nil {
 				t.Fatalf("prepareDevinHTTPRequest: %v", err)

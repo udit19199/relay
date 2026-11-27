@@ -9,13 +9,13 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/MoeForge/moego/ojson"
-	applypatch "github.com/router-for-me/CLIProxyAPI/v8/internal/client/codex/apply-patch"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	sigcompat "github.com/router-for-me/CLIProxyAPI/v8/internal/signature"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/thinking"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/translator/common"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	applypatch "github.com/udit19199/relay/internal/client/codex/apply-patch"
+	"github.com/udit19199/relay/internal/registry"
+	sigcompat "github.com/udit19199/relay/internal/signature"
+	"github.com/udit19199/relay/internal/thinking"
+	"github.com/udit19199/relay/internal/translator/common"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
+	"github.com/udit19199/relay/internal/util"
 )
 
 const (
@@ -49,7 +49,7 @@ func ConvertOpenAIResponsesRequestToClaudeWithCompat(modelName string, inputRawJ
 
 // ConvertOpenAIResponsesRequestEnvelopeToClaude translates with the
 // upstream.claude.tool-search value pinned in ctx, if any.
-func ConvertOpenAIResponsesRequestEnvelopeToClaude(ctx context.Context, req sdktranslator.RequestEnvelope) sdktranslator.RequestEnvelope {
+func ConvertOpenAIResponsesRequestEnvelopeToClaude(ctx context.Context, req translatorreg.RequestEnvelope) translatorreg.RequestEnvelope {
 	req.Body, req.Err = convertOpenAIResponsesRequestToClaude(ctx, req.Model, req.Body, req.Stream, false, ClientToolSearchEnabledFor(ctx))
 	return req
 }

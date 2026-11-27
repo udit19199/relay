@@ -9,18 +9,18 @@ import (
 	"time"
 
 	"github.com/MoeForge/moego/ojson"
-	metaauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/meta"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	log "github.com/sirupsen/logrus"
+	metaauth "github.com/udit19199/relay/internal/auth/meta"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	"github.com/udit19199/relay/internal/util"
 	"golang.org/x/sync/singleflight"
 )
 
 var (
-	_ cliproxyauth.ProviderExecutor    = (*MetaExecutor)(nil)
-	_ cliproxyauth.RequestAuthPreparer = (*MetaExecutor)(nil)
+	_ coreauth.ProviderExecutor    = (*MetaExecutor)(nil)
+	_ coreauth.RequestAuthPreparer = (*MetaExecutor)(nil)
 )
 
 var metaRefreshGroup singleflight.Group
@@ -49,7 +49,7 @@ func metaUserAgent() string {
 	return fmt.Sprintf("muse-build/%s (non-interactive; %s-%s; build %s)", metaClientVersion, goos, arch, metaClientBuild)
 }
 
-// MetaExecutor implements the cliproxyauth.ProviderExecutor for Meta Muse models (api.meta.ai).
+// MetaExecutor implements the coreauth.ProviderExecutor for Meta Muse models (api.meta.ai).
 type MetaExecutor struct {
 	cfg *config.Config
 }
@@ -65,7 +65,7 @@ func (e *MetaExecutor) Identifier() string {
 }
 
 // PrepareRequest injects Meta credentials into the outgoing HTTP request.
-func (e *MetaExecutor) PrepareRequest(req *http.Request, auth *cliproxyauth.Auth) error {
+func (e *MetaExecutor) PrepareRequest(req *http.Request, auth *coreauth.Auth) error {
 	if req == nil {
 		return nil
 	}
@@ -86,7 +86,7 @@ func (e *MetaExecutor) PrepareRequest(req *http.Request, auth *cliproxyauth.Auth
 }
 
 // HttpRequest injects Meta credentials into the request and executes it.
-func (e *MetaExecutor) HttpRequest(ctx context.Context, auth *cliproxyauth.Auth, req *http.Request) (*http.Response, error) {
+func (e *MetaExecutor) HttpRequest(ctx context.Context, auth *coreauth.Auth, req *http.Request) (*http.Response, error) {
 	if req == nil {
 		return nil, fmt.Errorf("meta executor: request is nil")
 	}
@@ -106,7 +106,7 @@ func (e *MetaExecutor) HttpRequest(ctx context.Context, auth *cliproxyauth.Auth,
 }
 
 // Refresh mints an API key from a DCA token if needed.
-func (e *MetaExecutor) Refresh(ctx context.Context, auth *cliproxyauth.Auth) (*cliproxyauth.Auth, error) {
+func (e *MetaExecutor) Refresh(ctx context.Context, auth *coreauth.Auth) (*coreauth.Auth, error) {
 	log.Debugf("meta executor: refresh called")
 	if auth == nil {
 		return nil, statusErr{code: http.StatusInternalServerError, msg: "meta executor: auth is nil"}
@@ -203,8 +203,8 @@ func (e *MetaExecutor) Refresh(ctx context.Context, auth *cliproxyauth.Auth) (*c
 }
 
 // ShouldPrepareRequestAuth reports true when a Meta auth has a DCA token but no usable API key.
-func (e *MetaExecutor) ShouldPrepareRequestAuth(auth *cliproxyauth.Auth) bool {
-	if auth == nil || cliproxyauth.IsConfigAPIKeyAuth(auth) {
+func (e *MetaExecutor) ShouldPrepareRequestAuth(auth *coreauth.Auth) bool {
+	if auth == nil || coreauth.IsConfigAPIKeyAuth(auth) {
 		return false
 	}
 	_, token := metaCreds(auth)
@@ -213,14 +213,14 @@ func (e *MetaExecutor) ShouldPrepareRequestAuth(auth *cliproxyauth.Auth) bool {
 
 // PrepareRequestAuth exchanges the DCA token for an API key before request execution,
 // allowing the conductor to atomically install and persist the credential in the manager.
-func (e *MetaExecutor) PrepareRequestAuth(ctx context.Context, auth *cliproxyauth.Auth) (*cliproxyauth.Auth, error) {
+func (e *MetaExecutor) PrepareRequestAuth(ctx context.Context, auth *coreauth.Auth) (*coreauth.Auth, error) {
 	if auth == nil || !e.ShouldPrepareRequestAuth(auth) {
 		return auth, nil
 	}
 	return e.Refresh(ctx, auth)
 }
 
-func (e *MetaExecutor) ensureAuth(ctx context.Context, auth *cliproxyauth.Auth) (*cliproxyauth.Auth, error) {
+func (e *MetaExecutor) ensureAuth(ctx context.Context, auth *coreauth.Auth) (*coreauth.Auth, error) {
 	if auth == nil {
 		return nil, statusErr{
 			code: http.StatusUnauthorized,
@@ -241,7 +241,7 @@ func (e *MetaExecutor) ensureAuth(ctx context.Context, auth *cliproxyauth.Auth) 
 	}
 
 	if token == "" {
-		if cliproxyauth.IsConfigAPIKeyAuth(auth) {
+		if coreauth.IsConfigAPIKeyAuth(auth) {
 			return nil, statusErr{
 				code: http.StatusUnauthorized,
 				msg:  "meta executor: meta-api-key requires a valid API key (DCA tokens require OAuth storage)",
@@ -256,13 +256,13 @@ func (e *MetaExecutor) ensureAuth(ctx context.Context, auth *cliproxyauth.Auth) 
 	return e.enrichAuth(auth), nil
 }
 
-func (e *MetaExecutor) enrichAuth(auth *cliproxyauth.Auth) *cliproxyauth.Auth {
+func (e *MetaExecutor) enrichAuth(auth *coreauth.Auth) *coreauth.Auth {
 	baseURL, token := metaCreds(auth)
-	var cloned *cliproxyauth.Auth
+	var cloned *coreauth.Auth
 	if auth != nil {
 		cloned = auth.Clone()
 	} else {
-		cloned = &cliproxyauth.Auth{
+		cloned = &coreauth.Auth{
 			Provider: "meta",
 		}
 	}
@@ -281,8 +281,8 @@ func (e *MetaExecutor) enrichAuth(auth *cliproxyauth.Auth) *cliproxyauth.Auth {
 	return cloned
 }
 
-func extractDCAToken(a *cliproxyauth.Auth) string {
-	if a == nil || cliproxyauth.IsConfigAPIKeyAuth(a) {
+func extractDCAToken(a *coreauth.Auth) string {
+	if a == nil || coreauth.IsConfigAPIKeyAuth(a) {
 		return ""
 	}
 	if a.Attributes != nil {
@@ -314,7 +314,7 @@ func extractDCAToken(a *cliproxyauth.Auth) string {
 	return ""
 }
 
-func metaCreds(a *cliproxyauth.Auth) (baseURL, token string) {
+func metaCreds(a *coreauth.Auth) (baseURL, token string) {
 	baseURL = metaauth.DefaultAPIBaseURL
 	if a == nil {
 		return baseURL, ""

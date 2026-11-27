@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	translatorcommon "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/common"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	translatorcommon "github.com/udit19199/relay/internal/translator/common"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 const (
@@ -70,8 +70,8 @@ func TestConvertOpenAIRequestToInteractions_RefusesAnyEmptiedUserTurn(t *testing
 				t.Fatalf("body is not JSON: %q", body)
 			}
 
-			envelope := sdktranslator.TranslateRequestEnvelope(context.Background(), sdktranslator.FormatOpenAI, sdktranslator.FormatInteractions,
-				sdktranslator.RequestEnvelope{Format: sdktranslator.FormatOpenAI, Model: "gemini-3.5-flash", Body: []byte(tc.input)})
+			envelope := translatorreg.TranslateRequestEnvelope(context.Background(), translatorreg.FormatOpenAI, translatorreg.FormatInteractions,
+				translatorreg.RequestEnvelope{Format: translatorreg.FormatOpenAI, Model: "gemini-3.5-flash", Body: []byte(tc.input)})
 			if !errors.As(envelope.Err, &unsupported) || unsupported.Type != tc.wantType {
 				t.Fatalf("registry err = %v, want unsupported content part: %s", envelope.Err, tc.wantType)
 			}

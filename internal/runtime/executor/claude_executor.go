@@ -12,15 +12,15 @@ import (
 	"time"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
-	sigcompat "github.com/router-for-me/CLIProxyAPI/v8/internal/signature"
-	responsesclaude "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/claude/openai/responses"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
 	log "github.com/sirupsen/logrus"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/runtime/executor/helps"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	sigcompat "github.com/udit19199/relay/internal/signature"
+	responsesclaude "github.com/udit19199/relay/internal/translator/claude/openai/responses"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
+	"github.com/udit19199/relay/internal/util"
 )
 
 // ClaudeExecutor handles Anthropic Claude over the messages API and keeps bounded
@@ -306,8 +306,8 @@ const defaultModelMaxTokens = 1024
 // max_tokens from originalTranslated when the caller's original request did not
 // explicitly supply an output token limit in the source protocol, allowing
 // payload.default rules targeting max_tokens to take effect.
-func stripTranslatedDefaultMaxTokens(from sdktranslator.Format, originalPayload, originalTranslated []byte) []byte {
-	if len(originalTranslated) == 0 || from == sdktranslator.FormatClaude {
+func stripTranslatedDefaultMaxTokens(from translatorreg.Format, originalPayload, originalTranslated []byte) []byte {
+	if len(originalTranslated) == 0 || from == translatorreg.FormatClaude {
 		return originalTranslated
 	}
 	hasExplicitMaxTokens := func(paths ...string) bool {
@@ -319,11 +319,11 @@ func stripTranslatedDefaultMaxTokens(from sdktranslator.Format, originalPayload,
 		return false
 	}
 	switch from {
-	case sdktranslator.FormatOpenAI:
+	case translatorreg.FormatOpenAI:
 		if hasExplicitMaxTokens("max_tokens", "max_completion_tokens") {
 			return originalTranslated
 		}
-	case sdktranslator.FormatOpenAIResponse:
+	case translatorreg.FormatOpenAIResponse:
 		if hasExplicitMaxTokens("max_output_tokens") {
 			return originalTranslated
 		}
@@ -343,11 +343,11 @@ func NewClaudeExecutor(cfg *config.Config) *ClaudeExecutor {
 
 func (e *ClaudeExecutor) Identifier() string { return "claude" }
 
-func (e *ClaudeExecutor) claudeWebSearchResultCacheScope(ctx context.Context, auth *cliproxyauth.Auth, from sdktranslator.Format, req cliproxyexecutor.Request, opts cliproxyexecutor.Options, originalPayload []byte) (string, time.Duration, int) {
+func (e *ClaudeExecutor) claudeWebSearchResultCacheScope(ctx context.Context, auth *coreauth.Auth, from translatorreg.Format, req coreexecutor.Request, opts coreexecutor.Options, originalPayload []byte) (string, time.Duration, int) {
 	if e == nil || e.cfg == nil || !e.cfg.Client.Codex.WebSearchResultCache.Enabled {
 		return "", 0, 0
 	}
-	if !sourceFormatEqual(from, sdktranslator.FormatOpenAIResponse) {
+	if !sourceFormatEqual(from, translatorreg.FormatOpenAIResponse) {
 		return "", 0, 0
 	}
 	sessionKey := xaiReasoningReplayIsolateSessionKey(ctx, codexReasoningReplaySessionKey(ctx, from, req, opts, originalPayload))
@@ -361,7 +361,7 @@ func (e *ClaudeExecutor) claudeWebSearchResultCacheScope(ctx context.Context, au
 	return sessionKey, cacheCfg.EffectiveTTL(), cacheCfg.EffectiveLimit()
 }
 
-func claudeWebSearchResultCacheCredentialScope(auth *cliproxyauth.Auth) string {
+func claudeWebSearchResultCacheCredentialScope(auth *coreauth.Auth) string {
 	if auth == nil {
 		return ""
 	}
@@ -383,7 +383,7 @@ func claudeWebSearchResultCacheCredentialScope(auth *cliproxyauth.Auth) string {
 	return "claude:" + hex.EncodeToString(sum[:8])
 }
 
-var _ cliproxyauth.NativeToolSearchSupport = (*ClaudeExecutor)(nil)
+var _ coreauth.NativeToolSearchSupport = (*ClaudeExecutor)(nil)
 
 // SupportsNativeToolSearch reports whether a credential can receive Codex
 // tool_search as Anthropic native tool search (defer_loading tools and
@@ -392,11 +392,11 @@ var _ cliproxyauth.NativeToolSearchSupport = (*ClaudeExecutor)(nil)
 // enabled for it. Models that predate tool search never qualify, and nothing
 // qualifies while upstream.claude.tool-search is off. That switch is read from
 // the translator so the executor and the translator always agree on it.
-func (e *ClaudeExecutor) SupportsNativeToolSearch(auth *cliproxyauth.Auth, upstreamModel string) bool {
+func (e *ClaudeExecutor) SupportsNativeToolSearch(auth *coreauth.Auth, upstreamModel string) bool {
 	return e.supportsNativeToolSearch(responsesclaude.ClientToolSearchEnabled(), auth, upstreamModel)
 }
 
-func (e *ClaudeExecutor) supportsNativeToolSearch(toolSearch bool, auth *cliproxyauth.Auth, upstreamModel string) bool {
+func (e *ClaudeExecutor) supportsNativeToolSearch(toolSearch bool, auth *coreauth.Auth, upstreamModel string) bool {
 	if !toolSearch || helps.ClaudeModelLacksToolSearch(upstreamModel) {
 		return false
 	}
@@ -420,8 +420,8 @@ func (e *ClaudeExecutor) supportsNativeToolSearch(toolSearch bool, auth *cliprox
 // The returned context pins upstream.claude.tool-search for the rest of the
 // request, so this decision and the request and response translations agree
 // even if the configuration is reloaded mid-request.
-func (e *ClaudeExecutor) applyNativeToolSearchFallback(ctx context.Context, auth *cliproxyauth.Auth, from sdktranslator.Format, upstreamModel string, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (context.Context, cliproxyexecutor.Request, cliproxyexecutor.Options) {
-	if from != sdktranslator.FormatOpenAIResponse {
+func (e *ClaudeExecutor) applyNativeToolSearchFallback(ctx context.Context, auth *coreauth.Auth, from translatorreg.Format, upstreamModel string, req coreexecutor.Request, opts coreexecutor.Options) (context.Context, coreexecutor.Request, coreexecutor.Options) {
+	if from != translatorreg.FormatOpenAIResponse {
 		return ctx, req, opts
 	}
 	toolSearch := responsesclaude.ClientToolSearchEnabledFor(ctx)
@@ -451,8 +451,8 @@ func (e *ClaudeExecutor) applyNativeToolSearchFallback(ctx context.Context, auth
 // instruction and rebuild_mid_system_message folds the turns into the system
 // field, so both keep the top-level path, as does an uncloaked request, which
 // forwards the caller's betas unchanged.
-func (e *ClaudeExecutor) pinResponsesSystemItemPlacement(ctx context.Context, auth *cliproxyauth.Auth, from sdktranslator.Format, upstreamModel string, policy claudeWirePolicy, settings claudeCloakSettings) context.Context {
-	if from != sdktranslator.FormatOpenAIResponse {
+func (e *ClaudeExecutor) pinResponsesSystemItemPlacement(ctx context.Context, auth *coreauth.Auth, from translatorreg.Format, upstreamModel string, policy claudeWirePolicy, settings claudeCloakSettings) context.Context {
+	if from != translatorreg.FormatOpenAIResponse {
 		return ctx
 	}
 	inPlace := policy.Cloak &&
@@ -533,12 +533,12 @@ func setClaudeResponseModel(payload []byte, model string) ([]byte, bool) {
 }
 
 // PrepareRequest injects Claude credentials into the outgoing HTTP request.
-func (e *ClaudeExecutor) PrepareRequest(req *http.Request, auth *cliproxyauth.Auth) error {
+func (e *ClaudeExecutor) PrepareRequest(req *http.Request, auth *coreauth.Auth) error {
 	if req == nil {
 		return nil
 	}
 	apiKey, _ := claudeCreds(auth)
-	useAPIKey := auth != nil && (auth.AuthKind() == cliproxyauth.AuthKindAPIKey || (auth.Attributes != nil && strings.TrimSpace(auth.Attributes["api_key"]) != ""))
+	useAPIKey := auth != nil && (auth.AuthKind() == coreauth.AuthKindAPIKey || (auth.Attributes != nil && strings.TrimSpace(auth.Attributes["api_key"]) != ""))
 	isAnthropicBase := isAnthropicUpstreamURL(req.URL)
 	if strings.TrimSpace(apiKey) != "" {
 		if isAnthropicBase && useAPIKey {
@@ -561,7 +561,7 @@ func (e *ClaudeExecutor) PrepareRequest(req *http.Request, auth *cliproxyauth.Au
 }
 
 // HttpRequest injects Claude credentials into the request and executes it.
-func (e *ClaudeExecutor) HttpRequest(ctx context.Context, auth *cliproxyauth.Auth, req *http.Request) (*http.Response, error) {
+func (e *ClaudeExecutor) HttpRequest(ctx context.Context, auth *coreauth.Auth, req *http.Request) (*http.Response, error) {
 	if req == nil {
 		return nil, fmt.Errorf("claude executor: request is nil")
 	}

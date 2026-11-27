@@ -1,0 +1,123 @@
+// Package cliproxy provides the core service implementation for the CLI Proxy API.
+// It includes service lifecycle management, authentication handling, file watching,
+// and integration with various AI service providers through a unified interface.
+package service
+
+import (
+	"context"
+	"sync"
+	"sync/atomic"
+
+	"github.com/udit19199/relay/internal/access"
+	"github.com/udit19199/relay/internal/api"
+	authlogin "github.com/udit19199/relay/internal/auth/login"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	"github.com/udit19199/relay/internal/watcher"
+)
+
+// Service wraps the proxy server lifecycle so external programs can embed the CLI proxy.
+// It manages the complete lifecycle including authentication, file watching, HTTP server,
+// and integration with various AI service providers.
+type Service struct {
+	// cfg holds the current application configuration.
+	cfg *config.Config
+
+	// cfgMu protects concurrent access to the configuration.
+	cfgMu sync.RWMutex
+
+	// configUpdateMu serializes config updates across watcher callbacks.
+	configUpdateMu sync.Mutex
+
+	// configRuntimeMu orders side-effecting runtime application after config commits.
+	configRuntimeMu        sync.Mutex
+	executorRegistrationMu sync.Mutex
+	authUpdateMu           sync.Mutex
+	authRevisions          map[string]uint64
+	authRegWaitMu          sync.Mutex
+	authRegWaiters         map[string]chan struct{}
+	configSequence         uint64
+	appliedRoutingState    *routingRuntimeState
+
+	// proxyPoolPublisher scopes connection-pool fencing to this service, so a reload
+	// here never retires config snapshots served by another service.
+	proxyPoolPublisher uint64
+
+	// configPath is the path to the configuration file.
+	configPath string
+
+	// tokenProvider handles loading token-based clients.
+	tokenProvider TokenClientProvider
+
+	// apiKeyProvider handles loading API key-based clients.
+	apiKeyProvider APIKeyClientProvider
+
+	// watcherFactory creates file watcher instances.
+	watcherFactory WatcherFactory
+
+	// hooks provides lifecycle callbacks.
+	hooks Hooks
+
+	// serverOptions contains additional server configuration options.
+	serverOptions []api.ServerOption
+
+	// server is the HTTP API server instance.
+	server *api.Server
+
+	// pprofServer manages the optional pprof HTTP debug server.
+	pprofServer *pprofServer
+
+	// kvStoreManaged tracks whether this service instance owns local KVStore lifecycle.
+	kvStoreManaged atomic.Bool
+
+	// serverErr channel for server startup/shutdown errors.
+	serverErr chan error
+
+	// watcher handles file system monitoring.
+	watcher *WatcherWrapper
+
+	// watcherCancel cancels the watcher context.
+	watcherCancel context.CancelFunc
+
+	// authUpdates channel for authentication updates.
+	authUpdates chan watcher.AuthUpdate
+
+	// authQueueStop cancels the auth update queue processing.
+	authQueueStop context.CancelFunc
+
+	// authManager handles legacy authentication operations.
+	authManager *authlogin.Manager
+
+	// accessManager handles request authentication providers.
+	accessManager *access.Manager
+
+	// coreManager handles core authentication and execution.
+	coreManager *coreauth.Manager
+
+	// cooldownStateStore persists runtime cooldown state when enabled.
+	cooldownStateStore coreauth.CooldownStateStore
+
+	// shutdownOnce ensures shutdown is called only once.
+	shutdownOnce sync.Once
+
+	runCancelMu                  sync.Mutex
+	runCancel                    context.CancelFunc
+	applyPprofConfigContextFn    func(context.Context, *config.Config) bool
+	updateServerClientsContextFn func(context.Context, *config.Config) bool
+}
+
+// SetResultPolicy sets an execution result policy on the underlying core auth manager.
+func (s *Service) SetResultPolicy(policy coreauth.ResultPolicy) {
+	if s == nil || s.coreManager == nil {
+		return
+	}
+	s.coreManager.SetResultPolicy(policy)
+}
+
+// ResultPolicy returns the execution result policy configured on the core auth manager.
+func (s *Service) ResultPolicy() coreauth.ResultPolicy {
+	if s == nil || s.coreManager == nil {
+		return nil
+	}
+	return s.coreManager.ResultPolicy()
+}

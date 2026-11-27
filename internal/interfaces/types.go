@@ -3,13 +3,13 @@
 // transformation operations, maintaining compatibility with the SDK translator package.
 package interfaces
 
-import sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+import translatorreg "github.com/udit19199/relay/internal/translator/registry"
 
 // Backwards compatible aliases for translator function types.
-type TranslateRequestFunc = sdktranslator.RequestTransform
+type TranslateRequestFunc = translatorreg.RequestTransform
 
-type TranslateResponseFunc = sdktranslator.ResponseStreamTransform
+type TranslateResponseFunc = translatorreg.ResponseStreamTransform
 
-type TranslateResponseNonStreamFunc = sdktranslator.ResponseNonStreamTransform
+type TranslateResponseNonStreamFunc = translatorreg.ResponseNonStreamTransform
 
-type TranslateResponse = sdktranslator.ResponseTransform
+type TranslateResponse = translatorreg.ResponseTransform

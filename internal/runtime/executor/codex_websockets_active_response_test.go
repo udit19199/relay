@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 // On a duplex socket a rejected queued create can fail while another response
@@ -105,7 +105,7 @@ func TestInterruptExecutionSessionTracksActiveResponseIdentity(t *testing.T) {
 	}
 	// An unknown id is not the running response: reject outright, without
 	// inviting a local HTTP fallback against the live websocket turn.
-	if errUnknown := interrupt(`{"type":"response.interrupt","response_id":"unknown"}`); !errors.Is(errUnknown, cliproxyexecutor.ErrUpstreamWebsocketInterruptRejected) {
+	if errUnknown := interrupt(`{"type":"response.interrupt","response_id":"unknown"}`); !errors.Is(errUnknown, coreexecutor.ErrUpstreamWebsocketInterruptRejected) {
 		t.Fatalf("unknown interrupt during r1 = %v, want ErrUpstreamWebsocketInterruptRejected", errUnknown)
 	}
 
@@ -116,7 +116,7 @@ func TestInterruptExecutionSessionTracksActiveResponseIdentity(t *testing.T) {
 	if errTerminal := interrupt(`{"type":"response.interrupt","response_id":"r1"}`); errTerminal != nil {
 		t.Fatalf("interrupt completed r1 = %v, want nil (already terminal)", errTerminal)
 	}
-	if errUnknown := interrupt(`{"type":"response.interrupt","response_id":"unknown-2"}`); !errors.Is(errUnknown, cliproxyexecutor.ErrUpstreamWebsocketInterruptRejected) {
+	if errUnknown := interrupt(`{"type":"response.interrupt","response_id":"unknown-2"}`); !errors.Is(errUnknown, coreexecutor.ErrUpstreamWebsocketInterruptRejected) {
 		t.Fatalf("unknown interrupt after completion = %v, want ErrUpstreamWebsocketInterruptRejected", errUnknown)
 	}
 

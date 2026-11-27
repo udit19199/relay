@@ -11,13 +11,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/httptransport"
-	"github.com/router-for-me/CLIProxyAPI/v8/sdk/proxyutil"
 	log "github.com/sirupsen/logrus"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/httptransport"
+	"github.com/udit19199/relay/internal/misc"
+	"github.com/udit19199/relay/internal/proxyutil"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 // NewProxyAwareHTTPClient creates an HTTP client with proper proxy configuration priority:
@@ -34,7 +34,7 @@ import (
 //
 // Returns:
 //   - *http.Client: An HTTP client with configured proxy or transport
-func NewProxyAwareHTTPClient(ctx context.Context, cfg *config.Config, auth *cliproxyauth.Auth, timeout time.Duration) (clientOut *http.Client) {
+func NewProxyAwareHTTPClient(ctx context.Context, cfg *config.Config, auth *coreauth.Auth, timeout time.Duration) (clientOut *http.Client) {
 	defer func() { clientOut = httptransport.Decorate(ctx, clientOut) }()
 	httpClient := &http.Client{}
 	if timeout > 0 {
@@ -211,7 +211,7 @@ func RetireProxyPoolPublisher(publisher uint64) {
 // ResetProxyTransports closes idle connections in cached explicit proxy transports.
 func ResetProxyTransports() { proxyTransportCache.Purge() }
 
-func pooledProxyTransport(proxyURL string, cfg *config.Config, auth *cliproxyauth.Auth) *http.Transport {
+func pooledProxyTransport(proxyURL string, cfg *config.Config, auth *coreauth.Auth) *http.Transport {
 	tr, pooled := pooledTransport(proxyPoolKindStandard, proxyURL, cfg, auth, func() (*http.Transport, error) {
 		return buildPooledBaseTransport(proxyURL)
 	})
@@ -228,7 +228,7 @@ func pooledProxyTransport(proxyURL string, cfg *config.Config, auth *cliproxyaut
 // pooledTransport resolves one credential's pool for a transport kind. pooled is
 // false when the credential did not opt in or its proxy setting cannot be pooled, so
 // the caller keeps its historical transport.
-func pooledTransport(kind proxyPoolKind, proxyURL string, cfg *config.Config, auth *cliproxyauth.Auth, build func() (*http.Transport, error)) (*http.Transport, bool) {
+func pooledTransport(kind proxyPoolKind, proxyURL string, cfg *config.Config, auth *coreauth.Auth, build func() (*http.Transport, error)) (*http.Transport, bool) {
 	settings, enabled := resolveProxyPoolSettings(auth)
 	if !enabled {
 		return nil, false
@@ -334,7 +334,7 @@ func pooledTransport(kind proxyPoolKind, proxyURL string, cfg *config.Config, au
 // credential. Writing the connection-pool block is the opt-in, so an omitted
 // `enabled` means enabled and only an explicit `enabled: false` turns pooling off
 // (a key opting out of its group). Omitted fields fall back to the pool defaults.
-func resolveProxyPoolSettings(auth *cliproxyauth.Auth) (config.ProxyConnectionPoolConfig, bool) {
+func resolveProxyPoolSettings(auth *coreauth.Auth) (config.ProxyConnectionPoolConfig, bool) {
 	override := proxyPoolOverride(auth)
 	if override == nil {
 		return config.ProxyConnectionPoolConfig{}, false
@@ -349,7 +349,7 @@ func resolveProxyPoolSettings(auth *cliproxyauth.Auth) (config.ProxyConnectionPo
 	}, true
 }
 
-func proxyPoolOverride(auth *cliproxyauth.Auth) *cliproxyauth.ProxyConnectionPoolOverride {
+func proxyPoolOverride(auth *coreauth.Auth) *coreauth.ProxyConnectionPoolOverride {
 	if auth == nil {
 		return nil
 	}
@@ -388,7 +388,7 @@ const proxyPoolAnonymousScope = "anonymous"
 // socket that was opened with the old one. Every credential therefore gets its own
 // pool. The scope is
 // only ever compared, never logged, so it cannot leak credential material.
-func proxyPoolScope(auth *cliproxyauth.Auth) string {
+func proxyPoolScope(auth *coreauth.Auth) string {
 	if auth == nil {
 		return proxyPoolAnonymousScope
 	}
@@ -396,9 +396,9 @@ func proxyPoolScope(auth *cliproxyauth.Auth) string {
 	if id := strings.TrimSpace(auth.ID); id != "" {
 		identity = "id:" + id
 	} else if auth.Attributes != nil {
-		if path := strings.TrimSpace(auth.Attributes[cliproxyauth.AttributePath]); path != "" {
+		if path := strings.TrimSpace(auth.Attributes[coreauth.AttributePath]); path != "" {
 			identity = "path:" + path
-		} else if source := strings.TrimSpace(auth.Attributes[cliproxyauth.AttributeSource]); source != "" {
+		} else if source := strings.TrimSpace(auth.Attributes[coreauth.AttributeSource]); source != "" {
 			identity = "source:" + source
 		}
 	}
@@ -420,7 +420,7 @@ func proxyPoolScope(auth *cliproxyauth.Auth) string {
 	return proxyPoolAnonymousScope
 }
 
-func proxyPoolCredentialSecretScope(auth *cliproxyauth.Auth) string {
+func proxyPoolCredentialSecretScope(auth *coreauth.Auth) string {
 	if auth == nil {
 		return ""
 	}
@@ -431,7 +431,7 @@ func proxyPoolCredentialSecretScope(auth *cliproxyauth.Auth) string {
 		return proxyPoolSecretScope("token:", access)
 	}
 	if auth.Attributes != nil {
-		if apiKey := strings.TrimSpace(auth.Attributes[cliproxyauth.AttributeAPIKey]); apiKey != "" {
+		if apiKey := strings.TrimSpace(auth.Attributes[coreauth.AttributeAPIKey]); apiKey != "" {
 			return proxyPoolSecretScope("apikey:", apiKey)
 		}
 	}
@@ -502,11 +502,11 @@ var devinTransportCache = NewTransportCache[string](DefaultTransportCacheCapacit
 
 // NewDevinHTTPClient creates an HTTP client customized for Devin Connect-RPC upstream.
 // Suppresses automatic Accept-Encoding: gzip while preserving connection reuse across requests.
-func NewDevinHTTPClient(ctx context.Context, cfg *config.Config, auth *cliproxyauth.Auth, timeout time.Duration) (clientOut *http.Client) {
+func NewDevinHTTPClient(ctx context.Context, cfg *config.Config, auth *coreauth.Auth, timeout time.Duration) (clientOut *http.Client) {
 	defer func() { clientOut = httptransport.Decorate(ctx, clientOut) }()
 	// A request proxy replaces both the injected round tripper and credential/global proxy.
 	// Respect explicitly injected context RoundTripper only when no request override is set.
-	if cliproxyexecutor.RequestProxyURL(ctx) == "" && ctx != nil {
+	if coreexecutor.RequestProxyURL(ctx) == "" && ctx != nil {
 		if rt, ok := ctx.Value("cliproxy.roundtripper").(http.RoundTripper); ok && rt != nil {
 			if tr, ok := rt.(*http.Transport); ok {
 				key := fmt.Sprintf("rt:%p", tr)
@@ -567,8 +567,8 @@ func (rt devinNoGzipRoundTripper) RoundTrip(req *http.Request) (*http.Response, 
 	return rt.base.RoundTrip(req)
 }
 
-func effectiveProxyURL(ctx context.Context, cfg *config.Config, auth *cliproxyauth.Auth) string {
-	if proxyURL := cliproxyexecutor.RequestProxyURL(ctx); proxyURL != "" {
+func effectiveProxyURL(ctx context.Context, cfg *config.Config, auth *coreauth.Auth) string {
+	if proxyURL := coreexecutor.RequestProxyURL(ctx); proxyURL != "" {
 		return proxyURL
 	}
 	if auth != nil {

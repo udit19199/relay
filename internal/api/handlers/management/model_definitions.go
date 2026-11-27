@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
+	"github.com/udit19199/relay/internal/registry"
 )
 
 // RefreshModelDefinitions triggers an immediate on-demand refresh of the model catalogs.

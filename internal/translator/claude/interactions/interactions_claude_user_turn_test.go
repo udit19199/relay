@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	translatorcommon "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/common"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	translatorcommon "github.com/udit19199/relay/internal/translator/common"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 const (
@@ -17,9 +17,9 @@ const (
 	videoByURI          = `{"type":"video","mime_type":"video/mp4","uri":"https://example.test/a.mp4"}`
 )
 
-func interactionsToClaudeEnvelope(input string) sdktranslator.RequestEnvelope {
-	return sdktranslator.TranslateRequestEnvelope(context.Background(), sdktranslator.FormatInteractions, sdktranslator.FormatClaude, sdktranslator.RequestEnvelope{
-		Format: sdktranslator.FormatInteractions,
+func interactionsToClaudeEnvelope(input string) translatorreg.RequestEnvelope {
+	return translatorreg.TranslateRequestEnvelope(context.Background(), translatorreg.FormatInteractions, translatorreg.FormatClaude, translatorreg.RequestEnvelope{
+		Format: translatorreg.FormatInteractions,
 		Model:  "m",
 		Body:   []byte(input),
 	})
@@ -27,11 +27,11 @@ func interactionsToClaudeEnvelope(input string) sdktranslator.RequestEnvelope {
 
 // interactionsFinalTurnToClaude translates two history turns followed by a final
 // user step holding the given content parts.
-func interactionsFinalTurnToClaude(finalContent string) sdktranslator.RequestEnvelope {
+func interactionsFinalTurnToClaude(finalContent string) translatorreg.RequestEnvelope {
 	return interactionsToClaudeEnvelope(`{"model":"m","input":[` + interactionsHistory + `,{"type":"user_input","content":[` + finalContent + `]}]}`)
 }
 
-func requireMediaRefusal(t *testing.T, envelope sdktranslator.RequestEnvelope, wantType string) {
+func requireMediaRefusal(t *testing.T, envelope translatorreg.RequestEnvelope, wantType string) {
 	t.Helper()
 	var unsupported *translatorcommon.UnsupportedPartError
 	if !errors.As(envelope.Err, &unsupported) || unsupported.Type != wantType || unsupported.StatusCode() != 400 {

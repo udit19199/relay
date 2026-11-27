@@ -9,11 +9,10 @@ import (
 	"sync/atomic"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/thinking"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	"github.com/udit19199/relay/internal/thinking"
 )
 
 var payloadConfigEvaluations atomic.Int64
@@ -48,17 +47,6 @@ func ApplyPayloadConfigWithRequest(cfg *config.Config, model, protocol, fromProt
 // ApplyPayloadConfigWithRequestDoc applies payload config in place on doc using source protocol and request header gates.
 func ApplyPayloadConfigWithRequestDoc(cfg *config.Config, model, protocol, fromProtocol, root string, doc *ojson.Doc, original []byte, requestedModel string, requestPath string, headers http.Header) {
 	_ = ApplyPayloadConfigWithRequestTrackedDoc(cfg, model, protocol, fromProtocol, root, doc, original, requestedModel, requestPath, headers, "")
-}
-
-// ApplyPayloadConfigWithRequestForExecutor applies payload config with explicit target executor context.
-func ApplyPayloadConfigWithRequestForExecutor(cfg *config.Config, targetExecutor, model, protocol, fromProtocol, root string, payload, original []byte, requestedModel string, requestPath string, headers http.Header) []byte {
-	out, _ := ApplyPayloadConfigWithTrackedPathsForExecutor(cfg, targetExecutor, model, protocol, fromProtocol, root, payload, original, requestedModel, requestPath, headers)
-	return out
-}
-
-// ApplyPayloadConfigWithRequestForExecutorDoc applies payload config in place on doc with explicit target executor context.
-func ApplyPayloadConfigWithRequestForExecutorDoc(cfg *config.Config, targetExecutor, model, protocol, fromProtocol, root string, doc *ojson.Doc, original []byte, requestedModel string, requestPath string, headers http.Header) {
-	_ = ApplyPayloadConfigWithTrackedPathsForExecutorDoc(cfg, targetExecutor, model, protocol, fromProtocol, root, doc, original, requestedModel, requestPath, headers)
 }
 
 func isCodexTargetExecutor(targetExecutor string) bool {
@@ -104,7 +92,7 @@ func applyPayloadConfigWithTrackedPathsForExecutorDoc(cfg *config.Config, target
 	return applyPayloadConfigWithTrackedPathsForExecutorAndAuthDoc(cfg, targetExecutor, model, protocol, fromProtocol, root, doc, original, requestedModel, requestPath, headers, nil, trackedPaths...)
 }
 
-func applyPayloadConfigWithTrackedPathsForExecutorAndAuthDoc(cfg *config.Config, targetExecutor, model, protocol, fromProtocol, root string, doc *ojson.Doc, original []byte, requestedModel, requestPath string, headers http.Header, auth *cliproxyauth.Auth, trackedPaths ...string) (map[string]bool, bool) {
+func applyPayloadConfigWithTrackedPathsForExecutorAndAuthDoc(cfg *config.Config, targetExecutor, model, protocol, fromProtocol, root string, doc *ojson.Doc, original []byte, requestedModel, requestPath string, headers http.Header, auth *coreauth.Auth, trackedPaths ...string) (map[string]bool, bool) {
 	payloadConfigEvaluations.Add(1)
 	touched := make(map[string]bool)
 	if doc == nil || doc.Len() == 0 {
@@ -479,7 +467,7 @@ func docToolChoiceSelectsImageGeneration(doc *ojson.Doc, toolChoicePath string) 
 	return false
 }
 
-func codexConfiguredPayloadIncompatibleWithAutoImageGenDoc(doc *ojson.Doc, root, fallbackModel string, auth *cliproxyauth.Auth, headers http.Header) bool {
+func codexConfiguredPayloadIncompatibleWithAutoImageGenDoc(doc *ojson.Doc, root, fallbackModel string, auth *coreauth.Auth, headers http.Header) bool {
 	if doc == nil {
 		return false
 	}
@@ -685,29 +673,6 @@ func payloadPathExistsDoc(doc *ojson.Doc, path string) bool {
 	return false
 }
 
-func payloadPathMatchesValue(payload []byte, path string, value any) bool {
-	for _, resolvedPath := range resolvePayloadRulePaths(payload, path) {
-		result := ojson.GetBytesNoCopy(payload, resolvedPath)
-		if !result.Exists() {
-			continue
-		}
-		if payloadResultEquals(result, value) {
-			return true
-		}
-	}
-	return false
-}
-
-func payloadPathExists(payload []byte, path string) bool {
-	for _, resolvedPath := range resolvePayloadRulePaths(payload, path) {
-		result := ojson.GetBytesNoCopy(payload, resolvedPath)
-		if result.Exists() && result.Type != ojson.Null {
-			return true
-		}
-	}
-	return false
-}
-
 func payloadResultEquals(result ojson.Result, value any) bool {
 	actual, ok := normalizedPayloadResult(result)
 	if !ok {
@@ -884,12 +849,6 @@ func resolvePayloadRulePathsDoc(doc *ojson.Doc, path string) []string {
 	return resolvePayloadRulePathsFromGetter(doc.Get, path)
 }
 
-func resolvePayloadRulePaths(payload []byte, path string) []string {
-	return resolvePayloadRulePathsFromGetter(func(p string) ojson.Result {
-		return payloadValueAtPath(payload, p)
-	}, path)
-}
-
 func resolvePayloadRulePathsFromGetter(get func(string) ojson.Result, path string) []string {
 	path = strings.TrimSpace(path)
 	if path == "" {
@@ -1041,13 +1000,6 @@ func appendPayloadPathPart(path, part string) string {
 		return path
 	}
 	return path + "." + part
-}
-
-func payloadValueAtPath(payload []byte, path string) ojson.Result {
-	if path == "" {
-		return util.ParseGJSONBytesNoCopy(payload)
-	}
-	return ojson.GetBytesNoCopy(payload, path)
 }
 
 func payloadQueryMatches(item ojson.Result, query string) bool {
@@ -1324,12 +1276,12 @@ func payloadRawValue(value any) ([]byte, bool) {
 	}
 }
 
-func PayloadRequestedModel(opts cliproxyexecutor.Options, fallback string) string {
+func PayloadRequestedModel(opts coreexecutor.Options, fallback string) string {
 	fallback = strings.TrimSpace(fallback)
 	if len(opts.Metadata) == 0 {
 		return fallback
 	}
-	raw, ok := opts.Metadata[cliproxyexecutor.RequestedModelMetadataKey]
+	raw, ok := opts.Metadata[coreexecutor.RequestedModelMetadataKey]
 	if !ok || raw == nil {
 		return fallback
 	}
@@ -1353,11 +1305,11 @@ func PayloadRequestedModel(opts cliproxyexecutor.Options, fallback string) strin
 	}
 }
 
-func PayloadRequestPath(opts cliproxyexecutor.Options) string {
+func PayloadRequestPath(opts coreexecutor.Options) string {
 	if len(opts.Metadata) == 0 {
 		return ""
 	}
-	raw, ok := opts.Metadata[cliproxyexecutor.RequestPathMetadataKey]
+	raw, ok := opts.Metadata[coreexecutor.RequestPathMetadataKey]
 	if !ok || raw == nil {
 		return ""
 	}

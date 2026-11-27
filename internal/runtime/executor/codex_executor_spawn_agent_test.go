@@ -11,11 +11,11 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gin-gonic/gin"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/registry"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestCodexExecutorOptimizeMultiAgentV2(t *testing.T) {
@@ -49,7 +49,7 @@ func TestCodexExecutorOptimizeMultiAgentV2(t *testing.T) {
 	defer server.Close()
 
 	payload := codexSpawnAgentTestPayload()
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"base_url": server.URL,
 		"api_key":  "test",
 	}}
@@ -72,8 +72,8 @@ func TestCodexExecutorOptimizeMultiAgentV2(t *testing.T) {
 			executor := NewCodexExecutor(&config.Config{SDKConfig: config.SDKConfig{Client: config.ClientConfig{Codex: config.CodexClientConfig{OptimizeMultiAgentV2: tt.enabled}}}})
 			ctx := codexSpawnAgentTestContext()
 			headers := http.Header{"User-Agent": []string{"overridden-client/1.0"}}
-			req := cliproxyexecutor.Request{Model: "gpt-5.4", Payload: payload}
-			opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString("openai-response"), Headers: headers}
+			req := coreexecutor.Request{Model: "gpt-5.4", Payload: payload}
+			opts := coreexecutor.Options{SourceFormat: translatorreg.FromString("openai-response"), Headers: headers}
 
 			var clientPayload []byte
 			switch tt.mode {
@@ -128,7 +128,7 @@ func TestCodexExecutorIsCompatConvertsAgentMessage(t *testing.T) {
 			},
 		}},
 	}
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"base_url": server.URL,
@@ -182,9 +182,9 @@ func TestCodexExecutorIsCompatConvertsAgentMessage(t *testing.T) {
 			cfg.Client.Codex.OptimizeMultiAgentV2 = tt.enabled
 			executor := NewCodexExecutor(&cfg)
 			ctx := codexSpawnAgentTestContext()
-			req := cliproxyexecutor.Request{Model: tt.model, Payload: payload}
-			opts := cliproxyexecutor.Options{
-				SourceFormat: sdktranslator.FromString("openai-response"),
+			req := coreexecutor.Request{Model: tt.model, Payload: payload}
+			opts := coreexecutor.Options{
+				SourceFormat: translatorreg.FromString("openai-response"),
 				Headers:      http.Header{"User-Agent": []string{"overridden-client/1.0"}},
 			}
 			if _, errExecute := executor.Execute(ctx, auth, req, opts); errExecute != nil {
@@ -236,7 +236,7 @@ func TestCodexExecutor_IsCompat_StripsAuthorAndRecipient_Issue6136(t *testing.T)
 			},
 		}},
 	}
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"base_url": server.URL,
@@ -249,9 +249,9 @@ func TestCodexExecutor_IsCompat_StripsAuthorAndRecipient_Issue6136(t *testing.T)
 		cfg := baseCfg
 		executor := NewCodexExecutor(&cfg)
 		ctx := codexSpawnAgentTestContext()
-		req := cliproxyexecutor.Request{Model: "compat-model", Payload: payload}
-		opts := cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FromString("openai-response"),
+		req := coreexecutor.Request{Model: "compat-model", Payload: payload}
+		opts := coreexecutor.Options{
+			SourceFormat: translatorreg.FromString("openai-response"),
 			Headers:      http.Header{"User-Agent": []string{"Codex Desktop/0.154.0"}},
 		}
 		if _, errExecute := executor.Execute(ctx, auth, req, opts); errExecute != nil {
@@ -280,10 +280,10 @@ func TestCodexExecutor_IsCompat_StripsAuthorAndRecipient_Issue6136(t *testing.T)
 		cfg := baseCfg
 		executor := NewCodexExecutor(&cfg)
 		ctx := codexSpawnAgentTestContext()
-		req := cliproxyexecutor.Request{Model: "compat-model", Payload: payload}
-		opts := cliproxyexecutor.Options{
+		req := coreexecutor.Request{Model: "compat-model", Payload: payload}
+		opts := coreexecutor.Options{
 			Stream:       true,
-			SourceFormat: sdktranslator.FromString("openai-response"),
+			SourceFormat: translatorreg.FromString("openai-response"),
 			Headers:      http.Header{"User-Agent": []string{"Codex Desktop/0.154.0"}},
 		}
 		streamResult, errStream := executor.ExecuteStream(ctx, auth, req, opts)
@@ -314,10 +314,10 @@ func TestCodexExecutor_IsCompat_StripsAuthorAndRecipient_Issue6136(t *testing.T)
 		cfg := baseCfg
 		executor := NewCodexExecutor(&cfg)
 		ctx := codexSpawnAgentTestContext()
-		req := cliproxyexecutor.Request{Model: "compat-model", Payload: payload}
-		opts := cliproxyexecutor.Options{
+		req := coreexecutor.Request{Model: "compat-model", Payload: payload}
+		opts := coreexecutor.Options{
 			Alt:          "responses/compact",
-			SourceFormat: sdktranslator.FromString("openai-response"),
+			SourceFormat: translatorreg.FromString("openai-response"),
 			Headers:      http.Header{"User-Agent": []string{"Codex Desktop/0.154.0"}},
 		}
 		if _, errExecute := executor.Execute(ctx, auth, req, opts); errExecute != nil {
@@ -344,9 +344,9 @@ func TestCodexExecutor_IsCompat_StripsAuthorAndRecipient_Issue6136(t *testing.T)
 		cfg.Client.Codex.OptimizeMultiAgentV2 = false
 		executor := NewCodexExecutor(&cfg)
 		ctx := codexSpawnAgentTestContext()
-		req := cliproxyexecutor.Request{Model: "compat-model", Payload: payload}
-		opts := cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FromString("openai-response"),
+		req := coreexecutor.Request{Model: "compat-model", Payload: payload}
+		opts := coreexecutor.Options{
+			SourceFormat: translatorreg.FromString("openai-response"),
 			Headers:      http.Header{"User-Agent": []string{"Codex Desktop/0.154.0"}},
 		}
 		if _, errExecute := executor.Execute(ctx, auth, req, opts); errExecute != nil {
@@ -375,9 +375,9 @@ func TestCodexExecutor_IsCompat_StripsAuthorAndRecipient_Issue6136(t *testing.T)
 		cfg := baseCfg
 		executor := NewCodexExecutor(&cfg)
 		ctx := codexSpawnAgentTestContext()
-		req := cliproxyexecutor.Request{Model: "native-model", Payload: payload}
-		opts := cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FromString("openai-response"),
+		req := coreexecutor.Request{Model: "native-model", Payload: payload}
+		opts := coreexecutor.Options{
+			SourceFormat: translatorreg.FromString("openai-response"),
 			Headers:      http.Header{"User-Agent": []string{"Codex Desktop/0.154.0"}},
 		}
 		if _, errExecute := executor.Execute(ctx, auth, req, opts); errExecute != nil {
@@ -430,7 +430,7 @@ func TestCodexExecutor_IsCompat_V8Layout_ClientScope_Issue6233(t *testing.T) {
 	if !baseCfg.ForAPIKey().Client.Codex.OptimizeMultiAgentV2 {
 		t.Fatal("API-key scoping cleared client optimization")
 	}
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		Provider: "codex",
 		Attributes: map[string]string{
 			"base_url": server.URL,
@@ -443,9 +443,9 @@ func TestCodexExecutor_IsCompat_V8Layout_ClientScope_Issue6233(t *testing.T) {
 		cfg := baseCfg
 		executor := NewCodexExecutor(&cfg)
 		ctx := codexSpawnAgentTestContext()
-		req := cliproxyexecutor.Request{Model: "compat-model", Payload: payload}
-		opts := cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FromString("openai-response"),
+		req := coreexecutor.Request{Model: "compat-model", Payload: payload}
+		opts := coreexecutor.Options{
+			SourceFormat: translatorreg.FromString("openai-response"),
 			Headers:      http.Header{"User-Agent": []string{"Codex Desktop/0.158.0-alpha.2.1"}},
 		}
 		if _, errExecute := executor.Execute(ctx, auth, req, opts); errExecute != nil {
@@ -469,10 +469,10 @@ func TestCodexExecutor_IsCompat_V8Layout_ClientScope_Issue6233(t *testing.T) {
 		cfg := baseCfg
 		executor := NewCodexExecutor(&cfg)
 		ctx := codexSpawnAgentTestContext()
-		req := cliproxyexecutor.Request{Model: "compat-model", Payload: payload}
-		opts := cliproxyexecutor.Options{
+		req := coreexecutor.Request{Model: "compat-model", Payload: payload}
+		opts := coreexecutor.Options{
 			Stream:       true,
-			SourceFormat: sdktranslator.FromString("openai-response"),
+			SourceFormat: translatorreg.FromString("openai-response"),
 			Headers:      http.Header{"User-Agent": []string{"Codex Desktop/0.158.0-alpha.2.1"}},
 		}
 		streamResult, errStream := executor.ExecuteStream(ctx, auth, req, opts)
@@ -606,7 +606,7 @@ func TestCodexExecutorOptimizeMultiAgentV2RestoresDottedFlatToolName(t *testing.
 	defer server.Close()
 
 	payload := codexSpawnAgentTestPayload()
-	auth := &cliproxyauth.Auth{Attributes: map[string]string{
+	auth := &coreauth.Auth{Attributes: map[string]string{
 		"base_url": server.URL,
 		"api_key":  "test",
 	}}
@@ -614,8 +614,8 @@ func TestCodexExecutorOptimizeMultiAgentV2RestoresDottedFlatToolName(t *testing.
 	executor := NewCodexExecutor(&config.Config{SDKConfig: config.SDKConfig{Client: config.ClientConfig{Codex: config.CodexClientConfig{OptimizeMultiAgentV2: true}}}})
 	ctx := codexSpawnAgentTestContext()
 	headers := http.Header{"User-Agent": []string{"overridden-client/1.0"}}
-	req := cliproxyexecutor.Request{Model: "gpt-5.4", Payload: payload}
-	opts := cliproxyexecutor.Options{SourceFormat: sdktranslator.FromString("openai-response"), Headers: headers}
+	req := coreexecutor.Request{Model: "gpt-5.4", Payload: payload}
+	opts := coreexecutor.Options{SourceFormat: translatorreg.FromString("openai-response"), Headers: headers}
 
 	// Test streaming execution
 	result, errStream := executor.ExecuteStream(ctx, auth, req, opts)

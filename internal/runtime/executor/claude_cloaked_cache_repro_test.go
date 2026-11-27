@@ -10,11 +10,11 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	claudeauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/claude"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
-	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	claudeauth "github.com/udit19199/relay/internal/auth/claude"
+	"github.com/udit19199/relay/internal/config"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 // TestClaudeBillingFingerprintMultiTurnUsesFirstUserText verifies that in a multi-turn conversation,
@@ -117,7 +117,7 @@ func TestClaudeCloakedSingleTurnPrefixStability(t *testing.T) {
 	})
 
 	ctx := context.WithValue(context.Background(), "cliproxy.roundtripper", http.RoundTripper(transport))
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:         "test-cloaked-oauth",
 		Attributes: map[string]string{"api_key": "sk-ant-oat-test-oauth-key"},
 		Metadata: map[string]any{
@@ -128,8 +128,8 @@ func TestClaudeCloakedSingleTurnPrefixStability(t *testing.T) {
 		},
 	}
 	exec := NewClaudeExecutor(&config.Config{})
-	options := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatClaude,
+	options := coreexecutor.Options{
+		SourceFormat: translatorreg.FormatClaude,
 	}
 
 	systemPrompt := "You are an expert software engineer with deep knowledge of distributed systems..."
@@ -140,13 +140,13 @@ func TestClaudeCloakedSingleTurnPrefixStability(t *testing.T) {
 		"max_tokens": 100
 	}`, systemPrompt)
 
-	req1 := cliproxyexecutor.Request{Model: "claude-opus-5", Payload: []byte(payload1)}
+	req1 := coreexecutor.Request{Model: "claude-opus-5", Payload: []byte(payload1)}
 	if _, err := exec.Execute(ctx, auth, req1, options); err != nil {
 		t.Fatalf("request 1 failed: %v", err)
 	}
 
 	// Request 2: identical payload sent shortly after (reproducing Issue #5730)
-	req2 := cliproxyexecutor.Request{Model: "claude-opus-5", Payload: []byte(payload1)}
+	req2 := coreexecutor.Request{Model: "claude-opus-5", Payload: []byte(payload1)}
 	if _, err := exec.Execute(ctx, auth, req2, options); err != nil {
 		t.Fatalf("request 2 failed: %v", err)
 	}
@@ -189,7 +189,7 @@ func TestClaudeCloakedSingleTurnPrefixStabilityWithPinnedSession(t *testing.T) {
 	})
 
 	ctx := context.WithValue(context.Background(), "cliproxy.roundtripper", http.RoundTripper(transport))
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:         "test-cloaked-oauth-pinned",
 		Attributes: map[string]string{"api_key": "sk-ant-oat-test-oauth-key-pinned"},
 		Metadata: map[string]any{
@@ -200,8 +200,8 @@ func TestClaudeCloakedSingleTurnPrefixStabilityWithPinnedSession(t *testing.T) {
 		},
 	}
 	exec := NewClaudeExecutor(&config.Config{})
-	options := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatClaude,
+	options := coreexecutor.Options{
+		SourceFormat: translatorreg.FormatClaude,
 		Headers:      http.Header{"X-Session-ID": []string{"pinned-session-42"}},
 	}
 
@@ -213,12 +213,12 @@ func TestClaudeCloakedSingleTurnPrefixStabilityWithPinnedSession(t *testing.T) {
 		"max_tokens": 100
 	}`, systemPrompt)
 
-	req1 := cliproxyexecutor.Request{Model: "claude-opus-5", Payload: []byte(payload1)}
+	req1 := coreexecutor.Request{Model: "claude-opus-5", Payload: []byte(payload1)}
 	if _, err := exec.Execute(ctx, auth, req1, options); err != nil {
 		t.Fatalf("request 1 failed: %v", err)
 	}
 
-	req2 := cliproxyexecutor.Request{Model: "claude-opus-5", Payload: []byte(payload1)}
+	req2 := coreexecutor.Request{Model: "claude-opus-5", Payload: []byte(payload1)}
 	if _, err := exec.Execute(ctx, auth, req2, options); err != nil {
 		t.Fatalf("request 2 failed: %v", err)
 	}
@@ -263,7 +263,7 @@ func TestClaudeCloakedMultiTurnPrefixStability(t *testing.T) {
 	})
 
 	ctx := context.WithValue(context.Background(), "cliproxy.roundtripper", http.RoundTripper(transport))
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:         "test-cloaked-multiturn-oauth",
 		Attributes: map[string]string{"api_key": "sk-ant-oat-test-oauth-key-multiturn", "cloak_mode": "always"},
 		Metadata: map[string]any{
@@ -274,8 +274,8 @@ func TestClaudeCloakedMultiTurnPrefixStability(t *testing.T) {
 		},
 	}
 	exec := NewClaudeExecutor(&config.Config{})
-	options := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatClaude,
+	options := coreexecutor.Options{
+		SourceFormat: translatorreg.FormatClaude,
 	}
 
 	systemPrompt := "You are an expert software engineer with deep knowledge of distributed systems..."
@@ -303,10 +303,10 @@ func TestClaudeCloakedMultiTurnPrefixStability(t *testing.T) {
 		"max_tokens": 100
 	}`, systemPrompt)
 
-	if _, err := exec.Execute(ctx, auth, cliproxyexecutor.Request{Model: "claude-opus-5", Payload: []byte(turn1Payload)}, options); err != nil {
+	if _, err := exec.Execute(ctx, auth, coreexecutor.Request{Model: "claude-opus-5", Payload: []byte(turn1Payload)}, options); err != nil {
 		t.Fatalf("turn 1 failed: %v", err)
 	}
-	if _, err := exec.Execute(ctx, auth, cliproxyexecutor.Request{Model: "claude-opus-5", Payload: []byte(turn2Payload)}, options); err != nil {
+	if _, err := exec.Execute(ctx, auth, coreexecutor.Request{Model: "claude-opus-5", Payload: []byte(turn2Payload)}, options); err != nil {
 		t.Fatalf("turn 2 failed: %v", err)
 	}
 
@@ -360,7 +360,7 @@ func TestClaudeCloakedMultiTurnPrefixStability(t *testing.T) {
 	}
 
 	// 7. Verify repeated turn 2 produces 100% byte-identical request body
-	if _, err := exec.Execute(ctx, auth, cliproxyexecutor.Request{Model: "claude-opus-5", Payload: []byte(turn2Payload)}, options); err != nil {
+	if _, err := exec.Execute(ctx, auth, coreexecutor.Request{Model: "claude-opus-5", Payload: []byte(turn2Payload)}, options); err != nil {
 		t.Fatalf("turn 2 repeat failed: %v", err)
 	}
 	if len(capturedBodies) != 3 {
@@ -386,10 +386,10 @@ func TestClaudeCloakedMultiTurnPrefixStability(t *testing.T) {
 		"max_tokens": 100
 	}`, systemPrompt)
 
-	if _, err := exec.Execute(ctx, auth, cliproxyexecutor.Request{Model: "claude-opus-5", Payload: []byte(turn3Payload)}, options); err != nil {
+	if _, err := exec.Execute(ctx, auth, coreexecutor.Request{Model: "claude-opus-5", Payload: []byte(turn3Payload)}, options); err != nil {
 		t.Fatalf("turn 3 failed: %v", err)
 	}
-	if _, err := exec.Execute(ctx, auth, cliproxyexecutor.Request{Model: "claude-opus-5", Payload: []byte(turn3Payload)}, options); err != nil {
+	if _, err := exec.Execute(ctx, auth, coreexecutor.Request{Model: "claude-opus-5", Payload: []byte(turn3Payload)}, options); err != nil {
 		t.Fatalf("turn 3 repeat failed: %v", err)
 	}
 
@@ -442,7 +442,7 @@ func TestClaudeCloakedStreamingPrefixStability(t *testing.T) {
 	})
 
 	ctx := context.WithValue(context.Background(), "cliproxy.roundtripper", http.RoundTripper(transport))
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:         "test-cloaked-stream-oauth",
 		Attributes: map[string]string{"api_key": "sk-ant-oat-test-stream-oauth-key"},
 		Metadata: map[string]any{
@@ -453,8 +453,8 @@ func TestClaudeCloakedStreamingPrefixStability(t *testing.T) {
 		},
 	}
 	exec := NewClaudeExecutor(&config.Config{})
-	options := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatClaude,
+	options := coreexecutor.Options{
+		SourceFormat: translatorreg.FormatClaude,
 		Stream:       true,
 	}
 
@@ -465,7 +465,7 @@ func TestClaudeCloakedStreamingPrefixStability(t *testing.T) {
 		"max_tokens": 100
 	}`
 
-	resp1, err1 := exec.ExecuteStream(ctx, auth, cliproxyexecutor.Request{Model: "claude-opus-5", Payload: []byte(payload1)}, options)
+	resp1, err1 := exec.ExecuteStream(ctx, auth, coreexecutor.Request{Model: "claude-opus-5", Payload: []byte(payload1)}, options)
 	if err1 != nil {
 		t.Fatalf("stream 1 failed: %v", err1)
 	}
@@ -475,7 +475,7 @@ func TestClaudeCloakedStreamingPrefixStability(t *testing.T) {
 		}
 	}
 
-	resp2, err2 := exec.ExecuteStream(ctx, auth, cliproxyexecutor.Request{Model: "claude-opus-5", Payload: []byte(payload1)}, options)
+	resp2, err2 := exec.ExecuteStream(ctx, auth, coreexecutor.Request{Model: "claude-opus-5", Payload: []byte(payload1)}, options)
 	if err2 != nil {
 		t.Fatalf("stream 2 failed: %v", err2)
 	}
@@ -519,7 +519,7 @@ func TestClaudeCloakedOpenAIFormatPrefixStability(t *testing.T) {
 	})
 
 	ctx := context.WithValue(context.Background(), "cliproxy.roundtripper", http.RoundTripper(transport))
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:         "test-cloaked-openai-oauth",
 		Attributes: map[string]string{"api_key": "sk-ant-oat-test-openai-key"},
 		Metadata: map[string]any{
@@ -530,8 +530,8 @@ func TestClaudeCloakedOpenAIFormatPrefixStability(t *testing.T) {
 		},
 	}
 	exec := NewClaudeExecutor(&config.Config{})
-	options := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatOpenAI,
+	options := coreexecutor.Options{
+		SourceFormat: translatorreg.FormatOpenAI,
 	}
 
 	openaiPayload := []byte(`{
@@ -542,12 +542,12 @@ func TestClaudeCloakedOpenAIFormatPrefixStability(t *testing.T) {
 		]
 	}`)
 
-	req1 := cliproxyexecutor.Request{Model: "claude-opus-5", Payload: openaiPayload}
+	req1 := coreexecutor.Request{Model: "claude-opus-5", Payload: openaiPayload}
 	if _, err := exec.Execute(ctx, auth, req1, options); err != nil {
 		t.Fatalf("openai req 1 failed: %v", err)
 	}
 
-	req2 := cliproxyexecutor.Request{Model: "claude-opus-5", Payload: openaiPayload}
+	req2 := coreexecutor.Request{Model: "claude-opus-5", Payload: openaiPayload}
 	if _, err := exec.Execute(ctx, auth, req2, options); err != nil {
 		t.Fatalf("openai req 2 failed: %v", err)
 	}
@@ -587,7 +587,7 @@ func TestClaudeCloakedToolContinuationPreservesExplicitPromptID(t *testing.T) {
 	})
 
 	ctx := context.WithValue(context.Background(), "cliproxy.roundtripper", http.RoundTripper(transport))
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:         "test-cloaked-explicit-prompt-oauth",
 		Attributes: map[string]string{"api_key": "sk-ant-oat-test-explicit-prompt-key", "cloak_mode": "always"},
 		Metadata: map[string]any{
@@ -598,8 +598,8 @@ func TestClaudeCloakedToolContinuationPreservesExplicitPromptID(t *testing.T) {
 		},
 	}
 	exec := NewClaudeExecutor(&config.Config{})
-	options := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatClaude,
+	options := coreexecutor.Options{
+		SourceFormat: translatorreg.FormatClaude,
 		Headers:      http.Header{"Session-Id": []string{"sess-explicit-tool-1"}},
 	}
 
@@ -612,7 +612,7 @@ func TestClaudeCloakedToolContinuationPreservesExplicitPromptID(t *testing.T) {
 		"messages": [{"role": "user", "content": "run tool"}]
 	}`)
 
-	if _, err := exec.Execute(ctx, auth, cliproxyexecutor.Request{Model: "claude-opus-5", Payload: turn1Payload}, options); err != nil {
+	if _, err := exec.Execute(ctx, auth, coreexecutor.Request{Model: "claude-opus-5", Payload: turn1Payload}, options); err != nil {
 		t.Fatalf("turn 1 failed: %v", err)
 	}
 
@@ -626,7 +626,7 @@ func TestClaudeCloakedToolContinuationPreservesExplicitPromptID(t *testing.T) {
 		]
 	}`)
 
-	if _, err := exec.Execute(ctx, auth, cliproxyexecutor.Request{Model: "claude-opus-5", Payload: turn1ToolPayload}, options); err != nil {
+	if _, err := exec.Execute(ctx, auth, coreexecutor.Request{Model: "claude-opus-5", Payload: turn1ToolPayload}, options); err != nil {
 		t.Fatalf("turn 1.1 failed: %v", err)
 	}
 
@@ -679,7 +679,7 @@ func TestClaudeCloakedColdStartToolContinuationUsesDeterministicPromptID(t *test
 	})
 
 	ctx := context.WithValue(context.Background(), "cliproxy.roundtripper", http.RoundTripper(transport))
-	auth := &cliproxyauth.Auth{
+	auth := &coreauth.Auth{
 		ID:         "test-cloaked-cold-start-tool-oauth",
 		Attributes: map[string]string{"api_key": "sk-ant-oat-test-cold-start-key", "cloak_mode": "always"},
 		Metadata: map[string]any{
@@ -690,8 +690,8 @@ func TestClaudeCloakedColdStartToolContinuationUsesDeterministicPromptID(t *test
 		},
 	}
 	exec := NewClaudeExecutor(&config.Config{})
-	options := cliproxyexecutor.Options{
-		SourceFormat: sdktranslator.FormatClaude,
+	options := coreexecutor.Options{
+		SourceFormat: translatorreg.FormatClaude,
 	}
 
 	// Cold start tool continuation turn: ending in tool_result without preceding request on this instance
@@ -704,12 +704,12 @@ func TestClaudeCloakedColdStartToolContinuationUsesDeterministicPromptID(t *test
 		]
 	}`)
 
-	req1 := cliproxyexecutor.Request{Model: "claude-opus-5", Payload: toolPayload}
+	req1 := coreexecutor.Request{Model: "claude-opus-5", Payload: toolPayload}
 	// First execution fails (uncommitted)
 	_, _ = exec.Execute(ctx, auth, req1, options)
 
 	// Repeated cold start tool continuation retry
-	req2 := cliproxyexecutor.Request{Model: "claude-opus-5", Payload: toolPayload}
+	req2 := coreexecutor.Request{Model: "claude-opus-5", Payload: toolPayload}
 	if _, err := exec.Execute(ctx, auth, req2, options); err != nil {
 		t.Fatalf("cold start tool continuation retry failed: %v", err)
 	}
@@ -728,7 +728,7 @@ func TestClaudeCloakedColdStartToolContinuationUsesDeterministicPromptID(t *test
 }
 
 func TestClaudeCloakedTopLevelCacheControl_Issue7366(t *testing.T) {
-	newCloakedOAuthEnv := func(t *testing.T) (context.Context, *cliproxyauth.Auth, *ClaudeExecutor, *[][]byte) {
+	newCloakedOAuthEnv := func(t *testing.T) (context.Context, *coreauth.Auth, *ClaudeExecutor, *[][]byte) {
 		t.Helper()
 		var capturedBodies [][]byte
 		call := 0
@@ -751,7 +751,7 @@ func TestClaudeCloakedTopLevelCacheControl_Issue7366(t *testing.T) {
 			}, nil
 		})
 		ctx := context.WithValue(context.Background(), "cliproxy.roundtripper", http.RoundTripper(transport))
-		auth := &cliproxyauth.Auth{
+		auth := &coreauth.Auth{
 			ID:         "test-issue7366-oauth",
 			Attributes: map[string]string{"api_key": "sk-ant-oat-test-issue7366-key"},
 			Metadata: map[string]any{
@@ -767,11 +767,11 @@ func TestClaudeCloakedTopLevelCacheControl_Issue7366(t *testing.T) {
 	t.Run("Error1_SingleTurnBareTopLevelCacheControlNoTTLMismatch", func(t *testing.T) {
 		ctx, auth, exec, captured := newCloakedOAuthEnv(t)
 		payload := []byte(`{"model":"claude-opus-5-5","max_tokens":64,"cache_control":{"type":"ephemeral"},"system":[{"type":"text","text":"You are a helpful assistant.","cache_control":{"type":"ephemeral"}}],"messages":[{"role":"user","content":[{"type":"text","text":"What time is it?"}]}]}`)
-		opts := cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FormatClaude,
+		opts := coreexecutor.Options{
+			SourceFormat: translatorreg.FormatClaude,
 			Headers:      http.Header{"Anthropic-Version": []string{"2023-06-01"}},
 		}
-		if _, err := exec.Execute(ctx, auth, cliproxyexecutor.Request{Model: "claude-opus-5-5", Payload: payload}, opts); err != nil {
+		if _, err := exec.Execute(ctx, auth, coreexecutor.Request{Model: "claude-opus-5-5", Payload: payload}, opts); err != nil {
 			t.Fatalf("Execute() error = %v", err)
 		}
 		if len(*captured) != 1 {
@@ -795,11 +795,11 @@ func TestClaudeCloakedTopLevelCacheControl_Issue7366(t *testing.T) {
 	t.Run("Error2_ToolResultTurnWith1hTopLevelCacheControlStaysWithin4Breakpoints", func(t *testing.T) {
 		ctx, auth, exec, captured := newCloakedOAuthEnv(t)
 		payload := []byte(`{"model":"claude-opus-5-5","max_tokens":64,"cache_control":{"type":"ephemeral","ttl":"1h"},"system":[{"type":"text","text":"You are a helpful assistant.","cache_control":{"type":"ephemeral","ttl":"1h"}}],"tools":[{"name":"get_time","description":"Returns the current time.","input_schema":{"type":"object","properties":{}}}],"messages":[{"role":"user","content":[{"type":"text","text":"What time is it?"}]},{"role":"assistant","content":[{"type":"tool_use","id":"toolu_01","name":"get_time","input":{}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_01","content":"12:00"}]}]}`)
-		opts := cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FormatClaude,
+		opts := coreexecutor.Options{
+			SourceFormat: translatorreg.FormatClaude,
 			Headers:      http.Header{"Anthropic-Version": []string{"2023-06-01"}},
 		}
-		if _, err := exec.Execute(ctx, auth, cliproxyexecutor.Request{Model: "claude-opus-5-5", Payload: payload}, opts); err != nil {
+		if _, err := exec.Execute(ctx, auth, coreexecutor.Request{Model: "claude-opus-5-5", Payload: payload}, opts); err != nil {
 			t.Fatalf("Execute() error = %v", err)
 		}
 		if len(*captured) != 1 {
@@ -843,7 +843,7 @@ func TestClaudeCloakedTopLevelCacheControl_Issue7366(t *testing.T) {
 			}, nil
 		})
 		ctx := context.WithValue(context.Background(), "cliproxy.roundtripper", http.RoundTripper(transport))
-		auth := &cliproxyauth.Auth{
+		auth := &coreauth.Auth{
 			ID:         "test-issue7366-stream-oauth",
 			Attributes: map[string]string{"api_key": "sk-ant-oat-test-issue7366-stream-key"},
 			Metadata: map[string]any{
@@ -855,8 +855,8 @@ func TestClaudeCloakedTopLevelCacheControl_Issue7366(t *testing.T) {
 		}
 		exec := NewClaudeExecutor(&config.Config{})
 		payload := []byte(`{"model":"claude-opus-5-5","max_tokens":64,"stream":true,"cache_control":{"type":"ephemeral","ttl":"1h"},"system":[{"type":"text","text":"You are a helpful assistant.","cache_control":{"type":"ephemeral","ttl":"1h"}}],"tools":[{"name":"get_time","description":"Returns the current time.","input_schema":{"type":"object","properties":{}}}],"messages":[{"role":"user","content":[{"type":"text","text":"What time is it?"}]},{"role":"assistant","content":[{"type":"tool_use","id":"toolu_01","name":"get_time","input":{}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_01","content":"12:00"}]}]}`)
-		res, err := exec.ExecuteStream(ctx, auth, cliproxyexecutor.Request{Model: "claude-opus-5-5", Payload: payload}, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FormatClaude,
+		res, err := exec.ExecuteStream(ctx, auth, coreexecutor.Request{Model: "claude-opus-5-5", Payload: payload}, coreexecutor.Options{
+			SourceFormat: translatorreg.FormatClaude,
 			Headers:      http.Header{"Anthropic-Version": []string{"2023-06-01"}},
 		})
 		if err != nil {
@@ -886,15 +886,15 @@ func TestClaudeCloakedTopLevelCacheControl_Issue7366(t *testing.T) {
 			}, nil
 		})
 		ctx := context.WithValue(context.Background(), "cliproxy.roundtripper", http.RoundTripper(transport))
-		auth := &cliproxyauth.Auth{
+		auth := &coreauth.Auth{
 			Attributes: map[string]string{
 				"api_key":  "sk-ant-api03-direct-top-cc-test",
 				"base_url": "https://api.anthropic.com",
 			},
 		}
 		payload := []byte(`{"model":"claude-opus-5-5","max_tokens":32,"cache_control":{"type":"ephemeral"},"system":[{"type":"text","text":"caller system"}],"messages":[{"role":"user","content":"hello"}]}`)
-		if _, err := NewClaudeExecutor(&config.Config{}).Execute(ctx, auth, cliproxyexecutor.Request{Model: "claude-opus-5-5", Payload: payload}, cliproxyexecutor.Options{
-			SourceFormat: sdktranslator.FormatClaude,
+		if _, err := NewClaudeExecutor(&config.Config{}).Execute(ctx, auth, coreexecutor.Request{Model: "claude-opus-5-5", Payload: payload}, coreexecutor.Options{
+			SourceFormat: translatorreg.FormatClaude,
 			Headers:      http.Header{"User-Agent": {"custom-sdk/1.0"}},
 		}); err != nil {
 			t.Fatalf("Execute() error = %v", err)

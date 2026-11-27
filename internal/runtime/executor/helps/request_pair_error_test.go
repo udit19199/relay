@@ -7,10 +7,10 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/clienterror"
-	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
-	translatorcommon "github.com/router-for-me/CLIProxyAPI/v8/internal/translator/common"
-	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
+	"github.com/udit19199/relay/internal/clienterror"
+	"github.com/udit19199/relay/internal/config"
+	translatorcommon "github.com/udit19199/relay/internal/translator/common"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 const (
@@ -38,14 +38,14 @@ func TestPairTranslationReportsOnlyTheWorkingError(t *testing.T) {
 
 	type pairFunc func(original, working []byte) (originalBody, workingBody []byte, err error)
 	routes := map[string]pairFunc{}
-	for _, to := range []sdktranslator.Format{sdktranslator.FormatOpenAI, sdktranslator.FormatCodex, sdktranslator.FormatInteractions} {
+	for _, to := range []translatorreg.Format{translatorreg.FormatOpenAI, translatorreg.FormatCodex, translatorreg.FormatInteractions} {
 		for _, compat := range []bool{false, true} {
 			name := "api-key pair to " + to.String()
 			if compat {
 				name += " compat"
 			}
 			routes[name] = func(original, working []byte) ([]byte, []byte, error) {
-				return TranslateRequestPairReturningError(ctx, nil, &config.Config{}, sdktranslator.FormatClaude, to, "m", original, working, false, compat)
+				return TranslateRequestPairReturningError(ctx, nil, &config.Config{}, translatorreg.FormatClaude, to, "m", original, working, false, compat)
 			}
 		}
 	}
@@ -78,20 +78,20 @@ func TestPairTranslationReportsOnlyTheWorkingError(t *testing.T) {
 func TestResponsesFileIDOnlyReturns400OnEveryPath(t *testing.T) {
 	payload := []byte(`{"model":"claude-sonnet-4","input":[{"type":"message","role":"user","content":[{"type":"input_file","file_id":"file-1"}]}]}`)
 	for _, compat := range []bool{false, true} {
-		_, single := TranslateRequestReturningError(context.Background(), nil, &config.Config{}, sdktranslator.FormatOpenAIResponse, sdktranslator.FormatClaude, "claude-sonnet-4", payload, false, compat)
+		_, single := TranslateRequestReturningError(context.Background(), nil, &config.Config{}, translatorreg.FormatOpenAIResponse, translatorreg.FormatClaude, "claude-sonnet-4", payload, false, compat)
 		requireUnsupportedPart(t, "single", single, "input_file")
-		_, _, pair := TranslateRequestPairReturningError(context.Background(), nil, &config.Config{}, sdktranslator.FormatOpenAIResponse, sdktranslator.FormatClaude, "claude-sonnet-4", payload, payload, false, compat)
+		_, _, pair := TranslateRequestPairReturningError(context.Background(), nil, &config.Config{}, translatorreg.FormatOpenAIResponse, translatorreg.FormatClaude, "claude-sonnet-4", payload, payload, false, compat)
 		requireUnsupportedPart(t, "pair", pair, "input_file")
 	}
 }
 
 func TestResponsesAudioAndTextBesideFileIDOnCompatPath(t *testing.T) {
 	audio := []byte(`{"model":"claude-sonnet-4","input":[{"type":"message","role":"user","content":[{"type":"input_audio","input_audio":{"data":"UklGRg==","format":"wav"}}]}]}`)
-	_, err := TranslateRequestReturningError(context.Background(), nil, &config.Config{}, sdktranslator.FormatOpenAIResponse, sdktranslator.FormatClaude, "claude-sonnet-4", audio, false, true)
+	_, err := TranslateRequestReturningError(context.Background(), nil, &config.Config{}, translatorreg.FormatOpenAIResponse, translatorreg.FormatClaude, "claude-sonnet-4", audio, false, true)
 	requireUnsupportedPart(t, "audio", err, "input_audio")
 
 	mixed := []byte(`{"model":"claude-sonnet-4","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"keep me"},{"type":"input_file","file_id":"file-1"}]}]}`)
-	body, err := TranslateRequestReturningError(context.Background(), nil, &config.Config{}, sdktranslator.FormatOpenAIResponse, sdktranslator.FormatClaude, "claude-sonnet-4", mixed, false, true)
+	body, err := TranslateRequestReturningError(context.Background(), nil, &config.Config{}, translatorreg.FormatOpenAIResponse, translatorreg.FormatClaude, "claude-sonnet-4", mixed, false, true)
 	if err != nil {
 		t.Fatalf("text beside a file id was refused: %v", err)
 	}
