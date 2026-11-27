@@ -2,24 +2,26 @@ module github.com/router-for-me/CLIProxyAPI/v8
 
 go 1.26.10
 
+toolchain go1.26.11
+
 require (
 	github.com/MoeForge/moego v0.1.0-alpha.1
-	github.com/andybalholm/brotli v1.0.6
+	github.com/andybalholm/brotli v1.2.8
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/gin-gonic/gin v1.10.1
 	github.com/google/uuid v1.6.0
-	github.com/gorilla/websocket v1.5.3
+	github.com/gorilla/websocket v1.5.4-0.20240701034025-d67f41855da4
 	github.com/joho/godotenv v1.5.1
-	github.com/klauspost/compress v1.17.4
+	github.com/klauspost/compress v1.20.4
 	github.com/refraction-networking/utls v1.8.2
 	github.com/sirupsen/logrus v1.9.3
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966
 	github.com/tiktoken-go/tokenizer v0.8.1
 	go.etcd.io/bbolt v1.5.0
-	golang.org/x/crypto v0.57.0
-	golang.org/x/net v0.60.0
-	golang.org/x/sync v0.23.0
-	golang.org/x/text v0.42.0
+	golang.org/x/crypto v0.58.0
+	golang.org/x/net v0.62.0
+	golang.org/x/sync v0.24.0
+	golang.org/x/text v0.43.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -30,7 +32,7 @@ require (
 	github.com/dlclark/regexp2/v2 v2.5.1 // indirect
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/rogpeppe/go-internal v1.15.0 // indirect
-	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/sys v0.49.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 )
 
