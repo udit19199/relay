@@ -248,7 +248,7 @@ What Relay adds on top:
 - Fallback chains across plans, built on CLIProxyAPI's credential priority and
   model aliases.
 - OpenCode Go as a built-in account: limits, model list, and requests, with no
-  plugin or config block.
+  extra config block.
 - The notch app rebuilt as a client of the proxy: pooled limits across
   accounts, per-account resets, adding and removing accounts.
 - Google providers and Antigravity turned off.

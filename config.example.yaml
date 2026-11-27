@@ -841,9 +841,6 @@ oauth:
   #   meta:
   #     - name: "muse-spark-1.3"
   #       alias: "muse-latest"
-  #   sample-provider:                  # plugin provider keys are supported for OAuth plugins
-  #     - name: "sample-model-latest"
-  #       alias: "sample-latest"
 
   # OAuth provider model settings (per channel)
   # Allows overriding model-level capabilities (such as context window) for OAuth credentials.
@@ -1003,62 +1000,6 @@ observability:
   pprof:
     enable: false
     addr: "127.0.0.1:8316"
-
-# Standard dynamic library plugins are trusted in-process code. They are disabled by default.
-# Build Go examples with go build -buildmode=c-shared for the target GOOS/GOARCH.
-# Other languages can implement the same C ABI and JSON method protocol.
-# Plugin executors require a matching auth record with the same provider key.
-# If the same provider is configured as OpenAI-compatible, the native executor wins.
-# Plugin command-line flags and Management API routes are optional capabilities.
-# Existing native flags/routes and higher-priority plugin flags/routes cannot be replaced.
-# Plugin list Management API reads Logo and ConfigFields from plugin metadata for management UI display.
-# Per-plugin enabled only controls plugins.configs.<pluginID>.enabled and does not implicitly change global plugins.enabled.
-plugins:
-  enabled: false
-  dir: "plugins"
-  # Additional plugin store registries. The built-in official registry is always included.
-  # store-sources:
-  #   - "https://example.com/cliproxy-plugins/registry.json"
-  # Optional plugin store auth rules. Secrets are read from environment variables.
-  # Tokens are not stored in plugin manifests or node status.
-  # store-auth:
-  #   - match: "https://plugins.example.com/bearer/"
-  #     apply-to: ["registry", "artifact"]
-  #     type: "bearer"
-  #     token-env: "CLIPROXY_PLUGIN_STORE_TOKEN"
-  #     allow-insecure: false
-  #   - match: "https://plugins.example.com/basic/"
-  #     apply-to: ["registry", "artifact"]
-  #     type: "basic"
-  #     username-env: "CLIPROXY_PLUGIN_STORE_USER"
-  #     password-env: "CLIPROXY_PLUGIN_STORE_PASSWORD"
-  #     allow-insecure: false
-  #   - match: "https://plugins.example.com/header/"
-  #     apply-to: ["registry", "artifact"]
-  #     type: "header"
-  #     header-name: "X-Plugin-Token"
-  #     header-value-env: "CLIPROXY_PLUGIN_STORE_HEADER_TOKEN"
-  #     allow-insecure: false
-  #   - match: "https://api.github.com/repos/example/"
-  #     apply-to: ["registry", "artifact"]
-  #     type: "github-token"
-  #     token-env: "CLIPROXY_PLUGIN_GITHUB_TOKEN"
-  #     allow-insecure: false
-
-  # Home owns this revision; it is not an ordinary editable setting.
-  # auth-revision: 0
-
-  configs:
-    example:
-      enabled: true
-      priority: 1
-      config1: true
-      config2: "string"
-      config3: 3
-      mode: "safe" # enum example: safe, fast
-      config-list: ["a", "b"]
-      config-object:
-        mode: "safe"
 
 # Legacy compatibility reference (comments only; not part of this v8 template).
 # Old files and /v0/management still work without a v8 write. Existing legacy-only

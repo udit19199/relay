@@ -42,7 +42,6 @@ the corresponding group value. Legacy field names are rejected by v8 writes.
 | `/config/client/codex/optimize-multi-agent-v2` | Boolean, default `false`; applies to Codex clients across OAuth and API-key routes. |
 | `/config/observability/logs/debug` | A boolean, for example `true`. |
 | `/config/routing/retry/request-retry` | A number, for example `0`. |
-| `/config/plugins/configs/<id>` | A plugin configuration object. |
 
 For example, `PATCH /v8/management/config` with this body disables additional
 request retries while preserving other settings:
@@ -61,7 +60,7 @@ JSON reads omit TURN usernames and credentials under
 `oauth.providers.codex.live-media-relay.ice-servers`; YAML reads include them.
 The Home-owned revision fields
 `credentials.concurrency.lifecycle-config-revision`,
-`credentials.concurrency.observation-barrier-revision`, and `plugins.auth-revision`
+`credentials.concurrency.observation-barrier-revision`
 cannot be changed through these endpoints.
 
 ### Weighted routing with session affinity
@@ -147,23 +146,17 @@ retain the corresponding business operation's fields.
 | `/credentials/fields` | PATCH | Change credential fields. |
 | `/credentials/refresh` | POST | Refresh credentials. |
 | `/credentials/verify` | POST | Run an operator-triggered, account-pinned inference verification using an isolated session and minimal 1-token prompt. |
-| `/oauth/auth-url?provider=<provider>` | GET, POST | Start built-in or plugin OAuth (supports `name`/`auth_index` for targeted credential recovery and optional `verify` opt-in). |
+| `/oauth/auth-url?provider=<provider>` | GET, POST | Start OAuth (supports `name`/`auth_index` for targeted credential recovery and optional `verify` opt-in). |
 | `/oauth/siwc/bind` | POST | Start SIWC binding to an existing file-backed Codex OAuth credential. |
 | `/oauth/siwc/status` | GET | Read local SIWC credential status (`off`, `valid`, or `invalid`). |
 | `/oauth/status?state=<state>` | GET | Get login status. |
 | `/oauth/session?state=<state>` | DELETE | Cancel a login session. |
 | `/oauth/callback` | GET, POST | Submit an OAuth callback. |
-| `/plugins` | GET | List installed plugins. |
-| `/plugins/<id>` | DELETE | Delete a plugin. |
-| `/plugins/store` | GET | List the plugin store (supports optional `?refresh=true` to bypass cached release checks). |
-| `/plugins/store/<id>/install` | POST | Install or update a plugin. |
-| `/plugins/<id>/quota` | GET, POST, DELETE | Read, fetch, or reset plugin quota. |
 
 ## OAuth
 
 The login URL is shared by all providers. Set the required `provider` query
-parameter to `claude`, `codex`, `xai`, `devin`, `meta`, or a registered
-plugin provider ID. For example:
+parameter to `claude`, `codex`, `xai`, `devin`, or `meta`. For example:
 
 ```http
 GET /v8/management/oauth/auth-url?provider=codex
@@ -302,6 +295,3 @@ precedence and its legacy equivalent is removed. V0 setters keep legacy-only
 files in their original layout; existing v8 files are saved in the latest v8
 layout. `PUT /v0/management/config.yaml` still replaces the complete file and
 accepts legacy, new, or mixed layouts, normalizing v8 documents on save.
-
-Plugin OAuth uses the shared v8 login endpoint. Other plugin-defined HTTP
-extensions retain their declared `/v0/management` routes.
