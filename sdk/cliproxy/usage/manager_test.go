@@ -126,7 +126,7 @@ func TestIsNativeAccessProvider(t *testing.T) {
 		{"CONFIG-API-KEY", true},
 		{"  config-inline  ", true},
 		{"custom-consumer", false},
-		{"realtime-client-secret", false},
+		{"custom-auth-provider", false},
 		{"", false},
 	}
 	for _, tt := range tests {

@@ -521,7 +521,7 @@ func TestV8MigrationPreservesEmptyLegacyContainers(t *testing.T) {
 		{"tls", "server.tls"}, {"remote-management", "management"},
 		{"pprof", "observability.pprof"},
 		{"streaming", "requests.streaming"}, {"payload", "requests.payload"},
-		{"codex", "oauth.providers.codex"}, {"codex.live-media-relay", "oauth.providers.codex.live-media-relay"},
+		{"codex", "oauth.providers.codex"},
 		{"codex-header-defaults", "oauth.providers.codex.header-defaults"},
 		{"claude", "upstream.claude"}, {"claude-code", "upstream.claude"},
 		{"claude-header-defaults", "upstream.claude.header-defaults"},
@@ -588,9 +588,9 @@ func TestV8MigrationPreservesEmptyLegacyContainers(t *testing.T) {
 func TestV8EmptyLegacyContainersKeepNewValues(t *testing.T) {
 	raw := []byte(`port: 8317
 tls: null
-codex: {disable-codex-cloaking: true, live-media-relay: {}}
+codex: {disable-codex-cloaking: true}
 server: {tls: {enable: true, cert: server.crt, key: server.key}}
-oauth: {providers: {codex: {live-media-relay: {max-sessions: 12}}}}
+oauth: {providers: {codex: {}}}
 `)
 	for _, migrate := range []bool{false, true} {
 		data, _, err := NormalizeConfigLayout(raw, migrate)
@@ -601,58 +601,19 @@ oauth: {providers: {codex: {live-media-relay: {max-sessions: 12}}}}
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !cfg.TLS.Enable || cfg.TLS.Cert != "server.crt" || cfg.TLS.Key != "server.key" || cfg.Codex.LiveMediaRelay.MaxSessions != 12 || !cfg.Codex.DisableCodexCloaking {
+		if !cfg.TLS.Enable || cfg.TLS.Cert != "server.crt" || cfg.TLS.Key != "server.key" || !cfg.Codex.DisableCodexCloaking {
 			t.Fatal("empty legacy block overwrote new values or a non-empty sibling")
 		}
 		var doc yaml.Node
 		if err = yaml.Unmarshal(data, &doc); err != nil {
 			t.Fatal(err)
 		}
-		if yamlPath(doc.Content[0], "tls") != nil || yamlPath(doc.Content[0], "codex.live-media-relay") != nil {
+		if yamlPath(doc.Content[0], "tls") != nil {
 			t.Fatal("conflicting empty legacy blocks were not removed")
 		}
 		if !migrate && yamlPath(doc.Content[0], "codex.disable-codex-cloaking") == nil {
 			t.Fatal("conflict cleanup migrated a non-conflicting legacy sibling")
 		}
-	}
-}
-
-func TestV8PrivateIPAliasPrecedenceAndMigration(t *testing.T) {
-	for _, tc := range []struct {
-		name, raw string
-		want      bool
-	}{
-		{"allow", "codex: {live-media-relay: {allow-private-remote-ips: true}}\n", false},
-		{"deny", "codex: {live-media-relay: {allow-private-remote-ips: false}}\n", true},
-		{"new wins", "codex: {live-media-relay: {allow-private-remote-ips: false}}\noauth: {providers: {codex: {live-media-relay: {disable-private-remote-ips: false}}}}\n", false},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			cfg, err := ParseConfigBytes([]byte(tc.raw))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if cfg.Codex.LiveMediaRelay.DisablePrivateRemoteIPs != tc.want {
-				t.Fatal("wrong private-IP policy")
-			}
-			path := filepath.Join(t.TempDir(), "config.yaml")
-			if err = os.WriteFile(path, []byte(tc.raw), 0600); err != nil {
-				t.Fatal(err)
-			}
-			if err = SaveConfigPreserveComments(path, cfg, true); err != nil {
-				t.Fatal(err)
-			}
-			after, err := LoadConfig(path)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if after.Codex.LiveMediaRelay.DisablePrivateRemoteIPs != tc.want {
-				t.Fatal("migration inverted the policy")
-			}
-			data, err := os.ReadFile(path)
-			if err != nil || strings.Contains(string(data), "allow-private-remote-ips") {
-				t.Fatalf("legacy alias remained: %v", err)
-			}
-		})
 	}
 }
 

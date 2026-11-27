@@ -57,7 +57,6 @@ request retries while preserving other settings:
 ```
 
 JSON reads omit TURN usernames and credentials under
-`oauth.providers.codex.live-media-relay.ice-servers`; YAML reads include them.
 The Home-owned revision fields
 `credentials.concurrency.lifecycle-config-revision`,
 `credentials.concurrency.observation-barrier-revision`

@@ -205,8 +205,6 @@ type CodexConfig struct {
 	// ModelLevelCooling scopes Codex usage_limit_reached quota cooldowns to the requested model
 	// rather than cooling down the entire credential across all sibling models.
 	ModelLevelCooling bool `yaml:"model-level-cooling" json:"model-level-cooling"`
-	// LiveMediaRelay terminates and relays Codex Live WebRTC media in this process.
-	LiveMediaRelay CodexLiveMediaRelayConfig `yaml:"live-media-relay" json:"live-media-relay"`
 	// ResponseSteering enables full-duplex Codex WebSockets, bound to one
 	// upstream model/account/socket for their entire lifetime. Default is false.
 	ResponseSteering bool `yaml:"response-steering" json:"response-steering"`
@@ -270,24 +268,6 @@ func (c *CodexConfig) StreamBootstrapTimeoutDuration() time.Duration {
 		}
 	}
 	return DefaultCodexStreamBootstrapTimeout
-}
-
-// CodexLiveMediaRelayConfig configures the in-process Codex Live WebRTC gateway.
-type CodexLiveMediaRelayConfig struct {
-	Enabled                 bool                 `yaml:"enabled" json:"enabled"`
-	MaxSessions             int                  `yaml:"max-sessions" json:"max-sessions"`
-	DisablePrivateRemoteIPs bool                 `yaml:"disable-private-remote-ips" json:"disable-private-remote-ips"`
-	PublicIP                string               `yaml:"public-ip" json:"public-ip"`
-	UDPPortMin              uint16               `yaml:"udp-port-min" json:"udp-port-min"`
-	UDPPortMax              uint16               `yaml:"udp-port-max" json:"udp-port-max"`
-	ICEServers              []CodexLiveICEServer `yaml:"ice-servers" json:"ice-servers"`
-}
-
-// CodexLiveICEServer configures a STUN or TURN server for the media relay.
-type CodexLiveICEServer struct {
-	URLs       []string `yaml:"urls" json:"urls"`
-	Username   string   `yaml:"username" json:"-"`
-	Credential string   `yaml:"credential" json:"-"`
 }
 
 // TLSConfig holds HTTPS server settings.

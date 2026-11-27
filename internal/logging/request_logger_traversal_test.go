@@ -16,7 +16,7 @@ func TestGenerateFilenameRejectsPathSeparators(t *testing.T) {
 	logger := &FileRequestLogger{}
 	cases := []string{
 		`/v1beta/models/x\..\..\..\..\probe:generateContent`,
-		`/v1/realtime/calls/x\..\..\..\probe/hangup`,
+		`/v1/chat/x\..\..\..\probe/completions`,
 		`/v1/models/../../etc/passwd`,
 		`/v1/models/..\..\..\..\windows\win.ini`,
 		`/v1/\..\..\..\root`,

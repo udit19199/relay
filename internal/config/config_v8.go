@@ -304,9 +304,6 @@ func flattenV8(node *yaml.Node) (*yaml.Node, error) {
 		return nil, err
 	}
 	node = expandConfigAliases(node)
-	if _, err := normalizeV8PrivateIPAlias(node, true); err != nil {
-		return nil, err
-	}
 	for _, path := range append(append([]configPath(nil), v8Paths...), v8Aliases...) {
 		parts := strings.Split(path.current, ".")
 		for i := 1; i < len(parts); i++ {
@@ -525,10 +522,7 @@ func NormalizeConfigLayout(data []byte, migrate bool) ([]byte, bool, error) {
 	}
 	root = expandConfigAliases(root)
 	doc.Content[0] = root
-	changed, err := normalizeV8PrivateIPAlias(root, migrate)
-	if err != nil {
-		return nil, false, err
-	}
+	changed := false
 	// Empty legacy structs have no leaf fields to move. Preserve them as empty v8
 	// mappings; null structs also mean defaults. User-owned maps are not included.
 	paths := append(append([]configPath(nil), v8Aliases...), v8Paths...)
@@ -762,35 +756,6 @@ func commentUnknownV8Fields(node *yaml.Node, archive *yaml.Node, allowed map[str
 		archive.FootComment = strings.TrimSpace(archive.FootComment + "\n" + strings.Join(comments, "\n"))
 	}
 	return nil
-}
-
-// The deprecated allow flag is the inverse of disable-private-remote-ips.
-// Resolve it before applying v8 precedence so both names cannot reach the runtime
-// decoder together. Legacy-only files are left untouched until a migration/save.
-func normalizeV8PrivateIPAlias(root *yaml.Node, migrate bool) (bool, error) {
-	const old = "codex.live-media-relay.allow-private-remote-ips"
-	const canonical = "codex.live-media-relay.disable-private-remote-ips"
-	value := yamlPath(root, old)
-	if value == nil {
-		return false, nil
-	}
-	if yamlPath(root, "oauth.providers."+canonical) != nil {
-		return deleteYAMLPath(root, old), nil
-	}
-	if !migrate || yamlPath(root, canonical) != nil {
-		return false, nil
-	}
-	var allow bool
-	if err := value.Decode(&allow); err != nil {
-		return false, fmt.Errorf("decode %s: %w", old, err)
-	}
-	replacement := deepCopyNode(value)
-	if err := replacement.Encode(!allow); err != nil {
-		return false, err
-	}
-	setYAMLPath(root, canonical, replacement)
-	deleteYAMLPath(root, old)
-	return true, nil
 }
 
 // restoreV8Layout lets v0 handlers update the effective runtime fields without

@@ -21,7 +21,7 @@ import (
 func TestConfigV8MigrationAndLegacyAPI(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	path := filepath.Join(t.TempDir(), "config.yaml")
-	raw := "# Keep this configuration\nport: 8317\nrequest-retry: 3\napi-keys: [client]\nws-auth: true\ntls: {}\npayload: null\ncodex: {live-media-relay: {}}\n"
+	raw := "# Keep this configuration\nport: 8317\nrequest-retry: 3\napi-keys: [client]\nws-auth: true\ntls: {}\npayload: null\ncodex: {}\n"
 	if err := os.WriteFile(path, []byte(raw), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -543,81 +543,6 @@ func TestConfigV8EmptyExcludedModelsSurvivesSave(t *testing.T) {
 				t.Error("load retained conflicting legacy rules")
 			}
 		})
-	}
-}
-
-func TestConfigV8JSONTURNSecrets(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.yaml")
-	raw := []byte(`oauth:
-  providers:
-    codex:
-      live-media-relay:
-        ice-servers:
-          - {urls: ['turn:example.invalid:3478'], username: test-relay-user, credential: test-relay-password}
-          - {urls: ['turn:example.invalid:3478'], username: test-relay-user-2, credential: test-relay-password-2}
-`)
-	if err := os.WriteFile(path, raw, 0600); err != nil {
-		t.Fatal(err)
-	}
-	cfg, err := config.LoadConfig(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	h := &Handler{cfg: cfg, configFilePath: path}
-	r := gin.New()
-	r.GET("/v8/management/config", h.ConfigV8)
-	r.PUT("/v8/management/config", h.ConfigV8)
-	r.GET("/v8/management/config.yaml", h.ConfigV8)
-	r.GET("/v8/management/config/*path", h.ConfigV8)
-	r.PUT("/v8/management/config/*path", h.ConfigV8)
-	for _, url := range []string{"/v8/management/config", "/v8/management/config/oauth/providers/codex/live-media-relay/ice-servers"} {
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, url, nil))
-		if w.Code != http.StatusOK {
-			t.Fatalf("GET status=%d body=%s", w.Code, w.Body.String())
-		}
-		if strings.Contains(w.Body.String(), "test-relay-user") || strings.Contains(w.Body.String(), "test-relay-password") {
-			t.Fatal("JSON exposed TURN credentials")
-		}
-		body := w.Body.String()
-		w = httptest.NewRecorder()
-		r.ServeHTTP(w, httptest.NewRequest(http.MethodPut, url, strings.NewReader(body)))
-		if w.Code != http.StatusOK {
-			t.Fatalf("PUT status=%d body=%s", w.Code, w.Body.String())
-		}
-		loaded, err := config.LoadConfig(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		servers := loaded.Codex.LiveMediaRelay.ICEServers
-		if len(servers) != 2 || servers[0].Username != "test-relay-user" || servers[0].Credential != "test-relay-password" || servers[1].Username != "test-relay-user-2" || servers[1].Credential != "test-relay-password-2" {
-			t.Fatal("JSON round trip changed redacted credentials")
-		}
-	}
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/v8/management/config.yaml", nil))
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "test-relay-password") {
-		t.Fatal("YAML export lost TURN credentials")
-	}
-	for _, body := range []string{
-		`[{"urls":["turn:replacement.invalid:3478"]}]`,
-		`[{"urls":["turn:example.invalid:3478"],"username":"","credential":null}]`,
-	} {
-		if err := os.WriteFile(path, raw, 0600); err != nil {
-			t.Fatal(err)
-		}
-		w = httptest.NewRecorder()
-		r.ServeHTTP(w, httptest.NewRequest(http.MethodPut, "/v8/management/config/oauth/providers/codex/live-media-relay/ice-servers", strings.NewReader(body)))
-		if w.Code != http.StatusOK {
-			t.Fatalf("PUT status=%d body=%s", w.Code, w.Body.String())
-		}
-		loaded, err := config.LoadConfig(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if server := loaded.Codex.LiveMediaRelay.ICEServers[0]; server.Username != "" || server.Credential != "" {
-			t.Fatal("unexpected inherited TURN credentials")
-		}
 	}
 }
 
