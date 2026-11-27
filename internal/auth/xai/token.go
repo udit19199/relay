@@ -49,9 +49,13 @@ func (ts *TokenStorage) SaveTokenToFile(authFilePath string) error {
 		return fmt.Errorf("xai token storage: merge metadata: %w", errMerge)
 	}
 
-	file, err := os.Create(authFilePath)
+	file, err := os.OpenFile(authFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return fmt.Errorf("xai token storage: create token file: %w", err)
+	}
+	if errChmod := file.Chmod(0o600); errChmod != nil {
+		_ = file.Close()
+		return fmt.Errorf("xai token storage: secure token file permissions: %w", errChmod)
 	}
 	defer func() {
 		if errClose := file.Close(); errClose != nil {

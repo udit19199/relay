@@ -77,9 +77,13 @@ func (ts *ClaudeTokenStorage) SaveTokenToFile(authFilePath string) error {
 		return fmt.Errorf("failed to merge metadata: %w", errMerge)
 	}
 
-	f, err := os.Create(authFilePath)
+	f, err := os.OpenFile(authFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return fmt.Errorf("failed to create token file: %w", err)
+	}
+	if errChmod := f.Chmod(0o600); errChmod != nil {
+		_ = f.Close()
+		return fmt.Errorf("failed to secure token file permissions: %w", errChmod)
 	}
 	defer func() {
 		if errClose := f.Close(); errClose != nil {
