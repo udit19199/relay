@@ -186,7 +186,6 @@ func TestServiceApplyConfigRuntimePreservesSelectorForUnchangedRouting(t *testin
 			SessionAffinity:    true,
 			SessionAffinityTTL: "1h",
 		},
-		UsageStatisticsEnabled: true,
 	})
 	if !service.applyConfigRuntime(context.Background(), newer, false) {
 		t.Fatal("newest same-routing config runtime apply failed")
@@ -225,7 +224,6 @@ func TestServiceApplyConfigRuntimePreservesSelectorForUnchangedRouting(t *testin
 			SessionAffinity:    true,
 			SessionAffinityTTL: "1h",
 		},
-		UsageStatisticsEnabled: false,
 	})
 	if !service.applyConfigRuntime(context.Background(), unrelated, false) {
 		t.Fatal("unrelated config runtime apply failed")

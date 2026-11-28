@@ -293,7 +293,6 @@ func TestBuildConfigChangeDetails_FlagsAndKeys(t *testing.T) {
 		AuthDir:                       "/old",
 		Debug:                         false,
 		LoggingToFile:                 false,
-		UsageStatisticsEnabled:        false,
 		DisableCooling:                false,
 		SaveCooldownStatus:            false,
 		TransientErrorCooldownSeconds: 0,
@@ -316,7 +315,6 @@ func TestBuildConfigChangeDetails_FlagsAndKeys(t *testing.T) {
 		AuthDir:                       "/new",
 		Debug:                         true,
 		LoggingToFile:                 true,
-		UsageStatisticsEnabled:        true,
 		DisableCooling:                true,
 		SaveCooldownStatus:            true,
 		TransientErrorCooldownSeconds: -1,
@@ -351,7 +349,6 @@ func TestBuildConfigChangeDetails_FlagsAndKeys(t *testing.T) {
 	details := BuildConfigChangeDetails(oldCfg, newCfg)
 	expectContains(t, details, "debug: false -> true")
 	expectContains(t, details, "logging-to-file: false -> true")
-	expectContains(t, details, "usage-statistics-enabled: false -> true")
 	expectContains(t, details, "disable-cooling: false -> true")
 	expectContains(t, details, "save-cooldown-status: false -> true")
 	expectContains(t, details, "transient-error-cooldown-seconds: 0 -> -1")
@@ -377,7 +374,6 @@ func TestBuildConfigChangeDetails_AllBranches(t *testing.T) {
 		AuthDir:                       "/a",
 		Debug:                         false,
 		LoggingToFile:                 false,
-		UsageStatisticsEnabled:        false,
 		DisableCooling:                false,
 		SaveCooldownStatus:            false,
 		TransientErrorCooldownSeconds: 0,
@@ -415,7 +411,6 @@ func TestBuildConfigChangeDetails_AllBranches(t *testing.T) {
 		AuthDir:                       "/b",
 		Debug:                         true,
 		LoggingToFile:                 true,
-		UsageStatisticsEnabled:        true,
 		DisableCooling:                true,
 		SaveCooldownStatus:            true,
 		TransientErrorCooldownSeconds: -1,
@@ -459,7 +454,6 @@ func TestBuildConfigChangeDetails_AllBranches(t *testing.T) {
 	expectContains(t, changes, "auth-dir: /a -> /b")
 	expectContains(t, changes, "debug: false -> true")
 	expectContains(t, changes, "logging-to-file: false -> true")
-	expectContains(t, changes, "usage-statistics-enabled: false -> true")
 	expectContains(t, changes, "disable-cooling: false -> true")
 	expectContains(t, changes, "save-cooldown-status: false -> true")
 	expectContains(t, changes, "transient-error-cooldown-seconds: 0 -> -1")

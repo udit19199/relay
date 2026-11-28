@@ -162,7 +162,6 @@ func newTestServerWithConfig(t *testing.T, cfg *proxyconfig.Config, opts ...Serv
 	cfg.AuthDir = authDir
 	cfg.Debug = true
 	cfg.LoggingToFile = false
-	cfg.UsageStatisticsEnabled = false
 
 	authManager := auth.NewManager(nil, nil, nil)
 	accessManager := access.NewManager()

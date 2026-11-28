@@ -105,7 +105,6 @@ func buildV8Paths() []configPath {
 		{"debug", "observability.logs.debug"}, {"logging-to-file", "observability.logs.logging-to-file"},
 		{"logs-max-total-size-mb", "observability.logs.logs-max-total-size-mb"}, {"request-log", "observability.logs.request-log"},
 		{"error-logs-max-files", "observability.logs.error-logs-max-files"},
-		{"usage-statistics-enabled", "observability.usage.usage-statistics-enabled"},
 		{"pprof", "observability.pprof"},
 	}
 	var out []configPath
