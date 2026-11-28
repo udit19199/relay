@@ -33,6 +33,12 @@ type provider struct {
 	keys map[string]struct{}
 }
 
+// NewAPIKeyProvider builds a config-access provider for tests and custom wiring
+// without touching the global provider registry.
+func NewAPIKeyProvider(keys []string) access.Provider {
+	return newProvider(access.DefaultAccessProviderName, keys)
+}
+
 func newProvider(name string, keys []string) *provider {
 	providerName := strings.TrimSpace(name)
 	if providerName == "" {

@@ -42,13 +42,15 @@ func (m *Manager) Providers() []Provider {
 }
 
 // Authenticate evaluates providers until one succeeds.
+// A manager with no providers denies every request: running without
+// configured API keys must never silently open the inference API.
 func (m *Manager) Authenticate(ctx context.Context, r *http.Request) (*Result, *AuthError) {
 	if m == nil {
 		return nil, nil
 	}
 	providers := m.Providers()
 	if len(providers) == 0 {
-		return nil, nil
+		return nil, NewDeniedError("no API keys are configured on the server", http.StatusForbidden)
 	}
 
 	var (

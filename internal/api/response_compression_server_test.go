@@ -48,7 +48,7 @@ func TestResponseCompressionServerHotReload(t *testing.T) {
 }
 
 func TestWebsocketCompressionServerHotReload(t *testing.T) {
-	cfg := &config.Config{}
+	cfg := &config.Config{SDKConfig: config.SDKConfig{APIKeys: []string{"test-key"}}}
 	server := newTestServerWithConfig(t, cfg)
 	httpServer := httptest.NewServer(server.engine)
 	defer httpServer.Close()
@@ -56,7 +56,8 @@ func TestWebsocketCompressionServerHotReload(t *testing.T) {
 	for _, enabled := range []bool{true, false, true} {
 		cfg.Codex.WebsocketCompression = &enabled
 		server.UpdateClients(cfg)
-		conn, response, errDial := dialer.Dial("ws"+strings.TrimPrefix(httpServer.URL, "http")+"/v1/responses", nil)
+		header := http.Header{"Authorization": []string{"Bearer test-key"}}
+		conn, response, errDial := dialer.Dial("ws"+strings.TrimPrefix(httpServer.URL, "http")+"/v1/responses", header)
 		if errDial != nil {
 			t.Fatal(errDial)
 		}

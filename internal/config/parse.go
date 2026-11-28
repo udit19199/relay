@@ -21,7 +21,7 @@ func ParseConfigBytes(data []byte) (*Config, error) {
 
 	var cfg Config
 	// Keep defaults aligned with LoadConfigOptional.
-	cfg.Host = "" // Default empty: binds to all interfaces (IPv4 + IPv6)
+	cfg.Host = "127.0.0.1" // Default loopback only; set host: 0.0.0.0 explicitly to bind all interfaces
 	cfg.LoggingToFile = false
 	cfg.LogsMaxTotalSizeMB = 0
 	cfg.ErrorLogsMaxFiles = 10

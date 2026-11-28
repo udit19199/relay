@@ -442,8 +442,8 @@ func corsAllowHeadersValue(req *http.Request) string {
 }
 
 // AuthMiddleware returns a Gin middleware handler that authenticates requests
-// using the configured authentication providers. When no providers are available,
-// it allows all requests (legacy behaviour).
+// using the configured authentication providers. A manager without providers
+// denies requests rather than allowing them.
 func AuthMiddleware(manager *access.Manager) gin.HandlerFunc {
 	return accessAuthMiddleware(manager)
 }
@@ -471,17 +471,20 @@ func accessAuthMiddleware(manager *access.Manager) gin.HandlerFunc {
 
 		result, err := manager.Authenticate(c.Request.Context(), c.Request)
 		if err == nil {
-			if result != nil {
-				c.Set("userApiKey", result.Principal)
-				c.Set("accessProvider", result.Provider)
-				if len(result.Metadata) > 0 {
-					c.Set("accessMetadata", result.Metadata)
-				}
-				reqCtx := coreusage.WithAPIKey(c.Request.Context(), result.Principal)
-				reqCtx = coreusage.WithAccessProvider(reqCtx, result.Provider)
-				reqCtx = coreusage.WithIsNativeKey(reqCtx, coreusage.IsNativeAccessProvider(result.Provider))
-				c.Request = c.Request.WithContext(reqCtx)
+			if result == nil {
+				closeUnconsumedRequestOnAbort(c)
+				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "access denied"})
+				return
 			}
+			c.Set("userApiKey", result.Principal)
+			c.Set("accessProvider", result.Provider)
+			if len(result.Metadata) > 0 {
+				c.Set("accessMetadata", result.Metadata)
+			}
+			reqCtx := coreusage.WithAPIKey(c.Request.Context(), result.Principal)
+			reqCtx = coreusage.WithAccessProvider(reqCtx, result.Provider)
+			reqCtx = coreusage.WithIsNativeKey(reqCtx, coreusage.IsNativeAccessProvider(result.Provider))
+			c.Request = c.Request.WithContext(reqCtx)
 			middleware.CaptureAuthenticatedRequestBody(c)
 			if c.IsAborted() {
 				return

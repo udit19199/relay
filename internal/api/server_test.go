@@ -15,6 +15,7 @@ import (
 	gin "github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/udit19199/relay/internal/access"
+	configaccess "github.com/udit19199/relay/internal/access/config_access"
 	managementHandlers "github.com/udit19199/relay/internal/api/handlers/management"
 	"github.com/udit19199/relay/internal/config"
 	proxyconfig "github.com/udit19199/relay/internal/config"
@@ -165,6 +166,9 @@ func newTestServerWithConfig(t *testing.T, cfg *proxyconfig.Config, opts ...Serv
 
 	authManager := auth.NewManager(nil, nil, nil)
 	accessManager := access.NewManager()
+	if len(cfg.APIKeys) > 0 {
+		accessManager.SetProviders([]access.Provider{configaccess.NewAPIKeyProvider(cfg.APIKeys)})
+	}
 
 	configPath := filepath.Join(tmpDir, "config.yaml")
 	return NewServer(cfg, authManager, accessManager, configPath, opts...)

@@ -22,7 +22,8 @@ models:
 # Listener, TLS, network discovery, and server operation.
 server:
   # Server host/interface to bind to. Relay listens on this Mac only.
-  # Set "" to bind all interfaces (IPv4 + IPv6) and expose the proxy to your network.
+  # Set 0.0.0.0 to bind all interfaces and expose the proxy to your network.
+  # When the key is absent, Relay binds loopback only.
   host: "127.0.0.1"
 
   # Server port
@@ -85,7 +86,7 @@ management:
 
 # Client authentication for the proxy API. These are not upstream provider keys.
 access:
-  # API keys for authentication
+  # API keys for authentication. With no keys the inference API rejects every request.
   api-keys:
     - "your-api-key-1"
     - "your-api-key-2"

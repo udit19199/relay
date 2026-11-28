@@ -7,6 +7,8 @@ import (
 	"context"
 	"fmt"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/udit19199/relay/internal/access"
 	configaccess "github.com/udit19199/relay/internal/access/config_access"
 	"github.com/udit19199/relay/internal/api"
@@ -179,6 +181,9 @@ func (b *Builder) Build() (*Service, error) {
 
 	configaccess.Register(&b.cfg.SDKConfig)
 	accessManager.SetProviders(access.RegisteredProviders())
+	if len(access.RegisteredProviders()) == 0 {
+		log.Warn("no API keys configured: the inference API will reject every request until at least one key is set")
+	}
 
 	coreManager := b.coreManager
 	cooldownStateStore := b.cooldownStateStore
