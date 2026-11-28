@@ -510,7 +510,7 @@ proxy-url: old
 
 func TestV8MigrationPreservesEmptyLegacyContainers(t *testing.T) {
 	for _, section := range []configPath{
-		{"tls", "server.tls"}, {"remote-management", "management"},
+		{"remote-management", "management"},
 		{"pprof", "observability.pprof"},
 		{"streaming", "requests.streaming"}, {"payload", "requests.payload"},
 		{"codex", "oauth.providers.codex"},
@@ -579,9 +579,9 @@ func TestV8MigrationPreservesEmptyLegacyContainers(t *testing.T) {
 
 func TestV8EmptyLegacyContainersKeepNewValues(t *testing.T) {
 	raw := []byte(`port: 8317
-tls: null
+pprof: null
 codex: {disable-codex-cloaking: true}
-server: {tls: {enable: true, cert: server.crt, key: server.key}}
+observability: {pprof: {enable: true, addr: "127.0.0.1:9999"}}
 oauth: {providers: {codex: {}}}
 `)
 	for _, migrate := range []bool{false, true} {
@@ -593,14 +593,14 @@ oauth: {providers: {codex: {}}}
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !cfg.TLS.Enable || cfg.TLS.Cert != "server.crt" || cfg.TLS.Key != "server.key" || !cfg.Codex.DisableCodexCloaking {
+		if !cfg.Pprof.Enable || cfg.Pprof.Addr != "127.0.0.1:9999" || !cfg.Codex.DisableCodexCloaking {
 			t.Fatal("empty legacy block overwrote new values or a non-empty sibling")
 		}
 		var doc yaml.Node
 		if err = yaml.Unmarshal(data, &doc); err != nil {
 			t.Fatal(err)
 		}
-		if yamlPath(doc.Content[0], "tls") != nil {
+		if yamlPath(doc.Content[0], "pprof") != nil {
 			t.Fatal("conflicting empty legacy blocks were not removed")
 		}
 		if !migrate && yamlPath(doc.Content[0], "codex.disable-codex-cloaking") == nil {

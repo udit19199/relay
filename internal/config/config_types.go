@@ -270,16 +270,6 @@ func (c *CodexConfig) StreamBootstrapTimeoutDuration() time.Duration {
 	return DefaultCodexStreamBootstrapTimeout
 }
 
-// TLSConfig holds HTTPS server settings.
-type TLSConfig struct {
-	// Enable toggles HTTPS server mode.
-	Enable bool `yaml:"enable" json:"enable"`
-	// Cert is the path to the TLS certificate file.
-	Cert string `yaml:"cert" json:"cert"`
-	// Key is the path to the TLS private key file.
-	Key string `yaml:"key" json:"key"`
-}
-
 // PprofConfig holds pprof HTTP server settings.
 type PprofConfig struct {
 	// Enable toggles the pprof HTTP debug server.

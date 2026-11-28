@@ -72,9 +72,9 @@ var v8KeyFamilies = []configPath{
 
 func buildV8Paths() []configPath {
 	prefixes := []configPath{
-		{"host", "server.host"}, {"port", "server.port"}, {"max-request-body-bytes", "server.max-request-body-bytes"}, {"trusted-proxies", "server.trusted-proxies"},
+		{"host", "server.host"}, {"port", "server.port"}, {"max-request-body-bytes", "server.max-request-body-bytes"},
 
-		{"tls", "server.tls"}, {"kv-store", "server.kv-store"},
+		{"kv-store", "server.kv-store"},
 		{"remote-management", "management"}, {"api-keys", "access.api-keys"},
 		{"force-model-prefix", "routing.force-model-prefix"},
 		{"request-retry", "routing.retry.request-retry"}, {"max-retry-credentials", "routing.retry.max-retry-credentials"},

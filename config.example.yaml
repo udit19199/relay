@@ -44,22 +44,6 @@ server:
     # Non-streaming responses smaller than this many bytes are sent uncompressed.
     min-bytes: 1024
 
-  # IP addresses or CIDRs of proxies allowed to supply forwarded client IP headers.
-  # An empty list (the default) does not trust forwarded headers. Restart after changing this setting.
-  trusted-proxies: []
-  # Example:
-  # trusted-proxies:
-  #   - 127.0.0.1
-  #   - 192.0.2.0/24
-
-  # TLS settings for HTTPS. When enabled, the server listens with the provided certificate and key.
-  tls:
-    enable: false
-    cert: ""
-    key: ""
-
-  # When true, disable high-overhead request logging and HTTP middleware features to reduce per-request memory usage under high concurrency.
-
   # Local persistent KV store settings (bbolt).
   kv-store:
     # Disable local bbolt KV persistence and fall back to in-memory maps (default: false).

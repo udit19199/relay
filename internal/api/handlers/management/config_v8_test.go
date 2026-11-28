@@ -733,7 +733,7 @@ api-keys:
 	}
 
 	// Verify that empty sequence retains flow style []
-	emptyJSON := `{"server":{"trusted-proxies":[]}}`
+	emptyJSON := `{"api-keys":{"openai-compatibility":[]}}`
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodPatch, "/v8/management/config", strings.NewReader(emptyJSON))
 	req.Header.Set("Content-Type", "application/json")
@@ -746,7 +746,7 @@ api-keys:
 		t.Fatal(errRead)
 	}
 	savedStr = string(saved)
-	if !strings.Contains(savedStr, "trusted-proxies: []") {
+	if !strings.Contains(savedStr, "openai-compatibility: []") {
 		t.Fatalf("expected empty sequence to retain flow style [], got:\n%s", savedStr)
 	}
 

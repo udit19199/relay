@@ -6,7 +6,6 @@ package api
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
@@ -27,7 +26,6 @@ import (
 	"github.com/udit19199/relay/internal/config"
 	"github.com/udit19199/relay/internal/logging"
 	"github.com/udit19199/relay/internal/service/auth"
-	"golang.org/x/net/http2"
 	"gopkg.in/yaml.v3"
 )
 
@@ -116,11 +114,10 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *acc
 
 	// Create gin engine
 	engine := gin.New()
-	if errSetTrustedProxies := engine.SetTrustedProxies(cfg.TrustedProxies); errSetTrustedProxies != nil {
-		log.WithError(errSetTrustedProxies).Error("invalid trusted-proxies configuration; forwarded client IP headers will be ignored")
-		if errDisableTrustedProxies := engine.SetTrustedProxies(nil); errDisableTrustedProxies != nil {
-			log.WithError(errDisableTrustedProxies).Error("failed to disable trusted proxy handling")
-		}
+	// Forwarded client IP headers are never trusted: Relay serves local clients,
+	// and the management localhost check must not be spoofable.
+	if errTrustedProxies := engine.SetTrustedProxies(nil); errTrustedProxies != nil {
+		log.WithError(errTrustedProxies).Error("failed to disable trusted proxy handling")
 	}
 	if optionState.engineConfigurator != nil {
 		optionState.engineConfigurator(engine)
@@ -270,38 +267,7 @@ func (s *Server) Start() error {
 		return fmt.Errorf("failed to start HTTP server: %v", errListen)
 	}
 
-	cfg := s.getConfig()
-	useTLS := cfg != nil && cfg.TLS.Enable
-	if useTLS {
-		certPath := strings.TrimSpace(cfg.TLS.Cert)
-		keyPath := strings.TrimSpace(cfg.TLS.Key)
-		if certPath == "" || keyPath == "" {
-			if errClose := listener.Close(); errClose != nil {
-				log.Errorf("failed to close listener after TLS validation failure: %v", errClose)
-			}
-			return fmt.Errorf("failed to start HTTPS server: tls.cert or tls.key is empty")
-		}
-		certPair, errLoad := tls.LoadX509KeyPair(certPath, keyPath)
-		if errLoad != nil {
-			if errClose := listener.Close(); errClose != nil {
-				log.Errorf("failed to close listener after TLS key pair load failure: %v", errClose)
-			}
-			return fmt.Errorf("failed to start HTTPS server: %v", errLoad)
-		}
-
-		tlsConfig := &tls.Config{
-			Certificates: []tls.Certificate{certPair},
-			NextProtos:   []string{"h2", "http/1.1"},
-		}
-		s.server.TLSConfig = tlsConfig
-		if errHTTP2 := http2.ConfigureServer(s.server, &http2.Server{}); errHTTP2 != nil {
-			log.Warnf("failed to configure HTTP/2: %v", errHTTP2)
-		}
-		listener = tls.NewListener(listener, tlsConfig)
-		log.Debugf("Starting API server on %s with TLS", addr)
-	} else {
-		log.Debugf("Starting API server on %s", addr)
-	}
+	log.Debugf("Starting API server on %s", addr)
 
 	errServe := s.server.Serve(listener)
 	if errServe == nil || errors.Is(errServe, http.ErrServerClosed) || errors.Is(errServe, net.ErrClosed) {
