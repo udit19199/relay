@@ -44,9 +44,6 @@ func effectiveSDKConfig(cfg *config.Config) *config.SDKConfig {
 	sdkCfg := cfg.SDKConfig
 	sdkCfg.CodexOrphanDelegationCompatibility = cfg.Codex.OrphanDelegationCompatibility
 	sdkCfg.CodexResponseSteering = cfg.Codex.ResponseSteering
-	if cfg.CommercialMode {
-		sdkCfg.RequestLog = false
-	}
 	return &sdkCfg
 }
 
