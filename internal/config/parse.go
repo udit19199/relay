@@ -15,10 +15,6 @@ func ParseConfigBytes(data []byte) (*Config, error) {
 		return nil, fmt.Errorf("config payload is empty")
 	}
 
-	if errValidate := validateCredentialWeightYAML(data); errValidate != nil {
-		return nil, errValidate
-	}
-
 	var cfg Config
 	// Keep defaults aligned with LoadConfigOptional.
 	cfg.Host = "127.0.0.1" // Default loopback only; set host: 0.0.0.0 explicitly to bind all interfaces
@@ -33,10 +29,6 @@ func ParseConfigBytes(data []byte) (*Config, error) {
 
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("parse config payload: %w", err)
-	}
-
-	if errValidate := cfg.ValidateCredentialWeights(); errValidate != nil {
-		return nil, errValidate
 	}
 
 	// Hash remote management key if plaintext is detected (nested), but do NOT persist.

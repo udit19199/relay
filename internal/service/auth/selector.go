@@ -17,7 +17,6 @@ import (
 	"github.com/MoeForge/moego/ojson"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/udit19199/relay/internal/credentialweight"
 	"github.com/udit19199/relay/internal/logging"
 	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 	coresession "github.com/udit19199/relay/internal/service/session"
@@ -36,42 +35,6 @@ type RoundRobinSelector struct {
 	lastPicked map[string]string
 	maxKeys    int
 }
-
-// WeightedRoundRobinSelector provides smooth weighted round-robin selection.
-type WeightedRoundRobinSelector struct {
-	mu         sync.Mutex
-	states     map[[32]byte]*weightedPoolState
-	stateCount int
-	maxKeys    int
-}
-
-type smoothWeightedState struct {
-	current map[string]int64
-	weights map[string]int64
-}
-
-type weightedSelectorStateModelKey struct{}
-
-func withWeightedSelectorStateModel(ctx context.Context, selector Selector, routeModel string) context.Context {
-	if _, ok := selector.(*WeightedRoundRobinSelector); !ok || strings.TrimSpace(routeModel) == "" {
-		return ctx
-	}
-	return context.WithValue(ctx, weightedSelectorStateModelKey{}, routeModel)
-}
-
-func weightedSelectorStateModel(ctx context.Context, availabilityModel string) string {
-	if ctx != nil {
-		if routeModel, ok := ctx.Value(weightedSelectorStateModelKey{}).(string); ok && strings.TrimSpace(routeModel) != "" {
-			return routeModel
-		}
-	}
-	return availabilityModel
-}
-
-// FillFirstSelector selects the first available credential (deterministic ordering).
-// This "burns" one account before moving to the next, which can help stagger
-// rolling-window subscription caps (e.g. chat message limits).
-type FillFirstSelector struct{}
 
 type blockReason int
 
@@ -376,27 +339,6 @@ func authPriority(auth *Auth) int {
 	return parsed
 }
 
-func authWeight(auth *Auth) int64 {
-	if auth == nil {
-		return credentialweight.Default
-	}
-	if rawWeight, ok := auth.Attributes[AttributeWeight]; ok && strings.TrimSpace(rawWeight) != "" {
-		weight, errParse := credentialweight.ParseString(rawWeight)
-		if errParse != nil {
-			return 0
-		}
-		return weight
-	}
-	if rawWeight, ok := auth.Metadata[AttributeWeight]; ok {
-		weight, errParse := credentialweight.ParseValue(rawWeight)
-		if errParse != nil {
-			return 0
-		}
-		return weight
-	}
-	return credentialweight.Default
-}
-
 func canonicalModelKey(model string) string {
 	model = strings.TrimSpace(model)
 	if model == "" {
@@ -669,117 +611,6 @@ func (s *RoundRobinSelector) ensureRotationKey(key string, limit int) {
 	if _, ok := s.lastPicked[key]; !ok && len(s.lastPicked) >= limit {
 		s.lastPicked = make(map[string]string)
 	}
-}
-
-func positiveWeightAuths(auths []*Auth) []*Auth {
-	weightedCandidates := make([]*Auth, 0, len(auths))
-	for _, auth := range auths {
-		if authWeight(auth) > 0 {
-			weightedCandidates = append(weightedCandidates, auth)
-		}
-	}
-	return weightedCandidates
-}
-
-// Pick selects the next available auth using smooth weighted round-robin.
-func (s *WeightedRoundRobinSelector) Pick(ctx context.Context, provider, model string, opts coreexecutor.Options, auths []*Auth) (*Auth, error) {
-	picked, reservation, errPick := s.reserveForRequest(ctx, provider, model, opts, auths, nil)
-	if errPick != nil {
-		return nil, errPick
-	}
-	reservation.finish(true)
-	return picked, nil
-}
-
-// maxSmoothWeightedStateEntries bounds a single accumulator map so credentials that are
-// removed permanently cannot leak entries. Real pools stay far below this bound, so the
-// transient subsets produced by retry exclusions and cooldowns are never pruned.
-const maxSmoothWeightedStateEntries = 1024
-
-// prepare syncs the configured weights into the state without discarding accumulated
-// credits. Credits are reset only when a credential's configured weight actually changes,
-// never when the candidate set shrinks temporarily (retry exclusions, cooldowns, session
-// affinity), because discarding credits there would collapse selection onto the first
-// candidate in slice order.
-func (s *smoothWeightedState) prepare(weights map[string]int64) {
-	if s.current == nil || weightsConfigChanged(s.weights, weights) {
-		s.current = make(map[string]int64, len(weights))
-	}
-	if s.weights == nil {
-		s.weights = make(map[string]int64, len(weights))
-	}
-	for authID, weight := range weights {
-		s.weights[authID] = weight
-	}
-	s.pruneStale(weights)
-}
-
-// pruneStale drops entries for credentials outside the current candidate set, but only
-// once a map exceeds the safety bound, so ordinary transient exclusions keep their credits.
-func (s *smoothWeightedState) pruneStale(weights map[string]int64) {
-	if len(s.current) <= maxSmoothWeightedStateEntries && len(s.weights) <= maxSmoothWeightedStateEntries {
-		return
-	}
-	for authID := range s.current {
-		if _, ok := weights[authID]; !ok {
-			delete(s.current, authID)
-		}
-	}
-	for authID := range s.weights {
-		if _, ok := weights[authID]; !ok {
-			delete(s.weights, authID)
-		}
-	}
-}
-
-// weightsConfigChanged reports whether any credential present in both vectors has a
-// different configured weight. Credentials that are merely missing from one side are
-// ignored, since a candidate subset is not a configuration change.
-func weightsConfigChanged(left, right map[string]int64) bool {
-	if len(left) == 0 {
-		return false
-	}
-	for authID, weight := range right {
-		if previous, ok := left[authID]; ok && previous != weight {
-			return true
-		}
-	}
-	return false
-}
-
-func authWeightVector(auths []*Auth) map[string]int64 {
-	weights := make(map[string]int64, len(auths))
-	for _, auth := range auths {
-		if auth == nil {
-			continue
-		}
-		if weight := authWeight(auth); weight > 0 {
-			weights[auth.ID] = weight
-		}
-	}
-	return weights
-}
-
-func saturatingAddInt64(value, delta int64) int64 {
-	if delta > 0 && value > math.MaxInt64-delta {
-		return math.MaxInt64
-	}
-	if delta < 0 && value < math.MinInt64-delta {
-		return math.MinInt64
-	}
-	return value + delta
-}
-
-// Pick selects the first available auth for the provider in a deterministic manner.
-func (s *FillFirstSelector) Pick(ctx context.Context, provider, model string, opts coreexecutor.Options, auths []*Auth) (*Auth, error) {
-	_ = opts
-	now := time.Now()
-	available, err := getSelectorAvailableAuths(ctx, auths, provider, model, now)
-	if err != nil {
-		return nil, err
-	}
-	available = preferCodexWebsocketAuths(ctx, provider, available)
-	return available[0], nil
 }
 
 // IsAuthAvailableForModel reports whether auth is eligible for selection on model at now.
@@ -1105,6 +936,14 @@ func (s *SessionAffinitySelector) Trees() *coresession.InMemorySessionTreeStore 
 // An established binding outranks credential priority: a bound credential that is still
 // available is reused even when a higher-priority credential recovers. Credential priority
 // applies to cold bindings, requests without a session, and genuine bound-credential
+// pickFallback selects through the fallback selector, honoring an existing bound credential.
+func (s *SessionAffinitySelector) pickFallback(ctx context.Context, provider, model string, opts coreexecutor.Options, auths []*Auth, bound *Auth) (*Auth, error) {
+	if bound != nil {
+		return bound, nil
+	}
+	return s.fallback.Pick(ctx, provider, model, opts, auths)
+}
+
 // failover, so the fallback selector only ever receives the highest available priority tier.
 //
 // Note: The cache key includes provider, session ID, and model to handle cases where
@@ -1117,9 +956,6 @@ func (s *SessionAffinitySelector) Pick(ctx context.Context, provider, model stri
 	if errContext := ctx.Err(); errContext != nil {
 		return nil, errContext
 	}
-	var reservation *weightedReservation
-	// Local bindings complete inside Pick; failed selections release speculative credit.
-	defer func() { reservation.finish(selected != nil && errPick == nil) }()
 	entry := selectorLogEntry(ctx)
 	if opts.Metadata == nil {
 		opts.Metadata = make(map[string]any)
@@ -1131,7 +967,7 @@ func (s *SessionAffinitySelector) Pick(ctx context.Context, provider, model stri
 	// consulted when no header, body, or execution-session identity is present.
 	explicitID, explicitFallbackID := extractExplicitSessionIDs(opts.Headers, opts.OriginalRequest, opts.Metadata)
 	if explicitID == "" {
-		if auth, handled, errLCP := s.pickLCP(ctx, provider, model, opts, auths, entry, &reservation); handled || errLCP != nil {
+		if auth, handled, errLCP := s.pickLCP(ctx, provider, model, opts, auths, entry); handled || errLCP != nil {
 			return auth, errLCP
 		}
 	} else if opts.Metadata != nil {
@@ -1164,16 +1000,13 @@ func (s *SessionAffinitySelector) Pick(ctx context.Context, provider, model stri
 	}
 	now := time.Now()
 	availabilityCandidates := auths
-	if _, weighted := s.fallback.(*WeightedRoundRobinSelector); weighted {
-		availabilityCandidates = positiveWeightAuths(auths)
-	}
 	if primaryID == "" {
 		fallbackAuths, errAvailable := getSelectorAvailableAuths(ctx, availabilityCandidates, provider, model, now)
 		if errAvailable != nil {
 			return nil, errAvailable
 		}
 		entry.Debugf("session-affinity: no session ID extracted, falling back to default selector | provider=%s model=%s", provider, model)
-		return s.pickWithAffinityReservation(ctx, provider, model, opts, fallbackAuths, nil, &reservation)
+		return s.pickFallback(ctx, provider, model, opts, fallbackAuths, nil)
 	}
 
 	// A single availability pass serves both lookups: the bound credential is validated against
@@ -1223,7 +1056,7 @@ func (s *SessionAffinitySelector) Pick(ctx context.Context, provider, model stri
 			if auth.ID == cachedAuthID {
 				bind(auth.ID, true)
 				entry.Infof("session-affinity: cache hit | session=%s auth=%s provider=%s model=%s", truncateSessionID(primaryID), auth.ID, provider, model)
-				return s.pickWithAffinityReservation(ctx, provider, model, opts, available, auth, &reservation)
+				return s.pickFallback(ctx, provider, model, opts, available, auth)
 			}
 		}
 		if s.rebindOnNever {
@@ -1236,7 +1069,7 @@ func (s *SessionAffinitySelector) Pick(ctx context.Context, provider, model stri
 			return nil, err
 		}
 		// Cached auth not available, reselect via fallback selector for even distribution
-		auth, err := s.pickWithAffinityReservation(ctx, provider, model, opts, fallbackAuths, nil, &reservation)
+		auth, err := s.pickFallback(ctx, provider, model, opts, fallbackAuths, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -1270,7 +1103,7 @@ func (s *SessionAffinitySelector) Pick(ctx context.Context, provider, model stri
 				if auth.ID == parentAuthID {
 					bind(auth.ID, true)
 					entry.Infof("session-affinity: guardian inherited parent binding | session=%s parent=%s auth=%s provider=%s model=%s", truncateSessionID(primaryID), truncateSessionID(fallbackID), auth.ID, provider, model)
-					return s.pickWithAffinityReservation(ctx, provider, model, opts, available, auth, &reservation)
+					return s.pickFallback(ctx, provider, model, opts, available, auth)
 				}
 			}
 		}
@@ -1287,7 +1120,7 @@ func (s *SessionAffinitySelector) Pick(ctx context.Context, provider, model stri
 						} else {
 							entry.Infof("session-affinity: fallback cache hit | session=%s fallback=%s auth=%s provider=%s model=%s", truncateSessionID(primaryID), truncateSessionID(fallbackID), auth.ID, provider, model)
 						}
-						return s.pickWithAffinityReservation(ctx, provider, model, opts, available, auth, &reservation)
+						return s.pickFallback(ctx, provider, model, opts, available, auth)
 					}
 				}
 			}
@@ -1298,7 +1131,7 @@ func (s *SessionAffinitySelector) Pick(ctx context.Context, provider, model stri
 				return nil, errBound
 			}
 			if !isSubagent && !isFork && s.shouldPreserveBindingWhenUnavailable(ctx, availabilityCandidates, model, cachedAuthID, now) {
-				auth, err := s.pickWithAffinityReservation(ctx, provider, model, opts, fallbackAuths, nil, &reservation)
+				auth, err := s.pickFallback(ctx, provider, model, opts, fallbackAuths, nil)
 				if err != nil {
 					return nil, err
 				}
@@ -1315,7 +1148,7 @@ func (s *SessionAffinitySelector) Pick(ctx context.Context, provider, model stri
 	if err != nil {
 		return nil, err
 	}
-	auth, err := s.pickWithAffinityReservation(ctx, provider, model, opts, fallbackAuths, nil, &reservation)
+	auth, err := s.pickFallback(ctx, provider, model, opts, fallbackAuths, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1331,7 +1164,7 @@ func (s *SessionAffinitySelector) Pick(ctx context.Context, provider, model stri
 	return auth, nil
 }
 
-func (s *SessionAffinitySelector) pickLCP(ctx context.Context, provider, model string, opts coreexecutor.Options, auths []*Auth, entry *log.Entry, reservation **weightedReservation) (*Auth, bool, error) {
+func (s *SessionAffinitySelector) pickLCP(ctx context.Context, provider, model string, opts coreexecutor.Options, auths []*Auth, entry *log.Entry) (*Auth, bool, error) {
 	if s == nil || s.matcher == nil {
 		return nil, false, nil
 	}
@@ -1355,9 +1188,6 @@ func (s *SessionAffinitySelector) pickLCP(ctx context.Context, provider, model s
 	}
 
 	availabilityCandidates := auths
-	if _, weighted := s.fallback.(*WeightedRoundRobinSelector); weighted {
-		availabilityCandidates = positiveWeightAuths(auths)
-	}
 	now := time.Now()
 	available, errAvailable := getSelectorAvailableAuthsAcrossPriorities(ctx, availabilityCandidates, provider, model, now)
 	if errAvailable != nil && !s.rebindOnNever {
@@ -1404,7 +1234,7 @@ func (s *SessionAffinitySelector) pickLCP(ctx context.Context, provider, model s
 				}
 				entry.Infof("session-affinity: LCP cache hit | session=%s prefix=%d auth=%s provider=%s model=%s", truncateSessionID(match.SessionID), match.PrefixLength, auth.ID, provider, model)
 			}
-			picked, errPick := s.pickWithAffinityReservation(ctx, provider, model, opts, available, auth, reservation)
+			picked, errPick := s.pickFallback(ctx, provider, model, opts, available, auth)
 			return picked, true, errPick
 		}
 		if !match.IsFork && s.rebindOnNever {
@@ -1444,7 +1274,7 @@ func (s *SessionAffinitySelector) pickLCP(ctx context.Context, provider, model s
 		return nil, true, errAvailable
 	}
 	fallbackAuths := highestPriorityAuths(available)
-	auth, errPick := s.pickWithAffinityReservation(ctx, provider, model, opts, fallbackAuths, nil, reservation)
+	auth, errPick := s.pickFallback(ctx, provider, model, opts, fallbackAuths, nil)
 	if errPick != nil {
 		return nil, true, errPick
 	}

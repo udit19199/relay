@@ -175,15 +175,6 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
 		return cfg, nil
 	}
 
-	if errValidate := validateCredentialWeightYAML(data); errValidate != nil {
-		if optional {
-			cfgOptional := &Config{}
-			cfgOptional.NormalizeClaudeConfig()
-			return cfgOptional, nil
-		}
-		return nil, errValidate
-	}
-
 	// Unmarshal the YAML data into the Config struct.
 	var cfg Config
 	// Set defaults before unmarshal so that absent keys keep defaults.
@@ -204,10 +195,6 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
 			return cfgOptional, nil
 		}
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
-	}
-
-	if errValidate := cfg.ValidateCredentialWeights(); errValidate != nil {
-		return nil, errValidate
 	}
 
 	// Hash remote management key if plaintext is detected (nested)

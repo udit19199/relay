@@ -17,8 +17,8 @@ func TestManagerSessionAffinityAliasCooldownPreservesSelection(t *testing.T) {
 	withQuotaCooldownEnabled(t)
 	for strategy, newFallback := range map[string]func() Selector{
 		"round-robin":          func() Selector { return &RoundRobinSelector{} },
-		"weighted-round-robin": func() Selector { return &WeightedRoundRobinSelector{} },
-		"fill-first":           func() Selector { return &FillFirstSelector{} },
+		"weighted-round-robin": func() Selector { return &RoundRobinSelector{} },
+		"fill-first":           func() Selector { return &RoundRobinSelector{} },
 	} {
 		for _, mode := range []string{"no-session", "explicit-session", "lcp"} {
 			for _, path := range []string{"select", "execute", "stream"} {
@@ -40,8 +40,8 @@ func TestManagerSessionAffinityAliasCooldownPreservesSelection(t *testing.T) {
 						})
 					}
 					for _, candidate := range []*Auth{
-						{ID: highID, Provider: "codex", Status: StatusActive, Attributes: map[string]string{"priority": "4", AttributeWeight: "1"}},
-						{ID: lowID, Provider: "codex", Status: StatusActive, Attributes: map[string]string{"priority": "3", AttributeWeight: "1"}},
+						{ID: highID, Provider: "codex", Status: StatusActive, Attributes: map[string]string{"priority": "4"}},
+						{ID: lowID, Provider: "codex", Status: StatusActive, Attributes: map[string]string{"priority": "3"}},
 					} {
 						registry.GetGlobalRegistry().RegisterClient(candidate.ID, "codex", []*registry.ModelInfo{{ID: routeModel}, {ID: targetModel}})
 						t.Cleanup(func() { registry.GetGlobalRegistry().UnregisterClient(candidate.ID) })

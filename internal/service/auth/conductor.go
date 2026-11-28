@@ -244,7 +244,7 @@ func NewManager(store Store, selector Selector, hook Hook) *Manager {
 	// atomic.Value requires non-nil initial value.
 	manager.runtimeConfig.Store(&internalconfig.Config{})
 	manager.apiKeyModelRouting.Store(&apiKeyModelRoutingSnapshot{config: &internalconfig.Config{}})
-	manager.scheduler = newAuthScheduler(selector)
+	manager.scheduler = newAuthScheduler()
 	return manager
 }
 

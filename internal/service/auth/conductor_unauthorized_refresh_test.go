@@ -432,7 +432,9 @@ func TestManager_ConcurrentUnauthorized_BarrierExecutionPreservesTerminalState(t
 		refreshErr: errors.New(`token refresh failed with status 400: {"error": "invalid_grant", "error_description": "Refresh token not found or invalid"}`),
 	}
 
-	m := NewManager(nil, &FillFirstSelector{}, nil)
+	affinity := NewSessionAffinitySelector(&RoundRobinSelector{})
+	t.Cleanup(affinity.Stop)
+	m := NewManager(nil, affinity, nil)
 	m.RegisterExecutor(executor)
 
 	reg := registry.GetGlobalRegistry()
@@ -468,11 +470,12 @@ func TestManager_ConcurrentUnauthorized_BarrierExecutionPreservesTerminalState(t
 	results := make([]string, 2)
 	errs := make([]error, 2)
 
+	sessionOpts := coreexecutor.Options{Metadata: map[string]any{coreexecutor.DerivedSessionIDMetadataKey: "barrier-shared-session"}}
 	for i := 0; i < 2; i++ {
 		idx := i
 		go func() {
 			defer wg.Done()
-			resp, err := m.Execute(context.Background(), []string{"codex"}, coreexecutor.Request{Model: model}, coreexecutor.Options{})
+			resp, err := m.Execute(context.Background(), []string{"codex"}, coreexecutor.Request{Model: model}, sessionOpts)
 			errs[idx] = err
 			if err == nil {
 				results[idx] = string(resp.Payload)
@@ -867,7 +870,7 @@ func TestManager_CodexTerminalRenewalRecoveryLifecycle_Issue5783(t *testing.T) {
 		),
 	}
 
-	m := NewManager(nil, &FillFirstSelector{}, nil)
+	m := NewManager(nil, &RoundRobinSelector{}, nil)
 	m.RegisterExecutor(executor)
 
 	reg := registry.GetGlobalRegistry()
@@ -1856,7 +1859,7 @@ func TestManager_ForceRefreshAuth_SignInRequiredDoesNotReadmitDeadCredential_Iss
 		tokenInvalid: map[string]struct{}{"revoked-access-token": {}},
 		refreshErr:   errors.New(`token refresh failed with status 401: {"error":{"code":"refresh_token_reused","message":"Refresh token has already been used"}}`),
 	}
-	m := NewManager(nil, &FillFirstSelector{}, nil)
+	m := NewManager(nil, &RoundRobinSelector{}, nil)
 	m.RegisterExecutor(executor)
 	model := "gpt-6.1-terra-issue7135"
 	reg := registry.GetGlobalRegistry()

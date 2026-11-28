@@ -421,8 +421,6 @@ func isKnownDefaultValue(path []string, node *yaml.Node) bool {
 		switch fullPath {
 		case "pprof.addr":
 			return node.Value == DefaultPprofAddr
-		case "routing.strategy":
-			return node.Value == "round-robin"
 		}
 	}
 

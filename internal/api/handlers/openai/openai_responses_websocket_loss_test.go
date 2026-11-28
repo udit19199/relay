@@ -550,7 +550,7 @@ func TestResponsesWebsocketEarly429RetriesAnotherCredentialWithoutClosingDownstr
 						StreamBootstrapBuffering: buffering,
 					},
 				}
-				manager := coreauth.NewManager(nil, &coreauth.FillFirstSelector{}, nil)
+				manager := coreauth.NewManager(nil, &coreauth.RoundRobinSelector{}, nil)
 				manager.SetConfig(cfg)
 				manager.SetRetryConfig(cfg.RequestRetry, 0, cfg.MaxRetryCredentials)
 				manager.RegisterExecutor(runtimeexecutor.NewCodexAutoExecutor(cfg))
@@ -825,7 +825,7 @@ func TestResponsesWebsocketTerminal429WhenAllCredentialsExhaustedOrCooling(t *te
 		RequestRetry:        0,
 		MaxRetryCredentials: 1,
 	}
-	manager := coreauth.NewManager(nil, &coreauth.FillFirstSelector{}, nil)
+	manager := coreauth.NewManager(nil, &coreauth.RoundRobinSelector{}, nil)
 	manager.SetConfig(cfg)
 	manager.SetRetryConfig(cfg.RequestRetry, 0, cfg.MaxRetryCredentials)
 	manager.RegisterExecutor(runtimeexecutor.NewCodexAutoExecutor(cfg))
@@ -1009,7 +1009,7 @@ func TestResponsesWebsocketPinned429ExposesErrorWhenOnlyAlternativeHasExpiredTok
 		RequestRetry:        0,
 		MaxRetryCredentials: 0,
 	}
-	manager := coreauth.NewManager(nil, &coreauth.FillFirstSelector{}, nil)
+	manager := coreauth.NewManager(nil, &coreauth.RoundRobinSelector{}, nil)
 	manager.SetConfig(cfg)
 	manager.SetRetryConfig(cfg.RequestRetry, 0, cfg.MaxRetryCredentials)
 	manager.RegisterExecutor(runtimeexecutor.NewCodexAutoExecutor(cfg))

@@ -26,7 +26,7 @@ func TestExecuteStreamQuotaFailurePreservesCooldownAndScope(t *testing.T) {
 			t.Run(name, func(t *testing.T) {
 				var selector Selector = &RoundRobinSelector{}
 				if weighted {
-					selector = &WeightedRoundRobinSelector{}
+					selector = &RoundRobinSelector{}
 				}
 				manager := NewManager(nil, selector, nil)
 				manager.SetRetryConfig(3, 30*time.Second, 0)
@@ -35,8 +35,8 @@ func TestExecuteStreamQuotaFailurePreservesCooldownAndScope(t *testing.T) {
 				highID := "stream-quota-high-" + name
 				lowID := "stream-quota-low-" + name
 				for _, candidate := range []*Auth{
-					{ID: highID, Provider: "codex", Status: StatusActive, Attributes: map[string]string{"priority": "4", AttributeWeight: "1"}},
-					{ID: lowID, Provider: "codex", Status: StatusActive, Attributes: map[string]string{"priority": "3", AttributeWeight: "1"}},
+					{ID: highID, Provider: "codex", Status: StatusActive, Attributes: map[string]string{"priority": "4"}},
+					{ID: lowID, Provider: "codex", Status: StatusActive, Attributes: map[string]string{"priority": "3"}},
 				} {
 					registry.GetGlobalRegistry().RegisterClient(candidate.ID, "codex", []*registry.ModelInfo{{ID: model}, {ID: siblingModel}})
 					t.Cleanup(func() { registry.GetGlobalRegistry().UnregisterClient(candidate.ID) })

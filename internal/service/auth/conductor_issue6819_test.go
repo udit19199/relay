@@ -433,7 +433,7 @@ func TestIssue6819_InStream401RecordedAfterConcurrentOuterRefreshAndAcrossUseSIW
 		},
 		chunks: chunks,
 	}
-	m := NewManager(nil, &FillFirstSelector{}, nil)
+	m := NewManager(nil, &RoundRobinSelector{}, nil)
 	m.RegisterExecutor(exec)
 	reg := registry.GetGlobalRegistry()
 	reg.RegisterClient(auth.ID, "codex", []*registry.ModelInfo{{ID: "gpt-5.4"}})
@@ -531,7 +531,7 @@ func TestIssue6819_ExecuteRetry401WithConcurrentOuterRefreshAndSameTokenRebind(t
 		t.Fatalf("WriteJSONFileAtomic: %v", errWrite)
 	}
 
-	m := NewManager(nil, &FillFirstSelector{}, nil)
+	m := NewManager(nil, &RoundRobinSelector{}, nil)
 	exec := &issue6819Retry401Executor{
 		issue6819OuterOnlyRefreshExecutor: issue6819OuterOnlyRefreshExecutor{
 			id:          "codex",
@@ -643,7 +643,7 @@ func TestCodexClient401OnSIWCAuthRejectsAndRefreshesOuterTokenOnly(t *testing.T)
 		},
 	}
 
-	m := NewManager(nil, &FillFirstSelector{}, nil)
+	m := NewManager(nil, &RoundRobinSelector{}, nil)
 	exec := &codexClientOuter401Executor{
 		issue6819OuterOnlyRefreshExecutor: issue6819OuterOnlyRefreshExecutor{
 			id:          "codex",

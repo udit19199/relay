@@ -17,7 +17,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/udit19199/relay/internal/auth/codex"
 	"github.com/udit19199/relay/internal/config"
-	"github.com/udit19199/relay/internal/credentialweight"
 	"github.com/udit19199/relay/internal/registry"
 	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
@@ -407,8 +406,8 @@ func (h *Handler) listAuthFilesFromDisk(c *gin.Context, pagination authFilesPagi
 		// Read file to get type field
 		full := filepath.Join(h.cfg.AuthDir, name)
 		if data, errRead := os.ReadFile(full); errRead == nil {
-			var fieldBuf [7]ojson.Result
-			fields := ojson.GetManyBytesNoCopy(fieldBuf[:0], data, "type", "email", "project_id", "priority", coreauth.AttributeWeight, "note", "websockets")
+			var fieldBuf [6]ojson.Result
+			fields := ojson.GetManyBytesNoCopy(fieldBuf[:0], data, "type", "email", "project_id", "priority", "note", "websockets")
 			typeValue := strings.Clone(fields[0].String())
 			emailValue := strings.Clone(fields[1].String())
 			fileData["type"] = typeValue
@@ -426,26 +425,12 @@ func (h *Handler) listAuthFilesFromDisk(c *gin.Context, pagination authFilesPagi
 					}
 				}
 			}
-			if wv := fields[4]; wv.Exists() {
-				var rawWeight string
-				switch wv.Type {
-				case ojson.Number:
-					rawWeight = wv.Raw
-				case ojson.String:
-					rawWeight = wv.String()
-				}
-				if rawWeight != "" {
-					if weight, errWeight := credentialweight.ParseString(rawWeight); errWeight == nil {
-						fileData[coreauth.AttributeWeight] = weight
-					}
-				}
-			}
-			if nv := fields[5]; nv.Exists() && nv.Type == ojson.String {
+			if nv := fields[4]; nv.Exists() && nv.Type == ojson.String {
 				if trimmed := strings.TrimSpace(nv.String()); trimmed != "" {
 					fileData["note"] = strings.Clone(trimmed)
 				}
 			}
-			if wv := fields[6]; wv.Exists() {
+			if wv := fields[5]; wv.Exists() {
 				switch wv.Type {
 				case ojson.True:
 					fileData["websockets"] = true
@@ -756,9 +741,6 @@ func (h *Handler) buildAuthFileEntryLocked(auth *coreauth.Auth, quota authFileQu
 			}
 		}
 	}
-	if weight, ok := authWeightValue(auth); ok {
-		entry[coreauth.AttributeWeight] = weight
-	}
 	if websockets, ok := authWebsocketsValue(auth); ok {
 		entry["websockets"] = websockets
 	}
@@ -888,25 +870,6 @@ func modelQuotaObservationPayload(provider string, states map[string]*coreauth.M
 		observations[model] = quotaObservationPayloadForProvider(provider, state.Quota)
 	}
 	return observations
-}
-
-func authWeightValue(auth *coreauth.Auth) (int64, bool) {
-	if auth == nil {
-		return 0, false
-	}
-	if rawWeight := strings.TrimSpace(authAttribute(auth, coreauth.AttributeWeight)); rawWeight != "" {
-		weight, errWeight := credentialweight.ParseString(rawWeight)
-		return weight, errWeight == nil
-	}
-	if auth.Metadata == nil {
-		return 0, false
-	}
-	rawWeight, ok := auth.Metadata[coreauth.AttributeWeight]
-	if !ok || rawWeight == nil {
-		return 0, false
-	}
-	weight, errWeight := credentialweight.ParseValue(rawWeight)
-	return weight, errWeight == nil
 }
 
 func authWebsocketsValue(auth *coreauth.Auth) (bool, bool) {

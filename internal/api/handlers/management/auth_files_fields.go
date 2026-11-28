@@ -21,7 +21,6 @@ import (
 	authlogin "github.com/udit19199/relay/internal/auth/login"
 	xaiauth "github.com/udit19199/relay/internal/auth/xai"
 	"github.com/udit19199/relay/internal/clienterror"
-	"github.com/udit19199/relay/internal/credentialweight"
 	"github.com/udit19199/relay/internal/misc"
 	coreauth "github.com/udit19199/relay/internal/service/auth"
 	"github.com/udit19199/relay/internal/watcher/synthesizer"
@@ -299,22 +298,7 @@ func applyAuthFileFieldsPatch(targetAuth *coreauth.Auth, req map[string]json.Raw
 			targetAuth.Metadata = make(map[string]any)
 		}
 
-		if fieldPath == coreauth.AttributeWeight {
-			if value == nil {
-				delete(targetAuth.Metadata, coreauth.AttributeWeight)
-			} else {
-				if _, okNumber := value.(json.Number); !okNumber {
-					return &authFileFieldPatchError{message: "weight must be an integer"}
-				}
-				weight, errWeight := credentialweight.ParseValue(value)
-				if errWeight != nil {
-					return &authFileFieldPatchError{message: errWeight.Error()}
-				}
-				targetAuth.Metadata[coreauth.AttributeWeight] = weight
-			}
-		} else if rootAuthFileField(fieldPath) == coreauth.AttributeWeight {
-			return &authFileFieldPatchError{message: "weight does not support nested fields"}
-		} else if fieldPath == "headers" {
+		if fieldPath == "headers" {
 			applyAuthFileHeadersPatch(targetAuth, value)
 		} else if errSet := setAuthFileMetadataValue(targetAuth.Metadata, fieldPath, value); errSet != nil {
 			return &authFileFieldPatchError{message: errSet.Error()}
@@ -564,9 +548,6 @@ func syncAuthFileMetadataFields(auth *coreauth.Auth, touchedRoots map[string]str
 	if _, ok := touchedRoots["priority"]; ok {
 		syncAuthFilePriorityAttribute(auth)
 	}
-	if _, ok := touchedRoots[coreauth.AttributeWeight]; ok {
-		syncAuthFileWeightAttribute(auth)
-	}
 	if _, ok := touchedRoots["note"]; ok {
 		syncAuthFileNoteAttribute(auth)
 	}
@@ -650,21 +631,6 @@ func syncAuthFilePriorityAttribute(auth *coreauth.Auth) {
 		return
 	}
 	auth.Attributes["priority"] = strconv.Itoa(priority)
-}
-
-func syncAuthFileWeightAttribute(auth *coreauth.Auth) {
-	if auth == nil {
-		return
-	}
-	if auth.Attributes == nil {
-		auth.Attributes = make(map[string]string)
-	}
-	weight, errWeight := credentialweight.ParseValue(auth.Metadata[coreauth.AttributeWeight])
-	if errWeight != nil {
-		delete(auth.Attributes, coreauth.AttributeWeight)
-		return
-	}
-	auth.Attributes[coreauth.AttributeWeight] = strconv.FormatInt(weight, 10)
 }
 
 func authFileIntValue(value any) (int, bool) {

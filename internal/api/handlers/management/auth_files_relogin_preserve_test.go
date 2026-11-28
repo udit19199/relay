@@ -3,18 +3,13 @@ package management
 import (
 	"context"
 	"encoding/json"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"reflect"
-	"strings"
 	"testing"
 
-	"github.com/gin-gonic/gin"
 	"github.com/udit19199/relay/internal/auth/claude"
 	"github.com/udit19199/relay/internal/auth/codex"
-	authlogin "github.com/udit19199/relay/internal/auth/login"
 	"github.com/udit19199/relay/internal/auth/xai"
 	"github.com/udit19199/relay/internal/config"
 	coreauth "github.com/udit19199/relay/internal/service/auth"
@@ -459,75 +454,5 @@ func TestSaveTokenRecord_SubjectOnlyReloginKeepsEmailCredential(t *testing.T) {
 	}
 	if len(entries) != 1 {
 		t.Fatalf("auth dir holds %d files, want the single canonical credential", len(entries))
-	}
-}
-
-func TestPatchAuthFileFields_DeletesCredentialFields(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	authDir := t.TempDir()
-	fileName := "custom-auth.json"
-	filePath := filepath.Join(authDir, fileName)
-
-	initialContent := map[string]any{
-		"type":    "custom-provider",
-		"token":   "tok-123",
-		"weight":  float64(10),
-		"headers": map[string]any{"X-Header": "val"},
-	}
-	raw, errMarshal := json.Marshal(initialContent)
-	if errMarshal != nil {
-		t.Fatalf("marshal error: %v", errMarshal)
-	}
-	if errWrite := os.WriteFile(filePath, raw, 0o600); errWrite != nil {
-		t.Fatalf("write error: %v", errWrite)
-	}
-
-	store := authlogin.NewFileTokenStore()
-	store.SetBaseDir(authDir)
-	manager := coreauth.NewManager(store, nil, nil)
-	record := &coreauth.Auth{
-		ID:       fileName,
-		FileName: fileName,
-		Provider: "custom-provider",
-		Metadata: map[string]any{
-			"type":    "custom-provider",
-			"token":   "tok-123",
-			"weight":  float64(10),
-			"headers": map[string]any{"X-Header": "val"},
-		},
-	}
-	if _, errRegister := manager.Register(context.Background(), record); errRegister != nil {
-		t.Fatalf("Register() error = %v", errRegister)
-	}
-
-	cfg := &config.Config{AuthDir: authDir}
-	h := NewHandlerWithoutConfigFilePath(cfg, manager)
-
-	// Patch weight: null to delete weight
-	rec := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(rec)
-	body := `{"name":"custom-auth.json","weight":null}`
-	c.Request = httptest.NewRequest(http.MethodPatch, "/v0/management/auth-files/fields", strings.NewReader(body))
-	c.Request.Header.Set("Content-Type", "application/json")
-	h.PatchAuthFileFields(c)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("PatchAuthFileFields status = %d, want 200; body=%s", rec.Code, rec.Body.String())
-	}
-
-	savedRaw, errRead := os.ReadFile(filePath)
-	if errRead != nil {
-		t.Fatalf("ReadFile error: %v", errRead)
-	}
-	var saved map[string]any
-	if errUnmarshal := json.Unmarshal(savedRaw, &saved); errUnmarshal != nil {
-		t.Fatalf("Unmarshal error: %v", errUnmarshal)
-	}
-
-	if _, exists := saved["weight"]; exists {
-		t.Errorf("weight still exists in file after delete: %#v", saved["weight"])
-	}
-	if saved["token"] != "tok-123" {
-		t.Errorf("token = %v, want tok-123", saved["token"])
 	}
 }

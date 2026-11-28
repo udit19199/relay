@@ -93,9 +93,6 @@ func synthesizeFileAuths(ctx *SynthesisContext, fullPath string, data []byte) ([
 		return nil, nil
 	}
 	coreauth.NormalizeCredentialMetadata(metadata)
-	if errWeight := coreauth.ValidateAuthWeight(&coreauth.Auth{Metadata: metadata}); errWeight != nil {
-		return nil, fmt.Errorf("invalid weight in %s: %w", filepath.Base(fullPath), errWeight)
-	}
 	// Invalid per-account rules must not drop an existing credential: keep the valid
 	// entries and warn. Write entry points (upload and PATCH) reject them before persisting.
 	perAccountExcluded, errExcluded := ExtractExcludedModelsFromMetadata(metadata)
@@ -164,9 +161,6 @@ func synthesizeFileAuths(ctx *SynthesisContext, fullPath string, data []byte) ([
 	}
 	// Read priority from auth file.
 	coreauth.ApplyAuthPriorityMetadata(a, metadata)
-	if errWeight := coreauth.ApplyAuthWeightMetadata(a, metadata); errWeight != nil {
-		return nil, fmt.Errorf("invalid auth weight in %s: %w", filepath.Base(fullPath), errWeight)
-	}
 	// Read note from auth file.
 	if rawNote, ok := metadata["note"]; ok {
 		if note, isStr := rawNote.(string); isStr {

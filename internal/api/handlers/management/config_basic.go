@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/udit19199/relay/internal/config"
@@ -218,48 +217,6 @@ func (h *Handler) GetForceModelPrefix(c *gin.Context) {
 }
 func (h *Handler) PutForceModelPrefix(c *gin.Context) {
 	h.updateBoolField(c, func(v bool) { h.cfg.ForceModelPrefix = v })
-}
-
-func normalizeRoutingStrategy(strategy string) (string, bool) {
-	normalized := strings.ToLower(strings.TrimSpace(strategy))
-	switch normalized {
-	case "", "round-robin", "roundrobin", "rr":
-		return "round-robin", true
-	case "weighted-round-robin", "weightedroundrobin", "wrr":
-		return "weighted-round-robin", true
-	case "fill-first", "fillfirst", "ff":
-		return "fill-first", true
-	default:
-		return "", false
-	}
-}
-
-// RoutingStrategy
-func (h *Handler) GetRoutingStrategy(c *gin.Context) {
-	strategy, ok := normalizeRoutingStrategy(h.cfg.Routing.Strategy)
-	if !ok {
-		c.JSON(200, gin.H{"strategy": strings.TrimSpace(h.cfg.Routing.Strategy)})
-		return
-	}
-	c.JSON(200, gin.H{"strategy": strategy})
-}
-func (h *Handler) PutRoutingStrategy(c *gin.Context) {
-	var body struct {
-		Value *string `json:"value"`
-	}
-	if errBindJSON := c.ShouldBindJSON(&body); errBindJSON != nil || body.Value == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
-		return
-	}
-	normalized, ok := normalizeRoutingStrategy(*body.Value)
-	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid strategy"})
-		return
-	}
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	h.cfg.Routing.Strategy = normalized
-	h.persistLocked(c)
 }
 
 // Proxy URL

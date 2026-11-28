@@ -99,7 +99,7 @@ func TestIssue6742_RejectedUnexpiredJWTRecoversViaBackgroundRefreshAfterTransien
 		},
 	}
 
-	m := NewManager(nil, &FillFirstSelector{}, nil)
+	m := NewManager(nil, &RoundRobinSelector{}, nil)
 	m.RegisterExecutor(executor)
 
 	reg := registry.GetGlobalRegistry()
@@ -246,7 +246,7 @@ func TestIssue6742_InStreamUnauthorizedMarksRejectedTokenAndSchedulesRefresh(t *
 		},
 	}
 
-	m := NewManager(nil, &FillFirstSelector{}, nil)
+	m := NewManager(nil, &RoundRobinSelector{}, nil)
 	m.RegisterExecutor(executor)
 
 	reg := registry.GetGlobalRegistry()
@@ -352,7 +352,7 @@ func TestIssue6742_InStreamUnauthorizedBlocksSiblingModelShardUntilRefreshed(t *
 		},
 	}
 
-	m := NewManager(nil, &FillFirstSelector{}, nil)
+	m := NewManager(nil, &RoundRobinSelector{}, nil)
 	m.RegisterExecutor(executor)
 
 	reg := registry.GetGlobalRegistry()

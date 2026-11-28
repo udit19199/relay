@@ -123,7 +123,7 @@ func TestCodexDuplexInitialFailure(t *testing.T) {
 						t.Fatal("rejected stream did not terminate")
 					}
 				} else {
-					manager := auth.NewManager(nil, &auth.FillFirstSelector{}, nil)
+					manager := auth.NewManager(nil, &auth.RoundRobinSelector{}, nil)
 					manager.SetConfig(cfg)
 					manager.SetRetryConfig(3, 30*time.Second, 0)
 					manager.RegisterExecutor(exec)

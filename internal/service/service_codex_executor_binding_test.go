@@ -9,7 +9,6 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/udit19199/relay/internal/config"
-	internalconfig "github.com/udit19199/relay/internal/config"
 	"github.com/udit19199/relay/internal/runtime/executor"
 	coreauth "github.com/udit19199/relay/internal/service/auth"
 	coreexecutor "github.com/udit19199/relay/internal/service/executor"
@@ -269,9 +268,6 @@ func TestApplyWatcherConfigUpdate_PreservesExistingWebsocketConnections(t *testi
 			reloadedCfg := &config.Config{
 				SDKConfig: config.SDKConfig{
 					ProxyURL: "http://127.0.0.1:1",
-				},
-				Routing: internalconfig.RoutingConfig{
-					Strategy: "fill-first",
 				},
 			}
 			service.applyWatcherConfigUpdate(reloadedCfg)

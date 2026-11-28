@@ -459,41 +459,6 @@ func TestManagerSessionAffinityRebindOnQuotaLCPPreservesBindingAcrossTransientFa
 	}
 }
 
-func TestSessionAffinitySelectorRebindOnQuotaDirectPickRebindsWhenAuthRemovedOrZeroWeight(t *testing.T) {
-	t.Parallel()
-
-	ctx := context.Background()
-	selector := NewSessionAffinitySelectorWithConfig(SessionAffinityConfig{
-		Fallback: &WeightedRoundRobinSelector{},
-		TTL:      time.Hour,
-		RebindOn: SessionAffinityRebindOnQuota,
-	})
-	defer selector.Stop()
-
-	authA := &Auth{ID: "auth-a", Status: StatusActive, Attributes: map[string]string{"weight": "10", "priority": "1"}}
-	authB := &Auth{ID: "auth-b", Status: StatusActive, Attributes: map[string]string{"weight": "5", "priority": "0"}}
-	authC := &Auth{ID: "auth-c", Status: StatusActive, Attributes: map[string]string{"weight": "5", "priority": "0"}}
-	opts := coreexecutor.Options{Metadata: map[string]any{
-		coreexecutor.DerivedSessionIDMetadataKey: "direct-pick-session",
-	}}
-
-	first, errPick := selector.Pick(ctx, "claude", "claude-3", opts, []*Auth{authA, authB, authC})
-	if errPick != nil || first == nil || first.ID != authA.ID {
-		t.Fatalf("initial pick = %v (err=%v), want %q", first, errPick, authA.ID)
-	}
-
-	// Weight of authA becomes 0 -> filtered out by positiveWeightAuths; must rebind and stick to the new auth.
-	authAZero := &Auth{ID: "auth-a", Status: StatusActive, Attributes: map[string]string{"weight": "0", "priority": "1"}}
-	second, errPick := selector.Pick(ctx, "claude", "claude-3", opts, []*Auth{authAZero, authB, authC})
-	if errPick != nil || second == nil || second.ID == authA.ID {
-		t.Fatalf("pick after zero weight = %v (err=%v), want non-%q", second, errPick, authA.ID)
-	}
-	third, errPick := selector.Pick(ctx, "claude", "claude-3", opts, []*Auth{authAZero, authB, authC})
-	if errPick != nil || third == nil || third.ID != second.ID {
-		t.Fatalf("subsequent pick after zero-weight rebind = %v (err=%v), want sticky %q", third, errPick, second.ID)
-	}
-}
-
 func TestSessionAffinitySelectorRebindOnQuotaLCPCompactionPreservesMetadataOnTransientFailover(t *testing.T) {
 	t.Parallel()
 

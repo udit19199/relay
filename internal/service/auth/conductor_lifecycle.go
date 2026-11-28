@@ -90,9 +90,6 @@ func (m *Manager) Register(ctx context.Context, auth *Auth) (*Auth, error) {
 		return nil, nil
 	}
 	NormalizeCredentialMetadata(auth.Metadata)
-	if errWeight := ValidateAuthWeight(auth); errWeight != nil {
-		return nil, fmt.Errorf("register auth: %w", errWeight)
-	}
 	if auth.ID == "" {
 		auth.ID = uuid.NewString()
 	}
@@ -303,9 +300,6 @@ func (m *Manager) updateInternalLocked(ctx context.Context, base, auth *Auth, mo
 		return nil, false, false, nil
 	}
 	NormalizeCredentialMetadata(auth.Metadata)
-	if errWeight := ValidateAuthWeight(auth); errWeight != nil {
-		return nil, false, false, fmt.Errorf("update auth: %w", errWeight)
-	}
 	isFileSnapshot := mode == updateModeReplace && auth.HasFileSnapshot()
 	if isFileSnapshot {
 		m.mu.RLock()
@@ -748,9 +742,6 @@ func (m *Manager) Load(ctx context.Context) error {
 			continue
 		}
 		NormalizeCredentialMetadata(auth.Metadata)
-		if errWeight := ValidateAuthWeight(auth); errWeight != nil {
-			continue
-		}
 		auth.EnsureIndex()
 		_ = m.migrateAuthAliasModelStatesLocked(auth, nil, now, false)
 		if len(auth.ModelStates) > 0 {
@@ -818,9 +809,6 @@ func (m *Manager) persist(ctx context.Context, auth *Auth) error {
 	m.mu.RUnlock()
 	if store == nil || auth == nil {
 		return nil
-	}
-	if errWeight := ValidateAuthWeight(auth); errWeight != nil {
-		return fmt.Errorf("persist auth: %w", errWeight)
 	}
 	if IsConfigAPIKeyAuth(auth) {
 		return nil

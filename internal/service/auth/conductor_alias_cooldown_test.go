@@ -16,8 +16,8 @@ func TestManagerAliasQuotaFailoverWithUnobservedTargetModel(t *testing.T) {
 	withQuotaCooldownEnabled(t)
 	for name, newSelector := range map[string]func() Selector{
 		"round-robin":          func() Selector { return &RoundRobinSelector{} },
-		"weighted-round-robin": func() Selector { return &WeightedRoundRobinSelector{} },
-		"fill-first":           func() Selector { return &FillFirstSelector{} },
+		"weighted-round-robin": func() Selector { return &RoundRobinSelector{} },
+		"fill-first":           func() Selector { return &RoundRobinSelector{} },
 	} {
 		for _, path := range []string{"select", "execute", "stream"} {
 			t.Run(name+"/"+path, func(t *testing.T) {
@@ -29,8 +29,8 @@ func TestManagerAliasQuotaFailoverWithUnobservedTargetModel(t *testing.T) {
 				})
 				highID, lowID := "alias-quota-high-"+t.Name(), "alias-quota-low-"+t.Name()
 				for _, candidate := range []*Auth{
-					{ID: highID, Provider: "codex", Status: StatusActive, Attributes: map[string]string{"priority": "4", AttributeWeight: "1"}},
-					{ID: lowID, Provider: "codex", Status: StatusActive, Attributes: map[string]string{"priority": "3", AttributeWeight: "1"}},
+					{ID: highID, Provider: "codex", Status: StatusActive, Attributes: map[string]string{"priority": "4"}},
+					{ID: lowID, Provider: "codex", Status: StatusActive, Attributes: map[string]string{"priority": "3"}},
 				} {
 					registry.GetGlobalRegistry().RegisterClient(candidate.ID, "codex", []*registry.ModelInfo{{ID: routeModel}, {ID: targetModel}, {ID: otherModel}})
 					t.Cleanup(func() { registry.GetGlobalRegistry().UnregisterClient(candidate.ID) })

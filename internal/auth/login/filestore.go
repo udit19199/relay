@@ -41,9 +41,6 @@ func (s *FileTokenStore) Save(ctx context.Context, auth *coreauth.Auth) (string,
 		return "", fmt.Errorf("auth filestore: auth is nil")
 	}
 	coreauth.NormalizeCredentialMetadata(auth.Metadata)
-	if errWeight := coreauth.ValidateAuthWeight(auth); errWeight != nil {
-		return "", fmt.Errorf("auth filestore: %w", errWeight)
-	}
 
 	path, err := s.resolveAuthPath(auth)
 	if err != nil {
@@ -210,9 +207,6 @@ func (s *FileTokenStore) readAuthFiles(path, baseDir string) ([]*coreauth.Auth, 
 		return nil, fmt.Errorf("unmarshal auth json: %w", err)
 	}
 	coreauth.NormalizeCredentialMetadata(metadata)
-	if errWeight := coreauth.ValidateAuthWeight(&coreauth.Auth{Metadata: metadata}); errWeight != nil {
-		return nil, errWeight
-	}
 	provider, _ := metadata["type"].(string)
 	provider = strings.TrimSpace(provider)
 	switch strings.ToLower(provider) {

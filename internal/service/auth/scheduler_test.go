@@ -76,8 +76,8 @@ func (s *trackingSelector) Pick(ctx context.Context, provider, model string, opt
 	return auths[len(auths)-1], nil
 }
 
-func newSchedulerForTest(selector Selector, auths ...*Auth) *authScheduler {
-	scheduler := newAuthScheduler(selector)
+func newSchedulerForTest(auths ...*Auth) *authScheduler {
+	scheduler := newAuthScheduler()
 	scheduler.rebuild(auths)
 	return scheduler
 }
@@ -99,7 +99,6 @@ func TestSchedulerPick_RoundRobinHighestPriority(t *testing.T) {
 	t.Parallel()
 
 	scheduler := newSchedulerForTest(
-		&RoundRobinSelector{},
 		&Auth{ID: "low", Provider: "gemini", Attributes: map[string]string{"priority": "0"}},
 		&Auth{ID: "high-b", Provider: "gemini", Attributes: map[string]string{"priority": "10"}},
 		&Auth{ID: "high-a", Provider: "gemini", Attributes: map[string]string{"priority": "10"}},
@@ -120,128 +119,23 @@ func TestSchedulerPick_RoundRobinHighestPriority(t *testing.T) {
 	}
 }
 
-func TestSchedulerPick_WeightedRoundRobin(t *testing.T) {
-	t.Parallel()
-
-	scheduler := newSchedulerForTest(
-		&WeightedRoundRobinSelector{},
-		&Auth{ID: "a", Provider: "gemini", Attributes: map[string]string{AttributeWeight: "5"}},
-		&Auth{ID: "b", Provider: "gemini", Attributes: map[string]string{AttributeWeight: "3"}},
-		&Auth{ID: "c", Provider: "gemini", Attributes: map[string]string{AttributeWeight: "2"}},
-	)
-
-	counts := make(map[string]int)
-	for index := 0; index < 100; index++ {
-		got, errPick := scheduler.pickSingle(context.Background(), "gemini", "", coreexecutor.Options{}, nil)
-		if errPick != nil {
-			t.Fatalf("pickSingle() #%d error = %v", index, errPick)
-		}
-		counts[got.ID]++
-	}
-	want := map[string]int{"a": 50, "b": 30, "c": 20}
-	for authID, wantCount := range want {
-		if counts[authID] != wantCount {
-			t.Fatalf("auth %q picks = %d, want %d", authID, counts[authID], wantCount)
-		}
-	}
-}
-
-func TestManagerLoad_WeightedRoundRobinUsesPersistedMetadataWeight(t *testing.T) {
-	t.Parallel()
-
-	manager := NewManager(&schedulerLoadStore{auths: []*Auth{
-		{ID: "a", Provider: "gemini", Metadata: map[string]any{AttributeWeight: float64(5)}},
-		{ID: "b", Provider: "gemini", Metadata: map[string]any{AttributeWeight: float64(1)}},
-	}}, &WeightedRoundRobinSelector{}, nil)
-	if errLoad := manager.Load(context.Background()); errLoad != nil {
-		t.Fatalf("Load() error = %v", errLoad)
-	}
-
-	counts := make(map[string]int)
-	for index := 0; index < 60; index++ {
-		got, errPick := manager.scheduler.pickSingle(context.Background(), "gemini", "", coreexecutor.Options{}, nil)
-		if errPick != nil {
-			t.Fatalf("pickSingle() #%d error = %v", index, errPick)
-		}
-		counts[got.ID]++
-	}
-	if counts["a"] != 50 || counts["b"] != 10 {
-		t.Fatalf("metadata-weighted picks = %#v, want a:b=50:10", counts)
-	}
-}
-
-func TestSchedulerPick_WeightedRoundRobinResetsCreditsWhenWeightsChange(t *testing.T) {
-	t.Parallel()
-
-	authA := &Auth{ID: "a", Provider: "gemini", Attributes: map[string]string{AttributeWeight: "1000000"}}
-	authB := &Auth{ID: "b", Provider: "gemini", Attributes: map[string]string{AttributeWeight: "1"}}
-	scheduler := newSchedulerForTest(&WeightedRoundRobinSelector{}, authA, authB)
-	for index := 0; index < 1000; index++ {
-		if _, errPick := scheduler.pickSingle(context.Background(), "gemini", "", coreexecutor.Options{}, nil); errPick != nil {
-			t.Fatalf("warmup pickSingle() #%d error = %v", index, errPick)
-		}
-	}
-
-	authA.Attributes[AttributeWeight] = "1"
-	scheduler.upsertAuth(authA)
-	counts := make(map[string]int)
-	for index := 0; index < 20; index++ {
-		got, errPick := scheduler.pickSingle(context.Background(), "gemini", "", coreexecutor.Options{}, nil)
-		if errPick != nil {
-			t.Fatalf("pickSingle() after weight change #%d error = %v", index, errPick)
-		}
-		counts[got.ID]++
-	}
-	if counts["a"] != 10 || counts["b"] != 10 {
-		t.Fatalf("picks after weight change = %#v, want a:b=10:10", counts)
-	}
-}
-
-func TestSchedulerPick_WeightedWebsocketResetsCreditsWhenWeightsChange(t *testing.T) {
-	t.Parallel()
-
-	authA := &Auth{ID: "a", Provider: "codex", Attributes: map[string]string{AttributeWeight: "1000000", "websockets": "true"}}
-	authB := &Auth{ID: "b", Provider: "codex", Attributes: map[string]string{AttributeWeight: "1", "websockets": "true"}}
-	scheduler := newSchedulerForTest(&WeightedRoundRobinSelector{}, authA, authB)
-	ctx := coreexecutor.WithDownstreamWebsocket(context.Background())
-	for index := 0; index < 1000; index++ {
-		if _, errPick := scheduler.pickSingle(ctx, "codex", "", coreexecutor.Options{}, nil); errPick != nil {
-			t.Fatalf("warmup websocket pickSingle() #%d error = %v", index, errPick)
-		}
-	}
-
-	authA.Attributes[AttributeWeight] = "1"
-	scheduler.upsertAuth(authA)
-	counts := make(map[string]int)
-	for index := 0; index < 20; index++ {
-		got, errPick := scheduler.pickSingle(ctx, "codex", "", coreexecutor.Options{}, nil)
-		if errPick != nil {
-			t.Fatalf("websocket pickSingle() after weight change #%d error = %v", index, errPick)
-		}
-		counts[got.ID]++
-	}
-	if counts["a"] != 10 || counts["b"] != 10 {
-		t.Fatalf("websocket picks after weight change = %#v, want a:b=10:10", counts)
-	}
-}
-
-func TestManagerLegacyWeightedRoundRobinKeepsIndependentAliasPrefixedModelState(t *testing.T) {
-	manager := NewManager(nil, &WeightedRoundRobinSelector{}, nil)
+func TestManagerLegacyRoundRobinKeepsIndependentAliasPrefixedModelState(t *testing.T) {
+	manager := NewManager(nil, &RoundRobinSelector{}, nil)
 	manager.executors["gemini"] = schedulerTestExecutor{}
 
 	auths := []*Auth{
-		{ID: "a-heavy", Provider: "gemini", Attributes: map[string]string{AttributeWeight: "3"}},
-		{ID: "a-light", Provider: "gemini", Attributes: map[string]string{AttributeWeight: "1"}},
-		{ID: "b-light", Provider: "gemini", Attributes: map[string]string{AttributeWeight: "1"}},
-		{ID: "b-heavy", Provider: "gemini", Attributes: map[string]string{AttributeWeight: "3"}},
+		{ID: "a-first", Provider: "gemini"},
+		{ID: "a-second", Provider: "gemini"},
+		{ID: "b-first", Provider: "gemini"},
+		{ID: "b-second", Provider: "gemini"},
 	}
 	for _, auth := range auths {
 		if _, errRegister := manager.Register(context.Background(), auth); errRegister != nil {
 			t.Fatalf("Register(%s) error = %v", auth.ID, errRegister)
 		}
 	}
-	registerSchedulerModels(t, "gemini", "team-a/shared", "a-heavy", "a-light")
-	registerSchedulerModels(t, "gemini", "team-b/shared", "b-light", "b-heavy")
+	registerSchedulerModels(t, "gemini", "team-a/shared", "a-first", "a-second")
+	registerSchedulerModels(t, "gemini", "team-b/shared", "b-first", "b-second")
 
 	counts := make(map[string]int)
 	for index := 0; index < 40; index++ {
@@ -253,51 +147,10 @@ func TestManagerLegacyWeightedRoundRobinKeepsIndependentAliasPrefixedModelState(
 			counts[got.ID]++
 		}
 	}
-	want := map[string]int{"a-heavy": 30, "a-light": 10, "b-light": 10, "b-heavy": 30}
+	want := map[string]int{"a-first": 20, "a-second": 20, "b-first": 20, "b-second": 20}
 	for authID, wantCount := range want {
 		if counts[authID] != wantCount {
 			t.Fatalf("auth %q picks = %d, want %d; all=%#v", authID, counts[authID], wantCount, counts)
-		}
-	}
-}
-
-func TestSchedulerPick_WeightedRoundRobinSkipsNonPositiveWeightPriorityTier(t *testing.T) {
-	t.Parallel()
-
-	scheduler := newSchedulerForTest(
-		&WeightedRoundRobinSelector{},
-		&Auth{ID: "excluded", Provider: "gemini", Attributes: map[string]string{"priority": "10", AttributeWeight: "0"}},
-		&Auth{ID: "available", Provider: "gemini", Attributes: map[string]string{"priority": "0", AttributeWeight: "1"}},
-	)
-	got, errPick := scheduler.pickSingle(context.Background(), "gemini", "", coreexecutor.Options{}, nil)
-	if errPick != nil {
-		t.Fatalf("pickSingle() error = %v", errPick)
-	}
-	if got == nil || got.ID != "available" {
-		t.Fatalf("pickSingle() auth = %#v, want available", got)
-	}
-}
-
-func TestSchedulerPick_FillFirstSticksToFirstReady(t *testing.T) {
-	t.Parallel()
-
-	scheduler := newSchedulerForTest(
-		&FillFirstSelector{},
-		&Auth{ID: "b", Provider: "gemini"},
-		&Auth{ID: "a", Provider: "gemini"},
-		&Auth{ID: "c", Provider: "gemini"},
-	)
-
-	for index := 0; index < 3; index++ {
-		got, errPick := scheduler.pickSingle(context.Background(), "gemini", "", coreexecutor.Options{}, nil)
-		if errPick != nil {
-			t.Fatalf("pickSingle() #%d error = %v", index, errPick)
-		}
-		if got == nil {
-			t.Fatalf("pickSingle() #%d auth = nil", index)
-		}
-		if got.ID != "a" {
-			t.Fatalf("pickSingle() #%d auth.ID = %q, want %q", index, got.ID, "a")
 		}
 	}
 }
@@ -308,7 +161,6 @@ func TestSchedulerPick_PromotesExpiredCooldownBeforePick(t *testing.T) {
 	model := "gemini-2.5-pro"
 	registerSchedulerModels(t, "gemini", model, "cooldown-expired")
 	scheduler := newSchedulerForTest(
-		&RoundRobinSelector{},
 		&Auth{
 			ID:       "cooldown-expired",
 			Provider: "gemini",
@@ -338,7 +190,6 @@ func TestSchedulerPick_CodexWebsocketPrefersWebsocketEnabledSubset(t *testing.T)
 	t.Parallel()
 
 	scheduler := newSchedulerForTest(
-		&RoundRobinSelector{},
 		&Auth{ID: "codex-http", Provider: "codex"},
 		&Auth{ID: "codex-ws-a", Provider: "codex", Attributes: map[string]string{"websockets": "true"}},
 		&Auth{ID: "codex-ws-b", Provider: "codex", Attributes: map[string]string{"websockets": "true"}},
@@ -364,7 +215,6 @@ func TestSchedulerPick_XAIWebsocketPrefersWebsocketEnabledSubset(t *testing.T) {
 	t.Parallel()
 
 	scheduler := newSchedulerForTest(
-		&RoundRobinSelector{},
 		&Auth{ID: "xai-http", Provider: "xai"},
 		&Auth{ID: "xai-ws-a", Provider: "xai", Attributes: map[string]string{"websockets": "true"}},
 		&Auth{ID: "xai-ws-b", Provider: "xai", Attributes: map[string]string{"websockets": "true"}},
@@ -390,7 +240,6 @@ func TestSchedulerPick_CodexWebsocketPrefersWebsocketEnabledAcrossPriorities(t *
 	t.Parallel()
 
 	scheduler := newSchedulerForTest(
-		&RoundRobinSelector{},
 		&Auth{ID: "codex-http", Provider: "codex", Attributes: map[string]string{"priority": "10"}},
 		&Auth{ID: "codex-ws-a", Provider: "codex", Attributes: map[string]string{"priority": "0", "websockets": "true"}},
 		&Auth{ID: "codex-ws-b", Provider: "codex", Attributes: map[string]string{"priority": "0", "websockets": "true"}},
@@ -416,7 +265,6 @@ func TestSchedulerPick_MixedProvidersUsesWeightedProviderRotationOverReadyCandid
 	t.Parallel()
 
 	scheduler := newSchedulerForTest(
-		&RoundRobinSelector{},
 		&Auth{ID: "gemini-a", Provider: "gemini"},
 		&Auth{ID: "gemini-b", Provider: "gemini"},
 		&Auth{ID: "claude-a", Provider: "claude"},
@@ -437,94 +285,6 @@ func TestSchedulerPick_MixedProvidersUsesWeightedProviderRotationOverReadyCandid
 		}
 		if got.ID != wantIDs[index] {
 			t.Fatalf("pickMixed() #%d auth.ID = %q, want %q", index, got.ID, wantIDs[index])
-		}
-	}
-}
-
-func TestSchedulerPick_MixedProvidersWeightedRoundRobin(t *testing.T) {
-	t.Parallel()
-
-	scheduler := newSchedulerForTest(
-		&WeightedRoundRobinSelector{},
-		&Auth{ID: "gemini-a", Provider: "gemini", Attributes: map[string]string{AttributeWeight: "5"}},
-		&Auth{ID: "claude-b", Provider: "claude", Attributes: map[string]string{AttributeWeight: "3"}},
-		&Auth{ID: "claude-c", Provider: "claude", Attributes: map[string]string{AttributeWeight: "2"}},
-	)
-
-	counts := make(map[string]int)
-	for index := 0; index < 100; index++ {
-		got, provider, errPick := scheduler.pickMixed(context.Background(), []string{"gemini", "claude"}, "", coreexecutor.Options{}, nil)
-		if errPick != nil {
-			t.Fatalf("pickMixed() #%d error = %v", index, errPick)
-		}
-		if got == nil || provider == "" {
-			t.Fatalf("pickMixed() #%d returned auth=%v provider=%q", index, got, provider)
-		}
-		counts[got.ID]++
-	}
-	want := map[string]int{"gemini-a": 50, "claude-b": 30, "claude-c": 20}
-	for authID, wantCount := range want {
-		if counts[authID] != wantCount {
-			t.Fatalf("auth %q picks = %d, want %d", authID, counts[authID], wantCount)
-		}
-	}
-}
-
-func TestSchedulerPick_MixedProvidersResetsCreditsWhenWeightsChange(t *testing.T) {
-	t.Parallel()
-
-	authA := &Auth{ID: "gemini-a", Provider: "gemini", Attributes: map[string]string{AttributeWeight: "1000000"}}
-	authB := &Auth{ID: "claude-b", Provider: "claude", Attributes: map[string]string{AttributeWeight: "1"}}
-	scheduler := newSchedulerForTest(&WeightedRoundRobinSelector{}, authA, authB)
-	providers := []string{"gemini", "claude"}
-	for index := 0; index < 1000; index++ {
-		if _, _, errPick := scheduler.pickMixed(context.Background(), providers, "", coreexecutor.Options{}, nil); errPick != nil {
-			t.Fatalf("warmup pickMixed() #%d error = %v", index, errPick)
-		}
-	}
-
-	authA.Attributes[AttributeWeight] = "1"
-	scheduler.upsertAuth(authA)
-	counts := make(map[string]int)
-	for index := 0; index < 20; index++ {
-		got, _, errPick := scheduler.pickMixed(context.Background(), providers, "", coreexecutor.Options{}, nil)
-		if errPick != nil {
-			t.Fatalf("pickMixed() after weight change #%d error = %v", index, errPick)
-		}
-		counts[got.ID]++
-	}
-	if counts[authA.ID] != 10 || counts[authB.ID] != 10 {
-		t.Fatalf("mixed picks after weight change = %#v, want 10 each", counts)
-	}
-}
-
-func TestSchedulerPickMixed_RetryTriedFilterPreservesSmoothWeightedDistribution(t *testing.T) {
-	t.Parallel()
-
-	authA := &Auth{ID: "auth-a", Provider: "provider-a"}
-	authB := &Auth{ID: "auth-b", Provider: "provider-b"}
-	authC := &Auth{ID: "auth-c", Provider: "provider-c"}
-	authD := &Auth{ID: "auth-d", Provider: "provider-d"}
-	auths := []*Auth{authA, authB, authC, authD}
-
-	scheduler := newSchedulerForTest(&WeightedRoundRobinSelector{}, auths...)
-	providers := []string{"provider-a", "provider-b", "provider-c", "provider-d"}
-
-	// Simulate retries where auth-a failed and is in the tried filter:
-	// Verify that retry picks rotate smoothly across auth-b, auth-c, auth-d without alphabetical bias towards auth-b.
-	retryCounts := make(map[string]int)
-	tried := map[string]struct{}{"auth-a": {}}
-	for index := 0; index < 30; index++ {
-		picked, _, errPick := scheduler.pickMixed(context.Background(), providers, "", coreexecutor.Options{}, tried)
-		if errPick != nil {
-			t.Fatalf("pickMixed(tried) error = %v", errPick)
-		}
-		retryCounts[picked.ID]++
-	}
-
-	for _, authID := range []string{"auth-b", "auth-c", "auth-d"} {
-		if retryCounts[authID] != 10 {
-			t.Fatalf("auth %q retry picks = %d, want 10 (even distribution without alphabetical bias, counts=%#v)", authID, retryCounts[authID], retryCounts)
 		}
 	}
 }
@@ -753,7 +513,7 @@ func TestSchedulerPick_RoundRobinPreservesWebsocketSuccessorAcrossCooldown(t *te
 	wsB := &Auth{ID: "codex-ws-b", Provider: "codex", Attributes: map[string]string{"websockets": "true"}}
 	wsC := &Auth{ID: "codex-ws-c", Provider: "codex", Attributes: map[string]string{"websockets": "true"}}
 	httpOnly := &Auth{ID: "codex-http", Provider: "codex"}
-	scheduler := newSchedulerForTest(&RoundRobinSelector{}, httpOnly, wsA, wsB, wsC)
+	scheduler := newSchedulerForTest(httpOnly, wsA, wsB, wsC)
 
 	ctx := coreexecutor.WithDownstreamWebsocket(context.Background())
 	got, errPick := scheduler.pickSingle(ctx, "codex", "", coreexecutor.Options{}, nil)
@@ -786,7 +546,6 @@ func TestSchedulerPick_MixedProvidersPrefersHighestPriorityTier(t *testing.T) {
 	registerSchedulerModels(t, "provider-high-b", model, "high-b")
 
 	scheduler := newSchedulerForTest(
-		&RoundRobinSelector{},
 		&Auth{ID: "low", Provider: "provider-low", Attributes: map[string]string{"priority": "4"}},
 		&Auth{ID: "high-a", Provider: "provider-high-a", Attributes: map[string]string{"priority": "7"}},
 		&Auth{ID: "high-b", Provider: "provider-high-b", Attributes: map[string]string{"priority": "7"}},
@@ -901,33 +660,7 @@ func TestManagerCodexAlphaSearchPolicyRejectsOrdinaryAPIKey(t *testing.T) {
 	}
 }
 
-func TestManagerSelectAuthByKindWeightedRoundRobinIgnoresIneligibleAPIKeyWeight(t *testing.T) {
-	manager := NewManager(nil, &WeightedRoundRobinSelector{}, nil)
-	manager.executors["codex"] = schedulerTestExecutor{}
-	for _, candidate := range []*Auth{
-		{ID: "api-high", Provider: "codex", Attributes: map[string]string{AttributeAPIKey: "test-key", AttributeWeight: "100"}},
-		{ID: "oauth-heavy", Provider: "codex", Attributes: map[string]string{AttributeWeight: "5"}, Metadata: map[string]any{"access_token": "heavy-token"}},
-		{ID: "oauth-light", Provider: "codex", Attributes: map[string]string{AttributeWeight: "1"}, Metadata: map[string]any{"access_token": "light-token"}},
-	} {
-		if _, errRegister := manager.Register(context.Background(), candidate); errRegister != nil {
-			t.Fatalf("Register(%s) error = %v", candidate.ID, errRegister)
-		}
-	}
-
-	counts := make(map[string]int)
-	for index := 0; index < 600; index++ {
-		selected, errSelect := manager.SelectAuthByKind(context.Background(), "codex", "", AuthKindOAuth, coreexecutor.Options{})
-		if errSelect != nil {
-			t.Fatalf("SelectAuthByKind() #%d error = %v", index, errSelect)
-		}
-		counts[selected.ID]++
-	}
-	if counts["oauth-heavy"] != 500 || counts["oauth-light"] != 100 || counts["api-high"] != 0 {
-		t.Fatalf("weighted OAuth picks = %#v, want oauth-heavy:oauth-light=500:100 and no API key", counts)
-	}
-}
-
-func TestManagerWeightedRoundRobinDisallowFreeAuthIgnoresFreeWeight(t *testing.T) {
+func TestManagerRoundRobinDisallowFreeAuthSkipsFreePlan(t *testing.T) {
 	tests := []struct {
 		name  string
 		mixed bool
@@ -938,7 +671,7 @@ func TestManagerWeightedRoundRobinDisallowFreeAuthIgnoresFreeWeight(t *testing.T
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			manager := NewManager(nil, &WeightedRoundRobinSelector{}, nil)
+			manager := NewManager(nil, &RoundRobinSelector{}, nil)
 			manager.executors["codex"] = schedulerTestExecutor{}
 			lightProvider := "codex"
 			if tt.mixed {
@@ -946,9 +679,9 @@ func TestManagerWeightedRoundRobinDisallowFreeAuthIgnoresFreeWeight(t *testing.T
 				manager.executors["gemini"] = schedulerTestExecutor{provider: "gemini"}
 			}
 			for _, candidate := range []*Auth{
-				{ID: "free-high", Provider: "codex", Attributes: map[string]string{"plan_type": "free", AttributeWeight: "100"}, Metadata: map[string]any{"access_token": "free-token"}},
-				{ID: "paid-heavy", Provider: "codex", Attributes: map[string]string{"plan_type": "plus", AttributeWeight: "5"}, Metadata: map[string]any{"access_token": "heavy-token"}},
-				{ID: "paid-light", Provider: lightProvider, Attributes: map[string]string{"plan_type": "plus", AttributeWeight: "1"}, Metadata: map[string]any{"access_token": "light-token"}},
+				{ID: "free-high", Provider: "codex", Attributes: map[string]string{"plan_type": "free"}, Metadata: map[string]any{"access_token": "free-token"}},
+				{ID: "paid-heavy", Provider: "codex", Attributes: map[string]string{"plan_type": "plus"}, Metadata: map[string]any{"access_token": "heavy-token"}},
+				{ID: "paid-light", Provider: lightProvider, Attributes: map[string]string{"plan_type": "plus"}, Metadata: map[string]any{"access_token": "light-token"}},
 			} {
 				if _, errRegister := manager.Register(context.Background(), candidate); errRegister != nil {
 					t.Fatalf("Register(%s) error = %v", candidate.ID, errRegister)
@@ -966,12 +699,12 @@ func TestManagerWeightedRoundRobinDisallowFreeAuthIgnoresFreeWeight(t *testing.T
 					selected, _, errPick = manager.pickNext(context.Background(), "codex", "", opts, nil)
 				}
 				if errPick != nil {
-					t.Fatalf("weighted pick #%d error = %v", index, errPick)
+					t.Fatalf("pick #%d error = %v", index, errPick)
 				}
 				counts[selected.ID]++
 			}
-			if counts["paid-heavy"] != 500 || counts["paid-light"] != 100 || counts["free-high"] != 0 {
-				t.Fatalf("weighted non-free picks = %#v, want paid-heavy:paid-light=500:100 and no free auth", counts)
+			if counts["paid-heavy"]+counts["paid-light"] != 600 || counts["free-high"] != 0 {
+				t.Fatalf("non-free picks = %#v, want only paid auths and no free auth", counts)
 			}
 		})
 	}
@@ -1069,14 +802,6 @@ func TestManager_InitializesSchedulerForBuiltInSelector(t *testing.T) {
 	manager := NewManager(nil, &RoundRobinSelector{}, nil)
 	if manager.scheduler == nil {
 		t.Fatalf("manager.scheduler = nil")
-	}
-	if manager.scheduler.strategy != schedulerStrategyRoundRobin {
-		t.Fatalf("manager.scheduler.strategy = %v, want %v", manager.scheduler.strategy, schedulerStrategyRoundRobin)
-	}
-
-	manager.SetSelector(&FillFirstSelector{})
-	if manager.scheduler.strategy != schedulerStrategyFillFirst {
-		t.Fatalf("manager.scheduler.strategy = %v, want %v", manager.scheduler.strategy, schedulerStrategyFillFirst)
 	}
 }
 

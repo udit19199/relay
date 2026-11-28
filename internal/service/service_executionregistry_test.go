@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -78,18 +79,18 @@ func TestServiceSkipsStaleLocalConfigRuntimeApply(t *testing.T) {
 	service := &Service{cfg: &config.Config{}}
 	var applied []string
 	service.applyPprofConfigContextFn = func(_ context.Context, cfg *config.Config) bool {
-		applied = append(applied, cfg.Routing.Strategy)
+		applied = append(applied, strconv.Itoa(cfg.Port))
 		return true
 	}
-	first := service.commitConfigUpdate(&config.Config{Routing: internalconfig.RoutingConfig{Strategy: "fill-first"}})
-	second := service.commitConfigUpdate(&config.Config{Routing: internalconfig.RoutingConfig{Strategy: "round-robin"}})
+	first := service.commitConfigUpdate(&config.Config{Port: 1})
+	second := service.commitConfigUpdate(&config.Config{Port: 2})
 	if !service.applyConfigRuntime(context.Background(), second, false) {
 		t.Fatal("newest config runtime apply failed")
 	}
 	if service.applyConfigRuntime(context.Background(), first, false) {
 		t.Fatal("stale config runtime apply succeeded")
 	}
-	if got, want := strings.Join(applied, ","), "round-robin"; got != want {
+	if got, want := strings.Join(applied, ","), "2"; got != want {
 		t.Fatalf("runtime apply order = %q, want %q", got, want)
 	}
 }
@@ -104,8 +105,8 @@ func TestServiceAppliesSameValueNewestSelectorCommit(t *testing.T) {
 	}
 
 	service := &Service{cfg: &config.Config{}, coreManager: manager}
-	older := service.commitConfigUpdate(&config.Config{Routing: internalconfig.RoutingConfig{Strategy: "fill-first"}})
-	newer := service.commitConfigUpdate(&config.Config{Routing: internalconfig.RoutingConfig{Strategy: "fill-first"}})
+	older := service.commitConfigUpdate(&config.Config{})
+	newer := service.commitConfigUpdate(&config.Config{})
 	if !service.applyConfigRuntime(context.Background(), newer, false) {
 		t.Fatal("newest same-value config runtime apply failed")
 	}
@@ -113,13 +114,14 @@ func TestServiceAppliesSameValueNewestSelectorCommit(t *testing.T) {
 		t.Fatal("stale same-value config runtime apply succeeded")
 	}
 
-	for range 2 {
+	wantOrder := []string{"auth-a", "auth-b"}
+	for index, wantID := range wantOrder {
 		selected, errSelect := manager.SelectAuth(context.Background(), "consumer-provider", "", coreexecutor.Options{})
 		if errSelect != nil {
 			t.Fatalf("SelectAuth() error = %v", errSelect)
 		}
-		if selected == nil || selected.ID != "auth-a" {
-			t.Fatalf("selector picked = %+v, want auth-a from fill-first", selected)
+		if selected == nil || selected.ID != wantID {
+			t.Fatalf("selector pick #%d = %+v, want %s (rotation must continue across same-value commits)", index, selected, wantID)
 		}
 	}
 }
@@ -128,7 +130,6 @@ func TestBuilderPreservesInitialSelectorForSameRouting(t *testing.T) {
 	cfg := &config.Config{
 		AuthDir: t.TempDir(),
 		Routing: internalconfig.RoutingConfig{
-			Strategy:           "fill-first",
 			SessionAffinity:    true,
 			SessionAffinityTTL: "1h",
 		},
@@ -161,7 +162,6 @@ func TestServiceApplyConfigRuntimePreservesSelectorForUnchangedRouting(t *testin
 	service := &Service{cfg: &config.Config{}, coreManager: manager}
 
 	initial := service.commitConfigUpdate(&config.Config{Routing: internalconfig.RoutingConfig{
-		Strategy:           "fill-first",
 		SessionAffinity:    true,
 		SessionAffinityTTL: "1h",
 	}})
@@ -176,13 +176,11 @@ func TestServiceApplyConfigRuntimePreservesSelectorForUnchangedRouting(t *testin
 	defer initialAffinity.Stop()
 
 	older := service.commitConfigUpdate(&config.Config{Routing: internalconfig.RoutingConfig{
-		Strategy:           " FILLFIRST ",
 		SessionAffinity:    true,
 		SessionAffinityTTL: "60m",
 	}})
 	newer := service.commitConfigUpdate(&config.Config{
 		Routing: internalconfig.RoutingConfig{
-			Strategy:           "fill-first",
 			SessionAffinity:    true,
 			SessionAffinityTTL: "1h",
 		},
@@ -201,9 +199,8 @@ func TestServiceApplyConfigRuntimePreservesSelectorForUnchangedRouting(t *testin
 	}
 
 	changed := service.commitConfigUpdate(&config.Config{Routing: internalconfig.RoutingConfig{
-		Strategy:           "round-robin",
 		SessionAffinity:    true,
-		SessionAffinityTTL: "1h",
+		SessionAffinityTTL: "2h",
 	}})
 	if !service.applyConfigRuntime(context.Background(), changed, false) {
 		t.Fatal("changed-routing config runtime apply failed")
@@ -219,10 +216,10 @@ func TestServiceApplyConfigRuntimePreservesSelectorForUnchangedRouting(t *testin
 	defer changedAffinity.Stop()
 
 	unrelated := service.commitConfigUpdate(&config.Config{
+		Debug: true,
 		Routing: internalconfig.RoutingConfig{
-			Strategy:           "round-robin",
 			SessionAffinity:    true,
-			SessionAffinityTTL: "1h",
+			SessionAffinityTTL: "2h",
 		},
 	})
 	if !service.applyConfigRuntime(context.Background(), unrelated, false) {
@@ -239,7 +236,6 @@ func TestServiceApplyConfigRuntimeSessionAffinitySubagentsChangeRecreatesSelecto
 
 	subagentsEnabled := true
 	initial := service.commitConfigUpdate(&config.Config{Routing: internalconfig.RoutingConfig{
-		Strategy:                 "round-robin",
 		SessionAffinity:          true,
 		SessionAffinityTTL:       "1h",
 		SessionAffinitySubagents: &subagentsEnabled,
@@ -251,7 +247,6 @@ func TestServiceApplyConfigRuntimeSessionAffinitySubagentsChangeRecreatesSelecto
 
 	subagentsDisabled := false
 	changed := service.commitConfigUpdate(&config.Config{Routing: internalconfig.RoutingConfig{
-		Strategy:                 "round-robin",
 		SessionAffinity:          true,
 		SessionAffinityTTL:       "1h",
 		SessionAffinitySubagents: &subagentsDisabled,
@@ -271,7 +266,6 @@ func TestServiceApplyConfigRuntimeSessionAffinityDisabledSubagentsChangeIsNoOp(t
 
 	subagentsEnabled := true
 	initial := service.commitConfigUpdate(&config.Config{Routing: internalconfig.RoutingConfig{
-		Strategy:                 "round-robin",
 		SessionAffinity:          false,
 		SessionAffinityTTL:       "1h",
 		SessionAffinitySubagents: &subagentsEnabled,
@@ -283,7 +277,6 @@ func TestServiceApplyConfigRuntimeSessionAffinityDisabledSubagentsChangeIsNoOp(t
 
 	subagentsDisabled := false
 	changed := service.commitConfigUpdate(&config.Config{Routing: internalconfig.RoutingConfig{
-		Strategy:                 "round-robin",
 		SessionAffinity:          false,
 		SessionAffinityTTL:       "1h",
 		SessionAffinitySubagents: &subagentsDisabled,
@@ -302,7 +295,6 @@ func TestServiceApplyConfigRuntimeSessionAffinityRebindOnChangeRecreatesSelector
 	service := &Service{cfg: &config.Config{}, coreManager: manager}
 
 	initial := service.commitConfigUpdate(&config.Config{Routing: internalconfig.RoutingConfig{
-		Strategy:                "round-robin",
 		SessionAffinity:         true,
 		SessionAffinityTTL:      "1h",
 		SessionAffinityRebindOn: "any",
@@ -313,7 +305,6 @@ func TestServiceApplyConfigRuntimeSessionAffinityRebindOnChangeRecreatesSelector
 	initialSelector := manager.Selector()
 
 	same := service.commitConfigUpdate(&config.Config{Routing: internalconfig.RoutingConfig{
-		Strategy:                "round-robin",
 		SessionAffinity:         true,
 		SessionAffinityTTL:      "1h",
 		SessionAffinityRebindOn: "",
@@ -326,7 +317,6 @@ func TestServiceApplyConfigRuntimeSessionAffinityRebindOnChangeRecreatesSelector
 	}
 
 	changed := service.commitConfigUpdate(&config.Config{Routing: internalconfig.RoutingConfig{
-		Strategy:                "round-robin",
 		SessionAffinity:         true,
 		SessionAffinityTTL:      "1h",
 		SessionAffinityRebindOn: "quota",
@@ -340,7 +330,6 @@ func TestServiceApplyConfigRuntimeSessionAffinityRebindOnChangeRecreatesSelector
 	}
 
 	neverCfg := service.commitConfigUpdate(&config.Config{Routing: internalconfig.RoutingConfig{
-		Strategy:                "round-robin",
 		SessionAffinity:         true,
 		SessionAffinityTTL:      "1h",
 		SessionAffinityRebindOn: "never",
@@ -354,7 +343,6 @@ func TestServiceApplyConfigRuntimeSessionAffinityRebindOnChangeRecreatesSelector
 	}
 
 	sameNeverCfg := service.commitConfigUpdate(&config.Config{Routing: internalconfig.RoutingConfig{
-		Strategy:                "round-robin",
 		SessionAffinity:         true,
 		SessionAffinityTTL:      "1h",
 		SessionAffinityRebindOn: " NEVER ",
@@ -367,7 +355,6 @@ func TestServiceApplyConfigRuntimeSessionAffinityRebindOnChangeRecreatesSelector
 	}
 
 	backToAnyCfg := service.commitConfigUpdate(&config.Config{Routing: internalconfig.RoutingConfig{
-		Strategy:                "round-robin",
 		SessionAffinity:         true,
 		SessionAffinityTTL:      "1h",
 		SessionAffinityRebindOn: "any",

@@ -208,27 +208,6 @@ func TestFileTokenStoreNormalizesLegacyCredentialMetadata(t *testing.T) {
 	})
 }
 
-func TestFileTokenStoreSaveRejectsInvalidWeight(t *testing.T) {
-	baseDir := t.TempDir()
-	store := NewFileTokenStore()
-	store.SetBaseDir(baseDir)
-	auth := &coreauth.Auth{
-		ID:       "invalid.json",
-		FileName: "invalid.json",
-		Metadata: map[string]any{
-			"type":                   "test",
-			coreauth.AttributeWeight: 1.5,
-		},
-	}
-
-	if _, errSave := store.Save(context.Background(), auth); errSave == nil {
-		t.Fatal("Save() accepted an invalid weight")
-	}
-	if _, errStat := os.Stat(filepath.Join(baseDir, auth.FileName)); !os.IsNotExist(errStat) {
-		t.Fatalf("invalid auth file was persisted: %v", errStat)
-	}
-}
-
 func TestFileTokenStoreSaveReadModifyWritePreservesSIWC(t *testing.T) {
 	baseDir := t.TempDir()
 	fileName := "codex-siwc.json"

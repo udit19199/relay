@@ -80,7 +80,7 @@ func TestCodexDuplexLaterCredentialFailure(t *testing.T) {
 					cfg.CodexResponseSteering = true
 					executor := NewCodexWebsocketsExecutor(cfg)
 					executor.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
-					manager := auth.NewManager(nil, &auth.FillFirstSelector{}, nil)
+					manager := auth.NewManager(nil, &auth.RoundRobinSelector{}, nil)
 					manager.SetConfig(cfg)
 					manager.SetRetryConfig(3, 30*time.Second, 0)
 					manager.RegisterExecutor(executor)

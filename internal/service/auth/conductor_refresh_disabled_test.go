@@ -338,7 +338,7 @@ func TestDisabledCodexRejectedRefreshTokenDoesNotSpin(t *testing.T) {
 			`token refresh failed with status 401: {"error":{"message":"Could not validate your refresh token. Please try signing in again.","type":"invalid_request_error","code":"invalid_refresh_token"}}`,
 		),
 	}
-	m := NewManager(nil, &FillFirstSelector{}, nil)
+	m := NewManager(nil, &RoundRobinSelector{}, nil)
 	m.RegisterExecutor(ex)
 	if _, errReg := m.Register(ctx, a); errReg != nil {
 		t.Fatalf("Register error: %v", errReg)

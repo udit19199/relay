@@ -19,7 +19,7 @@ import (
 
 func isBuiltInSelector(selector Selector) bool {
 	switch selector.(type) {
-	case *RoundRobinSelector, *WeightedRoundRobinSelector, *FillFirstSelector:
+	case *RoundRobinSelector:
 		return true
 	default:
 		return false
@@ -687,7 +687,7 @@ func (m *Manager) SetSelector(selector Selector) {
 		}
 	}
 	if m.scheduler != nil {
-		m.scheduler.setSelector(selector)
+		m.scheduler.setSelector()
 		m.syncScheduler()
 	}
 }
@@ -865,11 +865,6 @@ func (m *Manager) availableAuthsForRouteModelForRequest(ctx context.Context, aut
 // or scheduler additionally receives lower priority tiers.
 func (m *Manager) availableAuthsForSelector(ctx context.Context, selector Selector, auths []*Auth, provider, routeModel string, now time.Time, schedulerAcross bool, clientHeaders ...http.Header) (priorityAuths, selectorAuths []*Auth, err error) {
 	_, sessionAffinity := selector.(*SessionAffinitySelector)
-	if _, weighted := selector.(*WeightedRoundRobinSelector); weighted {
-		// Exclude zero-weight credentials before priority selection, just as the
-		// scheduler predicate does, including when only a lower tier has weight.
-		auths = positiveWeightAuths(auths)
-	}
 
 	if !sessionAffinity && !schedulerAcross {
 		priorityAuths, err = m.availableAuthsForRouteModelForRequest(ctx, auths, provider, routeModel, now, false, clientHeaders...)
@@ -910,7 +905,6 @@ func selectionArgForSelector(selector Selector, routeModel string) string {
 }
 
 func selectorContextForAvailableAuths(ctx context.Context, selector Selector, routeModel string) context.Context {
-	ctx = withWeightedSelectorStateModel(ctx, selector, routeModel)
 	if !isBuiltInSelector(selector) {
 		if _, sessionAffinity := selector.(*SessionAffinitySelector); !sessionAffinity {
 			return ctx
@@ -926,9 +920,6 @@ func (m *Manager) transientlyUnavailableSessionAffinityAuthIDs(ctx context.Conte
 	affinity, ok := selector.(*SessionAffinitySelector)
 	if !ok || affinity == nil || (!affinity.rebindOnQuotaOnly && !affinity.rebindOnNever) || len(affinityCandidates) == 0 {
 		return nil
-	}
-	if _, weighted := affinity.fallback.(*WeightedRoundRobinSelector); weighted {
-		affinityCandidates = positiveWeightAuths(affinityCandidates)
 	}
 	var authIDs map[string]struct{}
 	for _, candidate := range affinityCandidates {
@@ -1817,12 +1808,7 @@ func (m *Manager) pickNextLegacyOnce(ctx context.Context, provider, model string
 	targetKey := canonicalSchedulingProvider(provider)
 	affinitySelector, hasAffinity := selector.(*SessionAffinitySelector)
 	trackTransientAffinity := hasAffinity && affinitySelector != nil && (affinitySelector.rebindOnQuotaOnly || affinitySelector.rebindOnNever)
-	_, weighted := selector.(*WeightedRoundRobinSelector)
-	if hasAffinity && affinitySelector != nil {
-		_, weighted = affinitySelector.fallback.(*WeightedRoundRobinSelector)
-	}
-	trackPinnedAccounting := pinnedAuthID != "" && weighted
-	var accountingCandidates, affinityCandidates []*Auth
+	var affinityCandidates []*Auth
 	if trackTransientAffinity {
 		affinityCandidates = make([]*Auth, 0, len(m.auths))
 	}
@@ -1830,7 +1816,7 @@ func (m *Manager) pickNextLegacyOnce(ctx context.Context, provider, model string
 		if candidate == nil || canonicalSchedulingProvider(executorKeyFromAuth(candidate)) != targetKey || candidate.Disabled {
 			continue
 		}
-		if !trackPinnedAccounting && pinnedAuthID != "" && candidate.ID != pinnedAuthID {
+		if pinnedAuthID != "" && candidate.ID != pinnedAuthID {
 			continue
 		}
 		if !eligibility.allows(candidate) {
@@ -1840,10 +1826,6 @@ func (m *Manager) pickNextLegacyOnce(ctx context.Context, provider, model string
 			continue
 		}
 		_, used := tried[candidate.ID]
-		// Pinning restricts selection, not the eligible pool used for accounting.
-		if trackPinnedAccounting && !used {
-			accountingCandidates = append(accountingCandidates, candidate)
-		}
 		if pinnedAuthID != "" && candidate.ID != pinnedAuthID {
 			continue
 		}
@@ -1873,15 +1855,6 @@ func (m *Manager) pickNextLegacyOnce(ctx context.Context, provider, model string
 			return nil, nil, errAvailable
 		}
 	}
-	var accountingAuths []*Auth
-	if trackPinnedAccounting && len(candidates) > 0 && errAvailable == nil {
-		fullAvailable, _, errAccounting := m.availableAuthsForSelector(ctx, selector, accountingCandidates, provider, model, now, true, opts.Headers)
-		if errAccounting != nil {
-			m.mu.RUnlock()
-			return nil, nil, errAccounting
-		}
-		accountingAuths = fullAvailable
-	}
 	transientAuthIDs := m.transientlyUnavailableSessionAffinityAuthIDs(ctx, selector, affinityCandidates, model, now, opts.Headers)
 	m.mu.RUnlock()
 
@@ -1895,9 +1868,6 @@ func (m *Manager) pickNextLegacyOnce(ctx context.Context, provider, model string
 	if !handled {
 		selectorCtx := selectorContextForAvailableAuths(ctx, selector, model)
 		selectorCtx = withSessionAffinityTransientAuthIDs(selectorCtx, transientAuthIDs)
-		if accountingAuths != nil {
-			selectorCtx = context.WithValue(selectorCtx, weightedAccountingPoolKey{}, accountingAuths)
-		}
 		selected, errPick = selector.Pick(selectorCtx, provider, selectionArgForSelector(selector, model), opts, selectorAuths)
 		if errPick != nil {
 			if isAuthNotFoundError(errPick) {
@@ -2135,12 +2105,7 @@ func (m *Manager) pickNextMixedLegacy(ctx context.Context, providers []string, m
 	registryRef := registry.GetGlobalRegistry()
 	affinitySelector, hasAffinity := selector.(*SessionAffinitySelector)
 	trackTransientAffinity := hasAffinity && affinitySelector != nil && (affinitySelector.rebindOnQuotaOnly || affinitySelector.rebindOnNever)
-	_, weighted := selector.(*WeightedRoundRobinSelector)
-	if hasAffinity && affinitySelector != nil {
-		_, weighted = affinitySelector.fallback.(*WeightedRoundRobinSelector)
-	}
-	trackPinnedAccounting := pinnedAuthID != "" && weighted
-	var accountingCandidates, affinityCandidates []*Auth
+	var affinityCandidates []*Auth
 	if trackTransientAffinity {
 		affinityCandidates = make([]*Auth, 0, len(m.auths))
 	}
@@ -2148,7 +2113,7 @@ func (m *Manager) pickNextMixedLegacy(ctx context.Context, providers []string, m
 		if candidate == nil || candidate.Disabled {
 			continue
 		}
-		if !trackPinnedAccounting && pinnedAuthID != "" && candidate.ID != pinnedAuthID {
+		if pinnedAuthID != "" && candidate.ID != pinnedAuthID {
 			continue
 		}
 		if !eligibility.allows(candidate) {
@@ -2168,10 +2133,6 @@ func (m *Manager) pickNextMixedLegacy(ctx context.Context, providers []string, m
 			continue
 		}
 		_, used := tried[candidate.ID]
-		// Pinning restricts selection, not the eligible pool used for accounting.
-		if trackPinnedAccounting && !used {
-			accountingCandidates = append(accountingCandidates, candidate)
-		}
 		if pinnedAuthID != "" && candidate.ID != pinnedAuthID {
 			continue
 		}
@@ -2201,15 +2162,6 @@ func (m *Manager) pickNextMixedLegacy(ctx context.Context, providers []string, m
 			return nil, nil, "", errAvailable
 		}
 	}
-	var accountingAuths []*Auth
-	if trackPinnedAccounting && len(candidates) > 0 && errAvailable == nil {
-		fullAvailable, _, errAccounting := m.availableAuthsForSelector(ctx, selector, accountingCandidates, "mixed", model, now, true, opts.Headers)
-		if errAccounting != nil {
-			m.mu.RUnlock()
-			return nil, nil, "", errAccounting
-		}
-		accountingAuths = fullAvailable
-	}
 	transientAuthIDs := m.transientlyUnavailableSessionAffinityAuthIDs(ctx, selector, affinityCandidates, model, now, opts.Headers)
 	m.mu.RUnlock()
 
@@ -2223,27 +2175,6 @@ func (m *Manager) pickNextMixedLegacy(ctx context.Context, providers []string, m
 	if !handled {
 		selectorCtx := selectorContextForAvailableAuths(ctx, selector, model)
 		selectorCtx = withSessionAffinityTransientAuthIDs(selectorCtx, transientAuthIDs)
-		if accountingAuths != nil {
-			selectorCtx = context.WithValue(selectorCtx, weightedAccountingPoolKey{}, accountingAuths)
-		}
-		if _, bareWeighted := selector.(*WeightedRoundRobinSelector); bareWeighted {
-			// Match the scheduler's single-provider transport preference after
-			// excluding providers without an executor.
-			singleProvider := ""
-			for providerKey := range providerSet {
-				if _, okExecutor := m.Executor(providerKey); !okExecutor {
-					continue
-				}
-				if singleProvider != "" {
-					singleProvider = ""
-					break
-				}
-				singleProvider = providerKey
-			}
-			if singleProvider != "" {
-				selectorCtx = context.WithValue(selectorCtx, weightedTransportProviderKey{}, singleProvider)
-			}
-		}
 		selected, errPick = selector.Pick(selectorCtx, "mixed", selectionArgForSelector(selector, model), opts, selectorAuths)
 		if errPick != nil {
 			if isAuthNotFoundError(errPick) {

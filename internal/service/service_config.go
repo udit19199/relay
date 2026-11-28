@@ -56,7 +56,6 @@ type configCommit struct {
 }
 
 type routingRuntimeState struct {
-	strategy                 string
 	sessionAffinity          bool
 	sessionAffinityTTL       time.Duration
 	sessionAffinitySubagents bool
@@ -65,7 +64,6 @@ type routingRuntimeState struct {
 
 func normalizedRoutingRuntimeState(cfg *config.Config) routingRuntimeState {
 	state := routingRuntimeState{
-		strategy:                 "round-robin",
 		sessionAffinityTTL:       time.Hour,
 		sessionAffinitySubagents: true,
 		sessionAffinityRebindOn:  coreauth.SessionAffinityRebindOnAny,
@@ -74,12 +72,6 @@ func normalizedRoutingRuntimeState(cfg *config.Config) routingRuntimeState {
 		return state
 	}
 
-	switch strings.ToLower(strings.TrimSpace(cfg.Routing.Strategy)) {
-	case "weighted-round-robin", "weightedroundrobin", "wrr":
-		state.strategy = "weighted-round-robin"
-	case "fill-first", "fillfirst", "ff":
-		state.strategy = "fill-first"
-	}
 	state.sessionAffinity = cfg.Routing.SessionAffinity
 	if ttl := strings.TrimSpace(cfg.Routing.SessionAffinityTTL); ttl != "" {
 		if parsed, errParse := time.ParseDuration(ttl); errParse == nil && parsed > 0 {
@@ -104,15 +96,7 @@ func normalizedRoutingRuntimeState(cfg *config.Config) routingRuntimeState {
 }
 
 func newRoutingSelector(state routingRuntimeState) coreauth.Selector {
-	var selector coreauth.Selector
-	switch state.strategy {
-	case "weighted-round-robin":
-		selector = &coreauth.WeightedRoundRobinSelector{}
-	case "fill-first":
-		selector = &coreauth.FillFirstSelector{}
-	default:
-		selector = &coreauth.RoundRobinSelector{}
-	}
+	var selector coreauth.Selector = &coreauth.RoundRobinSelector{}
 	if state.sessionAffinity {
 		subagents := state.sessionAffinitySubagents
 		selector = coreauth.NewSessionAffinitySelectorWithConfig(coreauth.SessionAffinityConfig{
@@ -152,11 +136,6 @@ func (s *Service) commitConfigUpdate(newCfg *config.Config) configCommit {
 	if newCfg == nil {
 		return configCommit{}
 	}
-	if errValidate := newCfg.ValidateCredentialWeights(); errValidate != nil {
-		log.WithError(errValidate).Warn("rejected config update with invalid credential weights")
-		return configCommit{}
-	}
-
 	if errValidate := newCfg.Models.Validate(); errValidate != nil {
 		log.WithError(errValidate).Warn("rejected invalid model catalog sources")
 		return configCommit{}

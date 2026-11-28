@@ -104,7 +104,7 @@ func TestSessionAffinityGuardianParentCredential(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			enabled := !tt.disableAffinity
 			selector := NewSessionAffinitySelectorWithConfig(SessionAffinityConfig{
-				Fallback:         &FillFirstSelector{},
+				Fallback:         &RoundRobinSelector{},
 				TTL:              time.Minute,
 				SubagentAffinity: &enabled,
 			})
@@ -214,7 +214,7 @@ func TestSessionAffinityGuardianParentLifecycle(t *testing.T) {
 
 	for _, action := range []string{"read_only", "expired", "invalidated", "auth_invalidated", "failed", "evicted"} {
 		t.Run(action, func(t *testing.T) {
-			selector := NewSessionAffinitySelector(&FillFirstSelector{})
+			selector := NewSessionAffinitySelector(&RoundRobinSelector{})
 			t.Cleanup(selector.Stop)
 			authA := &Auth{ID: "auth-a", Provider: "codex"}
 			authB := &Auth{ID: "auth-b", Provider: "codex"}
@@ -276,7 +276,7 @@ func TestSessionAffinityGuardianParentLifecycle(t *testing.T) {
 func TestSessionAffinityGuardianMixedProviderIsolation(t *testing.T) {
 	t.Parallel()
 
-	selector := NewSessionAffinitySelector(&FillFirstSelector{})
+	selector := NewSessionAffinitySelector(&RoundRobinSelector{})
 	t.Cleanup(selector.Stop)
 	authA := &Auth{ID: "auth-a", Provider: "codex"}
 	authB := &Auth{ID: "auth-b", Provider: "codex"}
@@ -318,7 +318,7 @@ func TestSessionAffinityGuardianSchedulingProvider(t *testing.T) {
 				{name: "mixed_child", parent: tt.provider, child: "mixed"},
 			} {
 				t.Run(route.name, func(t *testing.T) {
-					selector := NewSessionAffinitySelector(&FillFirstSelector{})
+					selector := NewSessionAffinitySelector(&RoundRobinSelector{})
 					t.Cleanup(selector.Stop)
 					authA, authB := tt.auth, tt.auth
 					authA.ID, authB.ID = "auth-a", "auth-b"
@@ -333,7 +333,7 @@ func TestSessionAffinityGuardianSchedulingProvider(t *testing.T) {
 func TestSessionAffinityGuardianQuotaPreservedParent(t *testing.T) {
 	t.Parallel()
 
-	selector := NewSessionAffinitySelectorWithConfig(SessionAffinityConfig{Fallback: &FillFirstSelector{}, RebindOn: SessionAffinityRebindOnQuota})
+	selector := NewSessionAffinitySelectorWithConfig(SessionAffinityConfig{Fallback: &RoundRobinSelector{}, RebindOn: SessionAffinityRebindOnQuota})
 	t.Cleanup(selector.Stop)
 	authA := &Auth{ID: "auth-a", Provider: "codex"}
 	authB := &Auth{ID: "auth-b", Provider: "codex"}
@@ -349,7 +349,7 @@ func TestSessionAffinityGuardianQuotaPreservedParent(t *testing.T) {
 func TestSessionAffinityQuotaPreservedBindingAddsConversationAlias(t *testing.T) {
 	t.Parallel()
 
-	selector := NewSessionAffinitySelectorWithConfig(SessionAffinityConfig{Fallback: &FillFirstSelector{}, RebindOn: SessionAffinityRebindOnQuota})
+	selector := NewSessionAffinitySelectorWithConfig(SessionAffinityConfig{Fallback: &RoundRobinSelector{}, RebindOn: SessionAffinityRebindOnQuota})
 	t.Cleanup(selector.Stop)
 	authA := &Auth{ID: "auth-a", Provider: "codex"}
 	authB := &Auth{ID: "auth-b", Provider: "codex"}
@@ -368,13 +368,9 @@ func TestSessionAffinityQuotaPreservedBindingAddsConversationAlias(t *testing.T)
 func TestSessionAffinityGuardianCandidateEligibility(t *testing.T) {
 	t.Parallel()
 
-	for _, eligibility := range []string{"lower_priority", "model_cooldown", "zero_weight"} {
+	for _, eligibility := range []string{"lower_priority", "model_cooldown"} {
 		t.Run(eligibility, func(t *testing.T) {
-			var fallback Selector = &FillFirstSelector{}
-			if eligibility == "zero_weight" {
-				fallback = &WeightedRoundRobinSelector{}
-			}
-			selector := NewSessionAffinitySelector(fallback)
+			selector := NewSessionAffinitySelector(&RoundRobinSelector{})
 			t.Cleanup(selector.Stop)
 			authA := &Auth{ID: "auth-a", Provider: "codex", Attributes: map[string]string{"priority": "1"}}
 			authB := &Auth{ID: "auth-b", Provider: "codex", Attributes: map[string]string{"priority": "0"}}
@@ -385,9 +381,6 @@ func TestSessionAffinityGuardianCandidateEligibility(t *testing.T) {
 				authB.ModelStates = map[string]*ModelState{
 					"review-model": {Unavailable: true, NextRetryAfter: time.Now().Add(time.Hour)},
 				}
-				want = "auth-a"
-			case "zero_weight":
-				authB.Attributes["weight"] = "0"
 				want = "auth-a"
 			}
 			guardianTestPick(t, selector, "codex", "review-model", guardianTestOptions("review-thread", "main-thread"), []*Auth{authA, authB}, want)

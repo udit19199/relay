@@ -161,7 +161,6 @@ func TestV8KeyInheritance(t *testing.T) {
           disable-cooling: null
           request-retry: null
         - api-key: overridden
-          weight: 0
           priority: 0
           prefix: ''
           proxy-url: ''
@@ -195,7 +194,7 @@ func TestV8KeyInheritance(t *testing.T) {
 			if yamlPath(first, "priority").Value != "7" || yamlPath(first, "request-retry").Value != "3" || yamlPath(first, "disable-cooling").Value != "true" || yamlPath(first, "headers") == nil {
 				t.Fatal("null did not inherit")
 			}
-			if yamlPath(second, "request-retry").Value != "0" || yamlPath(second, "disable-cooling").Value != "false" || yamlPath(second, "weight").Value != "0" || yamlPath(third, "request-retry").Value != "-1" {
+			if yamlPath(second, "request-retry").Value != "0" || yamlPath(second, "disable-cooling").Value != "false" || yamlPath(third, "request-retry").Value != "-1" {
 				t.Fatal("explicit overrides lost")
 			}
 			for _, name := range []string{"headers", "models", "excluded-models"} {
@@ -225,7 +224,7 @@ codex-api-key:
 openai-compatibility:
   - name: compatible
     base-url: https://example.invalid
-    api-key-entries: [{api-key: a, weight: 0}, {api-key: b, proxy-url: direct}]
+    api-key-entries: [{api-key: a, proxy-url: http://proxy-a.invalid}, {api-key: b, proxy-url: direct}]
 `)
 	before, err := ParseConfigBytes(raw)
 	if err != nil {
@@ -301,7 +300,7 @@ proxy-url: old
 
 func TestV8MigrationCommentsUnknownNestedFields(t *testing.T) {
 	raw := []byte(`server: {port: 8317}
-routing: {strategy: fill-first, session-affinity: true}
+routing: {session-affinity: true}
 oauth:
   providers:
     codex:
@@ -327,7 +326,7 @@ oauth:
 		t.Fatalf("unknown nested field was not preserved as a comment: %s", migrated)
 	}
 	cfg, err := ParseConfigBytes(migrated)
-	if err != nil || cfg.Routing.Strategy != "fill-first" || !cfg.Routing.SessionAffinity || !cfg.Codex.DisableCodexCloaking {
+	if err != nil || !cfg.Routing.SessionAffinity || !cfg.Codex.DisableCodexCloaking {
 		t.Fatalf("migration changed known settings: cfg=%+v error=%v", cfg, err)
 	}
 	remigrated, _, err := NormalizeConfigLayout(migrated, true)
@@ -644,7 +643,6 @@ func TestV8SaveLegacyAdapterAndManualFallback(t *testing.T) {
 
 func TestV8RejectsInvalidGroups(t *testing.T) {
 	for _, raw := range []string{
-		"api-keys: {codex: [{name: a, keys: [{api-key: a, weight: 1.5}]}]}",
 		"api-keys: {codex: [{name: a, keys: [{api-key: a, base-url: https://invalid}]}]}",
 		"api-keys: {codex: [{name: a, keys: {api-key: a}}]}",
 		"server: true", "config-version: 9", "server: {port: bad}",

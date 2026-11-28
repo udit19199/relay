@@ -392,9 +392,6 @@ func expandV8Groups(groups *yaml.Node, provider string) (*yaml.Node, error) {
 		if keys == nil || keys.Kind != yaml.SequenceNode {
 			return nil, fmt.Errorf("api-keys.%s[%d].keys must be a list", provider, index)
 		}
-		if err := validateWeightSequenceNode(keys, "api-keys."+provider+".keys"); err != nil {
-			return nil, err
-		}
 		if provider == "openai-compatibility" {
 			item := deepCopyNode(group)
 			deleteYAMLPath(item, "keys")

@@ -14,12 +14,9 @@ import (
 func TestManagerNonWeightedPinnedSelection(t *testing.T) {
 	for _, mixed := range []bool{false, true} {
 		for _, affinity := range []bool{false, true} {
-			for _, strategy := range []string{"round-robin", "fill-first"} {
+			for _, strategy := range []string{"round-robin"} {
 				t.Run(fmt.Sprintf("mixed=%t/affinity=%t/%s", mixed, affinity, strategy), func(t *testing.T) {
 					var selector Selector = &RoundRobinSelector{}
-					if strategy == "fill-first" {
-						selector = &FillFirstSelector{}
-					}
 					if affinity {
 						sticky := NewSessionAffinitySelector(selector)
 						t.Cleanup(sticky.Stop)
