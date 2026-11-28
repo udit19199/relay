@@ -104,9 +104,6 @@ type Config struct {
 	// Routing controls credential selection behavior.
 	Routing RoutingConfig `yaml:"routing" json:"routing"`
 
-	// WebsocketAuth enables or disables authentication for the WebSocket API.
-	WebsocketAuth bool `yaml:"ws-auth" json:"ws-auth"`
-
 	// ProxyPoolPublisher identifies the runtime that published this snapshot, so a
 	// reload in one runtime never retires another runtime's snapshots.
 	ProxyPoolPublisher uint64 `yaml:"-" json:"-"`

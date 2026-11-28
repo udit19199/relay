@@ -152,11 +152,7 @@ func (s *Server) UpdateClientsContext(ctx context.Context, cfg *config.Config) b
 	s.cfgMu.Lock()
 	s.cfg = cfg
 	s.cfgMu.Unlock()
-	s.wsAuthEnabled.Store(cfg.WebsocketAuth)
 	openai.SetResponsesWebsocketCompressionEnabled(cfg.Codex.WebsocketCompressionEnabled())
-	if oldCfg != nil && s.wsAuthChanged != nil && oldCfg.WebsocketAuth != cfg.WebsocketAuth {
-		s.wsAuthChanged(oldCfg.WebsocketAuth, cfg.WebsocketAuth)
-	}
 	githubauth.SetToken(cfg.GitHubToken)
 	if errContext := ctx.Err(); errContext != nil {
 		return false

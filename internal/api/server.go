@@ -65,9 +65,7 @@ type Server struct {
 	// currentPath is the absolute path to the current working directory.
 	currentPath string
 
-	wsRoutes      map[string]struct{}
-	wsAuthChanged func(bool, bool)
-	wsAuthEnabled atomic.Bool
+	wsRoutes map[string]struct{}
 
 	// management handler
 	mgmt *managementHandlers.Handler
@@ -181,7 +179,6 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *acc
 	engine.Use(corsMiddleware())
 	engine.Use(s.responseCompressionMiddleware())
 	openai.SetResponsesWebsocketCompressionEnabled(cfg.Codex.WebsocketCompressionEnabled())
-	s.wsAuthEnabled.Store(cfg.WebsocketAuth)
 	s.exampleAPIKeySafeModeActive.Store(s.exampleAPIKeySafeModeRequired(cfg))
 	// Save initial YAML snapshot
 	s.oldConfigYaml, _ = yaml.Marshal(cfg)

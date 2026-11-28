@@ -212,7 +212,6 @@ func TestV8MigrationPreservesLegacySemantics(t *testing.T) {
 port: 8317
 api-keys: [client]
 request-retry: 0
-ws-auth: false
 codex-api-key:
   - api-key: a
     base-url: https://example.invalid
@@ -612,7 +611,7 @@ oauth: {providers: {codex: {}}}
 
 func TestV8SaveLegacyAdapterAndManualFallback(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.yaml")
-	raw := "config-version: 8\nrouting: {retry: {request-retry: 1}}\noauth: {providers: {codex: {ws-auth: true}}}\n"
+	raw := "config-version: 8\nrouting: {retry: {request-retry: 1}}\noauth: {providers: {codex: {}}}\n"
 	if err := os.WriteFile(path, []byte(raw), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -620,7 +619,7 @@ func TestV8SaveLegacyAdapterAndManualFallback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg.RequestRetry, cfg.WebsocketAuth = 0, false
+	cfg.RequestRetry = 0
 	if err = SaveConfigPreserveComments(path, cfg); err != nil {
 		t.Fatal(err)
 	}
@@ -628,17 +627,17 @@ func TestV8SaveLegacyAdapterAndManualFallback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if reloaded.RequestRetry != 0 || reloaded.WebsocketAuth {
+	if reloaded.RequestRetry != 0 {
 		t.Fatal("legacy API write was shadowed by stale v8 values")
 	}
-	if err = os.WriteFile(path, []byte("config-version: 8\nrequest-retry: 5\nws-auth: true\n"), 0600); err != nil {
+	if err = os.WriteFile(path, []byte("config-version: 8\nrequest-retry: 5\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	reloaded, err = LoadConfig(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if reloaded.RequestRetry != 5 || !reloaded.WebsocketAuth {
+	if reloaded.RequestRetry != 5 {
 		t.Fatal("manual legacy fallback failed")
 	}
 }

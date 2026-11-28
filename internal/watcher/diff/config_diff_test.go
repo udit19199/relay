@@ -300,7 +300,6 @@ func TestBuildConfigChangeDetails_FlagsAndKeys(t *testing.T) {
 		RequestRetry:                  1,
 		MaxRetryCredentials:           1,
 		MaxRetryInterval:              1,
-		WebsocketAuth:                 false,
 		ClaudeKey:                     []config.ClaudeKey{{APIKey: "c1"}},
 		CodexKey:                      []config.CodexKey{{APIKey: "x1"}},
 		RemoteManagement:              config.RemoteManagement{SecretKey: "keep"},
@@ -324,7 +323,6 @@ func TestBuildConfigChangeDetails_FlagsAndKeys(t *testing.T) {
 		RequestRetry:                  2,
 		MaxRetryCredentials:           3,
 		MaxRetryInterval:              3,
-		WebsocketAuth:                 true,
 		XAI:                           config.XAIConfig{InjectXSearch: true},
 		Claude:                        config.ClaudeConfig{ToolSearch: true},
 		ClaudeKey: []config.ClaudeKey{
@@ -363,7 +361,6 @@ func TestBuildConfigChangeDetails_FlagsAndKeys(t *testing.T) {
 	expectContains(t, details, "max-retry-credentials: 1 -> 3")
 	expectContains(t, details, "max-retry-interval: 1 -> 3")
 	expectContains(t, details, "proxy-url: http://old-proxy -> http://new-proxy")
-	expectContains(t, details, "ws-auth: false -> true")
 	expectContains(t, details, "force-model-prefix: false -> true")
 	expectContains(t, details, "nonstream-keepalive-interval: 0 -> 5")
 	expectContains(t, details, "xai.inject-x-search: false -> true")
@@ -387,7 +384,6 @@ func TestBuildConfigChangeDetails_AllBranches(t *testing.T) {
 		RequestRetry:                  1,
 		MaxRetryCredentials:           1,
 		MaxRetryInterval:              1,
-		WebsocketAuth:                 false,
 		ClaudeKey: []config.ClaudeKey{
 			{APIKey: "c-old", BaseURL: "http://c-old", ProxyURL: "http://cp-old", Headers: map[string]string{"H": "1"}, ExcludedModels: []string{"x"}},
 		},
@@ -426,7 +422,6 @@ func TestBuildConfigChangeDetails_AllBranches(t *testing.T) {
 		RequestRetry:                  2,
 		MaxRetryCredentials:           3,
 		MaxRetryInterval:              3,
-		WebsocketAuth:                 true,
 		ClaudeKey: []config.ClaudeKey{
 			{APIKey: "c-new", BaseURL: "http://c-new", ProxyURL: "http://cp-new", Headers: map[string]string{"H": "2"}, ExcludedModels: []string{"x", "y"}},
 		},
@@ -472,7 +467,6 @@ func TestBuildConfigChangeDetails_AllBranches(t *testing.T) {
 	expectContains(t, changes, "max-retry-credentials: 1 -> 3")
 	expectContains(t, changes, "max-retry-interval: 1 -> 3")
 	expectContains(t, changes, "proxy-url: http://old-proxy -> http://new-proxy")
-	expectContains(t, changes, "ws-auth: false -> true")
 	expectContains(t, changes, "api-keys: values updated (count unchanged, redacted)")
 	expectContains(t, changes, "claude[0].base-url: http://c-old -> http://c-new")
 	expectContains(t, changes, "claude[0].proxy-url: http://cp-old -> http://cp-new")

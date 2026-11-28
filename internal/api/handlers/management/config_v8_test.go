@@ -21,7 +21,7 @@ import (
 func TestConfigV8MigrationAndLegacyAPI(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	path := filepath.Join(t.TempDir(), "config.yaml")
-	raw := "# Keep this configuration\nport: 8317\nrequest-retry: 3\napi-keys: [client]\nws-auth: true\ntls: {}\npayload: null\ncodex: {}\n"
+	raw := "# Keep this configuration\nport: 8317\nrequest-retry: 3\napi-keys: [client]\ntls: {}\npayload: null\ncodex: {}\n"
 	if err := os.WriteFile(path, []byte(raw), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func TestConfigV8MigrationAndLegacyAPI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	request(http.MethodPatch, "/v8/management/config", `{"routing":{"retry":{"request-retry":0}},"oauth":{"providers":{"codex":{"ws-auth":false}}}}`, 200)
+	request(http.MethodPatch, "/v8/management/config", `{"routing":{"retry":{"request-retry":0}}}`, 200)
 	updatedFile, err := os.Stat(path)
 	if err != nil {
 		t.Fatal(err)
@@ -85,7 +85,7 @@ func TestConfigV8MigrationAndLegacyAPI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if loaded.RequestRetry != 0 || loaded.WebsocketAuth || len(loaded.APIKeys) != 1 {
+	if loaded.RequestRetry != 0 || len(loaded.APIKeys) != 1 {
 		t.Fatal("v8 patch lost effective values")
 	}
 	request(http.MethodPut, "/v0/management/request-retry", `{"value":5}`, 200)
@@ -388,7 +388,6 @@ func TestConfigV8DeleteLastField(t *testing.T) {
 		check func(*config.Config) bool
 	}{
 		{"retry", "request-retry: 3\n", "routing/retry/request-retry", func(cfg *config.Config) bool { return cfg.RequestRetry == 0 }},
-		{"websocket", "ws-auth: false\n", "oauth/providers/codex/ws-auth", func(cfg *config.Config) bool { return cfg.WebsocketAuth }},
 		{"debug", "debug: true\n", "observability/logs/debug", func(cfg *config.Config) bool { return !cfg.Debug }},
 		{"sibling", "routing: {strategy: fill-first, retry: {request-retry: 3}}\n", "routing/retry/request-retry", func(cfg *config.Config) bool { return cfg.RequestRetry == 0 && cfg.Routing.Strategy == "fill-first" }},
 		{"provider", "oauth: {providers: {codex: {disable-codex-cloaking: true}}}\n", "upstream/codex/disable-codex-cloaking", func(cfg *config.Config) bool { return !cfg.Codex.DisableCodexCloaking }},
@@ -473,7 +472,7 @@ func TestConfigV8ReplaceEmptyGroup(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if loaded.RequestRetry != 0 || !loaded.WebsocketAuth || loaded.Debug {
+			if loaded.RequestRetry != 0 || loaded.Debug {
 				t.Fatal("empty replacement did not restore defaults")
 			}
 		})
