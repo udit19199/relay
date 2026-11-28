@@ -180,7 +180,6 @@ func TestBuildConfigChangeDetails_XAIKeys(t *testing.T) {
 	oldCfg := &config.Config{XAIKey: []config.XAIKey{{
 		APIKey:         "old-key",
 		Priority:       1,
-		Prefix:         "old",
 		BaseURL:        "https://old.example.com/v1",
 		ProxyURL:       "http://old-proxy",
 		Websockets:     false,
@@ -193,7 +192,6 @@ func TestBuildConfigChangeDetails_XAIKeys(t *testing.T) {
 	newCfg := &config.Config{XAIKey: []config.XAIKey{{
 		APIKey:         "new-key",
 		Priority:       2,
-		Prefix:         "new",
 		BaseURL:        "https://new.example.com/v1",
 		ProxyURL:       "http://new-proxy",
 		Websockets:     true,
@@ -207,7 +205,6 @@ func TestBuildConfigChangeDetails_XAIKeys(t *testing.T) {
 	changes := BuildConfigChangeDetails(oldCfg, newCfg)
 	expectContains(t, changes, "xai[0].base-url: https://old.example.com -> https://new.example.com")
 	expectContains(t, changes, "xai[0].proxy-url: http://old-proxy -> http://new-proxy")
-	expectContains(t, changes, "xai[0].prefix: old -> new")
 	expectContains(t, changes, "xai[0].priority: 1 -> 2")
 	expectContains(t, changes, "xai[0].websockets: false -> true")
 	expectContains(t, changes, "xai[0].disable-cooling: false -> true")
@@ -306,7 +303,6 @@ func TestBuildConfigChangeDetails_FlagsAndKeys(t *testing.T) {
 			RequestLog:                 false,
 			ProxyURL:                   "http://old-proxy",
 			APIKeys:                    []string{"key-1"},
-			ForceModelPrefix:           false,
 			NonStreamKeepAliveInterval: 0,
 		},
 	}
@@ -338,7 +334,6 @@ func TestBuildConfigChangeDetails_FlagsAndKeys(t *testing.T) {
 			RequestLog:                 true,
 			ProxyURL:                   "http://new-proxy",
 			APIKeys:                    []string{" key-1 ", "key-2"},
-			ForceModelPrefix:           true,
 			NonStreamKeepAliveInterval: 5,
 			ClaudeCode: config.ClaudeCodeConfig{
 				DisableCloakingModelList: true,
@@ -358,7 +353,6 @@ func TestBuildConfigChangeDetails_FlagsAndKeys(t *testing.T) {
 	expectContains(t, details, "max-retry-credentials: 1 -> 3")
 	expectContains(t, details, "max-retry-interval: 1 -> 3")
 	expectContains(t, details, "proxy-url: http://old-proxy -> http://new-proxy")
-	expectContains(t, details, "force-model-prefix: false -> true")
 	expectContains(t, details, "nonstream-keepalive-interval: 0 -> 5")
 	expectContains(t, details, "xai.inject-x-search: false -> true")
 	expectContains(t, details, "claude.tool-search: false -> true")

@@ -106,9 +106,8 @@ func (s *ConfigSynthesizer) synthesizeClaudeKeys(ctx *SynthesisContext) []*corea
 		if key == "" && base == "" {
 			continue
 		}
-		prefix := strings.TrimSpace(ck.Prefix)
 		proxyURL := strings.TrimSpace(ck.ProxyURL)
-		idParts := []string{key, base, proxyURL, prefix, config.FormatSortedHeaders(ck.Headers)}
+		idParts := []string{key, base, proxyURL, config.FormatSortedHeaders(ck.Headers)}
 		if poolID := config.FormatConnectionPoolDedupID(ck.ConnectionPool); poolID != "" {
 			idParts = append(idParts, poolID)
 		}
@@ -149,7 +148,6 @@ func (s *ConfigSynthesizer) synthesizeClaudeKeys(ctx *SynthesisContext) []*corea
 			ID:         id,
 			Provider:   "claude",
 			Label:      "claude-apikey",
-			Prefix:     prefix,
 			Status:     coreauth.StatusActive,
 			ProxyURL:   proxyURL,
 			Attributes: attrs,
@@ -190,9 +188,8 @@ func (s *ConfigSynthesizer) synthesizeCodexStyleKeys(ctx *SynthesisContext, entr
 		if key == "" && baseURL == "" {
 			continue
 		}
-		prefix := strings.TrimSpace(entry.Prefix)
 		proxyURL := strings.TrimSpace(entry.ProxyURL)
-		idParts := []string{key, baseURL, proxyURL, prefix, config.FormatSortedHeaders(entry.Headers)}
+		idParts := []string{key, baseURL, proxyURL, config.FormatSortedHeaders(entry.Headers)}
 		if poolID := config.FormatConnectionPoolDedupID(entry.ConnectionPool); poolID != "" {
 			idParts = append(idParts, poolID)
 		}
@@ -233,7 +230,6 @@ func (s *ConfigSynthesizer) synthesizeCodexStyleKeys(ctx *SynthesisContext, entr
 			ID:                  id,
 			Provider:            provider,
 			Label:               provider + "-apikey",
-			Prefix:              prefix,
 			Status:              coreauth.StatusActive,
 			ProxyURL:            strings.TrimSpace(entry.ProxyURL),
 			Attributes:          attrs,
@@ -263,7 +259,6 @@ func (s *ConfigSynthesizer) synthesizeOpenAICompat(ctx *SynthesisContext) []*cor
 		if compat.Disabled {
 			continue
 		}
-		prefix := strings.TrimSpace(compat.Prefix)
 		providerName := strings.ToLower(strings.TrimSpace(compat.Name))
 		if providerName == "" {
 			providerName = "openai-compatibility"
@@ -312,7 +307,6 @@ func (s *ConfigSynthesizer) synthesizeOpenAICompat(ctx *SynthesisContext) []*cor
 				ID:                  id,
 				Provider:            internalProviderKey,
 				Label:               compat.Name,
-				Prefix:              prefix,
 				Status:              coreauth.StatusActive,
 				ProxyURL:            proxyURL,
 				Attributes:          attrs,
@@ -360,7 +354,6 @@ func (s *ConfigSynthesizer) synthesizeOpenAICompat(ctx *SynthesisContext) []*cor
 				ID:                  id,
 				Provider:            internalProviderKey,
 				Label:               compat.Name,
-				Prefix:              prefix,
 				Status:              coreauth.StatusActive,
 				Attributes:          attrs,
 				Metadata:            metadata,

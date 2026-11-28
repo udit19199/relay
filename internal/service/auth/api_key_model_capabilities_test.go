@@ -17,7 +17,6 @@ func TestAttachResolvedAPIKeyModelInfoUsesSelectedCredential(t *testing.T) {
 	manager.SetConfig(&internalconfig.Config{ClaudeKey: []internalconfig.ClaudeKey{
 		{
 			APIKey: "key-high",
-			Prefix: "tenant",
 			Models: []internalconfig.ClaudeModel{{
 				Name: "shared-upstream", Alias: "public-model",
 				Thinking: &registry.ThinkingSupport{Levels: []string{"high"}},
@@ -25,7 +24,6 @@ func TestAttachResolvedAPIKeyModelInfoUsesSelectedCredential(t *testing.T) {
 		},
 		{
 			APIKey: "key-max",
-			Prefix: "tenant",
 			Models: []internalconfig.ClaudeModel{{
 				Name: "shared-upstream", Alias: "public-model",
 				Thinking: &registry.ThinkingSupport{Levels: []string{"max"}},
@@ -53,8 +51,8 @@ func TestAttachResolvedAPIKeyModelInfoUsesExactDuplicateCredentialConfig(t *test
 		Thinking: &registry.ThinkingSupport{Levels: []string{"max"}},
 	}}
 	manager.SetConfig(&internalconfig.Config{ClaudeKey: []internalconfig.ClaudeKey{
-		{APIKey: "shared-key", Prefix: "tenant", Models: highModels},
-		{APIKey: "shared-key", Prefix: "tenant", Models: maxModels},
+		{APIKey: "shared-key", Models: highModels},
+		{APIKey: "shared-key", Models: maxModels},
 	}})
 
 	authHigh := configuredCapabilityTestAuth("auth-duplicate-high", "shared-key")
@@ -73,7 +71,6 @@ func TestAttachResolvedAPIKeyModelInfoPrefersExactConfiguredSuffix(t *testing.T)
 	auth := configuredCapabilityTestAuth("auth-suffix", "key-suffix")
 	manager.SetConfig(&internalconfig.Config{ClaudeKey: []internalconfig.ClaudeKey{{
 		APIKey: "key-suffix",
-		Prefix: "tenant",
 		Models: []internalconfig.ClaudeModel{
 			{Name: "shared-upstream(high)", Alias: "public-high", Thinking: &registry.ThinkingSupport{Levels: []string{"high"}}},
 			{Name: "shared-upstream(low)", Alias: "public-low", Thinking: &registry.ThinkingSupport{Levels: []string{"low"}}},
@@ -105,7 +102,6 @@ func TestAPIKeyModelRoutingClonesPublishedConfig(t *testing.T) {
 	manager := NewManager(nil, nil, nil)
 	cfg := &internalconfig.Config{ClaudeKey: []internalconfig.ClaudeKey{{
 		APIKey: "key-clone",
-		Prefix: "tenant",
 		Models: []internalconfig.ClaudeModel{{
 			Name: "shared-upstream", Alias: "public",
 			Thinking: &registry.ThinkingSupport{Levels: []string{"high"}},
@@ -131,7 +127,6 @@ func TestAPIKeyModelRoutingKeepsOneExecutionSnapshotAcrossReload(t *testing.T) {
 	buildConfig := func(level string) *internalconfig.Config {
 		return &internalconfig.Config{ClaudeKey: []internalconfig.ClaudeKey{{
 			APIKey: "key-reload",
-			Prefix: "tenant",
 			Models: []internalconfig.ClaudeModel{{
 				Name: "shared-upstream", Alias: "public",
 				Thinking: &registry.ThinkingSupport{Levels: []string{level}},
@@ -156,7 +151,6 @@ func TestAttachResolvedAPIKeyModelInfoSupportsKeylessOpenAICompatibility(t *test
 	manager := NewManager(nil, nil, nil)
 	manager.SetConfig(&internalconfig.Config{OpenAICompatibility: []internalconfig.OpenAICompatibility{{
 		Name:    "keyless",
-		Prefix:  "tenant",
 		BaseURL: "https://example.com/v1",
 		Models: []internalconfig.OpenAICompatibilityModel{
 			{
@@ -204,7 +198,6 @@ func TestAttachResolvedAPIKeyModelInfoBindsUnknownConfiguredCapability(t *testin
 	auth := configuredCapabilityTestAuth("auth-fallback", "key-fallback")
 	manager.SetConfig(&internalconfig.Config{ClaudeKey: []internalconfig.ClaudeKey{{
 		APIKey: "key-fallback",
-		Prefix: "tenant",
 		Models: []internalconfig.ClaudeModel{{Name: "unknown-upstream", Alias: "unknown-public"}},
 	}}})
 	registerCapabilityTestAuth(t, manager, auth)
@@ -224,17 +217,17 @@ func TestSelectedCodexConfigurationUpdateCapability(t *testing.T) {
 	const upstream = "gpt-6-luna"
 	manager := NewManager(nil, nil, nil)
 	manager.SetConfig(&internalconfig.Config{CodexKey: []internalconfig.CodexKey{
-		{APIKey: "key-disabled", Prefix: "tenant", Models: []internalconfig.CodexModel{
+		{APIKey: "key-disabled", Models: []internalconfig.CodexModel{
 			{Name: upstream, Alias: "public", SupportConfigurationUpdate: false},
 			{Name: "gpt-6-astra", Alias: "other", SupportConfigurationUpdate: true},
 		}},
-		{APIKey: "key-enabled", Prefix: "tenant", Models: []internalconfig.CodexModel{
+		{APIKey: "key-enabled", Models: []internalconfig.CodexModel{
 			{Name: upstream, Alias: "public", SupportConfigurationUpdate: true},
 			{Name: "gpt-6-astra", Alias: "other", SupportConfigurationUpdate: false},
 		}},
-		{APIKey: "key-unlisted", Prefix: "tenant"},
-		{APIKey: "key-base-only", Prefix: "tenant", BaseURL: "https://expected.example/v1"},
-	}, ClaudeKey: []internalconfig.ClaudeKey{{APIKey: "claude-unlisted", Prefix: "tenant"}}})
+		{APIKey: "key-unlisted"},
+		{APIKey: "key-base-only", BaseURL: "https://expected.example/v1"},
+	}, ClaudeKey: []internalconfig.ClaudeKey{{APIKey: "claude-unlisted"}}})
 
 	keyAuth := func(id, key string) *Auth {
 		auth := configuredCapabilityTestAuth(id, key)
@@ -248,7 +241,7 @@ func TestSelectedCodexConfigurationUpdateCapability(t *testing.T) {
 		registerCapabilityTestAuth(t, manager, auth)
 	}
 	oauth := &Auth{
-		ID: "codex-oauth", Provider: "codex", Prefix: "tenant",
+		ID: "codex-oauth", Provider: "codex",
 		Attributes: map[string]string{"plan_type": "free"},
 		Metadata:   map[string]any{"access_token": "fake-token"},
 	}
@@ -368,7 +361,7 @@ func TestSelectedCodexConfigurationUpdateCapability(t *testing.T) {
 		}
 		oldReq := attachResolvedAPIKeyModelInfo(oldRouting, coreexecutor.Request{}, enabled, "tenant/public", models[0])
 		manager.SetConfig(&internalconfig.Config{CodexKey: []internalconfig.CodexKey{{
-			APIKey: "key-enabled", Prefix: "tenant", Models: []internalconfig.CodexModel{{Name: upstream, Alias: "public"}},
+			APIKey: "key-enabled", Models: []internalconfig.CodexModel{{Name: upstream, Alias: "public"}},
 		}}})
 		assertSelected(t, enabled, "tenant/public", upstream, false)
 		if info, ok := ResolvedModelInfo(oldReq); !ok || info == nil || !info.SupportConfigurationUpdate {
@@ -384,8 +377,8 @@ func TestSelectedCodexConfigurationUpdateCapability(t *testing.T) {
 func TestSelectedCodexConfigurationUpdateCapabilityDuplicateKey(t *testing.T) {
 	manager := NewManager(nil, nil, nil)
 	manager.SetConfig(&internalconfig.Config{CodexKey: []internalconfig.CodexKey{
-		{APIKey: "shared-key", Prefix: "tenant", BaseURL: "https://one.example/v1", Models: []internalconfig.CodexModel{{Name: "gpt-6-luna", Alias: "public", SupportConfigurationUpdate: true}}},
-		{APIKey: "shared-key", Prefix: "tenant", BaseURL: "https://two.example/v1", Models: []internalconfig.CodexModel{{Name: "gpt-6-luna", Alias: "public"}}},
+		{APIKey: "shared-key", BaseURL: "https://one.example/v1", Models: []internalconfig.CodexModel{{Name: "gpt-6-luna", Alias: "public", SupportConfigurationUpdate: true}}},
+		{APIKey: "shared-key", BaseURL: "https://two.example/v1", Models: []internalconfig.CodexModel{{Name: "gpt-6-luna", Alias: "public"}}},
 	}})
 	for i, want := range []bool{true, false} {
 		auth := configuredCapabilityTestAuth("codex-shared-"+strconv.Itoa(i), "shared-key")
@@ -449,12 +442,12 @@ func TestSelectedCodexConfigurationUpdateCapabilityExecutionModelOverride(t *tes
 	}{
 		{
 			name: "unlisted_codex_key_defaults_off", provider: "codex", key: "key-unlisted",
-			config:         &internalconfig.Config{CodexKey: []internalconfig.CodexKey{{APIKey: "key-unlisted", Prefix: "tenant"}}},
+			config:         &internalconfig.Config{CodexKey: []internalconfig.CodexKey{{APIKey: "key-unlisted"}}},
 			selectionModel: "tenant/" + model, executionModel: model, wantBound: true,
 		},
 		{
 			name: "configured_execution_model_not_selection_model", provider: "codex", key: "key-explicit",
-			config: &internalconfig.Config{CodexKey: []internalconfig.CodexKey{{APIKey: "key-explicit", Prefix: "tenant", Models: []internalconfig.CodexModel{
+			config: &internalconfig.Config{CodexKey: []internalconfig.CodexKey{{APIKey: "key-explicit", Models: []internalconfig.CodexModel{
 				{Name: model, Alias: "public", SupportConfigurationUpdate: true},
 				{Name: "gpt-6-astra", Alias: "other", SupportConfigurationUpdate: false},
 			}}}},
@@ -462,14 +455,14 @@ func TestSelectedCodexConfigurationUpdateCapabilityExecutionModelOverride(t *tes
 		},
 		{
 			name: "configured_execution_model_enabled", provider: "codex", key: "key-explicit",
-			config: &internalconfig.Config{CodexKey: []internalconfig.CodexKey{{APIKey: "key-explicit", Prefix: "tenant", Models: []internalconfig.CodexModel{
+			config: &internalconfig.Config{CodexKey: []internalconfig.CodexKey{{APIKey: "key-explicit", Models: []internalconfig.CodexModel{
 				{Name: model, Alias: "public", SupportConfigurationUpdate: true},
 			}}}},
 			selectionModel: "tenant/public", executionModel: model, wantBound: true, wantUpdate: true,
 		},
 		{
 			name: "unlisted_execution_model_cannot_inherit_oauth_capability", provider: "codex", key: "key-explicit",
-			config: &internalconfig.Config{CodexKey: []internalconfig.CodexKey{{APIKey: "key-explicit", Prefix: "tenant", Models: []internalconfig.CodexModel{
+			config: &internalconfig.Config{CodexKey: []internalconfig.CodexKey{{APIKey: "key-explicit", Models: []internalconfig.CodexModel{
 				{Name: "other-configured-model", Alias: "public", SupportConfigurationUpdate: true},
 			}}}},
 			selectionModel: "tenant/public", executionModel: model, wantBound: true,
@@ -481,12 +474,12 @@ func TestSelectedCodexConfigurationUpdateCapabilityExecutionModelOverride(t *tes
 		},
 		{
 			name: "unmatched_codex_key_keeps_fallback", provider: "codex", key: "key-unmatched",
-			config:         &internalconfig.Config{CodexKey: []internalconfig.CodexKey{{APIKey: "key-configured", Prefix: "tenant"}}},
+			config:         &internalconfig.Config{CodexKey: []internalconfig.CodexKey{{APIKey: "key-configured"}}},
 			selectionModel: "tenant/" + model, executionModel: model,
 		},
 		{
 			name: "non_codex_override_keeps_fallback", provider: "claude", key: "key-claude",
-			config:         &internalconfig.Config{ClaudeKey: []internalconfig.ClaudeKey{{APIKey: "key-claude", Prefix: "tenant", Models: []internalconfig.ClaudeModel{{Name: model}}}}},
+			config:         &internalconfig.Config{ClaudeKey: []internalconfig.ClaudeKey{{APIKey: "key-claude", Models: []internalconfig.ClaudeModel{{Name: model}}}}},
 			selectionModel: "tenant/" + model, executionModel: model,
 		},
 	}

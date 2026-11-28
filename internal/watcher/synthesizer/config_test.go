@@ -49,7 +49,6 @@ func TestConfigSynthesizer_ClaudeKeys(t *testing.T) {
 			ClaudeKey: []config.ClaudeKey{
 				{
 					APIKey:                  "sk-ant-api-xxx",
-					Prefix:                  "main",
 					BaseURL:                 "https://api.anthropic.com",
 					DisableCooling:          boolPointer(true),
 					RebuildMidSystemMessage: true,
@@ -79,9 +78,6 @@ func TestConfigSynthesizer_ClaudeKeys(t *testing.T) {
 	}
 	if auths[0].Label != "claude-apikey" {
 		t.Errorf("expected label claude-apikey, got %s", auths[0].Label)
-	}
-	if auths[0].Prefix != "main" {
-		t.Errorf("expected prefix main, got %s", auths[0].Prefix)
 	}
 	if auths[0].Attributes["api_key"] != "sk-ant-api-xxx" {
 		t.Errorf("expected api_key sk-ant-api-xxx, got %s", auths[0].Attributes["api_key"])
@@ -153,7 +149,6 @@ func TestConfigSynthesizer_CodexKeys(t *testing.T) {
 			CodexKey: []config.CodexKey{
 				{
 					APIKey:               "codex-key-123",
-					Prefix:               "dev",
 					BaseURL:              "https://api.openai.com",
 					ProxyURL:             "http://proxy.local",
 					Websockets:           true,
@@ -204,7 +199,6 @@ func TestConfigSynthesizer_XAIKeys(t *testing.T) {
 		Config: &config.Config{
 			XAIKey: []config.XAIKey{{
 				APIKey:         "xai-key-123",
-				Prefix:         "grok",
 				BaseURL:        "https://api.x.ai/v1",
 				ProxyURL:       "http://proxy.local",
 				Websockets:     true,
@@ -607,7 +601,7 @@ func TestConfigSynthesizer_OpenAICompat_FallbackWithModels(t *testing.T) {
 func TestConfigSynthesizer_IDStability(t *testing.T) {
 	cfg := &config.Config{
 		ClaudeKey: []config.ClaudeKey{
-			{APIKey: "stable-key", Prefix: "test"},
+			{APIKey: "stable-key"},
 		},
 	}
 

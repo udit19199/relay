@@ -36,7 +36,6 @@ type openAICompatibilityWithAuthIndex struct {
 	Name                  string                                   `json:"name"`
 	Priority              int                                      `json:"priority,omitempty"`
 	Disabled              bool                                     `json:"disabled"`
-	Prefix                string                                   `json:"prefix,omitempty"`
 	BaseURL               string                                   `json:"base-url"`
 	APIKeyEntries         []openAICompatibilityAPIKeyWithAuthIndex `json:"api-key-entries,omitempty"`
 	Models                []config.OpenAICompatibilityModel        `json:"models,omitempty"`
@@ -399,9 +398,8 @@ func (h *Handler) claudeKeysWithAuthIndex() []claudeKeyWithAuthIndex {
 		key := strings.TrimSpace(entry.APIKey)
 		base := strings.TrimSpace(entry.BaseURL)
 		proxyURL := strings.TrimSpace(entry.ProxyURL)
-		prefix := strings.TrimSpace(entry.Prefix)
 		if key != "" || base != "" {
-			idParts := []string{key, base, proxyURL, prefix, config.FormatSortedHeaders(entry.Headers)}
+			idParts := []string{key, base, proxyURL, config.FormatSortedHeaders(entry.Headers)}
 			if poolID := config.FormatConnectionPoolDedupID(entry.ConnectionPool); poolID != "" {
 				idParts = append(idParts, poolID)
 			}
@@ -436,9 +434,8 @@ func (h *Handler) codexKeysWithAuthIndex() []codexKeyWithAuthIndex {
 		key := strings.TrimSpace(entry.APIKey)
 		base := strings.TrimSpace(entry.BaseURL)
 		proxyURL := strings.TrimSpace(entry.ProxyURL)
-		prefix := strings.TrimSpace(entry.Prefix)
 		if key != "" || base != "" {
-			idParts := []string{key, base, proxyURL, prefix, config.FormatSortedHeaders(entry.Headers)}
+			idParts := []string{key, base, proxyURL, config.FormatSortedHeaders(entry.Headers)}
 			if poolID := config.FormatConnectionPoolDedupID(entry.ConnectionPool); poolID != "" {
 				idParts = append(idParts, poolID)
 			}
@@ -473,9 +470,8 @@ func (h *Handler) xaiKeysWithAuthIndex() []xaiKeyWithAuthIndex {
 		key := strings.TrimSpace(entry.APIKey)
 		base := strings.TrimSpace(entry.BaseURL)
 		proxyURL := strings.TrimSpace(entry.ProxyURL)
-		prefix := strings.TrimSpace(entry.Prefix)
 		if key != "" || base != "" {
-			idParts := []string{key, base, proxyURL, prefix, config.FormatSortedHeaders(entry.Headers)}
+			idParts := []string{key, base, proxyURL, config.FormatSortedHeaders(entry.Headers)}
 			if poolID := config.FormatConnectionPoolDedupID(entry.ConnectionPool); poolID != "" {
 				idParts = append(idParts, poolID)
 			}
@@ -517,7 +513,6 @@ func (h *Handler) openAICompatibilityWithAuthIndex() []openAICompatibilityWithAu
 			Name:                  entry.Name,
 			Priority:              entry.Priority,
 			Disabled:              entry.Disabled,
-			Prefix:                entry.Prefix,
 			BaseURL:               entry.BaseURL,
 			Models:                entry.Models,
 			Headers:               entry.Headers,

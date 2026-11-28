@@ -57,9 +57,6 @@ func TestParseConfigBytesXAIAPIKeyMatchesCodexShape(t *testing.T) {
 	if entry.Priority != 3 {
 		t.Fatalf("priority = %d, want 3", entry.Priority)
 	}
-	if entry.Prefix != "team-xai" {
-		t.Fatalf("prefix = %q, want team-xai", entry.Prefix)
-	}
 	if entry.BaseURL != "https://api.x.ai/v1" {
 		t.Fatalf("base-url = %q, want https://api.x.ai/v1", entry.BaseURL)
 	}

@@ -211,14 +211,6 @@ func (h *Handler) PutMaxRetryInterval(c *gin.Context) {
 	h.updateIntField(c, func(v int) { h.cfg.MaxRetryInterval = v })
 }
 
-// ForceModelPrefix
-func (h *Handler) GetForceModelPrefix(c *gin.Context) {
-	c.JSON(200, gin.H{"force-model-prefix": h.cfg.ForceModelPrefix})
-}
-func (h *Handler) PutForceModelPrefix(c *gin.Context) {
-	h.updateBoolField(c, func(v bool) { h.cfg.ForceModelPrefix = v })
-}
-
 // Proxy URL
 func (h *Handler) GetProxyURL(c *gin.Context) { c.JSON(200, gin.H{"proxy-url": h.cfg.ProxyURL}) }
 func (h *Handler) PutProxyURL(c *gin.Context) {

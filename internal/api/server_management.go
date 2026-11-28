@@ -80,10 +80,6 @@ func (s *Server) registerManagementRoutes() {
 		mgmt.PUT("/max-retry-interval", s.mgmt.PutMaxRetryInterval)
 		mgmt.PATCH("/max-retry-interval", s.mgmt.PutMaxRetryInterval)
 
-		mgmt.GET("/force-model-prefix", s.mgmt.GetForceModelPrefix)
-		mgmt.PUT("/force-model-prefix", s.mgmt.PutForceModelPrefix)
-		mgmt.PATCH("/force-model-prefix", s.mgmt.PutForceModelPrefix)
-
 		mgmt.GET("/claude-api-key", s.mgmt.GetClaudeKeys)
 		mgmt.PUT("/claude-api-key", s.mgmt.PutClaudeKeys)
 		mgmt.PATCH("/claude-api-key", s.mgmt.PatchClaudeKey)

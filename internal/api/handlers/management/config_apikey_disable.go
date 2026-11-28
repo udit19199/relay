@@ -46,11 +46,10 @@ func toggleConfigAPIKeyExcludedAll(cfg *config.Config, auth *coreauth.Auth, disa
 		key := strings.TrimSpace(entry.APIKey)
 		base := strings.TrimSpace(entry.BaseURL)
 		proxyURL := strings.TrimSpace(entry.ProxyURL)
-		prefix := strings.TrimSpace(entry.Prefix)
 		if key == "" && base == "" {
 			continue
 		}
-		idParts := []string{key, base, proxyURL, prefix, config.FormatSortedHeaders(entry.Headers)}
+		idParts := []string{key, base, proxyURL, config.FormatSortedHeaders(entry.Headers)}
 		if poolID := config.FormatConnectionPoolDedupID(entry.ConnectionPool); poolID != "" {
 			idParts = append(idParts, poolID)
 		}
@@ -65,11 +64,10 @@ func toggleConfigAPIKeyExcludedAll(cfg *config.Config, auth *coreauth.Auth, disa
 		key := strings.TrimSpace(entry.APIKey)
 		base := strings.TrimSpace(entry.BaseURL)
 		proxyURL := strings.TrimSpace(entry.ProxyURL)
-		prefix := strings.TrimSpace(entry.Prefix)
 		if key == "" && base == "" {
 			continue
 		}
-		idParts := []string{key, base, proxyURL, prefix, config.FormatSortedHeaders(entry.Headers)}
+		idParts := []string{key, base, proxyURL, config.FormatSortedHeaders(entry.Headers)}
 		if poolID := config.FormatConnectionPoolDedupID(entry.ConnectionPool); poolID != "" {
 			idParts = append(idParts, poolID)
 		}
@@ -84,11 +82,10 @@ func toggleConfigAPIKeyExcludedAll(cfg *config.Config, auth *coreauth.Auth, disa
 		key := strings.TrimSpace(entry.APIKey)
 		base := strings.TrimSpace(entry.BaseURL)
 		proxyURL := strings.TrimSpace(entry.ProxyURL)
-		prefix := strings.TrimSpace(entry.Prefix)
 		if key == "" && base == "" {
 			continue
 		}
-		idParts := []string{key, base, proxyURL, prefix, config.FormatSortedHeaders(entry.Headers)}
+		idParts := []string{key, base, proxyURL, config.FormatSortedHeaders(entry.Headers)}
 		if poolID := config.FormatConnectionPoolDedupID(entry.ConnectionPool); poolID != "" {
 			idParts = append(idParts, poolID)
 		}

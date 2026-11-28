@@ -43,12 +43,10 @@ func TestServiceRun_WatcherReloadConcurrentWithStartupModelRegistration_Issue658
 	}
 
 	initialCfg := &config.Config{
-		SDKConfig: config.SDKConfig{
-			ForceModelPrefix: false,
-		},
-		Host:    "127.0.0.1",
-		Port:    port,
-		AuthDir: authDir,
+		SDKConfig: config.SDKConfig{},
+		Host:      "127.0.0.1",
+		Port:      port,
+		AuthDir:   authDir,
 		OpenAICompatibility: []config.OpenAICompatibility{
 			{
 				Name:    "compat-startup",
@@ -64,12 +62,10 @@ func TestServiceRun_WatcherReloadConcurrentWithStartupModelRegistration_Issue658
 	}
 
 	updatedCfg := &config.Config{
-		SDKConfig: config.SDKConfig{
-			ForceModelPrefix: true,
-		},
-		Host:    "127.0.0.1",
-		Port:    port,
-		AuthDir: authDir,
+		SDKConfig: config.SDKConfig{},
+		Host:      "127.0.0.1",
+		Port:      port,
+		AuthDir:   authDir,
 		OpenAICompatibility: []config.OpenAICompatibility{
 			{
 				Name:    "compat-startup",
@@ -263,9 +259,6 @@ func TestServiceRun_WatcherReloadConcurrentWithStartupModelRegistration_Issue658
 	if !reg.ClientSupportsModel(secondAuthID, "acct2/astra-aliased") {
 		t.Fatalf("expected secondAuthID %q to support aliased prefixed model %q from updatedCfg", secondAuthID, "acct2/astra-aliased")
 	}
-	if reg.ClientSupportsModel(secondAuthID, "gpt-6-astra") {
-		t.Fatalf("expected ForceModelPrefix=true from updatedCfg to suppress unprefixed model for %q", secondAuthID)
-	}
 	foundUpdatedCompat := false
 	for _, a := range service.coreManager.List() {
 		if a != nil && reg.ClientSupportsModel(a.ID, "alias-updated") {
@@ -282,96 +275,6 @@ func TestServiceRun_WatcherReloadConcurrentWithStartupModelRegistration_Issue658
 	stopRun()
 }
 
-func TestRegisterModelsForAuthBatch_ConsistentConfigSnapshotAcrossConcurrentCommit_Issue6583(t *testing.T) {
-	ctx := context.Background()
-	manager := coreauth.NewManager(nil, &coreauth.RoundRobinSelector{}, nil)
-	manager.RegisterExecutor(mockBatchTestExecutor{provider: "compat-snap"})
-
-	initialCfg := &config.Config{
-		SDKConfig: config.SDKConfig{
-			ForceModelPrefix: false,
-		},
-		OpenAICompatibility: []config.OpenAICompatibility{
-			{
-				Name:    "compat-snap",
-				BaseURL: "https://compat.example.com/v1",
-				APIKeyEntries: []config.OpenAICompatibilityAPIKey{
-					{APIKey: "sk-snap"},
-				},
-				Models: []config.OpenAICompatibilityModel{
-					{Name: "model-v1", Alias: "alias-v1"},
-				},
-			},
-		},
-	}
-
-	updatedCfg := &config.Config{
-		SDKConfig: config.SDKConfig{
-			ForceModelPrefix: true,
-		},
-		OpenAICompatibility: []config.OpenAICompatibility{
-			{
-				Name:    "compat-snap",
-				BaseURL: "https://compat.example.com/v1",
-				APIKeyEntries: []config.OpenAICompatibilityAPIKey{
-					{APIKey: "sk-snap"},
-				},
-				Models: []config.OpenAICompatibilityModel{
-					{Name: "model-v2", Alias: "alias-v2"},
-				},
-			},
-		},
-	}
-
-	service := &Service{
-		cfg:         initialCfg.CloneForRuntime(),
-		coreManager: manager,
-	}
-
-	authID := "compat-auth-6583"
-	auth := &coreauth.Auth{
-		ID:       authID,
-		Provider: "compat-snap",
-		Prefix:   "pfx",
-		Status:   coreauth.StatusActive,
-		Attributes: map[string]string{
-			"auth_kind":                   "apikey",
-			"compat_name":                 "compat-snap",
-			"provider_key":                "compat-snap",
-			coreauth.AttributeSource:      "config:compat-snap[token-1]",
-			coreauth.AttributeConfigIndex: "0",
-		},
-	}
-	if _, errRegister := manager.Register(ctx, auth); errRegister != nil {
-		t.Fatalf("failed to register auth: %v", errRegister)
-	}
-
-	reg := internalregistry.GetGlobalRegistry()
-	reg.UnregisterClient(authID)
-	t.Cleanup(func() {
-		reg.UnregisterClient(authID)
-		modelRegistrationTaskHook = nil
-	})
-
-	var committed atomic.Bool
-	modelRegistrationTaskHook = func() {
-		if committed.CompareAndSwap(false, true) {
-			service.commitConfigUpdate(updatedCfg.CloneForRuntime())
-		}
-	}
-
-	service.registerModelsForAuthBatch(ctx, manager.List())
-
-	// Because commitConfigUpdate ran before registerModelsForAuthWithCache read the config,
-	// registration must not mix compatCache from initialCfg (alias-v1) with ForceModelPrefix from updatedCfg.
-	if reg.ClientSupportsModel(authID, "pfx/alias-v1") && !reg.ClientSupportsModel(authID, "alias-v1") {
-		t.Fatalf("detected torn config snapshot: registered initialCfg model alias-v1 with updatedCfg ForceModelPrefix=true (only pfx/alias-v1 present)")
-	}
-	if !reg.ClientSupportsModel(authID, "pfx/alias-v2") {
-		t.Fatalf("expected auth %q to support pfx/alias-v2 from updatedCfg", authID)
-	}
-}
-
 func TestRegisterModelsForAuthBatch_ConcurrentCommitConfigUpdateRace_Issue6583(t *testing.T) {
 	ctx := context.Background()
 	manager := coreauth.NewManager(nil, &coreauth.RoundRobinSelector{}, nil)
@@ -379,11 +282,9 @@ func TestRegisterModelsForAuthBatch_ConcurrentCommitConfigUpdateRace_Issue6583(t
 	manager.RegisterExecutor(mockBatchTestExecutor{provider: "claude"})
 	manager.RegisterExecutor(mockBatchTestExecutor{provider: "compat-race"})
 
-	makeCfg := func(forcePrefix bool, aliasSuffix int) *config.Config {
+	makeCfg := func(aliasSuffix int) *config.Config {
 		return &config.Config{
-			SDKConfig: config.SDKConfig{
-				ForceModelPrefix: forcePrefix,
-			},
+			SDKConfig: config.SDKConfig{},
 			OAuthExcludedModels: map[string][]string{
 				"codex": {"gpt-5.5"},
 			},
@@ -421,7 +322,7 @@ func TestRegisterModelsForAuthBatch_ConcurrentCommitConfigUpdateRace_Issue6583(t
 	}
 
 	service := &Service{
-		cfg:         makeCfg(false, 0),
+		cfg:         makeCfg(0),
 		coreManager: manager,
 	}
 
@@ -507,7 +408,7 @@ func TestRegisterModelsForAuthBatch_ConcurrentCommitConfigUpdateRace_Issue6583(t
 		defer close(commitDone)
 		<-startCommits
 		for i := 1; i <= 20; i++ {
-			service.commitConfigUpdate(makeCfg(i%2 == 1, i))
+			service.commitConfigUpdate(makeCfg(i))
 		}
 	}()
 

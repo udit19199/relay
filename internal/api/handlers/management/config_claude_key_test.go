@@ -246,7 +246,6 @@ func TestPatchClaudeKeyDoesNotInheritModeWhenIdentityChanged(t *testing.T) {
 	initialYAML := `claude-api-key:
   - api-key: key-a
     base-url: https://a.example.com
-    prefix: teamA
     proxy-url: http://127.0.0.1:8080
     cloak:
       mode: always
@@ -261,7 +260,6 @@ func TestPatchClaudeKeyDoesNotInheritModeWhenIdentityChanged(t *testing.T) {
 	}{
 		{name: "api-key changed", patch: `{"index":0,"value":{"api-key":"key-b","cloak":{"mode":""}}}`},
 		{name: "base-url changed", patch: `{"index":0,"value":{"base-url":"https://b.example.com","cloak":{"mode":""}}}`},
-		{name: "prefix changed", patch: `{"index":0,"value":{"prefix":"teamB","cloak":{"mode":""}}}`},
 		{name: "proxy-url changed", patch: `{"index":0,"value":{"proxy-url":"http://127.0.0.1:9090","cloak":{"mode":""}}}`},
 	}
 
@@ -272,7 +270,6 @@ func TestPatchClaudeKeyDoesNotInheritModeWhenIdentityChanged(t *testing.T) {
 					{
 						APIKey:   "key-a",
 						BaseURL:  "https://a.example.com",
-						Prefix:   "teamA",
 						ProxyURL: "http://127.0.0.1:8080",
 						Cloak:    &config.CloakConfig{Mode: "always"},
 					},
@@ -506,57 +503,6 @@ func TestPutClaudeKeysRealFrontendPayload(t *testing.T) {
 	}
 }
 
-func TestPutClaudeKeysPreservesModeWithDifferentPrefix(t *testing.T) {
-	configFile := writeTestConfigFile(t)
-	initialYAML := `claude-api-key:
-  - api-key: shared-key
-    prefix: team1
-    cloak:
-      mode: always
-  - api-key: shared-key
-    prefix: team2
-    cloak:
-      mode: never
-`
-	if errWrite := os.WriteFile(configFile, []byte(initialYAML), 0o600); errWrite != nil {
-		t.Fatalf("os.WriteFile() error = %v", errWrite)
-	}
-
-	cfg := &config.Config{
-		ClaudeKey: []config.ClaudeKey{
-			{
-				APIKey: "shared-key",
-				Prefix: "team1",
-				Cloak:  &config.CloakConfig{Mode: "always"},
-			},
-			{
-				APIKey: "shared-key",
-				Prefix: "team2",
-				Cloak:  &config.CloakConfig{Mode: "never"},
-			},
-		},
-	}
-	h := &Handler{cfg: cfg, configFilePath: configFile}
-
-	// Update team2 with empty mode. It must retain its own "never" mode and not team1's "always".
-	rec := httptest.NewRecorder()
-	ctx, _ := gin.CreateTestContext(rec)
-	ctx.Request = httptest.NewRequest(http.MethodPut, "/v0/management/claude-api-key",
-		strings.NewReader(`[{"api-key":"shared-key","prefix":"team1","cloak":{"mode":"always"}},{"api-key":"shared-key","prefix":"team2","cloak":{"mode":""}}]`))
-	ctx.Request.Header.Set("Content-Type", "application/json")
-	h.PutClaudeKeys(ctx)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200; body=%s", rec.Code, rec.Body.String())
-	}
-	if len(cfg.ClaudeKey) != 2 {
-		t.Fatalf("ClaudeKey length = %d, want 2", len(cfg.ClaudeKey))
-	}
-	if got := cfg.ClaudeKey[1].Cloak.Mode; got != "never" {
-		t.Fatalf("team2 Cloak.Mode = %q, want its own preserved %q", got, "never")
-	}
-}
-
 func TestPutClaudeKeysAuthIndexCannotBypassStrictTupleIsolation(t *testing.T) {
 	configFile := writeTestConfigFile(t)
 	initialYAML := `claude-api-key:
@@ -708,53 +654,6 @@ func TestPutClaudeKeysAmbiguousCredentialsDoNotInheritMode(t *testing.T) {
 	}
 }
 
-func TestPutClaudeKeysNewCredentialWithDifferentPrefixDoesNotInheritMode(t *testing.T) {
-	configFile := writeTestConfigFile(t)
-	initialYAML := `claude-api-key:
-  - api-key: shared-key
-    prefix: team1
-    cloak:
-      mode: never
-`
-	if errWrite := os.WriteFile(configFile, []byte(initialYAML), 0o600); errWrite != nil {
-		t.Fatalf("os.WriteFile() error = %v", errWrite)
-	}
-
-	cfg := &config.Config{
-		ClaudeKey: []config.ClaudeKey{
-			{
-				APIKey: "shared-key",
-				Prefix: "team1",
-				Cloak:  &config.CloakConfig{Mode: "never"},
-			},
-		},
-	}
-	h := &Handler{cfg: cfg, configFilePath: configFile}
-
-	// PUT retains team1 and adds a second credential for team2 with empty mode without auth-index.
-	// team1 must retain its "never" mode, and newly added team2 must NOT inherit team1's "never" mode.
-	payload := `[{"api-key":"shared-key","prefix":"team1","cloak":{"mode":""}},{"api-key":"shared-key","prefix":"team2","cloak":{"mode":""}}]`
-	rec := httptest.NewRecorder()
-	ctx, _ := gin.CreateTestContext(rec)
-	ctx.Request = httptest.NewRequest(http.MethodPut, "/v0/management/claude-api-key",
-		strings.NewReader(payload))
-	ctx.Request.Header.Set("Content-Type", "application/json")
-	h.PutClaudeKeys(ctx)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200; body=%s", rec.Code, rec.Body.String())
-	}
-	if len(cfg.ClaudeKey) != 2 {
-		t.Fatalf("ClaudeKey length = %d, want 2", len(cfg.ClaudeKey))
-	}
-	if got := cfg.ClaudeKey[0].Cloak.Mode; got != "never" {
-		t.Fatalf("team1 Cloak.Mode = %q, want preserved %q", got, "never")
-	}
-	if got := cfg.ClaudeKey[1].Cloak.Mode; got != "" {
-		t.Fatalf("team2 Cloak.Mode = %q, want empty (new credential must not inherit mode from team1)", got)
-	}
-}
-
 func TestPutClaudeKeysOmittedCloakPreservesExistingMode(t *testing.T) {
 	configFile := writeTestConfigFile(t)
 	initialYAML := `claude-api-key:
@@ -864,7 +763,7 @@ func TestPatchClaudeKeyPriority(t *testing.T) {
 	rec = httptest.NewRecorder()
 	ctx, _ = gin.CreateTestContext(rec)
 	ctx.Request = httptest.NewRequest(http.MethodPatch, "/v0/management/claude-api-key",
-		strings.NewReader(`{"index":1,"value":{"prefix":"team-test"}}`))
+		strings.NewReader(`{"index":1,"value":{"cloak":{"mode":"never"}}}`))
 	ctx.Request.Header.Set("Content-Type", "application/json")
 	h.PatchClaudeKey(ctx)
 
@@ -873,9 +772,6 @@ func TestPatchClaudeKeyPriority(t *testing.T) {
 	}
 	if got := cfg.ClaudeKey[1].Priority; got != 20 {
 		t.Fatalf("ClaudeKey[1].Priority = %d, want preserved 20", got)
-	}
-	if got := cfg.ClaudeKey[1].Prefix; got != "team-test" {
-		t.Fatalf("ClaudeKey[1].Prefix = %q, want %q", got, "team-test")
 	}
 
 	// Reset priority to 0 explicitly

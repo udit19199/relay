@@ -57,11 +57,6 @@ type SDKConfig struct {
 	// 0, and values beyond the representable duration range saturate.
 	TLSHandshakeTimeoutSeconds int `yaml:"tls-handshake-timeout-seconds" json:"tls-handshake-timeout-seconds"`
 
-	// ForceModelPrefix requires explicit model prefixes (e.g., "teamA/claude-sonnet-4-6")
-	// to target prefixed credentials. When false, unprefixed model requests may use prefixed
-	// credentials as well.
-	ForceModelPrefix bool `yaml:"force-model-prefix" json:"force-model-prefix"`
-
 	// RequestLog enables or disables detailed request logging functionality.
 	RequestLog bool `yaml:"request-log" json:"request-log"`
 

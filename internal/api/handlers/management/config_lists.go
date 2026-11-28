@@ -144,14 +144,12 @@ func (h *Handler) DeleteAPIKeys(c *gin.Context) {
 func (h *Handler) findExistingClaudeKey(existing []config.ClaudeKey, item config.ClaudeKey) *config.ClaudeKey {
 	apiKey := strings.TrimSpace(item.APIKey)
 	baseURL := strings.TrimSpace(item.BaseURL)
-	prefix := strings.TrimSpace(item.Prefix)
 	proxyURL := strings.TrimSpace(item.ProxyURL)
 
 	var matches []*config.ClaudeKey
 	for i := range existing {
 		if strings.TrimSpace(existing[i].APIKey) == apiKey &&
 			strings.TrimSpace(existing[i].BaseURL) == baseURL &&
-			strings.TrimSpace(existing[i].Prefix) == prefix &&
 			strings.TrimSpace(existing[i].ProxyURL) == proxyURL {
 			matches = append(matches, &existing[i])
 		}
@@ -210,7 +208,6 @@ func (h *Handler) PatchClaudeKey(c *gin.Context) {
 		APIKey                  *string                          `json:"api-key"`
 		Priority                *int                             `json:"priority"`
 		FingerprintProfile      *string                          `json:"fingerprint-profile"`
-		Prefix                  *string                          `json:"prefix"`
 		BaseURL                 *string                          `json:"base-url"`
 		ProxyURL                *string                          `json:"proxy-url"`
 		Models                  *[]config.ClaudeModel            `json:"models"`
@@ -256,7 +253,6 @@ func (h *Handler) PatchClaudeKey(c *gin.Context) {
 	entry := oldEntry
 	identityChanged := (body.Value.APIKey != nil && strings.TrimSpace(*body.Value.APIKey) != oldEntry.APIKey) ||
 		(body.Value.BaseURL != nil && strings.TrimSpace(*body.Value.BaseURL) != oldEntry.BaseURL) ||
-		(body.Value.Prefix != nil && strings.TrimSpace(*body.Value.Prefix) != oldEntry.Prefix) ||
 		(body.Value.ProxyURL != nil && strings.TrimSpace(*body.Value.ProxyURL) != oldEntry.ProxyURL)
 	if body.Value.APIKey != nil {
 		entry.APIKey = strings.TrimSpace(*body.Value.APIKey)
@@ -269,9 +265,6 @@ func (h *Handler) PatchClaudeKey(c *gin.Context) {
 			return
 		}
 		entry.FingerprintProfile, _ = config.NormalizeClaudeFingerprintProfile(*body.Value.FingerprintProfile)
-	}
-	if body.Value.Prefix != nil {
-		entry.Prefix = strings.TrimSpace(*body.Value.Prefix)
 	}
 	if body.Value.BaseURL != nil {
 		entry.BaseURL = strings.TrimSpace(*body.Value.BaseURL)
@@ -449,7 +442,6 @@ func (h *Handler) PatchOpenAICompat(c *gin.Context) {
 	type openAICompatPatch struct {
 		Name                  *string                             `json:"name"`
 		Priority              *int                                `json:"priority"`
-		Prefix                *string                             `json:"prefix"`
 		Disabled              *bool                               `json:"disabled"`
 		DisableCooling        json.RawMessage                     `json:"disable-cooling"`
 		BaseURL               *string                             `json:"base-url"`
@@ -496,9 +488,6 @@ func (h *Handler) PatchOpenAICompat(c *gin.Context) {
 	}
 	if body.Value.Priority != nil {
 		entry.Priority = *body.Value.Priority
-	}
-	if body.Value.Prefix != nil {
-		entry.Prefix = strings.TrimSpace(*body.Value.Prefix)
 	}
 	if body.Value.Disabled != nil {
 		entry.Disabled = *body.Value.Disabled
@@ -905,7 +894,6 @@ func (h *Handler) PatchCodexKey(c *gin.Context) {
 	type codexKeyPatch struct {
 		APIKey               *string                          `json:"api-key"`
 		Priority             *int                             `json:"priority"`
-		Prefix               *string                          `json:"prefix"`
 		BaseURL              *string                          `json:"base-url"`
 		ProxyURL             *string                          `json:"proxy-url"`
 		AlphaSearch          *bool                            `json:"alpha-search"`
@@ -953,9 +941,6 @@ func (h *Handler) PatchCodexKey(c *gin.Context) {
 	}
 	if body.Value.Priority != nil {
 		entry.Priority = *body.Value.Priority
-	}
-	if body.Value.Prefix != nil {
-		entry.Prefix = strings.TrimSpace(*body.Value.Prefix)
 	}
 	if body.Value.BaseURL != nil {
 		trimmed := strings.TrimSpace(*body.Value.BaseURL)
@@ -1095,7 +1080,6 @@ func (h *Handler) PatchXAIKey(c *gin.Context) {
 	type xaiKeyPatch struct {
 		APIKey              *string                          `json:"api-key"`
 		Priority            *int                             `json:"priority"`
-		Prefix              *string                          `json:"prefix"`
 		BaseURL             *string                          `json:"base-url"`
 		Websockets          *bool                            `json:"websockets"`
 		ProxyURL            *string                          `json:"proxy-url"`
@@ -1142,9 +1126,6 @@ func (h *Handler) PatchXAIKey(c *gin.Context) {
 	}
 	if body.Value.Priority != nil {
 		entry.Priority = *body.Value.Priority
-	}
-	if body.Value.Prefix != nil {
-		entry.Prefix = strings.TrimSpace(*body.Value.Prefix)
 	}
 	if body.Value.BaseURL != nil {
 		trimmed := strings.TrimSpace(*body.Value.BaseURL)
@@ -1345,7 +1326,6 @@ func normalizeCodexKey(entry *config.CodexKey) {
 		return
 	}
 	entry.APIKey = strings.TrimSpace(entry.APIKey)
-	entry.Prefix = strings.TrimSpace(entry.Prefix)
 	entry.BaseURL = strings.TrimSpace(entry.BaseURL)
 	entry.ProxyURL = strings.TrimSpace(entry.ProxyURL)
 	entry.Headers = config.NormalizeHeaders(entry.Headers)

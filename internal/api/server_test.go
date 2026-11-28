@@ -496,7 +496,6 @@ func TestCodexAlphaSearchOptInAPIKeyResolvesModelAlias(t *testing.T) {
 	server.handlers.AuthManager.SetConfig(&proxyconfig.Config{
 		CodexKey: []proxyconfig.CodexKey{{
 			APIKey:      "codex-alpha-key",
-			Prefix:      "vendor",
 			BaseURL:     "https://codex.example.com/v1",
 			AlphaSearch: true,
 			Models: []proxyconfig.CodexModel{{

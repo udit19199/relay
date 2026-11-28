@@ -11,7 +11,6 @@ func TestResolvedAPIKeyModelInfoPropagatesIsCompat(t *testing.T) {
 	manager := NewManager(nil, nil, nil)
 	manager.SetConfig(&internalconfig.Config{ClaudeKey: []internalconfig.ClaudeKey{{
 		APIKey: "compat-key",
-		Prefix: "tenant",
 		Models: []internalconfig.ClaudeModel{{
 			Name:     "deepseek-upstream",
 			Alias:    "deepseek-alias",

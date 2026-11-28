@@ -105,8 +105,6 @@ routing:
   # Ignored when routing.session-affinity is false.
   session-affinity-rebind-on: "any"
 
-  # When true, unprefixed model requests only use credentials without a prefix (except when prefix == model name).
-  force-model-prefix: false
 
   retry:
     # Number of additional credential retry rounds after the first round exhausts
@@ -471,7 +469,6 @@ upstream:
 #
 #   codex:
 #     - name: codex-1
-#       prefix: "test" # optional: require calls like "test/gpt-5-codex" to target this credential
 #       disable-cooling: false # optional override: true disables cooling, false enables it; omit to inherit global
 #       request-retry: 3 # optional per-auth override; 0 disables additional rounds; omit or set < 0 to inherit global
 #       request-scoped-errors: # optional: custom rules to classify upstream errors by status and body patterns
@@ -532,7 +529,6 @@ upstream:
 #       keys:
 #         - api-key: "sk-atSM..." # use the official claude API key, no need to set the base url
 #     - name: claude-2
-#       prefix: "test" # optional: require calls like "test/claude-sonnet-latest" to target this credential
 #       disable-cooling: false # optional override: true disables cooling, false enables it; omit to inherit global
 #       request-retry: 3 # optional per-auth override; 0 disables additional rounds; omit or set < 0 to inherit global
 #       request-scoped-errors: # optional: custom rules to classify upstream errors by status and body patterns
@@ -639,7 +635,6 @@ upstream:
 #
 #   xai:
 #     - name: xai-1
-#       prefix: "xai" # optional: require calls like "xai/grok-4.5" to target this credential
 #       disable-cooling: false # optional override: true disables cooling, false enables it; omit to inherit global
 #       request-retry: 3 # optional per-auth override; 0 disables additional rounds; omit or set < 0 to inherit global
 #       request-scoped-errors: # optional: custom rules to classify upstream errors by status and body patterns
@@ -676,7 +671,6 @@ upstream:
 #   openai-compatibility:
 #     - name: "openrouter" # The name of the provider; it will be used in the user agent and other places.
 #       disabled: false # optional: set to true to disable this provider without removing it
-#       prefix: "test" # optional: require calls like "test/gpt-5" to target this provider's credentials
 #       base-url: "https://openrouter.ai/api/v1" # The base URL of the provider.
 #       support-prompt-cache-key: false # optional: derive prompt_cache_key for requests from all input protocols
 #       disable-cooling: false # optional provider override: true disables cooling, false enables it; omit to inherit global

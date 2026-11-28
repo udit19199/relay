@@ -188,10 +188,10 @@ func (s *Service) registerModelsForAuthWithConfigAndCache(ctx context.Context, c
 					providerKey = "openai-compatibility"
 				}
 				if len(ms) > 0 {
-					published = s.registerResolvedModelsForAuthFenced(a, fence, providerKey, applyModelPrefixes(ms, a.Prefix, cfg.ForceModelPrefix))
+					published = s.registerResolvedModelsForAuthFenced(a, fence, providerKey, applyModelPrefixes(ms, a.Prefix, false))
 				} else {
 					if len(ms) > 0 {
-						published = s.registerResolvedModelsForAuthFenced(a, fence, providerKey, applyModelPrefixes(ms, a.Prefix, cfg.ForceModelPrefix))
+						published = s.registerResolvedModelsForAuthFenced(a, fence, providerKey, applyModelPrefixes(ms, a.Prefix, false))
 					} else {
 						published = s.unregisterModelsForAuthFenced(a, fence)
 					}
@@ -209,10 +209,10 @@ func (s *Service) registerModelsForAuthWithConfigAndCache(ctx context.Context, c
 					}
 					ms := cached.models
 					if len(ms) > 0 {
-						published = s.registerResolvedModelsForAuthFenced(a, fence, providerKey, applyModelPrefixes(ms, a.Prefix, cfg.ForceModelPrefix))
+						published = s.registerResolvedModelsForAuthFenced(a, fence, providerKey, applyModelPrefixes(ms, a.Prefix, false))
 					} else {
 						if len(ms) > 0 {
-							published = s.registerResolvedModelsForAuthFenced(a, fence, providerKey, applyModelPrefixes(ms, a.Prefix, cfg.ForceModelPrefix))
+							published = s.registerResolvedModelsForAuthFenced(a, fence, providerKey, applyModelPrefixes(ms, a.Prefix, false))
 						} else {
 							published = s.unregisterModelsForAuthFenced(a, fence)
 						}
@@ -231,7 +231,7 @@ func (s *Service) registerModelsForAuthWithConfigAndCache(ctx context.Context, c
 			}
 			if isCompatAuth {
 				if len(models) > 0 {
-					published = s.registerResolvedModelsForAuthFenced(a, fence, providerKey, applyModelPrefixes(models, a.Prefix, cfg.ForceModelPrefix))
+					published = s.registerResolvedModelsForAuthFenced(a, fence, providerKey, applyModelPrefixes(models, a.Prefix, false))
 				} else {
 					// No matching provider found or models removed entirely; drop any prior registration.
 					published = s.unregisterModelsForAuthFenced(a, fence)
@@ -255,7 +255,7 @@ func (s *Service) registerModelsForAuthWithConfigAndCache(ctx context.Context, c
 		models = applyOAuthSettingsForAuth(cfg, provider, authKind, models)
 		// OpenCode Go models are exposed only under their prefix so catalog entries
 		// such as Claude models never shadow the native providers.
-		forcePrefix := (cfg != nil && cfg.ForceModelPrefix) || provider == openCodeGoProvider
+		forcePrefix := provider == openCodeGoProvider
 		resolved := applyModelPrefixes(models, a.Prefix, forcePrefix)
 		if provider == openCodeGoProvider {
 			resolved = withOpenCodeGoAliases(cfg, provider, authKind, a.Attributes, models, resolved)

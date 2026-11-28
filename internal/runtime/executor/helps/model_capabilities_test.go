@@ -103,9 +103,9 @@ func TestApplyRequestThinkingConfigurationUpdateSelectedCodexModel(t *testing.T)
 		t.Run(tc.name, func(t *testing.T) {
 			manager := coreauth.NewManager(nil, nil, nil)
 			manager.SetConfig(&internalconfig.Config{
-				SDKConfig: internalconfig.SDKConfig{ForceModelPrefix: true},
+				SDKConfig: internalconfig.SDKConfig{},
 				CodexKey: []internalconfig.CodexKey{{
-					APIKey: "selected-update-key", Prefix: "tenant",
+					APIKey: "selected-update-key",
 					Models: []internalconfig.CodexModel{{
 						Name: "opaque-route", Alias: "public", SupportConfigurationUpdate: tc.supported,
 						Thinking: &registry.ThinkingSupport{Levels: []string{"low", "medium", "high", "xhigh"}},
@@ -199,10 +199,9 @@ func TestApplyRequestThinkingConfigurationUpdateCrossProtocol(t *testing.T) {
 func TestApplyRequestThinkingUsesExactClaudeModeForSummaryOnlyRequest(t *testing.T) {
 	manager := coreauth.NewManager(nil, nil, nil)
 	manager.SetConfig(&internalconfig.Config{
-		SDKConfig: internalconfig.SDKConfig{ForceModelPrefix: true},
+		SDKConfig: internalconfig.SDKConfig{},
 		ClaudeKey: []internalconfig.ClaudeKey{{
 			APIKey: "summary-selected-key",
-			Prefix: "summary-tenant",
 			Models: []internalconfig.ClaudeModel{{
 				Name:  "summary-shared-upstream",
 				Alias: "summary-public-model",
@@ -276,10 +275,9 @@ func TestApplyRequestThinkingUsesExactClaudeModeForSummaryOnlyRequest(t *testing
 func TestApplyRequestThinkingUsesSelectedPrefixedAPIKeyModel(t *testing.T) {
 	manager := coreauth.NewManager(nil, nil, nil)
 	manager.SetConfig(&internalconfig.Config{
-		SDKConfig: internalconfig.SDKConfig{ForceModelPrefix: true},
+		SDKConfig: internalconfig.SDKConfig{},
 		ClaudeKey: []internalconfig.ClaudeKey{{
 			APIKey: "selected-key",
-			Prefix: "tenant",
 			Models: []internalconfig.ClaudeModel{{
 				Name: "shared-upstream", Alias: "public-model",
 				Thinking: &registry.ThinkingSupport{Levels: []string{"high"}},

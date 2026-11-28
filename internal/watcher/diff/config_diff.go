@@ -82,9 +82,6 @@ func BuildConfigChangeDetails(oldCfg, newCfg *config.Config) []string {
 	if oldCfg.ProxyURL != newCfg.ProxyURL {
 		changes = append(changes, fmt.Sprintf("proxy-url: %s -> %s", formatProxyURL(oldCfg.ProxyURL), formatProxyURL(newCfg.ProxyURL)))
 	}
-	if oldCfg.ForceModelPrefix != newCfg.ForceModelPrefix {
-		changes = append(changes, fmt.Sprintf("force-model-prefix: %t -> %t", oldCfg.ForceModelPrefix, newCfg.ForceModelPrefix))
-	}
 	if oldCfg.NonStreamKeepAliveInterval != newCfg.NonStreamKeepAliveInterval {
 		changes = append(changes, fmt.Sprintf("nonstream-keepalive-interval: %d -> %d", oldCfg.NonStreamKeepAliveInterval, newCfg.NonStreamKeepAliveInterval))
 	}
@@ -148,9 +145,6 @@ func BuildConfigChangeDetails(oldCfg, newCfg *config.Config) []string {
 				changes = append(changes, fmt.Sprintf("claude[%d].proxy-url: %s -> %s", i, formatProxyURL(o.ProxyURL), formatProxyURL(n.ProxyURL)))
 			}
 			changes = appendConnectionPoolChanges(changes, fmt.Sprintf("claude[%d].connection-pool", i), o.ConnectionPool, n.ConnectionPool)
-			if strings.TrimSpace(o.Prefix) != strings.TrimSpace(n.Prefix) {
-				changes = append(changes, fmt.Sprintf("claude[%d].prefix: %s -> %s", i, strings.TrimSpace(o.Prefix), strings.TrimSpace(n.Prefix)))
-			}
 			changes = appendOptionalBoolChange(changes, fmt.Sprintf("claude[%d].disable-cooling", i), o.DisableCooling, n.DisableCooling)
 			if strings.TrimSpace(o.APIKey) != strings.TrimSpace(n.APIKey) {
 				changes = append(changes, fmt.Sprintf("claude[%d].api-key: updated", i))
@@ -206,9 +200,6 @@ func BuildConfigChangeDetails(oldCfg, newCfg *config.Config) []string {
 				changes = append(changes, fmt.Sprintf("codex[%d].proxy-url: %s -> %s", i, formatProxyURL(o.ProxyURL), formatProxyURL(n.ProxyURL)))
 			}
 			changes = appendConnectionPoolChanges(changes, fmt.Sprintf("codex[%d].connection-pool", i), o.ConnectionPool, n.ConnectionPool)
-			if strings.TrimSpace(o.Prefix) != strings.TrimSpace(n.Prefix) {
-				changes = append(changes, fmt.Sprintf("codex[%d].prefix: %s -> %s", i, strings.TrimSpace(o.Prefix), strings.TrimSpace(n.Prefix)))
-			}
 			if o.Websockets != n.Websockets {
 				changes = append(changes, fmt.Sprintf("codex[%d].websockets: %t -> %t", i, o.Websockets, n.Websockets))
 			}
@@ -251,9 +242,6 @@ func BuildConfigChangeDetails(oldCfg, newCfg *config.Config) []string {
 				changes = append(changes, fmt.Sprintf("xai[%d].proxy-url: %s -> %s", i, formatProxyURL(o.ProxyURL), formatProxyURL(n.ProxyURL)))
 			}
 			changes = appendConnectionPoolChanges(changes, fmt.Sprintf("xai[%d].connection-pool", i), o.ConnectionPool, n.ConnectionPool)
-			if strings.TrimSpace(o.Prefix) != strings.TrimSpace(n.Prefix) {
-				changes = append(changes, fmt.Sprintf("xai[%d].prefix: %s -> %s", i, strings.TrimSpace(o.Prefix), strings.TrimSpace(n.Prefix)))
-			}
 			if o.Priority != n.Priority {
 				changes = append(changes, fmt.Sprintf("xai[%d].priority: %d -> %d", i, o.Priority, n.Priority))
 			}

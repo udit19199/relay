@@ -660,7 +660,6 @@ func (m *Manager) applyAPIKeyModelAliasWithRouting(routing *apiKeyModelRoutingSn
 type APIKeyConfigEntry interface {
 	GetAPIKey() string
 	GetBaseURL() string
-	GetPrefix() string
 	GetProxyURL() string
 }
 
@@ -691,7 +690,7 @@ func resolveAPIKeyConfig[T APIKeyConfigEntry](entries []T, auth *Auth) *T {
 	}
 	for i := range entries {
 		entry := entries[i]
-		if matchesCredentials(entry) && strings.EqualFold(strings.TrimSpace(entry.GetPrefix()), strings.TrimSpace(auth.Prefix)) && strings.EqualFold(strings.TrimSpace(entry.GetProxyURL()), strings.TrimSpace(auth.ProxyURL)) {
+		if matchesCredentials(entry) && strings.EqualFold(strings.TrimSpace(entry.GetProxyURL()), strings.TrimSpace(auth.ProxyURL)) {
 			return &entries[i]
 		}
 	}

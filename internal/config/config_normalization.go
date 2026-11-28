@@ -255,7 +255,6 @@ func (cfg *Config) SanitizeOpenAICompatibility() {
 	for i := range cfg.OpenAICompatibility {
 		e := cfg.OpenAICompatibility[i]
 		e.Name = strings.TrimSpace(e.Name)
-		e.Prefix = normalizeModelPrefix(e.Prefix)
 		e.BaseURL = strings.TrimSpace(e.BaseURL)
 		e.Headers = NormalizeHeaders(e.Headers)
 		if e.BaseURL == "" {
@@ -295,7 +294,6 @@ func sanitizeCodexKeyEntries(entries []CodexKey) []CodexKey {
 	out := make([]CodexKey, 0, len(entries))
 	for i := range entries {
 		e := entries[i]
-		e.Prefix = normalizeModelPrefix(e.Prefix)
 		e.BaseURL = strings.TrimSpace(e.BaseURL)
 		e.Headers = NormalizeHeaders(e.Headers)
 		e.ExcludedModels = NormalizeExcludedModels(e.ExcludedModels)
@@ -338,7 +336,6 @@ func (cfg *Config) SanitizeClaudeKeys() {
 	}
 	for i := range cfg.ClaudeKey {
 		entry := &cfg.ClaudeKey[i]
-		entry.Prefix = normalizeModelPrefix(entry.Prefix)
 		entry.Headers = NormalizeHeaders(entry.Headers)
 		entry.ExcludedModels = NormalizeExcludedModels(entry.ExcludedModels)
 		entry.Cloak = NormalizeCloakConfig(entry.Cloak)
@@ -391,18 +388,6 @@ func FormatSortedHeaders(headers map[string]string) string {
 		b.WriteByte(0)
 	}
 	return b.String()
-}
-
-func normalizeModelPrefix(prefix string) string {
-	trimmed := strings.TrimSpace(prefix)
-	trimmed = strings.Trim(trimmed, "/")
-	if trimmed == "" {
-		return ""
-	}
-	if strings.Contains(trimmed, "/") {
-		return ""
-	}
-	return trimmed
 }
 
 // NormalizeHeaders trims header keys and values and removes empty pairs.

@@ -507,9 +507,6 @@ type ClaudeKey struct {
 	// Higher values are preferred; defaults to 0.
 	Priority int `yaml:"priority,omitempty" json:"priority,omitempty"`
 
-	// Prefix optionally namespaces models for this credential (e.g., "teamA/claude-sonnet-4").
-	Prefix string `yaml:"prefix,omitempty" json:"prefix,omitempty"`
-
 	// BaseURL is the base URL for the Claude API endpoint.
 	// If empty, the default Claude API URL will be used.
 	BaseURL string `yaml:"base-url" json:"base-url"`
@@ -573,8 +570,6 @@ func (k ClaudeKey) GetAPIKey() string { return k.APIKey }
 
 func (k ClaudeKey) GetBaseURL() string { return k.BaseURL }
 
-func (k ClaudeKey) GetPrefix() string { return k.Prefix }
-
 func (k ClaudeKey) GetProxyURL() string { return k.ProxyURL }
 
 // ClaudeModel describes a mapping between an alias and the actual upstream model name.
@@ -624,9 +619,6 @@ type CodexKey struct {
 	// Higher values are preferred; defaults to 0.
 	Priority int `yaml:"priority,omitempty" json:"priority,omitempty"`
 
-	// Prefix optionally namespaces models for this credential (e.g., "teamA/gpt-5-codex").
-	Prefix string `yaml:"prefix,omitempty" json:"prefix,omitempty"`
-
 	// BaseURL is the base URL for the Codex API endpoint.
 	// If empty, the default Codex API URL will be used.
 	BaseURL string `yaml:"base-url" json:"base-url"`
@@ -673,8 +665,6 @@ type CodexKey struct {
 func (k CodexKey) GetAPIKey() string { return k.APIKey }
 
 func (k CodexKey) GetBaseURL() string { return k.BaseURL }
-
-func (k CodexKey) GetPrefix() string { return k.Prefix }
 
 func (k CodexKey) GetProxyURL() string { return k.ProxyURL }
 
@@ -739,9 +729,6 @@ type OpenAICompatibility struct {
 
 	// Disabled prevents this provider from being used for routing.
 	Disabled bool `yaml:"disabled,omitempty" json:"disabled,omitempty"`
-
-	// Prefix optionally namespaces model aliases for this provider (e.g., "teamA/model-x").
-	Prefix string `yaml:"prefix,omitempty" json:"prefix,omitempty"`
 
 	// BaseURL is the base URL for the external OpenAI-compatible API endpoint.
 	BaseURL string `yaml:"base-url" json:"base-url"`

@@ -12,7 +12,7 @@ type registrationInterleaveRuntime struct{ onRead func() }
 func (r *registrationInterleaveRuntime) GetClientID() string { r.onRead(); return "" }
 
 func TestModelRegistrationRejectsSupersededPrefix(t *testing.T) {
-	cfg := &config.Config{SDKConfig: config.SDKConfig{ForceModelPrefix: true}, OpenAICompatibility: []config.OpenAICompatibility{{Name: "compat-synthetic", Models: []config.OpenAICompatibilityModel{{Name: "upstream-model", Alias: "alias"}}}}}
+	cfg := &config.Config{OpenAICompatibility: []config.OpenAICompatibility{{Name: "compat-synthetic", Models: []config.OpenAICompatibilityModel{{Name: "upstream-model", Alias: "alias"}}}}}
 	manager := coreauth.NewManager(nil, &coreauth.RoundRobinSelector{}, nil)
 	service := &Service{cfg: cfg, coreManager: manager}
 	reg := GlobalModelRegistry()
@@ -59,7 +59,7 @@ func TestModelRegistrationRejectsSupersededPrefix(t *testing.T) {
 // request result mutating Generation without changing model-registration
 // inputs does not invalidate an in-flight registration for the same inputs.
 func TestModelRegistrationIgnoresExecutionOnlyGenerationChange(t *testing.T) {
-	cfg := &config.Config{SDKConfig: config.SDKConfig{ForceModelPrefix: true}, OpenAICompatibility: []config.OpenAICompatibility{{Name: "compat-synthetic", Models: []config.OpenAICompatibilityModel{{Name: "upstream-model", Alias: "alias"}}}}}
+	cfg := &config.Config{OpenAICompatibility: []config.OpenAICompatibility{{Name: "compat-synthetic", Models: []config.OpenAICompatibilityModel{{Name: "upstream-model", Alias: "alias"}}}}}
 	manager := coreauth.NewManager(nil, &coreauth.RoundRobinSelector{}, nil)
 	service := &Service{cfg: cfg, coreManager: manager}
 	reg := GlobalModelRegistry()
@@ -92,7 +92,7 @@ func TestModelRegistrationIgnoresExecutionOnlyGenerationChange(t *testing.T) {
 // of the same publication invariant: a registration computed before its auth
 // was removed must not republish the client when it finishes afterwards.
 func TestModelRegistrationDoesNotResurrectRemovedAuth(t *testing.T) {
-	cfg := &config.Config{SDKConfig: config.SDKConfig{ForceModelPrefix: true}, OpenAICompatibility: []config.OpenAICompatibility{{Name: "compat-synthetic", Models: []config.OpenAICompatibilityModel{{Name: "upstream-model", Alias: "alias"}}}}}
+	cfg := &config.Config{OpenAICompatibility: []config.OpenAICompatibility{{Name: "compat-synthetic", Models: []config.OpenAICompatibilityModel{{Name: "upstream-model", Alias: "alias"}}}}}
 	manager := coreauth.NewManager(nil, &coreauth.RoundRobinSelector{}, nil)
 	service := &Service{cfg: cfg, coreManager: manager}
 	reg := GlobalModelRegistry()
@@ -129,7 +129,7 @@ func TestModelRegistrationDoesNotResurrectRemovedAuth(t *testing.T) {
 // registration computed from the pre-removal identity must not overwrite the
 // models of the re-registered identity.
 func TestModelRegistrationRejectsPreReregisterSnapshot(t *testing.T) {
-	cfg := &config.Config{SDKConfig: config.SDKConfig{ForceModelPrefix: true}, OpenAICompatibility: []config.OpenAICompatibility{{Name: "compat-synthetic", Models: []config.OpenAICompatibilityModel{{Name: "upstream-model", Alias: "alias"}}}}}
+	cfg := &config.Config{OpenAICompatibility: []config.OpenAICompatibility{{Name: "compat-synthetic", Models: []config.OpenAICompatibilityModel{{Name: "upstream-model", Alias: "alias"}}}}}
 	manager := coreauth.NewManager(nil, &coreauth.RoundRobinSelector{}, nil)
 	service := &Service{cfg: cfg, coreManager: manager}
 	reg := GlobalModelRegistry()

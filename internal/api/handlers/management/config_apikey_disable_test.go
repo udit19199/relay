@@ -27,7 +27,7 @@ func TestToggleConfigAPIKeyExcludedAll_XAI(t *testing.T) {
 		}},
 	}
 	idGen := synthesizer.NewStableIDGenerator()
-	authID, _ := idGen.Next("xai:apikey", "xai-test", "https://api.x.ai/v1", "", "", "")
+	authID, _ := idGen.Next("xai:apikey", "xai-test", "https://api.x.ai/v1", "", "")
 	auth := &coreauth.Auth{
 		ID:       authID,
 		Provider: "xai",
@@ -54,7 +54,7 @@ func TestToggleConfigAPIKeyExcludedAll_Codex(t *testing.T) {
 		}},
 	}
 	idGen := synthesizer.NewStableIDGenerator()
-	authID, _ := idGen.Next("codex:apikey", "sk-test", "https://example.com/v1", "", "", "")
+	authID, _ := idGen.Next("codex:apikey", "sk-test", "https://example.com/v1", "", "")
 	auth := &coreauth.Auth{
 		ID:       authID,
 		Provider: "codex",
@@ -90,7 +90,7 @@ func TestToggleConfigAPIKeyExcludedAll_EmptyKeyWithBaseURL(t *testing.T) {
 		}},
 	}
 	idGen := synthesizer.NewStableIDGenerator()
-	claudeID, _ := idGen.Next("claude:apikey", "", "https://custom-claude.example.com", "", "", "")
+	claudeID, _ := idGen.Next("claude:apikey", "", "https://custom-claude.example.com", "", "")
 
 	claudeAuth := &coreauth.Auth{
 		ID:       claudeID,
