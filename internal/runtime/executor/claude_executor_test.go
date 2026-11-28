@@ -5628,9 +5628,8 @@ func TestClaudeExecutor_CustomBaseURLAPIKeyDoesNotEnableCCHSigning(t *testing.T)
 
 	executor := NewClaudeExecutor(&config.Config{
 		ClaudeKey: []config.ClaudeKey{{
-			APIKey:                 "key-123",
-			BaseURL:                server.URL,
-			ExperimentalCCHSigning: true,
+			APIKey:  "key-123",
+			BaseURL: server.URL,
 		}},
 	})
 	auth := &coreauth.Auth{Attributes: map[string]string{

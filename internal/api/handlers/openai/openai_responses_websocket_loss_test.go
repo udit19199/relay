@@ -1008,10 +1008,6 @@ func TestResponsesWebsocketPinned429ExposesErrorWhenOnlyAlternativeHasExpiredTok
 		SDKConfig:           config.SDKConfig{PassthroughHeaders: true},
 		RequestRetry:        0,
 		MaxRetryCredentials: 0,
-		QuotaExceeded: config.QuotaExceeded{
-			SwitchProject:      true,
-			SwitchPreviewModel: true,
-		},
 	}
 	manager := coreauth.NewManager(nil, &coreauth.FillFirstSelector{}, nil)
 	manager.SetConfig(cfg)

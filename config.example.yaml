@@ -669,7 +669,6 @@ upstream:
 #           # in the auth JSON. Refresh keeps it.
 #           #   Legacy "fingerprint-profile" credentials remain supported and are normalized at load time.
 #           # fingerprint-profile: "claude-code-cli" # optional api-keys.claude key field; default is empty (caller-owned); uncomment to opt in
-#           experimental-cch-signing: false # deprecated compatibility field; CCH is generated automatically
 #                                           # for real Claude OAuth on any upstream, and for claude-code-cli profiles
 #                                           # only on api.anthropic.com
 #
@@ -931,9 +930,3 @@ observability:
 #     - api-key: "your-upstream-key"
 #       base-url: "https://codex.example.com"
 #
-# Compatibility-only quota switches have no new v8 counterpart. They remain
-# readable/editable in legacy files and through /v0/management, but are omitted
-# from the active v8 template:
-#   quota-exceeded:
-#     switch-project: true
-#     switch-preview-model: true

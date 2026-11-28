@@ -70,9 +70,6 @@ func TestV8ExampleLoadsAndRoundTrips(t *testing.T) {
 	if cfg.Port != 8317 || len(cfg.APIKeys) != 3 || len(cfg.CodexKey) != 1 || len(cfg.ClaudeKey) != 2 || len(cfg.XAIKey) != 1 || len(cfg.OpenAICompatibility) != 1 {
 		t.Fatal("v8 example fields did not reach runtime config")
 	}
-	if cfg.QuotaExceeded.SwitchProject || cfg.QuotaExceeded.SwitchPreviewModel {
-		t.Fatal("legacy-only quota examples must remain commented")
-	}
 	path := filepath.Join(t.TempDir(), "config.yaml")
 	if err = os.WriteFile(path, data, 0600); err != nil {
 		t.Fatal(err)
@@ -216,7 +213,6 @@ port: 8317
 api-keys: [client]
 request-retry: 0
 ws-auth: false
-quota-exceeded: {switch-project: true, switch-preview-model: true, antigravity-credits: true}
 codex-api-key:
   - api-key: a
     base-url: https://example.invalid
@@ -257,9 +253,6 @@ openai-compatibility:
 	groups := yamlPath(doc.Content[0], "api-keys.codex")
 	if len(groups.Content) != 2 {
 		t.Fatal("different shared settings were combined")
-	}
-	if !after.QuotaExceeded.SwitchProject || !after.QuotaExceeded.SwitchPreviewModel {
-		t.Fatal("legacy-only options lost")
 	}
 }
 
