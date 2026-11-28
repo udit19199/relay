@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 import Foundation
 
-// Talks to the local Relay proxy's management API (127.0.0.1:8317).
+// Talks to the local Relay proxy's management API on loopback.
+// The port comes from server.port in ~/.relay/config.yaml, falling back to 8317.
 // Same user, same Mac: auth is a Bearer management key read from
 // ~/.relay/management.key (0600). Relay's own config holds the same secret.
 public struct RelayClient: Sendable {
@@ -30,9 +31,35 @@ public struct RelayClient: Sendable {
         let key = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !key.isEmpty else { throw RelayError.missingManagementKey }
         return RelayClient(
-            baseURL: URL(string: "http://127.0.0.1:8317")!,
+            baseURL: URL(string: "http://127.0.0.1:\(Self.configuredPort())")!,
             managementKey: key
         )
+    }
+
+    // Reads server.port from ~/.relay/config.yaml. The file is written by
+    // Relay itself in a fixed layout, so a small indentation-aware scan is
+    // enough; anything unexpected falls back to the default port.
+    static func configuredPort() -> Int {
+        let configURL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".relay")
+            .appendingPathComponent("config.yaml")
+        guard let text = try? String(contentsOf: configURL, encoding: .utf8) else { return 8317 }
+        var inServerSection = false
+        for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+            if line.hasPrefix("#") { continue }
+            let isTopLevel = line.first?.isWhitespace == false && !line.isEmpty
+            if isTopLevel {
+                inServerSection = line.trimmingCharacters(in: .whitespaces) == "server:"
+                continue
+            }
+            guard inServerSection else { continue }
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard trimmed.hasPrefix("port:") else { continue }
+            let value = trimmed.dropFirst("port:".count).trimmingCharacters(in: .whitespaces)
+            if let port = Int(value), port > 0, port < 65536 { return port }
+            return 8317
+        }
+        return 8317
     }
 
     // The auth-files entries already carry each credential's observed
