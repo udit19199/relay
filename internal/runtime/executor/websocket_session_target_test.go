@@ -132,7 +132,7 @@ func TestWebsocketRetryBindFailureClearsActiveSessionState(t *testing.T) {
 		{
 			name: "Codex nonstream",
 			run: func(t *testing.T, baseURL string) (func(coreexecutor.Options) error, *codexWebsocketSession) {
-				executor := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
+				executor := NewCodexWebsocketsExecutor(&config.Config{})
 				executor.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
 				auth := &coreauth.Auth{ID: "retry-bind-codex", Provider: "codex", Attributes: map[string]string{"api_key": "test-key", "base_url": baseURL}}
 				req := coreexecutor.Request{Model: "gpt-5-codex", Payload: []byte(`{"model":"gpt-5-codex","input":[{"type":"message","role":"user","content":"hello"}]}`)}
@@ -157,7 +157,7 @@ func TestWebsocketRetryBindFailureClearsActiveSessionState(t *testing.T) {
 		{
 			name: "Codex stream",
 			run: func(t *testing.T, baseURL string) (func(coreexecutor.Options) error, *codexWebsocketSession) {
-				executor := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
+				executor := NewCodexWebsocketsExecutor(&config.Config{})
 				executor.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
 				auth := &coreauth.Auth{ID: "retry-bind-codex", Provider: "codex", Attributes: map[string]string{"api_key": "test-key", "base_url": baseURL}}
 				req := coreexecutor.Request{Model: "gpt-5-codex", Payload: []byte(`{"model":"gpt-5-codex","input":[{"type":"message","role":"user","content":"hello"}]}`)}

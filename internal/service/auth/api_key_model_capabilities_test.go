@@ -5,10 +5,11 @@ import (
 	"net/http"
 	"testing"
 
+	"strconv"
+
 	internalconfig "github.com/udit19199/relay/internal/config"
 	"github.com/udit19199/relay/internal/registry"
 	coreexecutor "github.com/udit19199/relay/internal/service/executor"
-	"strconv"
 )
 
 func TestAttachResolvedAPIKeyModelInfoUsesSelectedCredential(t *testing.T) {

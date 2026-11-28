@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"bytes"
+
 	"github.com/MoeForge/moego/ojson"
 )
 

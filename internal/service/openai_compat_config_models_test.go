@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/udit19199/relay/internal/config"
-	"github.com/udit19199/relay/internal/registry"
 )
 
 func TestBuildOpenAICompatibilityConfigModels_InputModalities(t *testing.T) {
@@ -17,21 +16,15 @@ func TestBuildOpenAICompatibilityConfigModels_InputModalities(t *testing.T) {
 				DisplayName:     "Mimo Vision",
 				InputModalities: []string{"TEXT", "image", "image"},
 			},
-			{
-				Name:  "upstream-image",
-				Alias: "compat-image",
-				Image: true,
-			},
 		},
 	}
 
 	models := buildOpenAICompatibilityConfigModels(compat)
-	if len(models) != 2 {
-		t.Fatalf("model count = %d, want 2", len(models))
+	if len(models) != 1 {
+		t.Fatalf("model count = %d, want 1", len(models))
 	}
 
 	var vision *ModelInfo
-	var imageModel *ModelInfo
 	for _, model := range models {
 		if model == nil {
 			continue
@@ -39,8 +32,6 @@ func TestBuildOpenAICompatibilityConfigModels_InputModalities(t *testing.T) {
 		switch model.ID {
 		case "mimo-v2.5-pro":
 			vision = model
-		case "compat-image":
-			imageModel = model
 		}
 	}
 	if vision == nil {
@@ -51,18 +42,6 @@ func TestBuildOpenAICompatibilityConfigModels_InputModalities(t *testing.T) {
 	}
 	if got := joinModalities(vision.SupportedInputModalities); got != "text,image" {
 		t.Fatalf("SupportedInputModalities = %q, want text,image", got)
-	}
-	if imageModel == nil {
-		t.Fatal("expected image model")
-	}
-	if imageModel.DisplayName != "compat-image" {
-		t.Fatalf("image DisplayName = %q, want compat-image", imageModel.DisplayName)
-	}
-	if imageModel.Type != registry.OpenAIImageModelType {
-		t.Fatalf("image model type = %q, want %q", imageModel.Type, registry.OpenAIImageModelType)
-	}
-	if len(imageModel.SupportedInputModalities) != 0 {
-		t.Fatalf("image model input modalities = %+v, want none", imageModel.SupportedInputModalities)
 	}
 }
 

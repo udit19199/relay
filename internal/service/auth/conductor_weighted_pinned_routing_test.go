@@ -3,11 +3,12 @@ package auth
 import (
 	"context"
 	"fmt"
-	"github.com/udit19199/relay/internal/registry"
-	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 	"maps"
 	"net/http"
 	"testing"
+
+	"github.com/udit19199/relay/internal/registry"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 func TestManagerWeightedPinsShareCreditsWithoutAffinity(t *testing.T) {

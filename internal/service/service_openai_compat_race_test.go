@@ -3,11 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"github.com/udit19199/relay/internal/api"
-	"github.com/udit19199/relay/internal/config"
-	internalregistry "github.com/udit19199/relay/internal/registry"
-	coreauth "github.com/udit19199/relay/internal/service/auth"
-	"golang.org/x/crypto/bcrypt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -15,6 +10,12 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/udit19199/relay/internal/api"
+	"github.com/udit19199/relay/internal/config"
+	internalregistry "github.com/udit19199/relay/internal/registry"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func TestPutOpenAICompatConcurrentWithAuthFieldsPatch_Issue6559(t *testing.T) {

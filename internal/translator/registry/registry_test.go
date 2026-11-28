@@ -2,9 +2,10 @@ package registry
 
 import (
 	"context"
+	"testing"
+
 	"github.com/MoeForge/moego/ojson"
 	"github.com/udit19199/relay/internal/registry"
-	"testing"
 )
 
 func TestTranslateRequest_FallbackNormalizesModel(t *testing.T) {

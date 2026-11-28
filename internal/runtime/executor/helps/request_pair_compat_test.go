@@ -3,9 +3,10 @@ package helps
 import (
 	"bytes"
 	"context"
+	"testing"
+
 	"github.com/udit19199/relay/internal/config"
 	translatorreg "github.com/udit19199/relay/internal/translator/registry"
-	"testing"
 )
 
 func TestCompatibilityRequestPair(t *testing.T) {

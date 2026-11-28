@@ -144,39 +144,6 @@ func TestOpenAICompatExecutor_UserAgentPassthroughAndDefault(t *testing.T) {
 		}
 	})
 
-	t.Run("Execute images and ExecuteStream images forward downstream User-Agent", func(t *testing.T) {
-		imageReq := coreexecutor.Request{
-			Model:   "gpt-image-1",
-			Payload: []byte(`{"model":"gpt-image-1","prompt":"draw a cat"}`),
-		}
-		gotUserAgent = ""
-		_, err := executor.Execute(context.Background(), baseAuth, imageReq, coreexecutor.Options{
-			SourceFormat: translatorreg.FromString(openAICompatImageHandlerType),
-			Headers:      http.Header{"User-Agent": []string{"downstream-image-client/1.0"}},
-		})
-		if err != nil {
-			t.Fatalf("Execute(images) error = %v", err)
-		}
-		if gotUserAgent != "downstream-image-client/1.0" {
-			t.Fatalf("Execute(images) User-Agent = %q, want downstream-image-client/1.0", gotUserAgent)
-		}
-
-		gotUserAgent = ""
-		streamRes, err := executor.ExecuteStream(context.Background(), baseAuth, imageReq, coreexecutor.Options{
-			SourceFormat: translatorreg.FromString(openAICompatImageHandlerType),
-			Stream:       true,
-			Headers:      http.Header{"User-Agent": []string{"downstream-image-stream-client/1.0"}},
-		})
-		if err != nil {
-			t.Fatalf("ExecuteStream(images) error = %v", err)
-		}
-		for range streamRes.Chunks {
-		}
-		if gotUserAgent != "downstream-image-stream-client/1.0" {
-			t.Fatalf("ExecuteStream(images) User-Agent = %q, want downstream-image-stream-client/1.0", gotUserAgent)
-		}
-	})
-
 	t.Run("configured header:User-Agent overrides downstream User-Agent", func(t *testing.T) {
 		gotUserAgent = ""
 		overrideAuth := &coreauth.Auth{

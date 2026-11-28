@@ -11,7 +11,6 @@ import (
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gorilla/websocket"
 	log "github.com/sirupsen/logrus"
-	"github.com/udit19199/relay/internal/config"
 	"github.com/udit19199/relay/internal/runtime/executor/helps"
 	coreauth "github.com/udit19199/relay/internal/service/auth"
 	coreexecutor "github.com/udit19199/relay/internal/service/executor"
@@ -523,7 +522,6 @@ func (e *CodexWebsocketsExecutor) ExecuteStream(ctx context.Context, auth *corea
 				} else {
 					reporter.EnsurePublished(ctx)
 				}
-				publishCodexImageToolUsageWithOutputItems(ctx, reporter, clientBody, completedPayload, outputItemsByIndex, outputItemsFallback)
 			}
 
 			var currentChunks [][]byte
@@ -786,7 +784,6 @@ func (e *CodexWebsocketsExecutor) ExecuteStream(ctx context.Context, auth *corea
 				} else {
 					reporter.EnsurePublished(ctx)
 				}
-				publishCodexImageToolUsageWithOutputItems(ctx, reporter, clientBody, completedPayload, outputItemsByIndex, outputItemsFallback)
 			}
 
 			if coreexecutor.DownstreamWebsocket(ctx) {
@@ -905,16 +902,6 @@ func (e *CodexWebsocketsExecutor) prepareCodexWebsocketStream(ctx context.Contex
 	ensureWebSearchToolForHistoryDoc(doc, opts.Headers)
 	if !useSIWC {
 		normalizeCodexInstructionsDoc(doc, preserveNativeOutput)
-		if e.cfg == nil || e.cfg.DisableImageGeneration == config.DisableImageGenerationOff {
-			checkModel := req.Model
-			if strings.TrimSpace(checkModel) == "" {
-				checkModel = baseModel
-			}
-			ensureImageGenerationToolDoc(doc, checkModel, auth, opts.Headers)
-			if !codexAuthUsesAPIKey(auth) {
-				normalizeCodexImageGenerationToolsDoc(doc)
-			}
-		}
 	}
 	normalizeCodexWebsocketParallelToolCallsDoc(doc, opts.Headers)
 	helps.NormalizeCodexToolSchemasDoc(doc)
@@ -946,9 +933,6 @@ func (e *CodexWebsocketsExecutor) prepareCodexWebsocketStream(ctx context.Contex
 	wsHeaders = applyCodexWebsocketHeaders(ctx, wsHeaders, auth, apiKey, e.cfg, preserveNativeOutput, opts.Headers)
 	applyCodexRoutingHint(ctx, wsHeaders, auth, upstreamModel, body, opts.Headers)
 	applyModelHeaderOverrides(wsHeaders, upstreamModel)
-	if errValidate := helps.ValidateCodexHostedImageGenerationDoc(doc, wsHeaders, e.cfg, !useSIWC && !codexAuthUsesAPIKey(auth)); errValidate != nil {
-		return nil, errValidate
-	}
 
 	return &codexWebsocketPrepared{
 		from:                 from,

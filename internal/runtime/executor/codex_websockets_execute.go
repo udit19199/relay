@@ -9,7 +9,6 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gorilla/websocket"
-	"github.com/udit19199/relay/internal/config"
 	"github.com/udit19199/relay/internal/runtime/executor/helps"
 	coreauth "github.com/udit19199/relay/internal/service/auth"
 	coreexecutor "github.com/udit19199/relay/internal/service/executor"
@@ -80,16 +79,6 @@ func (e *CodexWebsocketsExecutor) Execute(ctx context.Context, auth *coreauth.Au
 	ensureWebSearchToolForHistoryDoc(doc, opts.Headers)
 	if !useSIWC {
 		normalizeCodexInstructionsDoc(doc, nativeRequest)
-		if e.cfg == nil || e.cfg.DisableImageGeneration == config.DisableImageGenerationOff {
-			checkModel := req.Model
-			if strings.TrimSpace(checkModel) == "" {
-				checkModel = baseModel
-			}
-			ensureImageGenerationToolDoc(doc, checkModel, auth, opts.Headers)
-			if !codexAuthUsesAPIKey(auth) {
-				normalizeCodexImageGenerationToolsDoc(doc)
-			}
-		}
 	}
 	normalizeCodexWebsocketParallelToolCallsDoc(doc, opts.Headers)
 	helps.NormalizeCodexToolSchemasDoc(doc)
@@ -125,9 +114,6 @@ func (e *CodexWebsocketsExecutor) Execute(ctx context.Context, auth *coreauth.Au
 	wsHeaders = applyCodexWebsocketHeaders(ctx, wsHeaders, auth, apiKey, e.cfg, nativeRequest, opts.Headers)
 	applyCodexRoutingHint(ctx, wsHeaders, auth, upstreamModel, body, opts.Headers)
 	applyModelHeaderOverrides(wsHeaders, upstreamModel)
-	if errValidate := helps.ValidateCodexHostedImageGenerationDoc(doc, wsHeaders, e.cfg, !useSIWC && !codexAuthUsesAPIKey(auth)); errValidate != nil {
-		return resp, errValidate
-	}
 
 	var authID, authLabel, authType, authValue string
 	if auth != nil {
@@ -395,7 +381,6 @@ func (e *CodexWebsocketsExecutor) Execute(ctx context.Context, auth *coreauth.Au
 			} else {
 				reporter.EnsurePublished(ctx)
 			}
-			publishCodexImageToolUsageWithOutputItems(ctx, reporter, body, payload, outputItemsByIndex, outputItemsFallback)
 			var param any
 			out := translatorreg.TranslateNonStream(ctx, to, responseFormat, req.Model, originalPayload, body, payload, &param)
 			if responseFormat == translatorreg.FormatOpenAIResponse {

@@ -12,10 +12,11 @@ import (
 	"testing"
 
 	"crypto/x509"
+	"io"
+
 	"github.com/google/uuid"
 	"github.com/udit19199/relay/internal/registry"
 	coreexecutor "github.com/udit19199/relay/internal/service/executor"
-	"io"
 )
 
 func windowsCodexTLSHandshakeError() error {

@@ -10,13 +10,14 @@ import (
 
 	"context"
 	"fmt"
+	"path/filepath"
+	"sync"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/udit19199/relay/internal/api"
 	"github.com/udit19199/relay/internal/config"
 	internalconfig "github.com/udit19199/relay/internal/config"
 	"golang.org/x/crypto/bcrypt"
-	"path/filepath"
-	"sync"
 )
 
 const issue6631ManagementKey = "issue-6631-management-key"

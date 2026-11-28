@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/udit19199/relay/internal/auth/codex"
 	"testing"
 	"time"
+
+	"github.com/udit19199/relay/internal/auth/codex"
 )
 
 func TestSIWCWakeCancellationPreservesOuterRefreshFailure(t *testing.T) {

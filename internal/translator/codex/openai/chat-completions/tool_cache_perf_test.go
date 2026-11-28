@@ -6,9 +6,10 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"github.com/udit19199/relay/internal/util"
 	"strings"
 	"testing"
+
+	"github.com/udit19199/relay/internal/util"
 )
 
 func tcHash(b []byte) string { s := sha256.Sum256(b); return hex.EncodeToString(s[:]) }

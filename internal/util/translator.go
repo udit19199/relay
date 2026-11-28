@@ -10,10 +10,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"github.com/MoeForge/moego/ojson"
-	log "github.com/sirupsen/logrus"
 	"sort"
 	"strconv"
+
+	"github.com/MoeForge/moego/ojson"
+	log "github.com/sirupsen/logrus"
 )
 
 // WalkSchema is Walk for JSON Schema documents: it records the field wherever a schema keyword

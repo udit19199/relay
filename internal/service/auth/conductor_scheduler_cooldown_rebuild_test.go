@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/udit19199/relay/internal/registry"
-	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 	"net/http"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/udit19199/relay/internal/registry"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 // TestScheduler_ModelCooldown_DoesNotTriggerRebuild verifies that when credentials

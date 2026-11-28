@@ -4,15 +4,16 @@ import (
 	"testing"
 
 	"context"
-	"github.com/udit19199/relay/internal/config"
-	"github.com/udit19199/relay/internal/registry"
-	coreauth "github.com/udit19199/relay/internal/service/auth"
-	"github.com/udit19199/relay/internal/watcher/synthesizer"
 	"os"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/registry"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	"github.com/udit19199/relay/internal/watcher/synthesizer"
 )
 
 // Without a watcher, a registration dropped for obsolete global exclusions

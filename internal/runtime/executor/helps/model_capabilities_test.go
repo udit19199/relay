@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 
+	"testing"
+
 	"github.com/MoeForge/moego/ojson"
 	internalconfig "github.com/udit19199/relay/internal/config"
 	"github.com/udit19199/relay/internal/registry"
@@ -15,7 +17,6 @@ import (
 	_ "github.com/udit19199/relay/internal/thinking/provider/openai"
 	_ "github.com/udit19199/relay/internal/translator"
 	translatorreg "github.com/udit19199/relay/internal/translator/registry"
-	"testing"
 )
 
 type configuredThinkingExecutor struct {

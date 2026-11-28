@@ -6,9 +6,10 @@ import (
 	"net/http"
 	"testing"
 
+	"time"
+
 	"github.com/udit19199/relay/internal/registry"
 	coreexecutor "github.com/udit19199/relay/internal/service/executor"
-	"time"
 )
 
 type schedulerTestExecutor struct {

@@ -244,7 +244,7 @@ func TestCodexWebsocketsExecuteUseSIWCStripsConfigurationUpdates(t *testing.T) {
 	}))
 	defer server.Close()
 
-	executor := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
+	executor := NewCodexWebsocketsExecutor(&config.Config{})
 	_, err := executor.Execute(context.Background(), codexSIWCAuthForUpdateTest(server.URL), coreexecutor.Request{
 		Model:   "gpt-6-astra",
 		Payload: []byte(codexSIWCUpdatePayload),
@@ -315,7 +315,7 @@ func TestCodexExecutorExecuteStreamUseSIWCStripsConfigurationUpdates(t *testing.
 }
 
 func TestCodexWebsocketsPrepareStreamUseSIWCKeepsSuffixEffort(t *testing.T) {
-	executor := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
+	executor := NewCodexWebsocketsExecutor(&config.Config{})
 	prepared, err := executor.prepareCodexWebsocketStream(context.Background(), codexSIWCAuthForUpdateTest("http://127.0.0.1:1"), coreexecutor.Request{
 		Model:   "gpt-6-astra(xhigh)",
 		Payload: []byte(codexSIWCUpdatePayload),

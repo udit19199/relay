@@ -1,9 +1,10 @@
 package service
 
 import (
+	"testing"
+
 	"github.com/udit19199/relay/internal/config"
 	coreauth "github.com/udit19199/relay/internal/service/auth"
-	"testing"
 )
 
 func TestHasNativeOpenAICompatExecutorConfig(t *testing.T) {

@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"github.com/udit19199/relay/internal/kvstore"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/udit19199/relay/internal/kvstore"
 )
 
 type fakeClaudeWebSearchResultKVClient struct {

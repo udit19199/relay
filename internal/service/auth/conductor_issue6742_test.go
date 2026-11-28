@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/MoeForge/moego/base64"
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/MoeForge/moego/base64"
 
 	"github.com/udit19199/relay/internal/registry"
 	coreexecutor "github.com/udit19199/relay/internal/service/executor"

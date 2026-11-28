@@ -146,14 +146,10 @@ func (m *Manager) normalizeSessionAffinityNeverTerminalError(err error, provider
 
 // Execute performs a non-streaming execution using the configured selector and executor.
 // It supports multiple providers for the same model and round-robins the starting provider per model.
-func isOpenAIImageExecutionOptions(opts coreexecutor.Options) bool {
-	return strings.EqualFold(strings.TrimSpace(opts.SourceFormat.String()), "openai-image")
-}
-
 func (m *Manager) Execute(ctx context.Context, providers []string, req coreexecutor.Request, opts coreexecutor.Options) (coreexecutor.Response, error) {
 	ctx = coreexecutor.WithRequestProxyURL(ctx, opts.ProxyURL)
 	req, opts = coresession.Enrich(req, opts)
-	ctx = WithCodexClientRequest(ctx, isOpenAIImageExecutionOptions(opts) || IsCodexClientRequest(ctx, opts.Headers))
+	ctx = WithCodexClientRequest(ctx, IsCodexClientRequest(ctx, opts.Headers))
 	ctx = coreusage.CaptureIdentity(ctx)
 	normalized := m.normalizeProviders(providers)
 	if len(normalized) == 0 {
@@ -258,7 +254,7 @@ func (m *Manager) ExecuteCount(ctx context.Context, providers []string, req core
 func (m *Manager) ExecuteStream(ctx context.Context, providers []string, req coreexecutor.Request, opts coreexecutor.Options) (*coreexecutor.StreamResult, error) {
 	ctx = coreexecutor.WithRequestProxyURL(ctx, opts.ProxyURL)
 	req, opts = coresession.Enrich(req, opts)
-	ctx = WithCodexClientRequest(ctx, isOpenAIImageExecutionOptions(opts) || IsCodexClientRequest(ctx, opts.Headers))
+	ctx = WithCodexClientRequest(ctx, IsCodexClientRequest(ctx, opts.Headers))
 	ctx = coreusage.CaptureIdentity(ctx)
 	normalized := m.normalizeProviders(providers)
 	if len(normalized) == 0 {

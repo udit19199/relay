@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/MoeForge/moego/ojson"
-	translatorapi "github.com/udit19199/relay/internal/translator/translator"
 	"strings"
 	"testing"
+
+	"github.com/MoeForge/moego/ojson"
+	translatorapi "github.com/udit19199/relay/internal/translator/translator"
 )
 
 const benchmarkHistorySentinel = "benchmark-final-history-turn"

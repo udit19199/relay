@@ -19,7 +19,6 @@ type modelExecutionOptions struct {
 	ProxyURL           string
 	Path               string
 	CallerScope        string
-	AllowSpeechModel   bool
 }
 
 // ProtocolExecutionRequest describes a route-level model execution request with explicit protocols.
@@ -80,8 +79,7 @@ func (h *BaseAPIHandler) ExecuteProtocolWithAuthManager(ctx context.Context, req
 	if req.Stream {
 		return ModelExecutionResponse{}, modelExecutionModeError("ExecuteProtocolWithAuthManager requires Stream=false")
 	}
-	allowImageModel := isModelExecutionImageProtocol(req.EntryProtocol) || isModelExecutionImageProtocol(req.ExitProtocol)
-	body, headers, errMsg := h.executeWithAuthManagerFormats(ctx, req.EntryProtocol, req.ExitProtocol, req.Model, cloneBytes(req.Body), req.Alt, allowImageModel, modelExecutionOptions{
+	body, headers, errMsg := h.executeWithAuthManagerFormats(ctx, req.EntryProtocol, req.ExitProtocol, req.Model, cloneBytes(req.Body), req.Alt, modelExecutionOptions{
 		Headers:            req.Headers,
 		Query:              req.Query,
 		ForcedProvider:     req.ForcedProvider,
@@ -103,8 +101,7 @@ func (h *BaseAPIHandler) ExecuteProtocolStreamWithAuthManager(ctx context.Contex
 	if !req.Stream {
 		return ModelExecutionStream{}, modelExecutionModeError("ExecuteProtocolStreamWithAuthManager requires Stream=true")
 	}
-	allowImageModel := isModelExecutionImageProtocol(req.EntryProtocol) || isModelExecutionImageProtocol(req.ExitProtocol)
-	dataChan, headers, errChan := h.executeStreamWithAuthManagerFormats(ctx, req.EntryProtocol, req.ExitProtocol, req.Model, cloneBytes(req.Body), req.Alt, allowImageModel, modelExecutionOptions{
+	dataChan, headers, errChan := h.executeStreamWithAuthManagerFormats(ctx, req.EntryProtocol, req.ExitProtocol, req.Model, cloneBytes(req.Body), req.Alt, modelExecutionOptions{
 		Headers:            req.Headers,
 		Query:              req.Query,
 		ForcedProvider:     req.ForcedProvider,
@@ -124,14 +121,6 @@ func (h *BaseAPIHandler) ExecuteProtocolStreamWithAuthManager(ctx context.Contex
 
 func modelExecutionModeError(message string) *interfaces.ErrorMessage {
 	return &interfaces.ErrorMessage{StatusCode: http.StatusBadRequest, Error: errors.New(message)}
-}
-
-func isModelExecutionImageProtocol(protocol string) bool {
-	return strings.EqualFold(strings.TrimSpace(protocol), "openai-image")
-}
-
-func isModelExecutionSpeechProtocol(protocol string) bool {
-	return strings.EqualFold(strings.TrimSpace(protocol), "openai-speech")
 }
 
 func modelExecutionResponseProtocol(entryProtocol, exitProtocol string) string {

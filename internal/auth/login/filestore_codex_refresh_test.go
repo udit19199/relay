@@ -7,9 +7,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"sync"
+
 	"github.com/udit19199/relay/internal/auth/codex"
 	coreauth "github.com/udit19199/relay/internal/service/auth"
-	"sync"
 )
 
 func codexRefreshFixture() *coreauth.Auth {

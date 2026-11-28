@@ -8,12 +8,13 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"errors"
-	tls "github.com/refraction-networking/utls"
 	"io"
 	"math/big"
 	"net"
 	"testing"
 	"time"
+
+	tls "github.com/refraction-networking/utls"
 )
 
 // newResumptionTestCertificate mints a short-lived self-signed leaf for the

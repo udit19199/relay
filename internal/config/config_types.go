@@ -846,11 +846,7 @@ type OpenAICompatibilityModel struct {
 	// ForceMapping rewrites upstream response model fields back to Alias.
 	ForceMapping bool `yaml:"force-mapping,omitempty" json:"force-mapping,omitempty"`
 
-	// Image marks this model as callable through /v1/images/generations and /v1/images/edits.
-	Image bool `yaml:"image,omitempty" json:"image,omitempty"`
-
 	// InputModalities declares chat/responses input capabilities (e.g. text, image) for Codex and other clients.
-	// This is separate from Image, which only enables /v1/images/* endpoints.
 	InputModalities []string `yaml:"input-modalities,omitempty" json:"input-modalities,omitempty"`
 
 	// OutputModalities declares supported output modalities when known (e.g. text, image).

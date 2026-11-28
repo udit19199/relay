@@ -74,11 +74,6 @@ func TestBuildCodexConfigModelsSelectsDefaultsOrConfiguredModels(t *testing.T) {
 			defaultIDs[model.ID] = struct{}{}
 		}
 	}
-	for _, modelID := range []string{"gpt-image-1.5", "gpt-image-2", "gpt-image-2.5-flare", "gpt-image-2.5-sunburst", "gpt-image-2.5", "gpt-image-2.6-flare", "gpt-image-2.6-sunburst", "gpt-image-2.6"} {
-		if _, ok := defaultIDs[modelID]; !ok {
-			t.Errorf("missing default model %q", modelID)
-		}
-	}
 }
 
 func TestBuildConfigModelsDisplayNameFallback(t *testing.T) {

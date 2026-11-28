@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"fmt"
+
 	"github.com/udit19199/relay/internal/registry"
 )
 
@@ -38,12 +39,6 @@ func TestCodexClientModelsResponse_InputModalitiesFromRegistry(t *testing.T) {
 			DisplayName:              "mimo-mixed-modalities-codex-test",
 			SupportedInputModalities: []string{"text", "image", "audio", "video", "TEXT", "IMAGE"},
 		},
-		{
-			ID:      "compat-image-only-codex-test",
-			Object:  "model",
-			OwnedBy: "mimo",
-			Type:    registry.OpenAIImageModelType,
-		},
 	})
 	t.Cleanup(func() {
 		modelRegistry.UnregisterClient("codex-input-modalities-test")
@@ -59,7 +54,6 @@ func TestCodexClientModelsResponse_InputModalitiesFromRegistry(t *testing.T) {
 	var visionEntry map[string]any
 	var textOnlyEntry map[string]any
 	var mixedEntry map[string]any
-	var imageEntry map[string]any
 	for _, entry := range models {
 		slug := stringModelValue(entry, "slug")
 		switch slug {
@@ -69,8 +63,6 @@ func TestCodexClientModelsResponse_InputModalitiesFromRegistry(t *testing.T) {
 			textOnlyEntry = entry
 		case "mimo-mixed-modalities-codex-test":
 			mixedEntry = entry
-		case "compat-image-only-codex-test":
-			imageEntry = entry
 		}
 	}
 	if visionEntry == nil {
@@ -121,26 +113,6 @@ func TestCodexClientModelsResponse_InputModalitiesFromRegistry(t *testing.T) {
 		t.Fatalf("mixed supports_image_detail_original = %#v, want false for non-Codex model", mixedEntry["supports_image_detail_original"])
 	}
 
-	if imageEntry == nil {
-		t.Fatal("expected codex entry for image-only compat model")
-	}
-	if got, _ := imageEntry["visibility"].(string); got != "hide" {
-		t.Fatalf("image model visibility = %q, want hide", got)
-	}
-	if _, exists := imageEntry["input_modalities"]; exists {
-		t.Fatalf("image endpoint model should not expose input_modalities from registry: %#v", imageEntry["input_modalities"])
-	}
-}
-
-func TestCodexClientHidesSpeechModels(t *testing.T) {
-	for _, id := range []string{"grok-tts", "grok-voice-tts-1.0", "xai/grok-tts"} {
-		if !isCodexClientImageOrVideoModel(id) {
-			t.Fatalf("%s should be hidden from the Codex chat catalog", id)
-		}
-	}
-	if isCodexClientImageOrVideoModel("grok-4") {
-		t.Fatal("grok-4 should stay visible")
-	}
 }
 
 func TestCodexClientModelsResponse_AppliesDisplayNameToTemplateModel(t *testing.T) {

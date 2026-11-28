@@ -3,11 +3,12 @@ package executor
 import (
 	"bytes"
 	"context"
-	"github.com/MoeForge/moego/base64"
 	"io"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/MoeForge/moego/base64"
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/udit19199/relay/internal/runtime/executor/helps"

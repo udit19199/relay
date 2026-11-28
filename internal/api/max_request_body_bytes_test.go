@@ -7,15 +7,16 @@ import (
 
 	"bytes"
 	"context"
-	"github.com/klauspost/compress/zstd"
-	"github.com/udit19199/relay/internal/access"
-	proxyconfig "github.com/udit19199/relay/internal/config"
 	"math"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
+
+	"github.com/klauspost/compress/zstd"
+	"github.com/udit19199/relay/internal/access"
+	proxyconfig "github.com/udit19199/relay/internal/config"
 )
 
 type countingBodyReader struct {
@@ -330,7 +331,7 @@ access:
 		if errClose := mw.Close(); errClose != nil {
 			t.Fatalf("Close() error = %v", errClose)
 		}
-		reqMultipart := httptest.NewRequest(http.MethodPost, "/v1/images/edits", io.NopCloser(bytes.NewReader(multipartBuf.Bytes())))
+		reqMultipart := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", io.NopCloser(bytes.NewReader(multipartBuf.Bytes())))
 		reqMultipart.ContentLength = -1
 		reqMultipart.Header.Set("Authorization", "Bearer test-key")
 		reqMultipart.Header.Set("Content-Type", mw.FormDataContentType())

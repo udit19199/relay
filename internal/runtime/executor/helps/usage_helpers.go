@@ -6,8 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"mime"
-	"mime/multipart"
 	"net/http"
 	"reflect"
 	"strings"
@@ -18,7 +16,6 @@ import (
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	log "github.com/sirupsen/logrus"
 	"github.com/udit19199/relay/internal/clienterror"
 	internallogging "github.com/udit19199/relay/internal/logging"
 	coreauth "github.com/udit19199/relay/internal/service/auth"
@@ -925,7 +922,6 @@ type StreamUsageBuffer struct {
 	openAIStreamImageDetails     *usage.ImageDetails
 	responsesOutputByIndex       map[int64][]byte
 	responsesOutputFallback      [][]byte
-	requestedImageDetails        *usage.ImageDetails
 }
 
 var (
@@ -968,13 +964,6 @@ func (b *StreamUsageBuffer) Observe(detail usage.Detail, ok bool) {
 		}
 	}
 	b.ok = true
-}
-
-func (b *StreamUsageBuffer) SetRequestPayload(requestPayload []byte, contentType ...string) {
-	if b == nil || len(requestPayload) == 0 {
-		return
-	}
-	b.requestedImageDetails = ParseRequestImageDetails(requestPayload, contentType...)
 }
 
 // ObserveOpenAIStream records usage, tool, and image artifacts from an OpenAI SSE line.
@@ -1121,9 +1110,6 @@ func (b *StreamUsageBuffer) applyOpenAIStreamObservations() {
 		}
 		if b.openAIStreamImageDetails != nil {
 			b.detail.ImageDetails = b.openAIStreamImageDetails.Clone()
-		}
-		if b.detail.RequestedImageDetails == nil && b.requestedImageDetails != nil {
-			b.detail.RequestedImageDetails = b.requestedImageDetails.Clone()
 		}
 		b.ok = true
 	}
@@ -1386,13 +1372,6 @@ func ParseCodexUsageWithOutputItems(data []byte, itemsByIndex map[int64][]byte, 
 	} else if len(itemsByIndex) > 0 || len(fallback) > 0 {
 		applyResponsesCollectedOutputItemsUsage(&detail, itemsByIndex, fallback)
 	}
-	// When response.tool_usage.image_gen is present, CodexExecutor publishes a dedicated
-	// additional usage record for the image model (e.g. gpt-image-2) carrying ImageCount
-	// and ImageDetails; clear them on the orchestrator model record to avoid double-counting.
-	if hasOpenAIStyleUsageTokenFields(root.Get("response.tool_usage.image_gen")) {
-		detail.ImageCount = nil
-		detail.ImageDetails = nil
-	}
 	return detail, true
 }
 
@@ -1435,67 +1414,6 @@ func applyResponsesCacheRetention(detail *usage.Detail, root, usageNode ojson.Re
 		detail.CacheCreation12hTokens = usage.Int64Ptr(long.Int())
 		detail.CacheDetails.Ephemeral12hInputTokens = usage.Int64Ptr(long.Int())
 	}
-}
-
-func ParseCodexImageToolUsage(data []byte) (usage.Detail, bool) {
-	return ParseCodexImageToolUsageWithOutputItems(nil, data, nil, nil)
-}
-
-func ParseCodexImageToolUsageWithOutputItems(requestBody, data []byte, itemsByIndex map[int64][]byte, fallback [][]byte) (usage.Detail, bool) {
-	if len(data) == 0 {
-		return usage.Detail{}, false
-	}
-	root := util.ParseGJSONBytesNoCopy(data)
-	usageNode := root.Get("response.tool_usage.image_gen")
-	if !hasOpenAIStyleUsageTokenFields(usageNode) {
-		return usage.Detail{}, false
-	}
-	detail := parseOpenAIStyleUsageNode(usageNode)
-	applyCodexImageToolOutputMetadata(&detail, requestBody, root.Get("response.output"), itemsByIndex, fallback)
-	return detail, true
-}
-
-func applyCodexImageToolOutputMetadata(detail *usage.Detail, requestBody []byte, outputNode ojson.Result, itemsByIndex map[int64][]byte, fallback [][]byte) {
-	if detail == nil {
-		return
-	}
-	var items []ojson.Result
-	if outputNode.Exists() && outputNode.IsArray() && len(outputNode.Array()) > 0 {
-		items = outputNode.Array()
-	} else {
-		items = parseCollectedOutputItems(itemsByIndex, fallback)
-	}
-	var count int64
-	var respMeta *usage.ImageDetails
-	for _, item := range items {
-		if strings.TrimSpace(item.Get("type").String()) != "image_generation_call" {
-			continue
-		}
-		if status := strings.TrimSpace(item.Get("status").String()); strings.EqualFold(status, "failed") || strings.EqualFold(status, "in_progress") {
-			continue
-		}
-		count++
-		if respMeta == nil {
-			meta := &usage.ImageDetails{
-				Size:          cloneTrimmedString(item.Get("size").String()),
-				Resolution:    cloneTrimmedString(item.Get("resolution").String()),
-				AspectRatio:   cloneTrimmedString(item.Get("aspect_ratio").String()),
-				Quality:       cloneTrimmedString(item.Get("quality").String()),
-				Background:    cloneTrimmedString(item.Get("background").String()),
-				OutputFormat:  cloneTrimmedString(item.Get("output_format").String()),
-				MimeType:      cloneTrimmedString(firstExistingUsageNode(item, "mime_type", "mimeType").String()),
-				InputFidelity: cloneTrimmedString(item.Get("input_fidelity").String()),
-			}
-			if !isEmptyImageDetails(meta) {
-				respMeta = meta
-			}
-		}
-	}
-	if count > 0 {
-		detail.ImageCount = usage.Int64Ptr(count)
-	}
-	detail.ImageDetails = respMeta
-	detail.RequestedImageDetails = ParseRequestImageDetails(requestBody)
 }
 
 func ParseOpenAIUsage(data []byte) usage.Detail {
@@ -2096,315 +2014,6 @@ func isEmptyImageDetails(d *usage.ImageDetails) bool {
 		return true
 	}
 	return d.Size == "" && d.Resolution == "" && d.ImageSize == "" && d.AspectRatio == "" && d.Quality == "" && d.Background == "" && d.OutputFormat == "" && d.ResponseFormat == "" && d.MimeType == "" && d.InputFidelity == ""
-}
-
-// ParseRequestImageDetails extracts requested image/video parameters strictly from a request payload,
-// preserving each upstream protocol's native field names.
-func ParseRequestImageDetails(requestPayload []byte, contentType ...string) *usage.ImageDetails {
-	if len(contentType) > 0 {
-		mediaType, params, errParse := mime.ParseMediaType(contentType[0])
-		if errParse == nil && mediaType == "multipart/form-data" {
-			return parseMultipartImageDetails(requestPayload, params["boundary"])
-		}
-	}
-	if len(requestPayload) == 0 || !ojson.ValidBytes(requestPayload) {
-		return nil
-	}
-	root := util.ParseGJSONBytesNoCopy(requestPayload)
-	pick := func(paths ...string) string {
-		for _, p := range paths {
-			if v := root.Get(p); v.Type == ojson.String {
-				if s := cloneTrimmedString(v.String()); s != "" {
-					return s
-				}
-			}
-		}
-		return ""
-	}
-	out := &usage.ImageDetails{
-		Size:           pick("size"),
-		Resolution:     pick("resolution", "image_config.resolution"),
-		ImageSize:      pick("image_size", "imageSize", "image_config.image_size", "image_config.imageSize", "generationConfig.imageConfig.imageSize", "generation_config.image_config.image_size", "request.generationConfig.imageConfig.imageSize", "request.generation_config.image_config.image_size", "parameters.sampleImageSize"),
-		AspectRatio:    pick("aspect_ratio", "aspectRatio", "image_config.aspect_ratio", "image_config.aspectRatio", "generationConfig.imageConfig.aspectRatio", "generation_config.image_config.aspect_ratio", "request.generationConfig.imageConfig.aspectRatio", "request.generation_config.image_config.aspect_ratio", "parameters.aspectRatio"),
-		Quality:        pick("quality"),
-		Background:     pick("background"),
-		OutputFormat:   pick("output_format"),
-		ResponseFormat: pick("response_format"),
-		MimeType:       pick("mime_type", "mimeType", "parameters.outputOptions.mimeType"),
-		InputFidelity:  pick("input_fidelity"),
-	}
-	if isEmptyImageDetails(out) {
-		for _, tool := range root.Get("tools").Array() {
-			if strings.TrimSpace(tool.Get("type").String()) != "image_generation" {
-				continue
-			}
-			out = &usage.ImageDetails{
-				Size:          cloneTrimmedString(tool.Get("size").String()),
-				Resolution:    cloneTrimmedString(tool.Get("resolution").String()),
-				ImageSize:     cloneTrimmedString(firstExistingUsageNode(tool, "image_size", "imageSize").String()),
-				AspectRatio:   cloneTrimmedString(firstExistingUsageNode(tool, "aspect_ratio", "aspectRatio").String()),
-				Quality:       cloneTrimmedString(tool.Get("quality").String()),
-				Background:    cloneTrimmedString(tool.Get("background").String()),
-				OutputFormat:  cloneTrimmedString(tool.Get("output_format").String()),
-				MimeType:      cloneTrimmedString(firstExistingUsageNode(tool, "mime_type", "mimeType").String()),
-				InputFidelity: cloneTrimmedString(tool.Get("input_fidelity").String()),
-			}
-			break
-		}
-	}
-	if isEmptyImageDetails(out) {
-		return nil
-	}
-	return out
-}
-
-// parseMultipartImageDetails reads only small scalar attributes. File parts and
-// unrelated fields are drained without allocating another copy or temporary files.
-func parseMultipartImageDetails(payload []byte, boundary string) *usage.ImageDetails {
-	if boundary == "" {
-		return nil
-	}
-	out := &usage.ImageDetails{}
-	fields := map[string]*string{
-		"size": &out.Size, "resolution": &out.Resolution, "image_size": &out.ImageSize,
-		"aspect_ratio": &out.AspectRatio, "quality": &out.Quality,
-		"background": &out.Background, "output_format": &out.OutputFormat,
-		"response_format": &out.ResponseFormat, "mime_type": &out.MimeType,
-		"input_fidelity": &out.InputFidelity,
-	}
-	reader := multipart.NewReader(bytes.NewReader(payload), boundary)
-	for {
-		part, errNext := reader.NextPart()
-		if errNext == io.EOF {
-			break
-		}
-		if errNext != nil {
-			log.Debugf("usage: read multipart image attributes: %v", errNext)
-			return nil
-		}
-		dst := fields[part.FormName()]
-		var value []byte
-		var errRead error
-		const maxAttributeBytes = 4096
-		if dst != nil && part.FileName() == "" {
-			value, errRead = io.ReadAll(io.LimitReader(part, maxAttributeBytes+1))
-		}
-		errClose := part.Close()
-		if errRead != nil || errClose != nil {
-			log.Debugf("usage: read multipart image attribute: read=%v close=%v", errRead, errClose)
-			return nil
-		}
-		if dst != nil && len(value) <= maxAttributeBytes && len(value) > 0 {
-			*dst = strings.TrimSpace(string(value))
-		}
-	}
-	if isEmptyImageDetails(out) {
-		return nil
-	}
-	return out
-}
-
-// ParseOpenAIImageUsage extracts token usage, generated image count, and separate
-// request vs upstream response image parameters from an OpenAI or xAI image request/response.
-func ParseOpenAIImageUsage(requestPayload, responsePayload []byte, contentType ...string) usage.Detail {
-	var detail usage.Detail
-	detail.RequestedImageDetails = ParseRequestImageDetails(requestPayload, contentType...)
-	if len(responsePayload) == 0 || !ojson.ValidBytes(responsePayload) {
-		return detail
-	}
-	root := util.ParseGJSONBytesNoCopy(responsePayload)
-	var (
-		usageNode     ojson.Result
-		serviceTier   string
-		imageCount    int64
-		imgDetails    usage.ImageDetails
-		firstItemMeta usage.ImageDetails
-	)
-	root.ForEach(func(key, val ojson.Result) bool {
-		switch key.String() {
-		case "usage":
-			usageNode = val
-		case "service_tier":
-			if val.Type == ojson.String {
-				serviceTier = cloneTrimmedString(val.String())
-			}
-		case "data":
-			if val.IsArray() {
-				arr := val.Array()
-				imageCount = int64(len(arr))
-				if len(arr) > 0 && arr[0].IsObject() {
-					arr[0].ForEach(func(dk, dv ojson.Result) bool {
-						if dv.Type != ojson.String {
-							return true
-						}
-						switch dk.String() {
-						case "b64_json", "url", "revised_prompt":
-							return true
-						case "size":
-							firstItemMeta.Size = cloneTrimmedString(dv.String())
-						case "resolution":
-							firstItemMeta.Resolution = cloneTrimmedString(dv.String())
-						case "image_size", "imageSize":
-							if firstItemMeta.ImageSize == "" {
-								firstItemMeta.ImageSize = cloneTrimmedString(dv.String())
-							}
-						case "aspect_ratio", "aspectRatio":
-							if firstItemMeta.AspectRatio == "" {
-								firstItemMeta.AspectRatio = cloneTrimmedString(dv.String())
-							}
-						case "quality":
-							firstItemMeta.Quality = cloneTrimmedString(dv.String())
-						case "background":
-							firstItemMeta.Background = cloneTrimmedString(dv.String())
-						case "output_format":
-							firstItemMeta.OutputFormat = cloneTrimmedString(dv.String())
-						case "mime_type", "mimeType":
-							if firstItemMeta.MimeType == "" {
-								firstItemMeta.MimeType = cloneTrimmedString(dv.String())
-							}
-						case "input_fidelity":
-							firstItemMeta.InputFidelity = cloneTrimmedString(dv.String())
-						}
-						return true
-					})
-				}
-			}
-		case "size":
-			if val.Type == ojson.String {
-				imgDetails.Size = cloneTrimmedString(val.String())
-			}
-		case "resolution":
-			if val.Type == ojson.String {
-				imgDetails.Resolution = cloneTrimmedString(val.String())
-			}
-		case "image_size", "imageSize":
-			if val.Type == ojson.String && imgDetails.ImageSize == "" {
-				imgDetails.ImageSize = cloneTrimmedString(val.String())
-			}
-		case "aspect_ratio", "aspectRatio":
-			if val.Type == ojson.String && imgDetails.AspectRatio == "" {
-				imgDetails.AspectRatio = cloneTrimmedString(val.String())
-			}
-		case "quality":
-			if val.Type == ojson.String {
-				imgDetails.Quality = cloneTrimmedString(val.String())
-			}
-		case "background":
-			if val.Type == ojson.String {
-				imgDetails.Background = cloneTrimmedString(val.String())
-			}
-		case "output_format":
-			if val.Type == ojson.String {
-				imgDetails.OutputFormat = cloneTrimmedString(val.String())
-			}
-		case "mime_type", "mimeType":
-			if val.Type == ojson.String && imgDetails.MimeType == "" {
-				imgDetails.MimeType = cloneTrimmedString(val.String())
-			}
-		case "input_fidelity":
-			if val.Type == ojson.String {
-				imgDetails.InputFidelity = cloneTrimmedString(val.String())
-			}
-		}
-		return true
-	})
-	if usageNode.Exists() {
-		if hasOpenAIStyleUsageTokenFields(usageNode) {
-			detail = parseOpenAIStyleUsageNode(usageNode)
-		} else {
-			populateOpenAIStyleStructuredFields(&detail, usageNode)
-		}
-		detail.RequestedImageDetails = ParseRequestImageDetails(requestPayload, contentType...)
-	}
-	if serviceTier != "" {
-		detail.ResponseServiceTier = serviceTier
-		if detail.UpstreamServiceTier == "" {
-			detail.UpstreamServiceTier = serviceTier
-		}
-	}
-	if imageCount > 0 {
-		detail.ImageCount = usage.Int64Ptr(imageCount)
-	}
-	if imgDetails.Size == "" {
-		imgDetails.Size = firstItemMeta.Size
-	}
-	if imgDetails.Resolution == "" {
-		imgDetails.Resolution = firstItemMeta.Resolution
-	}
-	if imgDetails.ImageSize == "" {
-		imgDetails.ImageSize = firstItemMeta.ImageSize
-	}
-	if imgDetails.AspectRatio == "" {
-		imgDetails.AspectRatio = firstItemMeta.AspectRatio
-	}
-	if imgDetails.Quality == "" {
-		imgDetails.Quality = firstItemMeta.Quality
-	}
-	if imgDetails.Background == "" {
-		imgDetails.Background = firstItemMeta.Background
-	}
-	if imgDetails.OutputFormat == "" {
-		imgDetails.OutputFormat = firstItemMeta.OutputFormat
-	}
-	if imgDetails.MimeType == "" {
-		imgDetails.MimeType = firstItemMeta.MimeType
-	}
-	if imgDetails.InputFidelity == "" {
-		imgDetails.InputFidelity = firstItemMeta.InputFidelity
-	}
-	if !isEmptyImageDetails(&imgDetails) {
-		detail.ImageDetails = &imgDetails
-	}
-	return detail
-}
-
-// ParseXAIImageUsage extracts token usage, generated image count, and image parameters
-// from an xAI image generation/edit request and response.
-func ParseXAIImageUsage(requestPayload, responsePayload []byte) usage.Detail {
-	return ParseOpenAIImageUsage(requestPayload, responsePayload)
-}
-
-// ParseXAIVideoUsage extracts token usage and video parameters from an xAI video response.
-func ParseXAIVideoUsage(requestPayload, responsePayload []byte) usage.Detail {
-	detail := ParseOpenAIUsage(responsePayload)
-	root := util.ParseGJSONBytesNoCopy(responsePayload)
-	reqRoot := util.ParseGJSONBytesNoCopy(requestPayload)
-	// Only attach video media attributes when a completed video output or usage is present,
-	// not on an initial async job creation response that only returns {"request_id":"..."}.
-	hasCompletedVideo := root.Get("usage").Exists() || root.Get("video").Exists() || root.Get("data").Exists() || root.Get("url").Exists() || strings.EqualFold(strings.TrimSpace(root.Get("status").String()), "completed")
-	if !hasCompletedVideo {
-		return detail
-	}
-	pickRespString := func(paths ...string) string {
-		for _, p := range paths {
-			if v := root.Get(p); v.Type == ojson.String {
-				if s := cloneTrimmedString(v.String()); s != "" {
-					return s
-				}
-			}
-		}
-		return ""
-	}
-	imgDetails := &usage.ImageDetails{
-		Resolution:  pickRespString("resolution", "video.resolution", "data.0.resolution"),
-		AspectRatio: pickRespString("aspect_ratio", "video.aspect_ratio", "data.0.aspect_ratio"),
-	}
-	if !isEmptyImageDetails(imgDetails) {
-		detail.ImageDetails = imgDetails
-	}
-	detail.RequestedImageDetails = ParseRequestImageDetails(requestPayload)
-	if dur := firstExistingUsageNode(root, "duration", "video.duration"); dur.Type == ojson.Number && dur.Float() > 0 {
-		detail.MediaCounts = &usage.MediaCounts{
-			CompletionMedia: usage.Int64Ptr(1),
-			AudioSeconds:    usage.Float64Ptr(dur.Float()),
-		}
-	} else if dur := reqRoot.Get("duration"); dur.Type == ojson.Number && dur.Float() > 0 {
-		detail.MediaCounts = &usage.MediaCounts{
-			CompletionMedia: usage.Int64Ptr(1),
-			AudioSeconds:    usage.Float64Ptr(dur.Float()),
-		}
-	}
-	return detail
 }
 
 func parseOpenAIToolUsageDetailsNode(node ojson.Result) *usage.ToolUsageDetails {

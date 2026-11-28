@@ -1,6 +1,8 @@
 package thinking_test
 
 import (
+	"testing"
+
 	"github.com/MoeForge/moego/ojson"
 	"github.com/udit19199/relay/internal/registry"
 	"github.com/udit19199/relay/internal/thinking"
@@ -8,7 +10,6 @@ import (
 	_ "github.com/udit19199/relay/internal/thinking/provider/openai"
 	codexclaude "github.com/udit19199/relay/internal/translator/codex/claude"
 	openaiclaude "github.com/udit19199/relay/internal/translator/openai/claude"
-	"testing"
 )
 
 func TestApplyThinking_ClaudeStandaloneEffort(t *testing.T) {

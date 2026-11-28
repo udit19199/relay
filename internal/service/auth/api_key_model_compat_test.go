@@ -1,9 +1,10 @@
 package auth
 
 import (
+	"testing"
+
 	internalconfig "github.com/udit19199/relay/internal/config"
 	coreexecutor "github.com/udit19199/relay/internal/service/executor"
-	"testing"
 )
 
 func TestResolvedAPIKeyModelInfoPropagatesIsCompat(t *testing.T) {

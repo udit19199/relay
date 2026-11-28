@@ -1,9 +1,10 @@
 package models
 
 import (
-	"github.com/udit19199/relay/internal/registry"
 	"reflect"
 	"testing"
+
+	"github.com/udit19199/relay/internal/registry"
 )
 
 func TestCodexCatalogApplyPatchCapability(t *testing.T) {
@@ -11,7 +12,6 @@ func TestCodexCatalogApplyPatchCapability(t *testing.T) {
 	clientID := "catalog-patch-metadata-test"
 	modelRegistry.RegisterClient(clientID, "custom-compat", []*registry.ModelInfo{
 		{ID: "catalog-patch-alias", MetadataModelID: "gpt-5.5"},
-		{ID: "catalog-patch-image", Type: registry.OpenAIImageModelType},
 		{ID: "catalog-patch-image-input", SupportedInputModalities: []string{"image"}},
 	})
 	t.Cleanup(func() { modelRegistry.UnregisterClient(clientID) })
@@ -26,12 +26,6 @@ func TestCodexCatalogApplyPatchCapability(t *testing.T) {
 			{"catalog-patch-alias", true},
 			{"team/gpt-5.5", true},
 			{"gpt-reserve", true},
-			{"gpt-image-2", false},
-			{"team/gpt-image-2", false},
-			{"team/nested/gpt-image-2", false},
-			{"GPT-IMAGE-2", false},
-			{"grok-imagine-video", false},
-			{"catalog-patch-image", false},
 			{"catalog-patch-image-input", false},
 		} {
 			for _, providerLookup := range []struct {

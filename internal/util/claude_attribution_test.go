@@ -1,9 +1,10 @@
 package util
 
 import (
-	"github.com/MoeForge/moego/ojson"
 	"strings"
 	"testing"
+
+	"github.com/MoeForge/moego/ojson"
 )
 
 func TestIsClaudeCodeAttributionSystemText(t *testing.T) {

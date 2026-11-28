@@ -136,7 +136,6 @@ func buildCodexClientModelsWithToolCapabilities(models []map[string]any, provide
 			applyCodexClientSearchToolSupport(entry, id, true, searchToolProvidersForModel, toolSearchCapabilityForModel)
 			applyCPAWebSearchCapability(entry, id, webSearchCapabilityForModel, clientVersion)
 			sanitizeCodexClientReasoningMetadata(entry, clientVersion)
-			applyCodexClientVisibilityOverride(entry, id)
 			if optimizeMultiAgentV2 {
 				entry["multi_agent_version"] = "v2"
 			}
@@ -152,7 +151,6 @@ func buildCodexClientModelsWithToolCapabilities(models []map[string]any, provide
 		applyCodexClientSearchToolSupport(entry, id, false, searchToolProvidersForModel, toolSearchCapabilityForModel)
 		applyCPAWebSearchCapability(entry, id, webSearchCapabilityForModel, clientVersion)
 		sanitizeCodexClientReasoningMetadata(entry, clientVersion)
-		applyCodexClientVisibilityOverride(entry, id)
 		applyCodexClientDevinDisplayName(entry, id, model, providersForModel)
 		applyCodexClientApplyPatchCapability(entry, id, applyPatchCapabilityForModel)
 		result = append(result, entry)
@@ -383,13 +381,6 @@ func applyCodexClientBaseInstructions(entry map[string]any, model map[string]any
 }
 
 func applyCodexClientModelCapabilities(entry map[string]any, id, metadataID string, info *registry.ModelInfo, providersForModel ProvidersForModelFunc, clientVersion string) {
-	if info != nil && info.Type == registry.OpenAIImageModelType {
-		entry["visibility"] = "hide"
-		delete(entry, "input_modalities")
-		delete(entry, "supports_image_detail_original")
-		return
-	}
-
 	var providers []string
 	if providersForModel != nil {
 		providers = providersForModel(id)
@@ -670,13 +661,7 @@ func applyCodexClientModelMetadata(entry map[string]any, id string, model map[st
 		if contextWindow <= 0 && info.ContextLength > 0 {
 			contextWindow = info.ContextLength
 		}
-		if info.Type == registry.OpenAIImageModelType {
-			entry["visibility"] = "hide"
-			delete(entry, "input_modalities")
-			delete(entry, "supports_image_detail_original")
-		} else {
-			applyCodexClientInputModalitiesMetadata(entry, info.SupportedInputModalities)
-		}
+		applyCodexClientInputModalitiesMetadata(entry, info.SupportedInputModalities)
 		if thinkingSupport == nil {
 			thinkingSupport = info.Thinking
 		}
@@ -738,27 +723,6 @@ func codexClientThinkingSupport(model map[string]any) *registry.ThinkingSupport 
 		return nil
 	}
 	return &thinking
-}
-
-func applyCodexClientVisibilityOverride(entry map[string]any, id string) {
-	if isCodexClientImageOrVideoModel(id) {
-		entry["visibility"] = "hide"
-	}
-}
-
-// isCodexClientImageOrVideoModel reports catalog IDs that are not chat models.
-// Speech IDs are included so the Codex client does not offer them as text models.
-func isCodexClientImageOrVideoModel(id string) bool {
-	target := strings.TrimSpace(id)
-	if idx := strings.Index(target, "/"); idx != -1 {
-		target = strings.TrimSpace(target[idx+1:])
-	}
-	switch target {
-	case "grok-imagine-image-quality", "gpt-image-1.5", "gpt-image-2", "gpt-image-2.5-flare", "gpt-image-2.5-sunburst", "gpt-image-2.5", "gpt-image-2.6-flare", "gpt-image-2.6-sunburst", "gpt-image-2.6", "grok-imagine-image", "grok-imagine-image-2.0", "grok-imagine-video", "grok-imagine-video-1.5", "grok-imagine-video-1.5-preview", "grok-tts", "grok-voice-tts-1.0":
-		return true
-	default:
-		return false
-	}
 }
 
 func applyCodexClientInputModalitiesMetadata(entry map[string]any, modalities []string) {

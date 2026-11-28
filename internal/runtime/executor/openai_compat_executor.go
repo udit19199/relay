@@ -8,10 +8,7 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"mime"
-	"mime/multipart"
 	"net/http"
-	"net/textproto"
 	"strconv"
 	"strings"
 	"time"
@@ -29,14 +26,7 @@ import (
 	"github.com/udit19199/relay/internal/util"
 )
 
-const (
-	openAICompatImageHandlerType            = "openai-image"
-	openAICompatImagesGenerationsPath       = "/images/generations"
-	openAICompatImagesEditsPath             = "/images/edits"
-	openAICompatDefaultImageEndpoint        = openAICompatImagesGenerationsPath
-	openAICompatMultipartMemory       int64 = 32 << 20
-	openAICompatDefaultUserAgent            = "cli-proxy-openai-compat"
-)
+const openAICompatDefaultUserAgent = "cli-proxy-openai-compat"
 
 func ensureOpenAICompatUserAgent(r *http.Request, clientHeaders ...http.Header) {
 	if r == nil {
@@ -102,9 +92,6 @@ func (e *OpenAICompatExecutor) HttpRequest(ctx context.Context, auth *coreauth.A
 
 func (e *OpenAICompatExecutor) Execute(ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) (resp coreexecutor.Response, err error) {
 	ctx = helps.EnsureSessionContext(ctx, opts, req.Payload)
-	if endpointPath := openAICompatImageEndpointPath(opts); endpointPath != "" {
-		return e.executeImages(ctx, auth, req, opts, endpointPath)
-	}
 	baseURL, apiKey := e.resolveCredentials(auth)
 	compat := e.resolveCompatConfig(auth, req)
 	return e.executeWithCredentials(ctx, auth, req, opts, baseURL, apiKey, compat)
@@ -258,105 +245,8 @@ func (e *OpenAICompatExecutor) executeWithCredentials(ctx context.Context, auth 
 	return resp, nil
 }
 
-func (e *OpenAICompatExecutor) executeImages(ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options, endpointPath string) (resp coreexecutor.Response, err error) {
-	baseModel := thinking.ParseSuffix(req.Model).ModelName
-
-	reporter := helps.NewExecutorUsageReporter(ctx, e, baseModel, auth)
-	defer reporter.TrackFailure(ctx, &err)
-
-	baseURL, apiKey := e.resolveCredentials(auth)
-	if baseURL == "" {
-		err = statusErr{code: http.StatusUnauthorized, msg: "missing provider baseURL"}
-		return resp, err
-	}
-
-	payload, contentType, errPrepare := prepareOpenAICompatImagesPayload(req.Payload, baseModel, opts.Headers.Get("Content-Type"), false)
-	if errPrepare != nil {
-		err = errPrepare
-		return resp, err
-	}
-	if contentType == "" {
-		contentType = "application/json"
-	}
-	payload, contentType, errPrepare = helps.ApplyMediaPayloadConfig(e.cfg, e.Identifier(), baseModel, "openai", payload, contentType, req, opts)
-	if errPrepare != nil {
-		return resp, errPrepare
-	}
-	reporter.SetTranslatedReasoningEffort(payload, "openai")
-
-	url := strings.TrimSuffix(baseURL, "/") + endpointPath
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
-	if err != nil {
-		return resp, err
-	}
-	httpReq.Header.Set("Content-Type", contentType)
-	if apiKey != "" {
-		httpReq.Header.Set("Authorization", "Bearer "+apiKey)
-	}
-	ensureOpenAICompatUserAgent(httpReq, opts.Headers)
-	var attrs map[string]string
-	if auth != nil {
-		attrs = auth.Attributes
-	}
-	util.ApplyCustomHeadersFromAttrs(httpReq, attrs, opts.Headers)
-	var authID, authLabel, authType, authValue string
-	if auth != nil {
-		authID = auth.ID
-		authLabel = auth.Label
-		authType, authValue = auth.AccountInfo()
-	}
-	helps.RecordAPIRequest(ctx, e.cfg, helps.UpstreamRequestLog{
-		URL:       url,
-		Method:    http.MethodPost,
-		Headers:   httpReq.Header.Clone(),
-		Body:      payload,
-		Provider:  e.Identifier(),
-		AuthID:    authID,
-		AuthLabel: authLabel,
-		AuthType:  authType,
-		AuthValue: authValue,
-	})
-
-	httpClient := helps.NewProxyAwareHTTPClient(ctx, e.cfg, auth, 0)
-	httpClient = reporter.TrackHTTPClient(httpClient)
-	httpResp, err := httpClient.Do(httpReq)
-	if err != nil {
-		helps.RecordAPIResponseError(ctx, e.cfg, err)
-		return resp, err
-	}
-	defer func() {
-		if errClose := httpResp.Body.Close(); errClose != nil {
-			log.Errorf("openai compat executor: close response body error: %v", errClose)
-		}
-	}()
-	helps.RecordAPIResponseMetadata(ctx, e.cfg, httpResp.StatusCode, httpResp.Header.Clone())
-
-	body, errRead := io.ReadAll(httpResp.Body)
-	if errRead != nil {
-		helps.RecordAPIResponseError(ctx, e.cfg, errRead)
-		err = errRead
-		return resp, err
-	}
-	helps.AppendAPIResponseChunk(ctx, e.cfg, body)
-
-	if httpResp.StatusCode < 200 || httpResp.StatusCode >= 300 {
-		helps.LogWithRequestID(ctx).Debugf("request error, error status: %d, error message: %s", httpResp.StatusCode, helps.SummarizeErrorBody(httpResp.Header.Get("Content-Type"), body))
-		err = newOpenAICompatStatusError(httpResp.StatusCode, httpResp.Header, body)
-		return resp, err
-	}
-
-	reporter.ObserveResponseModel(body)
-	reporter.Publish(ctx, helps.ParseOpenAIImageUsage(payload, body, contentType))
-	reporter.EnsurePublished(ctx)
-	resp = coreexecutor.Response{Payload: body, Headers: httpResp.Header.Clone()}
-	return resp, nil
-}
-
 func (e *OpenAICompatExecutor) ExecuteStream(ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) (_ *coreexecutor.StreamResult, err error) {
 	ctx = helps.EnsureSessionContext(ctx, opts, req.Payload)
-	if endpointPath := openAICompatImageEndpointPath(opts); endpointPath != "" {
-		return e.executeImagesStream(ctx, auth, req, opts, endpointPath)
-	}
 	baseURL, apiKey := e.resolveCredentials(auth)
 	compat := e.resolveCompatConfig(auth, req)
 	return e.executeStreamWithCredentials(ctx, auth, req, opts, baseURL, apiKey, compat)
@@ -684,140 +574,6 @@ func (e *OpenAICompatExecutor) executeStreamWithCredentials(ctx context.Context,
 	return &coreexecutor.StreamResult{Headers: httpResp.Header.Clone(), Chunks: out}, nil
 }
 
-func (e *OpenAICompatExecutor) executeImagesStream(ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options, endpointPath string) (_ *coreexecutor.StreamResult, err error) {
-	baseModel := thinking.ParseSuffix(req.Model).ModelName
-
-	reporter := helps.NewExecutorUsageReporter(ctx, e, baseModel, auth)
-	defer reporter.TrackFailure(ctx, &err)
-
-	baseURL, apiKey := e.resolveCredentials(auth)
-	if baseURL == "" {
-		err = statusErr{code: http.StatusUnauthorized, msg: "missing provider baseURL"}
-		return nil, err
-	}
-
-	payload, contentType, errPrepare := prepareOpenAICompatImagesPayload(req.Payload, baseModel, opts.Headers.Get("Content-Type"), true)
-	if errPrepare != nil {
-		err = errPrepare
-		return nil, err
-	}
-	if contentType == "" {
-		contentType = "application/json"
-	}
-	payload, contentType, errPrepare = helps.ApplyMediaPayloadConfig(e.cfg, e.Identifier(), baseModel, "openai", payload, contentType, req, opts)
-	if errPrepare != nil {
-		return nil, errPrepare
-	}
-	reporter.SetTranslatedReasoningEffort(payload, "openai")
-
-	url := strings.TrimSuffix(baseURL, "/") + endpointPath
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
-	if err != nil {
-		return nil, err
-	}
-	httpReq.Header.Set("Content-Type", contentType)
-	httpReq.Header.Set("Accept", "text/event-stream")
-	httpReq.Header.Set("Cache-Control", "no-cache")
-	if apiKey != "" {
-		httpReq.Header.Set("Authorization", "Bearer "+apiKey)
-	}
-	ensureOpenAICompatUserAgent(httpReq, opts.Headers)
-	var attrs map[string]string
-	if auth != nil {
-		attrs = auth.Attributes
-	}
-	util.ApplyCustomHeadersFromAttrs(httpReq, attrs, opts.Headers)
-	var authID, authLabel, authType, authValue string
-	if auth != nil {
-		authID = auth.ID
-		authLabel = auth.Label
-		authType, authValue = auth.AccountInfo()
-	}
-	helps.RecordAPIRequest(ctx, e.cfg, helps.UpstreamRequestLog{
-		URL:       url,
-		Method:    http.MethodPost,
-		Headers:   httpReq.Header.Clone(),
-		Body:      payload,
-		Provider:  e.Identifier(),
-		AuthID:    authID,
-		AuthLabel: authLabel,
-		AuthType:  authType,
-		AuthValue: authValue,
-	})
-
-	httpClient := helps.NewProxyAwareHTTPClient(ctx, e.cfg, auth, 0)
-	httpClient = reporter.TrackHTTPClient(httpClient)
-	httpResp, err := httpClient.Do(httpReq)
-	if err != nil {
-		helps.RecordAPIResponseError(ctx, e.cfg, err)
-		return nil, err
-	}
-	helps.RecordAPIResponseMetadata(ctx, e.cfg, httpResp.StatusCode, httpResp.Header.Clone())
-
-	if httpResp.StatusCode < 200 || httpResp.StatusCode >= 300 {
-		body, errRead := io.ReadAll(httpResp.Body)
-		if errClose := httpResp.Body.Close(); errClose != nil {
-			log.Errorf("openai compat executor: close response body error: %v", errClose)
-		}
-		if errRead != nil {
-			helps.RecordAPIResponseError(ctx, e.cfg, errRead)
-			return nil, errRead
-		}
-		helps.AppendAPIResponseChunk(ctx, e.cfg, body)
-		helps.LogWithRequestID(ctx).Debugf("request error, error status: %d, error message: %s", httpResp.StatusCode, helps.SummarizeErrorBody(httpResp.Header.Get("Content-Type"), body))
-		return nil, statusErr{code: httpResp.StatusCode, msg: string(body)}
-	}
-
-	out := make(chan coreexecutor.StreamChunk)
-	go func() {
-		defer close(out)
-		var streamUsage helps.StreamUsageBuffer
-		streamUsage.SetRequestPayload(payload, contentType)
-		usageObserver := helps.NewOpenAIStreamUsageObserver(&streamUsage, helps.StreamScannerBuffer)
-		observer := helps.NewStreamResponseModelObserver(reporter)
-		defer func() {
-			observer.Finish()
-			if errClose := httpResp.Body.Close(); errClose != nil {
-				log.Errorf("openai compat executor: close response body error: %v", errClose)
-			}
-			usageObserver.Finish()
-			streamUsage.Publish(ctx, reporter)
-			reporter.EnsurePublished(ctx)
-		}()
-		buffer := make([]byte, 32*1024)
-		for {
-			n, errRead := httpResp.Body.Read(buffer)
-			if n > 0 {
-				chunk := bytes.Clone(buffer[:n])
-				helps.AppendAPIResponseChunk(ctx, e.cfg, chunk)
-				observer.Feed(chunk)
-				usageObserver.Feed(chunk)
-				select {
-				case out <- coreexecutor.StreamChunk{Payload: chunk}:
-				case <-ctx.Done():
-					return
-				}
-			}
-			if errRead != nil {
-				if errRead != io.EOF {
-					helps.RecordAPIResponseError(ctx, e.cfg, errRead)
-					observer.Finish()
-					usageObserver.Finish()
-					if !streamUsage.PublishFailure(ctx, reporter, errRead) {
-						reporter.PublishFailure(ctx, errRead)
-					}
-					select {
-					case out <- coreexecutor.StreamChunk{Err: errRead}:
-					case <-ctx.Done():
-					}
-				}
-				return
-			}
-		}
-	}()
-	return &coreexecutor.StreamResult{Headers: httpResp.Header.Clone(), Chunks: out}, nil
-}
-
 func (e *OpenAICompatExecutor) executeOpenAICompatResponsesCompaction(ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options, baseURL, apiKey string, compat *config.OpenAICompatibility) (coreexecutor.Response, error) {
 	var resp coreexecutor.Response
 	baseModel := thinking.ParseSuffix(req.Model).ModelName
@@ -944,125 +700,6 @@ func openAICompatAuthHasRefreshToken(auth *coreauth.Auth) bool {
 		return true
 	}
 	return false
-}
-
-func openAICompatImageEndpointPath(opts coreexecutor.Options) string {
-	if opts.SourceFormat.String() != openAICompatImageHandlerType {
-		return ""
-	}
-	path := helps.PayloadRequestPath(opts)
-	if strings.HasSuffix(path, "/images/edits") {
-		return openAICompatImagesEditsPath
-	}
-	if strings.HasSuffix(path, "/images/generations") {
-		return openAICompatImagesGenerationsPath
-	}
-	return openAICompatDefaultImageEndpoint
-}
-
-func prepareOpenAICompatImagesPayload(payload []byte, model string, contentType string, stream bool) ([]byte, string, error) {
-	model = strings.TrimSpace(model)
-	contentType = strings.TrimSpace(contentType)
-	if json.Valid(payload) {
-		doc := ojson.NewDoc(payload)
-		if model != "" {
-			helps.SetStringIfDifferentDoc(doc, "model", model)
-		}
-		if stream {
-			helps.SetBoolIfDifferentDoc(doc, "stream", true)
-		} else {
-			_ = doc.Delete("stream")
-		}
-		return doc.Bytes(), "application/json", nil
-	}
-
-	mediaType, params, errParse := mime.ParseMediaType(contentType)
-	if errParse != nil || !strings.HasPrefix(strings.ToLower(strings.TrimSpace(mediaType)), "multipart/") {
-		return payload, contentType, nil
-	}
-	boundary := strings.TrimSpace(params["boundary"])
-	if boundary == "" {
-		return nil, "", fmt.Errorf("multipart boundary is missing")
-	}
-	return rewriteOpenAICompatImagesMultipartPayload(payload, model, boundary, stream)
-}
-
-func cloneOpenAICompatMIMEHeader(src textproto.MIMEHeader) textproto.MIMEHeader {
-	dst := make(textproto.MIMEHeader, len(src))
-	for key, values := range src {
-		dst[key] = append([]string(nil), values...)
-	}
-	return dst
-}
-
-func rewriteOpenAICompatImagesMultipartPayload(payload []byte, model string, boundary string, stream bool) ([]byte, string, error) {
-	reader := multipart.NewReader(bytes.NewReader(payload), boundary)
-	form, errRead := reader.ReadForm(openAICompatMultipartMemory)
-	if errRead != nil {
-		return nil, "", fmt.Errorf("read multipart form failed: %w", errRead)
-	}
-	defer func() {
-		if errRemove := form.RemoveAll(); errRemove != nil {
-			log.Errorf("openai compat executor: remove multipart form files error: %v", errRemove)
-		}
-	}()
-
-	var body bytes.Buffer
-	writer := multipart.NewWriter(&body)
-	if model != "" {
-		if errWrite := writer.WriteField("model", model); errWrite != nil {
-			return nil, "", fmt.Errorf("write model field failed: %w", errWrite)
-		}
-	}
-	if stream {
-		if errWrite := writer.WriteField("stream", "true"); errWrite != nil {
-			return nil, "", fmt.Errorf("write stream field failed: %w", errWrite)
-		}
-	}
-	for key, values := range form.Value {
-		if key == "model" || key == "stream" {
-			continue
-		}
-		for _, value := range values {
-			if errWrite := writer.WriteField(key, value); errWrite != nil {
-				return nil, "", fmt.Errorf("write form field %s failed: %w", key, errWrite)
-			}
-		}
-	}
-	for key, files := range form.File {
-		for _, fileHeader := range files {
-			if fileHeader == nil {
-				continue
-			}
-			header := cloneOpenAICompatMIMEHeader(fileHeader.Header)
-			header.Set("Content-Disposition", multipart.FileContentDisposition(key, fileHeader.Filename))
-			if header.Get("Content-Type") == "" {
-				header.Set("Content-Type", "application/octet-stream")
-			}
-			part, errCreate := writer.CreatePart(header)
-			if errCreate != nil {
-				return nil, "", fmt.Errorf("create file field %s failed: %w", key, errCreate)
-			}
-			src, errOpen := fileHeader.Open()
-			if errOpen != nil {
-				return nil, "", fmt.Errorf("open upload file failed: %w", errOpen)
-			}
-			_, errCopy := io.Copy(part, src)
-			if errClose := src.Close(); errClose != nil {
-				log.Errorf("openai compat executor: close upload file error: %v", errClose)
-				if errCopy == nil {
-					errCopy = errClose
-				}
-			}
-			if errCopy != nil {
-				return nil, "", fmt.Errorf("copy upload file failed: %w", errCopy)
-			}
-		}
-	}
-	if errClose := writer.Close(); errClose != nil {
-		return nil, "", fmt.Errorf("close multipart writer failed: %w", errClose)
-	}
-	return body.Bytes(), writer.FormDataContentType(), nil
 }
 
 func (e *OpenAICompatExecutor) applyPromptCacheKey(ctx context.Context, auth *coreauth.Auth, from translatorreg.Format, baseModel string, req coreexecutor.Request, opts coreexecutor.Options, translated []byte) ([]byte, error) {

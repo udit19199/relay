@@ -6,13 +6,14 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"net/http"
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	log "github.com/sirupsen/logrus"
 	"github.com/udit19199/relay/internal/config"
 	"github.com/udit19199/relay/internal/httpwire"
-	"net/http"
-	"strings"
 )
 
 func TestResponseCompressionServerHotReload(t *testing.T) {

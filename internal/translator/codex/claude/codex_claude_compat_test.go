@@ -1,8 +1,9 @@
 package claude
 
 import (
-	"github.com/MoeForge/moego/ojson"
 	"testing"
+
+	"github.com/MoeForge/moego/ojson"
 )
 
 func TestConvertClaudeRequestToCodexWithCompatPreservesEmptyThinking(t *testing.T) {

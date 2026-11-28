@@ -269,13 +269,6 @@ func codexTerminalErrorBody(eventData []byte, path string) []byte {
 			_ = doc.Set("error.message", errorType)
 		}
 	}
-	if strings.EqualFold(strings.TrimSpace(doc.Get("error.type").String()), "image_generation_user_error") {
-		msg := strings.TrimSpace(doc.Get("error.message").String())
-		param := strings.ToLower(strings.TrimSpace(doc.Get("error.param").String()))
-		if (param == "complexity" || strings.Contains(strings.ToLower(msg), "complexity")) && !strings.Contains(msg, "/v1/images/generations") {
-			_ = doc.Set("error.message", msg+` (Set tool_choice to {"type":"image_generation"}, use a compatible Responses model such as gpt-5.4-mini, or call /v1/images/generations directly.)`)
-		}
-	}
 	return doc.Bytes()
 }
 

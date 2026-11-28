@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"mime/multipart"
 	"runtime"
 	"strings"
 	"testing"
@@ -14,92 +13,7 @@ import (
 	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
-func TestCodexMultipartImageEditAppendsExistingImages(t *testing.T) {
-	var body bytes.Buffer
-	writer := multipart.NewWriter(&body)
-	for _, value := range []string{"existing-1", "existing-2"} {
-		if errWrite := writer.WriteField("images", value); errWrite != nil {
-			t.Fatalf("write images field: %v", errWrite)
-		}
-	}
-	imagePart, errCreate := writer.CreateFormFile("image[]", "source.png")
-	if errCreate != nil {
-		t.Fatalf("create image field: %v", errCreate)
-	}
-	if _, errWrite := imagePart.Write([]byte("png-data")); errWrite != nil {
-		t.Fatalf("write image data: %v", errWrite)
-	}
-	if errClose := writer.Close(); errClose != nil {
-		t.Fatalf("close multipart writer: %v", errClose)
-	}
-
-	output, _, errRewrite := codexRewriteOpenAIImageEditMultipartToJSON(body.Bytes(), "gpt-image-1.5", writer.Boundary(), false)
-	if errRewrite != nil {
-		t.Fatalf("rewrite multipart payload: %v", errRewrite)
-	}
-	if got := ojson.GetBytes(output, "images.0").String(); got != "existing-1" {
-		t.Fatalf("images.0 = %q", got)
-	}
-	if got := ojson.GetBytes(output, "images.1").String(); got != "existing-2" {
-		t.Fatalf("images.1 = %q", got)
-	}
-	if got := ojson.GetBytes(output, "images.2.image_url").String(); !strings.HasPrefix(got, "data:application/octet-stream;base64,") {
-		t.Fatalf("images.2.image_url = %q", got)
-	}
-}
-
-func TestCodexImageBuildersPreservePayloads(t *testing.T) {
-	tool := []byte(`{"type":"image_generation","model":"gpt-image-2"}`)
-	request := codexBuildImagesResponsesRequest(`draw "this"`, []string{"data:image/png;base64,AA==", "", "data:image/jpeg;base64,BB=="}, tool)
-	if !ojson.ValidBytes(request) {
-		t.Fatalf("request is invalid JSON: %s", request)
-	}
-	if got := ojson.GetBytes(request, "input.0.content.0.text").String(); got != `draw "this"` {
-		t.Fatalf("prompt = %q", got)
-	}
-	if got := ojson.GetBytes(request, "input.0.content.#").Int(); got != 3 {
-		t.Fatalf("content count = %d, want 3", got)
-	}
-	if got := ojson.GetBytes(request, "tools.0.model").String(); got != "gpt-image-2" {
-		t.Fatalf("tool model = %q", got)
-	}
-
-	result := codexImageCallResult{Result: "AA==", OutputFormat: "png", RevisedPrompt: `revised "prompt"`, Quality: "high", Size: "1024x1024"}
-	response, errBuild := codexBuildImagesAPIResponse([]codexImageCallResult{result}, 123, []byte(`{"images":1}`), result, "b64_json")
-	if errBuild != nil {
-		t.Fatalf("codexBuildImagesAPIResponse returned error: %v", errBuild)
-	}
-	if !ojson.ValidBytes(response) {
-		t.Fatalf("response is invalid JSON: %s", response)
-	}
-	if got := ojson.GetBytes(response, "data.0.b64_json").String(); got != "AA==" {
-		t.Fatalf("b64_json = %q", got)
-	}
-	if got := ojson.GetBytes(response, "data.0.revised_prompt").String(); got != `revised "prompt"` {
-		t.Fatalf("revised_prompt = %q", got)
-	}
-	if got := ojson.GetBytes(response, "usage.images").Int(); got != 1 {
-		t.Fatalf("usage.images = %d", got)
-	}
-}
-
 var benchmarkExecutorPayloadOutput []byte
-
-func BenchmarkCodexBuildImagesAPIResponseLargePayload(b *testing.B) {
-	image := strings.Repeat("A", 2<<20)
-	results := []codexImageCallResult{
-		{Result: image, OutputFormat: "png"},
-		{Result: image, OutputFormat: "png"},
-		{Result: image, OutputFormat: "png"},
-		{Result: image, OutputFormat: "png"},
-	}
-	b.ReportAllocs()
-	b.SetBytes(int64(len(image) * len(results)))
-	b.ResetTimer()
-	for b.Loop() {
-		benchmarkExecutorPayloadOutput, _ = codexBuildImagesAPIResponse(results, 1, []byte(`{"images":4}`), codexImageCallResult{}, "b64_json")
-	}
-}
 
 func TestObserveClaudeStreamJSONPayloadClonesMessageID(t *testing.T) {
 	buf := []byte(`{"type":"message_start","message":{"id":"msg_reusable_buffer_01"}}`)
@@ -158,7 +72,6 @@ func TestExecutorPayloadSingleDocPipelinesByteConsistency(t *testing.T) {
 		byteOut := bytes.Clone(raw)
 		byteOut = normalizeCodexInstructions(byteOut)
 		byteOut = ensureWebSearchToolForHistory(byteOut, opts.Headers)
-		byteOut = ensureImageGenerationTool(byteOut, "gpt-5", nil, opts.Headers)
 		byteOut = normalizeCodexParallelToolCalls(byteOut, opts.Headers)
 		byteOut = sanitizeOpenAIResponsesReasoningEncryptedContentWithCompatModelAndBaseURL(ctx, "codex executor", byteOut, false, "gpt-5", "")
 		byteOut = applyCodexSIWCRequestBodyRules(byteOut, false, opts)
@@ -166,7 +79,6 @@ func TestExecutorPayloadSingleDocPipelinesByteConsistency(t *testing.T) {
 		doc := ojson.NewDoc(bytes.Clone(raw))
 		normalizeCodexInstructionsDoc(doc)
 		ensureWebSearchToolForHistoryDoc(doc, opts.Headers)
-		ensureImageGenerationToolDoc(doc, "gpt-5", nil, opts.Headers)
 		normalizeCodexParallelToolCallsDoc(doc, opts.Headers)
 		sanitizeOpenAIResponsesReasoningEncryptedContentWithCompatModelAndBaseURLDoc(ctx, "codex executor", doc, false, "gpt-5", "")
 		applyCodexSIWCRequestBodyRulesDoc(doc, false, opts)
@@ -187,7 +99,6 @@ func TestExecutorPayloadSingleDocPipelinesByteConsistency(t *testing.T) {
 		byteOut = normalizeXAIInputCustomToolCalls(byteOut)
 		byteOut = normalizeXAIInputReasoningItems(byteOut)
 		byteOut = sanitizeXAIInputEncryptedContentForBaseURL(byteOut, "")
-		byteOut = normalizeXAIImageRefs(byteOut)
 
 		doc := ojson.NewDoc(bytes.Clone(raw))
 		normalizeXAIToolsWithFoldDoc(doc, false)
@@ -196,7 +107,6 @@ func TestExecutorPayloadSingleDocPipelinesByteConsistency(t *testing.T) {
 		normalizeXAIInputCustomToolCallsDoc(doc)
 		normalizeXAIInputReasoningItemsDoc(doc)
 		sanitizeXAIInputEncryptedContentForBaseURLDoc(doc, "")
-		normalizeXAIImageRefsDoc(doc)
 		docOut := doc.Bytes()
 
 		if !bytes.Equal(docOut, byteOut) {
@@ -204,77 +114,6 @@ func TestExecutorPayloadSingleDocPipelinesByteConsistency(t *testing.T) {
 		}
 	})
 }
-
-func TestNormalizeXAIImageRefsDocArbitraryNestedExtensionPath(t *testing.T) {
-	raw := []byte(`{"model":"grok-4","extension":{"image":{"image_url":"https://example.com/ext.png"}},"deep":{"arr":[{"reference_images":[{"image_url":{"url":"https://example.com/ref.png"}}]}]}}`)
-	doc := ojson.NewDoc(bytes.Clone(raw))
-	_ = doc.Set("model", "grok-3")
-	_ = doc.Set("stream", true)
-	if !normalizeXAIImageRefsDoc(doc) {
-		t.Fatal("expected normalizeXAIImageRefsDoc to report true")
-	}
-	out := doc.Bytes()
-	if got := ojson.GetBytesNoCopy(out, "extension.image.url").String(); got != "https://example.com/ext.png" {
-		t.Fatalf("extension.image.url = %q, want https://example.com/ext.png", got)
-	}
-	if ojson.GetBytesNoCopy(out, "extension.image.image_url").Exists() {
-		t.Fatalf("extension.image.image_url should be removed: %s", out)
-	}
-	if got := ojson.GetBytesNoCopy(out, "deep.arr.0.reference_images.0.url").String(); got != "https://example.com/ref.png" {
-		t.Fatalf("deep.arr.0.reference_images.0.url = %q, want https://example.com/ref.png", got)
-	}
-	if ojson.GetBytesNoCopy(out, "deep.arr.0.reference_images.0.image_url").Exists() {
-		t.Fatalf("deep.arr.0.reference_images.0.image_url should be removed: %s", out)
-	}
-
-	nestedInsideDeleted := ojson.NewDoc([]byte(`{"image":{"image_url":{"url":"outer","image":{"image_url":"inner"}}}}`))
-	if !normalizeXAIImageRefsDoc(nestedInsideDeleted) {
-		t.Fatal("expected nestedInsideDeleted to be normalized")
-	}
-	if got := string(nestedInsideDeleted.Bytes()); got != `{"image":{"url":"outer"}}` {
-		t.Fatalf("nestedInsideDeleted = %s, want {\"image\":{\"url\":\"outer\"}}", got)
-	}
-
-	unicodeEscapedKey := ojson.NewDoc([]byte(`{"image":{"url":"keep"},"extension":{"im\u0061ge":{"image_url":"ext"}}}`))
-	if !normalizeXAIImageRefsDoc(unicodeEscapedKey) {
-		t.Fatal("expected unicodeEscapedKey to be normalized")
-	}
-	unicodeOut := unicodeEscapedKey.Bytes()
-	if got := ojson.GetBytesNoCopy(unicodeOut, "extension.image.url").String(); got != "ext" {
-		t.Fatalf("extension.image.url = %q, want ext; body=%s", got, unicodeOut)
-	}
-	if ojson.GetBytesNoCopy(unicodeOut, "extension.image.image_url").Exists() {
-		t.Fatalf("extension.image.image_url should be removed: %s", unicodeOut)
-	}
-
-	newlyAddedTopKey := ojson.NewDoc([]byte(`{"model":"grok-4"}`))
-	_ = newlyAddedTopKey.Set("extension.image.image_url", "new")
-	if !normalizeXAIImageRefsDoc(newlyAddedTopKey) {
-		t.Fatal("expected newlyAddedTopKey to be normalized")
-	}
-	if got := string(newlyAddedTopKey.Bytes()); got != `{"model":"grok-4","extension":{"image":{"url":"new"}}}` {
-		t.Fatalf("newlyAddedTopKey = %s, want {\"model\":\"grok-4\",\"extension\":{\"image\":{\"url\":\"new\"}}}", got)
-	}
-
-	mutatedEmptyKey := ojson.NewDoc([]byte(`{"":{"image":{"image_url":"old"}}}`))
-	_ = mutatedEmptyKey.Set(".image.image_url", "new")
-	if !normalizeXAIImageRefsDoc(mutatedEmptyKey) {
-		t.Fatal("expected mutatedEmptyKey to be normalized")
-	}
-	if got := string(mutatedEmptyKey.Bytes()); got != `{"":{"image":{"url":"new"}}}` {
-		t.Fatalf("mutatedEmptyKey = %s, want {\"\":{\"image\":{\"url\":\"new\"}}}", got)
-	}
-
-	deletedEmptyKey := ojson.NewDoc([]byte(`{"":{"image":{"image_url":"old"}},"other":1}`))
-	_ = deletedEmptyKey.Delete(".image")
-	if normalizeXAIImageRefsDoc(deletedEmptyKey) {
-		t.Fatal("expected deletedEmptyKey to report false after .image was deleted")
-	}
-	if got := string(deletedEmptyKey.Bytes()); got != `{"":{},"other":1}` {
-		t.Fatalf("deletedEmptyKey = %s, want {\"\":{},\"other\":1}", got)
-	}
-}
-
 func TestClaudeCacheControlDocChecksDoNotMaterializeLargeMessagesArray(t *testing.T) {
 	t.Run("split messages container avoids 1MiB materialization", func(t *testing.T) {
 		chunk := strings.Repeat("a", 64*1024)
@@ -465,33 +304,4 @@ func TestClaudeStreamDocScannerEdgeCases(t *testing.T) {
 			t.Fatalf("expected first user message to receive cache_control: %s", got)
 		}
 	})
-}
-
-func TestNormalizeXAIImageRefsDocAvoidsLargePayloadCopy(t *testing.T) {
-	largePrompt := strings.Repeat("x", 1<<20)
-	raw := []byte(`{"model":"grok-imagine-image","prompt":"` + largePrompt + `","image":{"image_url":"https://example.com/a.png"}}`)
-	doc := ojson.NewDoc(raw)
-
-	// Warm up ojson WriteTo buffer pool before measuring allocations.
-	warmDoc := ojson.NewDoc([]byte(`{"model":"grok-imagine-image","image":{"image_url":"https://example.com/w.png"}}`))
-	normalizeXAIImageRefsDoc(warmDoc)
-
-	var mBefore, mAfter runtime.MemStats
-	runtime.ReadMemStats(&mBefore)
-	if !normalizeXAIImageRefsDoc(doc) {
-		t.Fatal("expected normalizeXAIImageRefsDoc to report true")
-	}
-	runtime.ReadMemStats(&mAfter)
-
-	allocated := mAfter.TotalAlloc - mBefore.TotalAlloc
-	if allocated > 32*1024 {
-		t.Fatalf("normalizeXAIImageRefsDoc allocated %d bytes for 1MiB payload, want < 32 KiB", allocated)
-	}
-	out := doc.Bytes()
-	if got := ojson.GetBytesNoCopy(out, "image.url").String(); got != "https://example.com/a.png" {
-		t.Fatalf("image.url = %q, want https://example.com/a.png", got)
-	}
-	if ojson.GetBytesNoCopy(out, "image.image_url").Exists() {
-		t.Fatalf("image.image_url should be deleted")
-	}
 }

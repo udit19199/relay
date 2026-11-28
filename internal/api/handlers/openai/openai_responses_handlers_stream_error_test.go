@@ -1177,8 +1177,8 @@ func TestResponsesSSEPayloadErrorMessage_ImageGenerationUserErrorMapsToBadReques
 		if errMsg.StatusCode != http.StatusBadRequest {
 			t.Fatalf("StatusCode = %d, want %d for payload %s", errMsg.StatusCode, http.StatusBadRequest, payload)
 		}
-		if !strings.Contains(errMsg.Error.Error(), "/v1/images/generations") || !strings.Contains(errMsg.Error.Error(), "gpt-5.4-mini") {
-			t.Fatalf("expected remediation guidance in error message, got %q", errMsg.Error.Error())
+		if !strings.Contains(errMsg.Error.Error(), "Complexity 'medium' is not supported") {
+			t.Fatalf("expected upstream message preserved, got %q", errMsg.Error.Error())
 		}
 	}
 }

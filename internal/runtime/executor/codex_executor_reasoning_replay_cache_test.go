@@ -4,12 +4,13 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"github.com/MoeForge/moego/base64"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/MoeForge/moego/base64"
 
 	"github.com/MoeForge/moego/ojson"
 	"github.com/gin-gonic/gin"

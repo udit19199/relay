@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/MoeForge/moego/ojson"
-	"github.com/gorilla/websocket"
 	"github.com/udit19199/relay/internal/config"
 	"github.com/udit19199/relay/internal/runtime/executor/helps"
 	coreauth "github.com/udit19199/relay/internal/service/auth"
@@ -17,83 +16,6 @@ import (
 	"github.com/udit19199/relay/internal/service/usage"
 	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
-
-func TestPayloadBarrierCodexImageFilter(t *testing.T) {
-	for _, transport := range []string{"http", "websocket"} {
-		for _, stream := range []bool{false, true} {
-			for _, model := range []string{"gpt-5.4", "gpt-5.5", "gpt-6-astra", "gpt-6-sol"} {
-				t.Run(transport+"/"+model+map[bool]string{false: "/execute", true: "/stream"}[stream], func(t *testing.T) {
-					captured := make(chan []byte, 1)
-					completed := []byte(`{"type":"response.completed","response":{"id":"resp_barrier","status":"completed","output":[],"usage":{"input_tokens":0,"output_tokens":0,"total_tokens":0}}}`)
-					server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-						if transport == "websocket" {
-							upgrader := websocket.Upgrader{}
-							conn, errUpgrade := upgrader.Upgrade(w, r, nil)
-							if errUpgrade != nil {
-								t.Error(errUpgrade)
-								return
-							}
-							defer func() {
-								if errClose := conn.Close(); errClose != nil {
-									t.Error(errClose)
-								}
-							}()
-							_, body, errRead := conn.ReadMessage()
-							if errRead != nil {
-								t.Error(errRead)
-								return
-							}
-							captured <- body
-							if errWrite := conn.WriteMessage(websocket.TextMessage, completed); errWrite != nil {
-								t.Error(errWrite)
-							}
-							return
-						}
-						body, errRead := io.ReadAll(r.Body)
-						if errRead != nil {
-							t.Error(errRead)
-							return
-						}
-						captured <- body
-						w.Header().Set("Content-Type", "text/event-stream")
-						_, _ = w.Write(append(append([]byte("data: "), completed...), '\n', '\n'))
-					}))
-					defer server.Close()
-					cfg := &config.Config{Payload: config.PayloadConfig{Filter: []config.PayloadFilterRule{{Models: []config.PayloadModelRule{{Name: "gpt-5.4"}, {Name: "gpt-6-astra"}}, Params: []string{`tools.#(type=="image_generation")#`, "instructions", "prompt_cache_key"}}}}}
-					var executor coreauth.ProviderExecutor = NewCodexExecutor(cfg)
-					if transport == "websocket" {
-						executor = NewCodexWebsocketsExecutor(cfg)
-					}
-					auth := &coreauth.Auth{ID: t.Name(), Provider: "codex", Attributes: map[string]string{"api_key": "test", "base_url": server.URL, "plan_type": "pro"}}
-					req := coreexecutor.Request{Model: model, Payload: []byte(`{"input":"hello","prompt_cache_key":"injected-cache"}`)}
-					opts := coreexecutor.Options{SourceFormat: translatorreg.FormatOpenAIResponse}
-					if stream {
-						result, errStream := executor.ExecuteStream(context.Background(), auth, req, opts)
-						if errStream != nil {
-							t.Fatal(errStream)
-						}
-						for chunk := range result.Chunks {
-							if chunk.Err != nil {
-								t.Fatal(chunk.Err)
-							}
-						}
-					} else if _, errExecute := executor.Execute(context.Background(), auth, req, opts); errExecute != nil {
-						t.Fatal(errExecute)
-					}
-					body := <-captured
-					filteredModel := model == "gpt-5.4" || model == "gpt-6-astra"
-					image := ojson.GetBytes(body, `tools.#(type=="image_generation")`).Exists()
-					if image != !filteredModel {
-						t.Fatalf("image tool presence = %v: %s", image, body)
-					}
-					if filteredModel && (ojson.GetBytes(body, "instructions").Exists() || ojson.GetBytes(body, "prompt_cache_key").Exists()) {
-						t.Fatalf("late injection undid filter: %s", body)
-					}
-				})
-			}
-		}
-	}
-}
 
 func TestPayloadBarrierXAIWebsocketRetry(t *testing.T) {
 	cfg := &config.Config{Payload: config.PayloadConfig{
@@ -272,58 +194,6 @@ func TestPayloadBarrierEffectiveServiceTierUsageAfterOverride(t *testing.T) {
 				record := <-consumer.records
 				if record.ServiceTier != "auto" || record.EffectiveServiceTier != "priority" || record.ResponseServiceTier != "default" {
 					t.Fatalf("usage tiers = requested:%q effective:%q response:%q, want auto/priority/default", record.ServiceTier, record.EffectiveServiceTier, record.ResponseServiceTier)
-				}
-			})
-		}
-	})
-
-	t.Run("xai video get omits effective service tier while post records it", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			if r.Method == http.MethodGet {
-				_, _ = w.Write([]byte(`{"status":"done","video":{"url":"https://vidgen.x.ai/video.mp4","duration":6},"model":"grok-imagine-video","progress":100}`))
-				return
-			}
-			_, _ = w.Write([]byte(`{"request_id":"vid_123"}`))
-		}))
-		defer server.Close()
-
-		executor := NewXAIExecutor(cfg)
-		for _, tc := range []struct {
-			name    string
-			payload string
-			wantEff string
-		}{
-			{name: "post_generation", payload: `{"model":"grok-imagine-video","prompt":"animate"}`, wantEff: "priority"},
-			{name: "get_status", payload: `{"request_id":"vid_123"}`, wantEff: ""},
-		} {
-			t.Run(tc.name, func(t *testing.T) {
-				authID := t.Name()
-				consumer := &captureEffectiveServiceTierConsumer{
-					authID:  authID,
-					records: make(chan usage.Record, 1),
-				}
-				usage.RegisterConsumer(consumer)
-
-				auth := &coreauth.Auth{
-					ID:         authID,
-					Provider:   "xai",
-					Attributes: map[string]string{"base_url": server.URL},
-					Metadata:   map[string]any{"access_token": "xai-token"},
-				}
-				ctx := usage.WithServiceTier(context.Background(), usage.AutoServiceTier)
-				_, errExec := executor.Execute(ctx, auth, coreexecutor.Request{
-					Model:   "grok-imagine-video",
-					Payload: []byte(tc.payload),
-				}, coreexecutor.Options{
-					SourceFormat: translatorreg.FromString("openai-video"),
-				})
-				if errExec != nil {
-					t.Fatalf("Execute error: %v", errExec)
-				}
-				record := <-consumer.records
-				if record.ServiceTier != "auto" || record.EffectiveServiceTier != tc.wantEff {
-					t.Fatalf("usage tiers = requested:%q effective:%q, want auto/%q", record.ServiceTier, record.EffectiveServiceTier, tc.wantEff)
 				}
 			})
 		}

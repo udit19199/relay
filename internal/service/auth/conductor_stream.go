@@ -145,7 +145,7 @@ func (m *Manager) recordCanceledUpstreamCooldown(ctx context.Context, auth *Auth
 }
 
 func (m *Manager) wrapStreamResult(ctx context.Context, auth *Auth, provider, resultModel, routeModel string, headers http.Header, buffered []coreexecutor.StreamChunk, remaining <-chan coreexecutor.StreamChunk, aliasResult OAuthModelAliasResult, ephemeralResult bool, opts coreexecutor.Options, executionSeq uint64) *coreexecutor.StreamResult {
-	ctx = WithCodexClientRequest(ctx, isOpenAIImageExecutionOptions(opts) || IsCodexClientRequest(ctx, opts.Headers))
+	ctx = WithCodexClientRequest(ctx, IsCodexClientRequest(ctx, opts.Headers))
 	accessToken := authAccessTokenForRequest(ctx, auth, opts.Headers)
 	out := make(chan coreexecutor.StreamChunk)
 	streamStart := time.Now()

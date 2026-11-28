@@ -671,15 +671,12 @@ func buildOpenAICompatibilityConfigModels(compat *config.OpenAICompatibility) []
 	for i := range compat.Models {
 		model := compat.Models[i]
 		modelType := "openai-compatibility"
-		if model.Image {
-			modelType = registry.OpenAIImageModelType
-		}
 		info := buildConfiguredModelInfo(model, compat.Name, modelType, now, strings.TrimSpace(model.Alias), false)
 		if info == nil {
 			continue
 		}
 		thinkingSupport := model.Thinking
-		if thinkingSupport == nil && !model.Image {
+		if thinkingSupport == nil {
 			thinkingSupport = &registry.ThinkingSupport{Levels: []string{"low", "medium", "high"}}
 		}
 		if model.Thinking != nil {

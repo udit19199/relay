@@ -2,18 +2,19 @@ package service
 
 import (
 	"context"
-	"github.com/gin-gonic/gin"
-	management "github.com/udit19199/relay/internal/api/handlers/management"
-	"github.com/udit19199/relay/internal/config"
-	"github.com/udit19199/relay/internal/registry"
-	coreauth "github.com/udit19199/relay/internal/service/auth"
-	"github.com/udit19199/relay/internal/watcher/synthesizer"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	management "github.com/udit19199/relay/internal/api/handlers/management"
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/registry"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
+	"github.com/udit19199/relay/internal/watcher/synthesizer"
 )
 
 func TestCodexExcludedModelsCredentialPriorityAfterPatchAndReload(t *testing.T) {

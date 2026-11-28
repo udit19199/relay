@@ -13,8 +13,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	coreauth "github.com/udit19199/relay/internal/service/auth"
 	"strconv"
+
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 func TestUtlsFallbackProxyConnectionPool(t *testing.T) {

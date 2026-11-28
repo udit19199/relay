@@ -317,7 +317,7 @@ func TestCodexClientModelsApplyPatchRouting(t *testing.T) {
 		provider string
 		models   []*registry.ModelInfo
 	}{
-		{"codex", []*registry.ModelInfo{{ID: "gpt-5.5"}, {ID: "gpt-reserve"}, {ID: "gpt-image-2"}, {ID: "catalog-patch-mixed"}, {ID: "catalog-patch-partial"}}},
+		{"codex", []*registry.ModelInfo{{ID: "gpt-5.5"}, {ID: "gpt-reserve"}, {ID: "catalog-patch-imageonly", SupportedInputModalities: []string{"image"}}, {ID: "catalog-patch-mixed"}, {ID: "catalog-patch-partial"}}},
 		{"catalog-custom", []*registry.ModelInfo{{ID: "catalog-patch-synthetic"}, {ID: "catalog-patch-mixed"}, {ID: "catalog-patch-alias", MetadataModelID: "gpt-5.5", SupportedInputModalities: []string{"text"}}}},
 		{"catalog-remote", []*registry.ModelInfo{{ID: "catalog-patch-partial"}, {ID: "catalog-patch-unknown", MetadataModelID: "gpt-5.5"}, {ID: "team/gpt-5.5"}}},
 		{"catalog-disabled", []*registry.ModelInfo{{ID: "catalog-patch-disabled"}}},
@@ -377,7 +377,7 @@ func TestCodexClientModelsApplyPatchRouting(t *testing.T) {
 			for _, id := range []string{"gpt-5.5", "gpt-reserve", "catalog-patch-synthetic", "catalog-patch-alias", "catalog-patch-mixed"} {
 				assertPatch(t, response, id, "freeform")
 			}
-			for _, id := range []string{"gpt-image-2", "catalog-patch-partial", "catalog-patch-unknown", "team/gpt-5.5", "catalog-patch-disabled"} {
+			for _, id := range []string{"catalog-patch-imageonly", "catalog-patch-partial", "catalog-patch-unknown", "team/gpt-5.5", "catalog-patch-disabled"} {
 				assertPatch(t, response, id, nil)
 			}
 		})

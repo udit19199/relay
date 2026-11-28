@@ -2,14 +2,15 @@ package auth
 
 import (
 	"fmt"
-	"github.com/udit19199/relay/internal/registry"
-	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 	"maps"
 	"math/rand/v2"
 	"net/http"
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/udit19199/relay/internal/registry"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 // weightedStateForTest checks that the requested accounting pool was created.

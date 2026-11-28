@@ -2,6 +2,7 @@ package registry
 
 import (
 	"context"
+
 	log "github.com/sirupsen/logrus"
 )
 

@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/MoeForge/moego/ojson"
 	"strings"
+
+	"github.com/MoeForge/moego/ojson"
 )
 
 func TestConvertCodexResponseToOpenAI_IncompleteTerminal(t *testing.T) {

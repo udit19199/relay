@@ -1,10 +1,11 @@
 package helps
 
 import (
-	"github.com/MoeForge/moego/ojson"
-	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 	"net/http"
 	"testing"
+
+	"github.com/MoeForge/moego/ojson"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestApplyPayloadConfigWithTrackedPathsForExecutorCodexIntegerNormalizationUsesExecutor(t *testing.T) {

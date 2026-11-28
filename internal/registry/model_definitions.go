@@ -6,26 +6,6 @@ import (
 	"strings"
 )
 
-const (
-	codexBuiltinImage15ModelID         = "gpt-image-1.5"
-	codexBuiltinImageModelID           = "gpt-image-2"
-	codexBuiltinImage25FlareModelID    = "gpt-image-2.5-flare"
-	codexBuiltinImage25SunburstModelID = "gpt-image-2.5-sunburst"
-	codexBuiltinImage25ModelID         = "gpt-image-2.5"
-	codexBuiltinImage26FlareModelID    = "gpt-image-2.6-flare"
-	codexBuiltinImage26SunburstModelID = "gpt-image-2.6-sunburst"
-	codexBuiltinImage26ModelID         = "gpt-image-2.6"
-	xaiBuiltinImageModelID             = "grok-imagine-image"
-	xaiBuiltinImageQualityModelID      = "grok-imagine-image-quality"
-	xaiBuiltinImage20ModelID           = "grok-imagine-image-2.0"
-	xaiBuiltinVideoModelID             = "grok-imagine-video"
-	xaiBuiltinVideo15ModelID           = "grok-imagine-video-1.5"
-	xaiBuiltinVideo15PreviewID         = "grok-imagine-video-1.5-preview"
-	xaiBuiltinVideo15LiteModelID       = "grok-imagine-video-1.5-lite"
-	xaiBuiltinSpeechModelID            = "grok-tts"
-	xaiBuiltinSpeechVoiceModelID       = "grok-voice-tts-1.0"
-)
-
 // staticModelsJSON mirrors the top-level structure of models.json.
 type staticModelsJSON struct {
 	Claude    []*ModelInfo `json:"claude"`
@@ -44,22 +24,22 @@ func GetClaudeModels() []*ModelInfo {
 
 // GetCodexFreeModels returns model definitions for the Codex free plan tier.
 func GetCodexFreeModels() []*ModelInfo {
-	return WithCodexBuiltins(cloneModelInfos(getModels().CodexFree))
+	return cloneModelInfos(getModels().CodexFree)
 }
 
 // GetCodexTeamModels returns model definitions for the Codex team plan tier.
 func GetCodexTeamModels() []*ModelInfo {
-	return WithCodexBuiltins(cloneModelInfos(getModels().CodexTeam))
+	return cloneModelInfos(getModels().CodexTeam)
 }
 
 // GetCodexPlusModels returns model definitions for the Codex plus plan tier.
 func GetCodexPlusModels() []*ModelInfo {
-	return WithCodexBuiltins(cloneModelInfos(getModels().CodexPlus))
+	return cloneModelInfos(getModels().CodexPlus)
 }
 
 // GetCodexProModels returns model definitions for the Codex pro plan tier.
 func GetCodexProModels() []*ModelInfo {
-	return WithCodexBuiltins(cloneModelInfos(getModels().CodexPro))
+	return cloneModelInfos(getModels().CodexPro)
 }
 
 var staticDevinModels = []*ModelInfo{
@@ -189,246 +169,8 @@ var staticDevinModels = []*ModelInfo{
 
 // GetXAIModels returns the standard xAI Grok model definitions.
 func GetXAIModels() []*ModelInfo {
-	return WithXAIBuiltins(cloneModelInfos(getModels().XAI))
+	return cloneModelInfos(getModels().XAI)
 }
-
-// WithCodexBuiltins injects hard-coded Codex-only model definitions that should
-// not depend on remote models.json updates. Built-ins replace any matching IDs
-// already present in the provided slice.
-func WithCodexBuiltins(models []*ModelInfo) []*ModelInfo {
-	return upsertModelInfos(models,
-		codexBuiltinImage15ModelInfo(),
-		codexBuiltinImageModelInfo(),
-		codexBuiltinImage25FlareModelInfo(),
-		codexBuiltinImage25SunburstModelInfo(),
-		codexBuiltinImage25ModelInfo(),
-		codexBuiltinImage26FlareModelInfo(),
-		codexBuiltinImage26SunburstModelInfo(),
-		codexBuiltinImage26ModelInfo(),
-	)
-}
-
-// WithXAIBuiltins injects hard-coded xAI image, video, and speech model definitions
-// that should not depend on remote models.json updates.
-func WithXAIBuiltins(models []*ModelInfo) []*ModelInfo {
-	return upsertModelInfos(models, xaiBuiltinImageModelInfo(), xaiBuiltinImageQualityModelInfo(), xaiBuiltinImage20ModelInfo(), xaiBuiltinVideoModelInfo(), xaiBuiltinVideo15ModelInfo(), xaiBuiltinVideo15PreviewModelInfo(), xaiBuiltinVideo15LiteModelInfo(), xaiBuiltinSpeechModelInfo(), xaiBuiltinSpeechVoiceModelInfo())
-}
-
-func codexBuiltinImage15ModelInfo() *ModelInfo {
-	return &ModelInfo{
-		ID:          codexBuiltinImage15ModelID,
-		Object:      "model",
-		Created:     1704067200, // 2024-01-01
-		OwnedBy:     "openai",
-		Type:        "openai",
-		DisplayName: "GPT Image 1.5",
-		Version:     codexBuiltinImage15ModelID,
-	}
-}
-
-func codexBuiltinImageModelInfo() *ModelInfo {
-	return &ModelInfo{
-		ID:          codexBuiltinImageModelID,
-		Object:      "model",
-		Created:     1704067200, // 2024-01-01
-		OwnedBy:     "openai",
-		Type:        "openai",
-		DisplayName: "GPT Image 2",
-		Version:     codexBuiltinImageModelID,
-	}
-}
-
-func codexBuiltinImage25FlareModelInfo() *ModelInfo {
-	return &ModelInfo{
-		ID:          codexBuiltinImage25FlareModelID,
-		Object:      "model",
-		Created:     1704067200, // 2024-01-01
-		OwnedBy:     "openai",
-		Type:        "openai",
-		DisplayName: "GPT Image 2.5 Flare",
-		Version:     codexBuiltinImage25FlareModelID,
-	}
-}
-
-func codexBuiltinImage25SunburstModelInfo() *ModelInfo {
-	return &ModelInfo{
-		ID:          codexBuiltinImage25SunburstModelID,
-		Object:      "model",
-		Created:     1704067200, // 2024-01-01
-		OwnedBy:     "openai",
-		Type:        "openai",
-		DisplayName: "GPT Image 2.5 Sunburst",
-		Version:     codexBuiltinImage25SunburstModelID,
-	}
-}
-
-func codexBuiltinImage25ModelInfo() *ModelInfo {
-	return &ModelInfo{
-		ID:          codexBuiltinImage25ModelID,
-		Object:      "model",
-		Created:     1704067200, // 2024-01-01
-		OwnedBy:     "openai",
-		Type:        "openai",
-		DisplayName: "GPT Image 2.5",
-		Version:     codexBuiltinImage25ModelID,
-	}
-}
-
-func codexBuiltinImage26FlareModelInfo() *ModelInfo {
-	return &ModelInfo{
-		ID:          codexBuiltinImage26FlareModelID,
-		Object:      "model",
-		Created:     1704067200, // 2024-01-01
-		OwnedBy:     "openai",
-		Type:        "openai",
-		DisplayName: "GPT Image 2.6 Flare",
-		Version:     codexBuiltinImage26FlareModelID,
-	}
-}
-
-func codexBuiltinImage26SunburstModelInfo() *ModelInfo {
-	return &ModelInfo{
-		ID:          codexBuiltinImage26SunburstModelID,
-		Object:      "model",
-		Created:     1704067200, // 2024-01-01
-		OwnedBy:     "openai",
-		Type:        "openai",
-		DisplayName: "GPT Image 2.6 Sunburst",
-		Version:     codexBuiltinImage26SunburstModelID,
-	}
-}
-
-func codexBuiltinImage26ModelInfo() *ModelInfo {
-	return &ModelInfo{
-		ID:          codexBuiltinImage26ModelID,
-		Object:      "model",
-		Created:     1704067200, // 2024-01-01
-		OwnedBy:     "openai",
-		Type:        "openai",
-		DisplayName: "GPT Image 2.6",
-		Version:     codexBuiltinImage26ModelID,
-	}
-}
-
-func xaiBuiltinImageModelInfo() *ModelInfo {
-	return &ModelInfo{
-		ID:          xaiBuiltinImageModelID,
-		Object:      "model",
-		Created:     1735689600, // 2025-01-01
-		OwnedBy:     "xai",
-		Type:        "xai",
-		DisplayName: "Grok Imagine Image",
-		Name:        xaiBuiltinImageModelID,
-		Description: "xAI Grok image generation model.",
-	}
-}
-
-func xaiBuiltinImageQualityModelInfo() *ModelInfo {
-	return &ModelInfo{
-		ID:          xaiBuiltinImageQualityModelID,
-		Object:      "model",
-		Created:     1735689600, // 2025-01-01
-		OwnedBy:     "xai",
-		Type:        "xai",
-		DisplayName: "Grok Imagine Image Quality",
-		Name:        xaiBuiltinImageQualityModelID,
-		Description: "xAI Grok higher-fidelity image generation model.",
-	}
-}
-
-func xaiBuiltinImage20ModelInfo() *ModelInfo {
-	return &ModelInfo{
-		ID:          xaiBuiltinImage20ModelID,
-		Object:      "model",
-		Created:     1786060800, // 2026-08-07
-		OwnedBy:     "xai",
-		Type:        "xai",
-		DisplayName: "Grok Imagine Image 2.0",
-		Name:        xaiBuiltinImage20ModelID,
-		Description: "xAI Grok image generation model.",
-	}
-}
-
-func xaiBuiltinVideoModelInfo() *ModelInfo {
-	return &ModelInfo{
-		ID:          xaiBuiltinVideoModelID,
-		Object:      "model",
-		Created:     1735689600, // 2025-01-01
-		OwnedBy:     "xai",
-		Type:        "xai",
-		DisplayName: "Grok Imagine Video",
-		Name:        xaiBuiltinVideoModelID,
-		Description: "xAI Grok video generation model.",
-	}
-}
-
-func xaiBuiltinVideo15ModelInfo() *ModelInfo {
-	return &ModelInfo{
-		ID:          xaiBuiltinVideo15ModelID,
-		Object:      "model",
-		Created:     1735689600, // 2025-01-01
-		OwnedBy:     "xai",
-		Type:        "xai",
-		DisplayName: "Grok Imagine Video 1.5",
-		Name:        xaiBuiltinVideo15ModelID,
-		Description: "xAI Grok video generation model.",
-	}
-}
-
-func xaiBuiltinVideo15PreviewModelInfo() *ModelInfo {
-	return &ModelInfo{
-		ID:          xaiBuiltinVideo15PreviewID,
-		Object:      "model",
-		Created:     1735689600, // 2025-01-01
-		OwnedBy:     "xai",
-		Type:        "xai",
-		DisplayName: "Grok Imagine Video 1.5 Preview",
-		Name:        xaiBuiltinVideo15PreviewID,
-		Description: "Compatibility alias for the xAI Grok video generation model.",
-	}
-}
-
-func xaiBuiltinVideo15LiteModelInfo() *ModelInfo {
-	return &ModelInfo{
-		ID:                        xaiBuiltinVideo15LiteModelID,
-		Object:                    "model",
-		Created:                   1787702400, // 2026-08-26
-		OwnedBy:                   "xai",
-		Type:                      "xai",
-		DisplayName:               "Grok Imagine Video 1.5 Lite",
-		Name:                      xaiBuiltinVideo15LiteModelID,
-		Description:               "xAI Grok Imagine Video 1.5 Lite supports text-to-video and image-to-video generation. Output pricing per second: $0.02 at 480p, $0.03 at 720p, and $0.14 at 1080p.",
-		SupportedInputModalities:  []string{"text", "image"},
-		SupportedOutputModalities: []string{"video"},
-	}
-}
-
-func xaiBuiltinSpeechModelInfo() *ModelInfo {
-	return &ModelInfo{
-		ID:          xaiBuiltinSpeechModelID,
-		Object:      "model",
-		Created:     1773619200, // 2026-03-16
-		OwnedBy:     "xai",
-		Type:        "xai",
-		DisplayName: "Grok TTS",
-		Name:        xaiBuiltinSpeechModelID,
-		Description: "xAI Grok unary text-to-speech model.",
-	}
-}
-
-func xaiBuiltinSpeechVoiceModelInfo() *ModelInfo {
-	return &ModelInfo{
-		ID:          xaiBuiltinSpeechVoiceModelID,
-		Object:      "model",
-		Created:     1773619200, // 2026-03-16
-		OwnedBy:     "xai",
-		Type:        "xai",
-		DisplayName: "Grok Voice TTS 1.0",
-		Name:        xaiBuiltinSpeechVoiceModelID,
-		Description: "xAI Grok unary text-to-speech model.",
-	}
-}
-
 func upsertModelInfos(models []*ModelInfo, extras ...*ModelInfo) []*ModelInfo {
 	if len(extras) == 0 {
 		return models

@@ -763,7 +763,6 @@ func (e *CodexWebsocketsExecutor) streamCodexDuplex(
 				} else {
 					reporter.EnsurePublished(ctx)
 				}
-				publishCodexImageToolUsageWithOutputItems(ctx, reporter, current.clientBody, payload, outputItems, outputFallback)
 			}
 			if !send(coreexecutor.StreamChunk{Payload: helps.EnsureResponsesUsageDetails(payload), Incomplete: eventType == "response.incomplete"}) {
 				return

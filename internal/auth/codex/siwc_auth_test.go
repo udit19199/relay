@@ -10,12 +10,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/udit19199/relay/internal/config"
-	"github.com/udit19199/relay/internal/misc"
-	"golang.org/x/sync/singleflight"
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/misc"
+	"golang.org/x/sync/singleflight"
 )
 
 func TestGenerateSIWCAuthURL(t *testing.T) {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/MoeForge/moego/base64"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -13,6 +12,8 @@ import (
 	"sync"
 	"testing"
 	"testing/synctest"
+
+	"github.com/MoeForge/moego/base64"
 
 	"github.com/gin-gonic/gin"
 	fileauth "github.com/udit19199/relay/internal/auth/login"

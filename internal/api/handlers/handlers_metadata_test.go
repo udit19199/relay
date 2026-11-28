@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/udit19199/relay/internal/config"
 	"github.com/udit19199/relay/internal/logging"
@@ -14,7 +16,6 @@ import (
 	coresession "github.com/udit19199/relay/internal/service/session"
 	coreusage "github.com/udit19199/relay/internal/service/usage"
 	"golang.org/x/net/context"
-	"time"
 )
 
 func TestGetContextWithCancelCapturesClientRequestMetadata(t *testing.T) {

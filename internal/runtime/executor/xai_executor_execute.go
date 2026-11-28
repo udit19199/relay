@@ -22,16 +22,6 @@ func (e *XAIExecutor) Execute(ctx context.Context, auth *coreauth.Auth, req core
 	if opts.Alt == "responses/compact" {
 		return e.executeCompact(ctx, auth, req, opts)
 	}
-	if endpointPath := xaiImageEndpointPath(opts); endpointPath != "" {
-		return e.executeImages(ctx, auth, req, opts, endpointPath)
-	}
-	if xaiIsVideoRequest(opts) {
-		return e.executeVideos(ctx, auth, req, opts)
-	}
-	if xaiIsSpeechRequest(opts) {
-		return e.executeSpeech(ctx, auth, req, opts)
-	}
-
 	token, _ := xaiCreds(auth)
 	baseURL := xaiChatBaseURL(auth)
 	logXAIResolvedBaseURL(ctx, baseURL)

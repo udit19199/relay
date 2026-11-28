@@ -3,7 +3,6 @@ package management
 import (
 	"context"
 	"encoding/json"
-	"github.com/MoeForge/moego/base64"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/MoeForge/moego/base64"
 
 	"github.com/gin-gonic/gin"
 	"github.com/udit19199/relay/internal/auth/codex"

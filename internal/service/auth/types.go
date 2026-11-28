@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"github.com/MoeForge/moego/base64"
 	"io"
 	"net/http"
 	"net/url"
@@ -16,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/MoeForge/moego/base64"
 
 	"github.com/gin-gonic/gin"
 	baseauth "github.com/udit19199/relay/internal/auth"

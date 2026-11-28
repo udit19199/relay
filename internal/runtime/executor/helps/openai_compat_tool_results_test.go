@@ -3,9 +3,10 @@ package helps
 import (
 	"testing"
 
+	"strings"
+
 	"github.com/MoeForge/moego/ojson"
 	"github.com/udit19199/relay/internal/config"
-	"strings"
 )
 
 func TestNormalizeOpenAIToolResultsTextOnlyRelayedImages(t *testing.T) {

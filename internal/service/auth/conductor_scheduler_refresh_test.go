@@ -7,9 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"strings"
+
 	"github.com/udit19199/relay/internal/registry"
 	coreexecutor "github.com/udit19199/relay/internal/service/executor"
-	"strings"
 )
 
 type schedulerProviderTestExecutor struct {

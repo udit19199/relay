@@ -2,10 +2,11 @@ package auth
 
 import (
 	"context"
-	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 	"strings"
 	"testing"
 	"time"
+
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 func TestSessionAffinitySelector_LookupAffinity(t *testing.T) {

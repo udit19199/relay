@@ -2,9 +2,10 @@ package service
 
 import (
 	"context"
+	"testing"
+
 	internalconfig "github.com/udit19199/relay/internal/config"
 	coreauth "github.com/udit19199/relay/internal/service/auth"
-	"testing"
 )
 
 func TestBuilder_WithResultPolicy(t *testing.T) {

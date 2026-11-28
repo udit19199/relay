@@ -98,10 +98,6 @@ func (s *Server) UpdateClientsContext(ctx context.Context, cfg *config.Config) b
 		auth.SetCredentialQuotaProbeIntervalSeconds(cfg.QuotaProbeIntervalSeconds)
 	}
 
-	if oldCfg != nil && oldCfg.DisableImageGeneration != cfg.DisableImageGeneration {
-		log.Infof("disable-image-generation updated: %v -> %v", oldCfg.DisableImageGeneration, cfg.DisableImageGeneration)
-	}
-
 	applyClaudeToolSearchConfig(cfg)
 
 	if s.handlers != nil && s.handlers.AuthManager != nil {

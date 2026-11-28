@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"bytes"
+
 	"github.com/MoeForge/moego/ojson"
 	log "github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"

@@ -25,18 +25,6 @@ func TestComputeOpenAICompatModelsHash_Deterministic(t *testing.T) {
 		t.Fatal("hash should change when model list changes")
 	}
 }
-
-func TestComputeOpenAICompatModelsHash_IncludesImageFlag(t *testing.T) {
-	textModel := ComputeOpenAICompatModelsHash([]config.OpenAICompatibilityModel{{Name: "gpt-image", Alias: "image"}})
-	imageModel := ComputeOpenAICompatModelsHash([]config.OpenAICompatibilityModel{{Name: "gpt-image", Alias: "image", Image: true}})
-	if textModel == "" || imageModel == "" {
-		t.Fatal("hashes should not be empty")
-	}
-	if textModel == imageModel {
-		t.Fatal("hash should change when image flag changes")
-	}
-}
-
 func TestComputeOpenAICompatModelsHashIncludesModalities(t *testing.T) {
 	base := []config.OpenAICompatibilityModel{{Name: "model", InputModalities: []string{"text"}, OutputModalities: []string{"text"}}}
 	inputChanged := []config.OpenAICompatibilityModel{{Name: "model", InputModalities: []string{"text", "image"}, OutputModalities: []string{"text"}}}

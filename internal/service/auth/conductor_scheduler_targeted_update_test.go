@@ -3,11 +3,12 @@ package auth
 import (
 	"context"
 	"fmt"
-	"github.com/udit19199/relay/internal/registry"
-	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/udit19199/relay/internal/registry"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 func TestManager_MarkResult_TargetedModelShardUpdate(t *testing.T) {

@@ -2,13 +2,14 @@ package auth
 
 import (
 	"fmt"
-	"github.com/udit19199/relay/internal/registry"
-	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 	"maps"
 	"net/http"
 	"strconv"
 	"sync"
 	"testing"
+
+	"github.com/udit19199/relay/internal/registry"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 func TestWeightedOverloadExactCompensation(t *testing.T) {

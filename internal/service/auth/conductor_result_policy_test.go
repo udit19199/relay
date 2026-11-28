@@ -2,13 +2,14 @@ package auth
 
 import (
 	"context"
-	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 	"net/http"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 type recordingHook struct {

@@ -9,16 +9,6 @@ type ApplyPatchCapabilityForModelFunc func(string) bool
 func applyCodexClientApplyPatchCapability(entry map[string]any, id string, capability ApplyPatchCapabilityForModelFunc) {
 	templateSupported := entry["apply_patch_tool_type"] == "freeform"
 	entry["apply_patch_tool_type"] = nil
-	// Built-in image, video, and speech IDs can inherit a generic text template in Home.
-	// This classification is a model restriction, not routing capability evidence.
-	baseID := strings.ToLower(strings.TrimSpace(id))
-	if index := strings.LastIndex(baseID, "/"); index != -1 {
-		baseID = strings.TrimSpace(baseID[index+1:])
-	}
-	if isCodexClientImageOrVideoModel(baseID) {
-		return
-	}
-
 	// Hidden text models remain usable, but non-text catalog entries must not
 	// advertise a conversation tool even when their executor supports it.
 	supportsText := false

@@ -1,10 +1,11 @@
 package api
 
 import (
+	"testing"
+
 	"github.com/udit19199/relay/internal/config"
 	"github.com/udit19199/relay/internal/githubauth"
 	"github.com/udit19199/relay/internal/util"
-	"testing"
 )
 
 func TestServerGitHubTokenReload(t *testing.T) {

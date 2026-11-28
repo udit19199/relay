@@ -1500,83 +1500,6 @@ func TestParseClaudeUsageExtractsCacheTTLServerToolsIterationsAndCost(t *testing
 		t.Fatalf("CostDetails = %+v", detail.CostDetails)
 	}
 }
-
-func TestParseCodexUsageWithCollectedOutputItemsAndImageToolUsage(t *testing.T) {
-	completed := []byte(`{"type":"response.completed","response":{"id":"resp_codex_1","service_tier":"priority","prompt_cache_retention":"24h","output":[],"usage":{"input_tokens":1200,"input_tokens_details":{"cached_tokens":1024,"text_tokens":1100,"image_tokens":100,"cached_tokens_details":{"text_tokens":1024}},"output_tokens":350,"output_tokens_details":{"reasoning_tokens":200,"text_tokens":150},"total_tokens":1550,"attribution":{"tier":"priority"}},"tool_usage":{"image_gen":{"input_tokens":80,"input_tokens_details":{"text_tokens":30,"image_tokens":50},"output_tokens":1056,"output_tokens_details":{"image_tokens":1056,"text_tokens":0},"total_tokens":1136}}}}`)
-	itemsByIndex := map[int64][]byte{
-		0: []byte(`{"id":"ws_1","type":"web_search_call","status":"completed","action":{"type":"search","query":"openai responses usage","sources":[{"url":"https://a.example"},{"url":"https://b.example"}]}}`),
-		1: []byte(`{"id":"ci_1","type":"code_interpreter_call","status":"completed"}`),
-		2: []byte(`{"id":"ig_1","type":"image_generation_call","status":"completed","size":"1024x1024","quality":"high","background":"transparent","output_format":"png","result":"AA=="}`),
-		3: []byte(`{"id":"fc_1","type":"function_call","status":"completed","name":"run_check","call_id":"call_1","arguments":"{}"}`),
-	}
-	detail, ok := ParseCodexUsageWithOutputItems(completed, itemsByIndex, nil)
-	if !ok {
-		t.Fatal("expected ParseCodexUsageWithOutputItems ok = true")
-	}
-	if detail.ResponseServiceTier != "priority" || detail.UpstreamServiceTier != "priority" {
-		t.Fatalf("unexpected service tier: response=%q upstream=%q", detail.ResponseServiceTier, detail.UpstreamServiceTier)
-	}
-	if detail.CacheDetails == nil || detail.CacheDetails.Retention != "24h" {
-		t.Fatalf("unexpected CacheDetails: %+v", detail.CacheDetails)
-	}
-	if detail.CachedTextTokens == nil || *detail.CachedTextTokens != 1024 {
-		t.Fatalf("unexpected CachedTextTokens: %+v", detail.CachedTextTokens)
-	}
-	if detail.WebSearchRequests == nil || *detail.WebSearchRequests != 1 {
-		t.Fatalf("unexpected WebSearchRequests: %+v", detail.WebSearchRequests)
-	}
-	if detail.ToolUsageDetails == nil ||
-		detail.ToolUsageDetails.WebSearchCalls == nil || *detail.ToolUsageDetails.WebSearchCalls != 1 ||
-		detail.ToolUsageDetails.WebSearchQueries == nil || *detail.ToolUsageDetails.WebSearchQueries != 1 ||
-		detail.ToolUsageDetails.NumSourcesUsed == nil || *detail.ToolUsageDetails.NumSourcesUsed != 2 ||
-		detail.ToolUsageDetails.CodeExecutionCalls == nil || *detail.ToolUsageDetails.CodeExecutionCalls != 1 ||
-		detail.ToolUsageDetails.ImageGenerationCalls == nil || *detail.ToolUsageDetails.ImageGenerationCalls != 1 ||
-		detail.ToolUsageDetails.ToolCallsRequested == nil || *detail.ToolUsageDetails.ToolCallsRequested != 1 {
-		t.Fatalf("unexpected ToolUsageDetails: %+v", detail.ToolUsageDetails)
-	}
-	if detail.ImageCount != nil || detail.ImageDetails != nil {
-		t.Fatalf("expected orchestrator record ImageCount/ImageDetails to be nil when tool_usage.image_gen is present, got count=%+v details=%+v", detail.ImageCount, detail.ImageDetails)
-	}
-
-	imgToolDetail, okImg := ParseCodexImageToolUsageWithOutputItems([]byte(`{"tools":[{"type":"image_generation","input_fidelity":"high"}]}`), completed, itemsByIndex, nil)
-	if !okImg {
-		t.Fatal("expected ParseCodexImageToolUsageWithOutputItems ok = true")
-	}
-	if imgToolDetail.TotalTokens != 1136 || imgToolDetail.TextInputTokens == nil || *imgToolDetail.TextInputTokens != 30 || imgToolDetail.ImageInputTokens == nil || *imgToolDetail.ImageInputTokens != 50 || imgToolDetail.ImageOutputTokens == nil || *imgToolDetail.ImageOutputTokens != 1056 {
-		t.Fatalf("unexpected image tool token breakdown: %+v", imgToolDetail)
-	}
-	if imgToolDetail.ImageCount == nil || *imgToolDetail.ImageCount != 1 || imgToolDetail.ImageDetails == nil || imgToolDetail.ImageDetails.Size != "1024x1024" || imgToolDetail.ImageDetails.InputFidelity != "" {
-		t.Fatalf("unexpected image tool response metadata: count=%+v details=%+v", imgToolDetail.ImageCount, imgToolDetail.ImageDetails)
-	}
-	if imgToolDetail.RequestedImageDetails == nil || imgToolDetail.RequestedImageDetails.InputFidelity != "high" {
-		t.Fatalf("unexpected image tool requested metadata: %+v", imgToolDetail.RequestedImageDetails)
-	}
-}
-
-func TestStreamUsageBufferObserveOpenAIStreamToolCallsAndImageCompleted(t *testing.T) {
-	var buffer StreamUsageBuffer
-	buffer.ObserveOpenAIStream([]byte(`data: {"id":"chatcmpl-1","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"f1","arguments":""}}]}}]}`))
-	buffer.ObserveOpenAIStream([]byte(`data: {"id":"chatcmpl-1","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{}"}},{"index":1,"id":"call_2","type":"function","function":{"name":"f2","arguments":"{}"}}]}}]}`))
-	buffer.ObserveOpenAIStream([]byte(`data: {"id":"chatcmpl-1","service_tier":"default","choices":[],"usage":{"prompt_tokens":50,"completion_tokens":20,"total_tokens":70}}`))
-	detail, ok := buffer.Detail()
-	if !ok {
-		t.Fatal("expected buffer.Detail() ok = true")
-	}
-	if detail.TotalTokens != 70 || detail.ToolUsageDetails == nil || detail.ToolUsageDetails.ToolCallsRequested == nil || *detail.ToolUsageDetails.ToolCallsRequested != 2 {
-		t.Fatalf("unexpected OpenAI stream tool call usage: %+v, tools=%+v", detail, detail.ToolUsageDetails)
-	}
-
-	var imgBuffer StreamUsageBuffer
-	imgBuffer.ObserveOpenAIStream([]byte(`data: {"type":"image_generation.completed","b64_json":"AA==","size":"1024x1536","quality":"medium","background":"opaque","output_format":"webp","usage":{"input_tokens":25,"input_tokens_details":{"text_tokens":25,"image_tokens":0},"output_tokens":1500,"output_tokens_details":{"image_tokens":1500,"text_tokens":0},"total_tokens":1525}}`))
-	imgDetail, okImg := imgBuffer.Detail()
-	if !okImg {
-		t.Fatal("expected imgBuffer.Detail() ok = true")
-	}
-	if imgDetail.TotalTokens != 1525 || imgDetail.ImageCount == nil || *imgDetail.ImageCount != 1 || imgDetail.ImageDetails == nil || imgDetail.ImageDetails.Size != "1024x1536" || imgDetail.ImageDetails.Quality != "medium" || imgDetail.ImageDetails.OutputFormat != "webp" {
-		t.Fatalf("unexpected OpenAI image stream usage: %+v, details=%+v", imgDetail, imgDetail.ImageDetails)
-	}
-}
-
 func TestParseCodexUsageExtractsXAIServerSideToolUsageAndModalities(t *testing.T) {
 	data := []byte(`{"type":"response.completed","response":{"id":"resp_xai_1","usage":{"input_tokens":3804,"input_tokens_details":{"cached_tokens":3072,"text_tokens":3500,"image_tokens":304,"cached_prompt_text_tokens":3072},"output_tokens":889,"output_tokens_details":{"reasoning_tokens":828,"text_tokens":61,"accepted_prediction_tokens":5,"rejected_prediction_tokens":2},"total_tokens":4693,"num_sources_used":0,"num_server_side_tools_used":1,"cost_in_usd_ticks":76246640,"server_side_tool_usage_details":{"web_search_calls":0,"x_search_calls":1,"x_posts_fetched":1,"x_users_fetched":0,"code_interpreter_calls":0,"file_search_calls":0,"mcp_calls":0,"document_search_calls":0,"image_generation_calls":0}}}}`)
 	detail, ok := ParseCodexUsage(data)
@@ -1596,31 +1519,6 @@ func TestParseCodexUsageExtractsXAIServerSideToolUsageAndModalities(t *testing.T
 		t.Fatalf("unexpected CostDetails: %+v", detail.CostDetails)
 	}
 }
-
-func TestParseXAIImageAndVideoUsage(t *testing.T) {
-	imgDetail := ParseXAIImageUsage(
-		[]byte(`{"model":"grok-imagine-image","prompt":"cat","aspect_ratio":"16:9","resolution":"2k","quality":"medium"}`),
-		[]byte(`{"data":[{"b64_json":"AA=="},{"b64_json":"BB=="}],"usage":{"prompt_tokens":12,"completion_tokens":100,"total_tokens":112}}`),
-	)
-	if imgDetail.TotalTokens != 112 || imgDetail.ImageCount == nil || *imgDetail.ImageCount != 2 {
-		t.Fatalf("unexpected image usage: %+v", imgDetail)
-	}
-	if imgDetail.RequestedImageDetails == nil || imgDetail.RequestedImageDetails.AspectRatio != "16:9" || imgDetail.RequestedImageDetails.Resolution != "2k" || imgDetail.RequestedImageDetails.Quality != "medium" {
-		t.Fatalf("unexpected requested image details: %+v", imgDetail.RequestedImageDetails)
-	}
-
-	vidDetail := ParseXAIVideoUsage(
-		[]byte(`{"model":"grok-imagine-video","prompt":"wave","aspect_ratio":"16:9","resolution":"720p","duration":5}`),
-		[]byte(`{"status":"completed","url":"https://example.com/v.mp4","video":{"resolution":"720p","aspect_ratio":"16:9"},"usage":{"prompt_tokens":20,"completion_tokens":400,"total_tokens":420}}`),
-	)
-	if vidDetail.TotalTokens != 420 || vidDetail.ImageDetails == nil || vidDetail.ImageDetails.Resolution != "720p" || vidDetail.ImageDetails.AspectRatio != "16:9" || vidDetail.RequestedImageDetails == nil || vidDetail.RequestedImageDetails.Resolution != "720p" {
-		t.Fatalf("unexpected video usage: %+v", vidDetail)
-	}
-	if vidDetail.MediaCounts == nil || vidDetail.MediaCounts.CompletionMedia == nil || *vidDetail.MediaCounts.CompletionMedia != 1 || vidDetail.MediaCounts.AudioSeconds == nil || *vidDetail.MediaCounts.AudioSeconds != 5 {
-		t.Fatalf("unexpected video media counts: %+v", vidDetail.MediaCounts)
-	}
-}
-
 func TestStreamUsageBufferObserveClaudeStream_PreservesSingleTurnCacheCreationTTL(t *testing.T) {
 	var buffer StreamUsageBuffer
 	buffer.ObserveClaudeStream([]byte(`data: {"type":"message_start","message":{"id":"msg_1","model":"claude-haiku-5-5","usage":{"input_tokens":16,"cache_creation_input_tokens":45045,"cache_read_input_tokens":0,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":45045},"output_tokens":4,"speed":"standard"}}}`))
@@ -1706,35 +1604,6 @@ func TestClaudeStreamToolDeduplicationOwnsIDsAndCountsMultipleSearches(t *testin
 		t.Fatalf("unexpected Claude stream search counts: detail=%+v tools=%+v", d, d.ToolUsageDetails)
 	}
 }
-
-func TestCodexUsageOwnsImageMetadataStrings(t *testing.T) {
-	for _, imageTool := range []bool{false, true} {
-		t.Run(fmt.Sprintf("image_tool=%v", imageTool), func(t *testing.T) {
-			raw := []byte(`{"response":{"usage":{"input_tokens":1,"output_tokens":1,"server_tool_use":{"custom_tool_requests":3}},"prompt_cache_retention":"24h","tool_usage":{"image_gen":{"input_tokens":1,"output_tokens":2}},"output":[{"type":"image_generation_call","status":"completed","size":"1024x1024","quality":"high"}]}}`)
-			var detailJSON []byte
-			if !imageTool {
-				detailJSON = bytes.ReplaceAll(raw, []byte(`"image_gen"`), []byte(`"other_tool"`))
-			} else {
-				detailJSON = raw
-			}
-			d, ok := ParseCodexUsage(detailJSON)
-			if imageTool {
-				d, ok = ParseCodexImageToolUsage(detailJSON)
-			}
-			for i := range detailJSON {
-				detailJSON[i] = 'X'
-			}
-			if !ok || d.ImageDetails == nil || d.ImageDetails.Size != "1024x1024" || d.ImageDetails.Quality != "high" {
-				t.Fatalf("image metadata aliases input buffer: %+v", d.ImageDetails)
-			}
-			if !imageTool && (d.CacheDetails == nil || d.CacheDetails.Retention != "24h" ||
-				d.ToolUsageDetails == nil || d.ToolUsageDetails.Extra["custom_tool_requests"] != 3) {
-				t.Fatalf("cache metadata or tool keys alias input buffer: %+v", d)
-			}
-		})
-	}
-}
-
 func TestResponsesCacheWriteLifetimesAreReportedNotInferred(t *testing.T) {
 	tests := []struct {
 		name, body  string
@@ -1853,35 +1722,4 @@ func TestObserveResponsesStreamPreservesOutputItemDoneToolUsageWhenCompletedOutp
 		t.Fatalf("ObserveResponsesStream lost output_item.done tool usage: %+v", d.ToolUsageDetails)
 	}
 
-}
-
-func TestImageDetailsCloneStringsFromReusableBuffer(t *testing.T) {
-	reqBuf := []byte(`{"size":"1024x1024","quality":"high","background":"transparent","output_format":"png","response_format":"b64_json","mime_type":"image/png","input_fidelity":"high"}`)
-	reqDetails := ParseRequestImageDetails(reqBuf)
-	for i := range reqBuf {
-		reqBuf[i] = 'X'
-	}
-	if reqDetails == nil || reqDetails.Size != "1024x1024" || reqDetails.Quality != "high" || reqDetails.Background != "transparent" || reqDetails.OutputFormat != "png" || reqDetails.ResponseFormat != "b64_json" || reqDetails.MimeType != "image/png" || reqDetails.InputFidelity != "high" {
-		t.Fatalf("ParseRequestImageDetails corrupted after buffer overwrite: %+v", reqDetails)
-	}
-
-	toolReqBuf := []byte(`{"tools":[{"type":"image_generation","size":"1536x1024","quality":"medium","background":"opaque","output_format":"webp"}]}`)
-	toolDetails := ParseRequestImageDetails(toolReqBuf)
-	for i := range toolReqBuf {
-		toolReqBuf[i] = 'X'
-	}
-	if toolDetails == nil || toolDetails.Size != "1536x1024" || toolDetails.Quality != "medium" || toolDetails.Background != "opaque" || toolDetails.OutputFormat != "webp" {
-		t.Fatalf("ParseRequestImageDetails (tool) corrupted after buffer overwrite: %+v", toolDetails)
-	}
-
-	streamBuf := []byte(`data: {"type":"image_generation.completed","size":"1024x1536","quality":"high","background":"transparent","output_format":"png","usage":{"input_tokens":5,"output_tokens":10,"total_tokens":15}}`)
-	var b StreamUsageBuffer
-	b.ObserveOpenAIStream(streamBuf)
-	for i := range streamBuf {
-		streamBuf[i] = 'X'
-	}
-	d, ok := b.Detail()
-	if !ok || d.ImageDetails == nil || d.ImageDetails.Size != "1024x1536" || d.ImageDetails.Quality != "high" || d.ImageDetails.Background != "transparent" || d.ImageDetails.OutputFormat != "png" {
-		t.Fatalf("ObserveOpenAIStream ImageDetails corrupted after buffer overwrite: %+v", d.ImageDetails)
-	}
 }

@@ -2,11 +2,12 @@ package service
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"github.com/udit19199/relay/internal/config"
 	"github.com/udit19199/relay/internal/registry"
 	coreauth "github.com/udit19199/relay/internal/service/auth"
-	"testing"
-	"time"
 )
 
 func TestServiceApplyCoreAuthAddOrUpdate_DeleteReAddDoesNotInheritStaleRuntimeState(t *testing.T) {

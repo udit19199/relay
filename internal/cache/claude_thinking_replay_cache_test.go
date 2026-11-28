@@ -3,10 +3,11 @@ package cache
 import (
 	"bytes"
 	"context"
-	"github.com/udit19199/relay/internal/kvstore"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/udit19199/relay/internal/kvstore"
 )
 
 type fakeClaudeThinkingReplayKVClient struct {

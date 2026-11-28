@@ -1,8 +1,9 @@
 package util
 
 import (
-	"github.com/MoeForge/moego/ojson"
 	"testing"
+
+	"github.com/MoeForge/moego/ojson"
 )
 
 func TestConvertClaudeToolResult_PreservesErrorFlag(t *testing.T) {

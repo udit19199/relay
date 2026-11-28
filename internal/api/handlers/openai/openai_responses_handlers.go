@@ -21,7 +21,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/udit19199/relay/internal/access"
 	"github.com/udit19199/relay/internal/api/handlers"
-	"github.com/udit19199/relay/internal/client/codex/optimize-multi-agent-v2"
+	multiagentv2 "github.com/udit19199/relay/internal/client/codex/optimize-multi-agent-v2"
 	"github.com/udit19199/relay/internal/clienterror"
 	. "github.com/udit19199/relay/internal/constant"
 	"github.com/udit19199/relay/internal/httpwire"
@@ -358,31 +358,7 @@ func responsesSSEPayloadErrorMessage(payload []byte) *interfaces.ErrorMessage {
 	if !foundStatus {
 		status = responsesSSEPayloadErrorStatus(payload)
 	}
-	errPayload := responsesAnnotateImageGenerationComplexityPayload(payload)
-	return sanitizeResponsesStreamErrorMessage(&interfaces.ErrorMessage{StatusCode: status, Error: fmt.Errorf("%s", errPayload)})
-}
-
-func responsesAnnotateImageGenerationComplexityPayload(payload []byte) []byte {
-	if len(payload) == 0 || !ojson.ValidBytes(payload) {
-		return payload
-	}
-	for _, basePath := range []string{"error", "response.error"} {
-		errObj := ojson.GetBytesNoCopy(payload, basePath)
-		if !errObj.IsObject() {
-			continue
-		}
-		if !strings.EqualFold(strings.TrimSpace(errObj.Get("type").String()), "image_generation_user_error") {
-			continue
-		}
-		msg := strings.TrimSpace(errObj.Get("message").String())
-		param := strings.ToLower(strings.TrimSpace(errObj.Get("param").String()))
-		if (param == "complexity" || strings.Contains(strings.ToLower(msg), "complexity")) && !strings.Contains(msg, "/v1/images/generations") {
-			doc := ojson.NewDoc(payload)
-			_ = doc.Set(basePath+".message", msg+` (Set tool_choice to {"type":"image_generation"}, use a compatible Responses model such as gpt-5.4-mini, or call /v1/images/generations directly.)`)
-			return doc.Bytes()
-		}
-	}
-	return payload
+	return sanitizeResponsesStreamErrorMessage(&interfaces.ErrorMessage{StatusCode: status, Error: fmt.Errorf("%s", payload)})
 }
 
 func responsesSSEPayloadErrorStatus(payload []byte) int {

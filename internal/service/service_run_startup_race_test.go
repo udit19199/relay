@@ -9,12 +9,13 @@ import (
 	"time"
 
 	"errors"
-	"github.com/udit19199/relay/internal/config"
-	internalregistry "github.com/udit19199/relay/internal/registry"
-	coreauth "github.com/udit19199/relay/internal/service/auth"
 	"net"
 	"os"
 	"path/filepath"
+
+	"github.com/udit19199/relay/internal/config"
+	internalregistry "github.com/udit19199/relay/internal/registry"
+	coreauth "github.com/udit19199/relay/internal/service/auth"
 )
 
 func TestServiceRun_WatcherReloadConcurrentWithStartupModelRegistration_Issue6583(t *testing.T) {

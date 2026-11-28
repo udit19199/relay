@@ -23,8 +23,9 @@ import (
 	"github.com/udit19199/relay/internal/service/session"
 	"github.com/udit19199/relay/internal/util"
 
-	"github.com/gin-gonic/gin"
 	"sort"
+
+	"github.com/gin-gonic/gin"
 )
 
 const (

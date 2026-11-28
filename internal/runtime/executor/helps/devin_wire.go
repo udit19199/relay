@@ -9,7 +9,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/MoeForge/moego/base64"
 	"io"
 	"math"
 	"net/http"
@@ -17,6 +16,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"unicode/utf8"
+
+	"github.com/MoeForge/moego/base64"
 
 	"github.com/google/uuid"
 	"github.com/udit19199/relay/internal/cache"

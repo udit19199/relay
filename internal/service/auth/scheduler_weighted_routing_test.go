@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"testing"
+
 	"github.com/udit19199/relay/internal/registry"
 	coreexecutor "github.com/udit19199/relay/internal/service/executor"
-	"testing"
 )
 
 func TestWeightedWebsocketPreferenceAcrossPriorities(t *testing.T) {

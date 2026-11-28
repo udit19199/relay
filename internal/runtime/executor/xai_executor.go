@@ -18,9 +18,6 @@ var (
 )
 
 const (
-	xaiImageHandlerType        = "openai-image"
-	xaiVideoHandlerType        = "openai-video"
-	xaiSpeechHandlerType       = "openai-speech"
 	xaiCustomToolType          = "custom"
 	xaiFunctionToolType        = "function"
 	xaiImageGenerationToolType = "image_generation"
@@ -36,20 +33,11 @@ const (
 	xaiCodexAppNamespaceName    = "codex_app"
 	xaiAutomationUpdateToolName = "automation_update"
 	// Permissive placeholder schema: keeps the tool callable without the hang.
-	xaiSafeFunctionParameters   = `{"type":"object","properties":{},"additionalProperties":true}`
-	xaiImagesGenerationsPath    = "/images/generations"
-	xaiImagesEditsPath          = "/images/edits"
-	xaiDefaultImageEndpointPath = xaiImagesGenerationsPath
-	xaiVideosGenerationsPath    = "/videos/generations"
-	xaiVideosEditsPath          = "/videos/edits"
-	xaiVideosExtensionsPath     = "/videos/extensions"
-	xaiVideosPath               = "/videos"
-	xaiTTSPath                  = "/tts"
-	xaiIdempotencyKeyMetaKey    = "idempotency_key"
-	xaiComposerModelPrefix      = "grok-composer-"
-	xaiTokenAuthHeader          = "X-XAI-Token-Auth"
-	xaiTokenAuthValue           = "xai-grok-cli"
-	xaiClientVersionHeader      = "x-grok-client-version"
+	xaiSafeFunctionParameters = `{"type":"object","properties":{},"additionalProperties":true}`
+	xaiComposerModelPrefix    = "grok-composer-"
+	xaiTokenAuthHeader        = "X-XAI-Token-Auth"
+	xaiTokenAuthValue         = "xai-grok-cli"
+	xaiClientVersionHeader    = "x-grok-client-version"
 	// Keep in sync with the current Grok CLI client version that chat-proxy
 	// expects. The server rejects older versions with HTTP 426; it required
 	// 1.0.13+ as of 2026-10-01 (#6249).
@@ -60,7 +48,7 @@ const (
 	xaiClientIdentifierValue      = "grok-shell"
 	xaiAuthenticateResponseHeader = "x-authenticateresponse"
 	xaiAuthenticateResponseValue  = "authenticate-response"
-	// xaiUsingAPIAttr enables the official API path for HTTP chat and media.
+	// xaiUsingAPIAttr enables the official API path for HTTP chat.
 	xaiUsingAPIAttr = "using_api"
 )
 

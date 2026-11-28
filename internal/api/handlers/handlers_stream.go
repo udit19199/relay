@@ -16,7 +16,7 @@ import (
 // This path is the only supported execution route.
 // The returned http.Header carries upstream response headers captured before streaming begins.
 func (h *BaseAPIHandler) ExecuteStreamWithAuthManager(ctx context.Context, handlerType, modelName string, rawJSON []byte, alt string) (<-chan []byte, http.Header, <-chan *interfaces.ErrorMessage) {
-	return h.executeStreamWithAuthManager(ctx, handlerType, modelName, rawJSON, alt, false)
+	return h.executeStreamWithAuthManager(ctx, handlerType, modelName, rawJSON, alt)
 }
 
 // HasAlternativeExecutionTarget reports whether an alternative credential other
@@ -26,11 +26,9 @@ func (h *BaseAPIHandler) HasAlternativeExecutionTarget(ctx context.Context, hand
 		return false
 	}
 	originalRequestedModel := modelName
-	execOptions := modelExecutionOptions{
-		AllowSpeechModel: isModelExecutionSpeechProtocol(handlerType),
-	}
+	execOptions := modelExecutionOptions{}
 
-	providers, normalizedModel, errMsg := h.providersForExecution(modelName, originalRequestedModel, false, execOptions)
+	providers, normalizedModel, errMsg := h.providersForExecution(modelName, originalRequestedModel, execOptions)
 	if errMsg != nil {
 		return false
 	}
@@ -61,22 +59,15 @@ func (h *BaseAPIHandler) HasAlternativeExecutionTarget(ctx context.Context, hand
 	return h.AuthManager.HasAlternativeTargetForModel(ctx, providers, normalizedModel, opts, excludedAuthID)
 }
 
-// ExecuteImageStreamWithAuthManager executes a streaming OpenAI-compatible image endpoint request.
-func (h *BaseAPIHandler) ExecuteImageStreamWithAuthManager(ctx context.Context, handlerType, modelName string, rawJSON []byte, alt string) (<-chan []byte, http.Header, <-chan *interfaces.ErrorMessage) {
-	return h.executeStreamWithAuthManager(ctx, handlerType, modelName, rawJSON, alt, true)
+func (h *BaseAPIHandler) executeStreamWithAuthManager(ctx context.Context, handlerType, modelName string, rawJSON []byte, alt string) (<-chan []byte, http.Header, <-chan *interfaces.ErrorMessage) {
+	return h.executeStreamWithAuthManagerFormats(ctx, handlerType, handlerType, modelName, rawJSON, alt, modelExecutionOptions{})
 }
 
-func (h *BaseAPIHandler) executeStreamWithAuthManager(ctx context.Context, handlerType, modelName string, rawJSON []byte, alt string, allowImageModel bool) (<-chan []byte, http.Header, <-chan *interfaces.ErrorMessage) {
-	return h.executeStreamWithAuthManagerFormats(ctx, handlerType, handlerType, modelName, rawJSON, alt, allowImageModel, modelExecutionOptions{})
-}
-
-func (h *BaseAPIHandler) executeStreamWithAuthManagerFormats(ctx context.Context, entryProtocol, exitProtocol, modelName string, rawJSON []byte, alt string, allowImageModel bool, execOptions modelExecutionOptions) (<-chan []byte, http.Header, <-chan *interfaces.ErrorMessage) {
+func (h *BaseAPIHandler) executeStreamWithAuthManagerFormats(ctx context.Context, entryProtocol, exitProtocol, modelName string, rawJSON []byte, alt string, execOptions modelExecutionOptions) (<-chan []byte, http.Header, <-chan *interfaces.ErrorMessage) {
 	originalRequestedModel := modelName
-	// Speech-only models are reachable solely through the speech entry protocol.
-	execOptions.AllowSpeechModel = isModelExecutionSpeechProtocol(entryProtocol)
 	responseProtocol := modelExecutionResponseProtocol(entryProtocol, exitProtocol)
 
-	providers, normalizedModel, errMsg := h.providersForExecution(modelName, originalRequestedModel, allowImageModel, execOptions)
+	providers, normalizedModel, errMsg := h.providersForExecution(modelName, originalRequestedModel, execOptions)
 	if errMsg != nil {
 		errChan := make(chan *interfaces.ErrorMessage, 1)
 		errChan <- errMsg

@@ -2,6 +2,11 @@ package service
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
+	"testing"
+
 	"github.com/gorilla/websocket"
 	"github.com/udit19199/relay/internal/config"
 	internalconfig "github.com/udit19199/relay/internal/config"
@@ -9,10 +14,6 @@ import (
 	coreauth "github.com/udit19199/relay/internal/service/auth"
 	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 	translatorreg "github.com/udit19199/relay/internal/translator/registry"
-	"net/http"
-	"net/http/httptest"
-	"sync/atomic"
-	"testing"
 )
 
 func TestEnsureExecutorsForAuth_CodexDoesNotReplaceInNormalMode(t *testing.T) {
@@ -202,9 +203,7 @@ func TestApplyWatcherConfigUpdate_PreservesExistingWebsocketConnections(t *testi
 			defer server.Close()
 
 			initialCfg := &config.Config{
-				SDKConfig: config.SDKConfig{
-					DisableImageGeneration: internalconfig.DisableImageGenerationAll,
-				},
+				SDKConfig: config.SDKConfig{},
 			}
 			manager := coreauth.NewManager(nil, nil, nil)
 			service := &Service{
@@ -269,8 +268,7 @@ func TestApplyWatcherConfigUpdate_PreservesExistingWebsocketConnections(t *testi
 
 			reloadedCfg := &config.Config{
 				SDKConfig: config.SDKConfig{
-					ProxyURL:               "http://127.0.0.1:1",
-					DisableImageGeneration: internalconfig.DisableImageGenerationAll,
+					ProxyURL: "http://127.0.0.1:1",
 				},
 				Routing: internalconfig.RoutingConfig{
 					Strategy: "fill-first",

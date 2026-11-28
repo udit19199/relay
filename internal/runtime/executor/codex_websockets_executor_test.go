@@ -133,7 +133,7 @@ func TestCodexWebsocketsExecuteRestoresClaudeAgentReasoningReplay(t *testing.T) 
 	}))
 	defer server.Close()
 
-	exec := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
+	exec := NewCodexWebsocketsExecutor(&config.Config{})
 	auth := &coreauth.Auth{Provider: "codex", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
 	req := coreexecutor.Request{
 		Model: "gpt-5.4",
@@ -355,7 +355,7 @@ func TestCodexWebsocketsExecutePreservesPreviousResponseIDUpstream(t *testing.T)
 	}))
 	defer server.Close()
 
-	exec := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
+	exec := NewCodexWebsocketsExecutor(&config.Config{})
 	auth := &coreauth.Auth{Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
 	req := coreexecutor.Request{
 		Model:   "gpt-5-codex",
@@ -394,7 +394,7 @@ func TestCodexWebsocketsExecuteStreamUpgradeRequiredReturnsWithoutLockingSession
 	}))
 	defer server.Close()
 
-	exec := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
+	exec := NewCodexWebsocketsExecutor(&config.Config{})
 	const executionSessionID = "ws-upgrade-required-session"
 	t.Cleanup(func() { exec.CloseExecutionSession(executionSessionID) })
 	auth := &coreauth.Auth{
@@ -454,7 +454,7 @@ func TestCodexWebsocketsExecuteStreamHandshakeErrorReturnsWithoutLockingSession(
 	}))
 	defer server.Close()
 
-	exec := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
+	exec := NewCodexWebsocketsExecutor(&config.Config{})
 	const executionSessionID = "ws-handshake-error-session"
 	t.Cleanup(func() { exec.CloseExecutionSession(executionSessionID) })
 	auth := &coreauth.Auth{
@@ -523,7 +523,7 @@ func TestExistingWebsocketSessionConnRequiresMatchingHealthyConnection(t *testin
 }
 
 func TestCodexAutoExecutorRequiredUpstreamWebsocketRejectsHTTPFallback(t *testing.T) {
-	exec := NewCodexAutoExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
+	exec := NewCodexAutoExecutor(&config.Config{})
 	auth := &coreauth.Auth{
 		ID:       "codex-http-only",
 		Provider: "codex",
@@ -553,73 +553,8 @@ func TestCodexAutoExecutorRequiredUpstreamWebsocketRejectsHTTPFallback(t *testin
 		t.Fatalf("ExecuteStream() error = %T, want request-scoped replay signal", errExecute)
 	}
 }
-
-func TestCodexWebsocketUpgradeFallbackLocalErrorDoesNotMarkUpstreamAttempt(t *testing.T) {
-	tests := []struct {
-		name    string
-		execute func(*CodexWebsocketsExecutor, context.Context, *coreauth.Auth, coreexecutor.Request, coreexecutor.Options) error
-	}{
-		{
-			name: "non-stream",
-			execute: func(exec *CodexWebsocketsExecutor, ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) error {
-				_, errExecute := exec.Execute(ctx, auth, req, opts)
-				return errExecute
-			},
-		},
-		{
-			name: "stream",
-			execute: func(exec *CodexWebsocketsExecutor, ctx context.Context, auth *coreauth.Auth, req coreexecutor.Request, opts coreexecutor.Options) error {
-				_, errExecute := exec.ExecuteStream(ctx, auth, req, opts)
-				return errExecute
-			},
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			var upgradeAttempts atomic.Int32
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if !strings.EqualFold(r.Header.Get("Upgrade"), "websocket") {
-					t.Errorf("unexpected HTTP fallback request: %s %s", r.Method, r.URL.Path)
-					w.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-				upgradeAttempts.Add(1)
-				w.WriteHeader(http.StatusUpgradeRequired)
-				_, _ = w.Write([]byte(`{"error":{"message":"websocket unavailable"}}`))
-			}))
-			defer server.Close()
-
-			exec := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
-			auth := &coreauth.Auth{
-				ID:       "codex-fallback-local-error",
-				Provider: "codex",
-				Attributes: map[string]string{
-					"api_key":  "sk-test",
-					"base_url": server.URL,
-				},
-			}
-			ctx := coreexecutor.WithUpstreamAttemptTracker(context.Background())
-			opts := codexOpenAIImageTestOptions(codexImagesGenerationsPath, tc.name == "stream")
-			errExecute := tc.execute(exec, ctx, auth, coreexecutor.Request{
-				Model:   "gpt-5.4",
-				Payload: []byte("not-json"),
-			}, opts)
-			if errExecute == nil || !strings.Contains(errExecute.Error(), "invalid OpenAI image generation request JSON") {
-				t.Fatalf("Execute() error = %v, want local image request validation error", errExecute)
-			}
-			if got := upgradeAttempts.Load(); got != 1 {
-				t.Fatalf("websocket upgrade attempts = %d, want 1", got)
-			}
-			if coreexecutor.UpstreamAttempted(ctx) {
-				t.Fatal("transparent 426 fallback marked a local HTTP preparation error as an upstream attempt")
-			}
-		})
-	}
-}
-
 func TestCodexWebsocketMissingRequiredSessionDoesNotMarkUpstreamAttempt(t *testing.T) {
-	exec := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
+	exec := NewCodexWebsocketsExecutor(&config.Config{})
 	exec.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
 	auth := &coreauth.Auth{
 		ID:       "codex-required-session",
@@ -678,7 +613,7 @@ func TestCodexWebsocketsExecuteStreamPassesThroughUpstreamWebsocketPayloadForDow
 	}))
 	defer server.Close()
 
-	exec := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
+	exec := NewCodexWebsocketsExecutor(&config.Config{})
 	auth := &coreauth.Auth{Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
 	req := coreexecutor.Request{
 		Model:   "gpt-5-codex",
@@ -751,7 +686,7 @@ func TestCodexWebsocketsExecuteStreamPropagatesUpstreamErrorForDownstreamWebsock
 	}))
 	defer server.Close()
 
-	exec := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
+	exec := NewCodexWebsocketsExecutor(&config.Config{})
 	auth := &coreauth.Auth{Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
 	req := coreexecutor.Request{
 		Model:   "gpt-5-codex",
@@ -981,7 +916,7 @@ func TestCodexWebsocketsExecuteStreamMapsMessageTooBigClose(t *testing.T) {
 	}))
 	defer server.Close()
 
-	exec := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
+	exec := NewCodexWebsocketsExecutor(&config.Config{})
 	auth := &coreauth.Auth{Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
 	req := coreexecutor.Request{
 		Model:   "gpt-5-codex",
@@ -1968,7 +1903,7 @@ func TestCodexWebsocketUpgradeRequiredDoesNotFallbackToHTTPWithLifecycle(t *test
 	}))
 	defer server.Close()
 
-	exec := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
+	exec := NewCodexWebsocketsExecutor(&config.Config{})
 	auth := &coreauth.Auth{ID: "auth-a", Provider: "codex", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
 	req := coreexecutor.Request{Model: "gpt-5-codex", Payload: []byte(`{"model":"gpt-5-codex","input":[{"type":"message","role":"user","content":"hello"}]}`)}
 	opts := coreexecutor.Options{
@@ -1993,7 +1928,7 @@ func TestCodexWebsocketHandshakeFailureReleasesSessionRequestLock(t *testing.T) 
 			}))
 			defer server.Close()
 
-			exec := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
+			exec := NewCodexWebsocketsExecutor(&config.Config{})
 			exec.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
 			auth := &coreauth.Auth{ID: "auth-a", Provider: "codex", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
 			req := coreexecutor.Request{Model: "gpt-5-codex", Payload: []byte(`{"model":"gpt-5-codex","input":[{"type":"message","role":"user","content":"hello"}]}`)}
@@ -2065,7 +2000,7 @@ func TestCodexWebsocketTerminalFailureInvalidatesRetainedLifecycle(t *testing.T)
 	}))
 	defer server.Close()
 
-	exec := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
+	exec := NewCodexWebsocketsExecutor(&config.Config{})
 	exec.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
 	auth := &coreauth.Auth{ID: "auth-a", Provider: "codex", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
 	req := coreexecutor.Request{Model: "gpt-5-codex", Payload: []byte(`{"model":"gpt-5-codex","input":[{"type":"message","role":"user","content":"hello"}]}`)}
@@ -2149,7 +2084,7 @@ func TestCodexWebsocketNonstreamLifecycleBindFailureDetachesConnection(t *testin
 	}))
 	defer server.Close()
 
-	exec := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
+	exec := NewCodexWebsocketsExecutor(&config.Config{})
 	exec.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
 	auth := &coreauth.Auth{ID: "auth-a", Provider: "codex", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
 	req := coreexecutor.Request{Model: "gpt-5-codex", Payload: []byte(`{"model":"gpt-5-codex","input":[{"type":"message","role":"user","content":"hello"}]}`)}
@@ -2211,7 +2146,7 @@ func TestCodexWebsocketLifecycleBindFailureReleasesSessionRequestLock(t *testing
 	}))
 	defer server.Close()
 
-	exec := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
+	exec := NewCodexWebsocketsExecutor(&config.Config{})
 	exec.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
 	auth := &coreauth.Auth{ID: "auth-a", Provider: "codex", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
 	req := coreexecutor.Request{Model: "gpt-5-codex", Payload: []byte(`{"model":"gpt-5-codex","input":[{"type":"message","role":"user","content":"hello"}]}`)}
@@ -2534,9 +2469,7 @@ func TestCodexWebsocketZeroTokenIncompleteReleasesSessionRequestLock(t *testing.
 		Codex: config.CodexConfig{
 			StreamBootstrapBuffering: true,
 		},
-		SDKConfig: config.SDKConfig{
-			DisableImageGeneration: config.DisableImageGenerationAll,
-		},
+		SDKConfig: config.SDKConfig{},
 	})
 	exec.store = &codexWebsocketSessionStore{sessions: make(map[string]*codexWebsocketSession)}
 	auth := &coreauth.Auth{ID: "auth-a", Provider: "codex", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
@@ -2728,9 +2661,7 @@ func TestCodexWebsockets_KeepalivePingDuringUpload_WithSession(t *testing.T) {
 	defer server.Close()
 
 	exec := NewCodexWebsocketsExecutor(&config.Config{
-		SDKConfig: config.SDKConfig{
-			DisableImageGeneration: config.DisableImageGenerationAll,
-		},
+		SDKConfig: config.SDKConfig{},
 	})
 	auth := &coreauth.Auth{ID: "auth-session-ping", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
 	req := coreexecutor.Request{
@@ -2841,9 +2772,7 @@ func TestCodexWebsockets_KeepalivePingDuringUpload_Sessionless(t *testing.T) {
 	defer server.Close()
 
 	exec := NewCodexWebsocketsExecutor(&config.Config{
-		SDKConfig: config.SDKConfig{
-			DisableImageGeneration: config.DisableImageGenerationAll,
-		},
+		SDKConfig: config.SDKConfig{},
 	})
 	auth := &coreauth.Auth{ID: "auth-sessionless-ping", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
 	req := coreexecutor.Request{
@@ -2951,9 +2880,7 @@ func TestCodexWebsockets_KeepalivePingDuringUpload_NonstreamSessionless(t *testi
 	defer server.Close()
 
 	exec := NewCodexWebsocketsExecutor(&config.Config{
-		SDKConfig: config.SDKConfig{
-			DisableImageGeneration: config.DisableImageGenerationAll,
-		},
+		SDKConfig: config.SDKConfig{},
 	})
 	auth := &coreauth.Auth{ID: "auth-nonstream-ping", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
 	req := coreexecutor.Request{
@@ -3011,9 +2938,7 @@ func TestCodexWebsockets_SessionlessBufferingImmediateTerminalClosesConnection(t
 		Codex: config.CodexConfig{
 			StreamBootstrapBuffering: true,
 		},
-		SDKConfig: config.SDKConfig{
-			DisableImageGeneration: config.DisableImageGenerationAll,
-		},
+		SDKConfig: config.SDKConfig{},
 	})
 	auth := &coreauth.Auth{ID: "auth-buffering-close", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
 	req := coreexecutor.Request{
@@ -3311,9 +3236,7 @@ func TestCodexWebsockets_SendErrorLogsSessionObject(t *testing.T) {
 	defer func() { testWebsocketWritePayloadHook = nil }()
 
 	exec := NewCodexWebsocketsExecutor(&config.Config{
-		SDKConfig: config.SDKConfig{
-			DisableImageGeneration: config.DisableImageGenerationAll,
-		},
+		SDKConfig: config.SDKConfig{},
 	})
 	auth := &coreauth.Auth{ID: "auth-send-fail", Attributes: map[string]string{"api_key": "sk-test", "base_url": server.URL}}
 	req := coreexecutor.Request{

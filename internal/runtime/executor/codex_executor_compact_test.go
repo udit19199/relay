@@ -240,7 +240,7 @@ func TestCodexExecutorReplayedWebSearchCallHistoryEnsuresWebSearchTool_Issue6770
 		}))
 		defer server.Close()
 
-		executor := NewCodexExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
+		executor := NewCodexExecutor(&config.Config{})
 		auth := &coreauth.Auth{
 			Provider: "codex",
 			Attributes: map[string]string{
@@ -333,7 +333,7 @@ func TestCodexExecutorReplayedWebSearchCallHistoryEnsuresWebSearchTool_Issue6770
 
 	t.Run("existing web_search tool declaration is preserved without duplication", func(t *testing.T) {
 		payloadWithWebSearch := `{"model":"gpt-6.1-sol","input":[{"id":"ws_1","type":"web_search_call","status":"completed","action":{"type":"search","query":"q"}}],"tools":[{"type":"web_search","external_web_access":true}]}`
-		wsExecutor := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
+		wsExecutor := NewCodexWebsocketsExecutor(&config.Config{})
 		auth := &coreauth.Auth{
 			Provider: "codex",
 			Attributes: map[string]string{
@@ -406,9 +406,7 @@ func TestCodexExecutorReplayedWebSearchCallHistoryEnsuresWebSearchTool_Issue6770
 		defer server.Close()
 
 		cfg := &config.Config{
-			SDKConfig: config.SDKConfig{
-				DisableImageGeneration: config.DisableImageGenerationAll,
-			},
+			SDKConfig: config.SDKConfig{},
 			Payload: config.PayloadConfig{
 				Filter: []config.PayloadFilterRule{
 					{

@@ -1,7 +1,6 @@
 package helps
 
 import (
-	"strings"
 	"testing"
 )
 
@@ -32,20 +31,5 @@ func BenchmarkObserveClaudeStream_TextDelta(b *testing.B) {
 			buf.ObserveClaudeStream(deltaChunk)
 		}
 		buf.ObserveClaudeStream(msgDelta)
-	}
-}
-
-func BenchmarkParseOpenAIImageUsage_LargeBase64(b *testing.B) {
-	reqPayload := []byte(`{"model":"grok-imagine-image","prompt":"A minimal orange square","response_format":"b64_json","aspect_ratio":"16:9","resolution":"1k"}`)
-	largeB64 := strings.Repeat("QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVowMTIzNDU2Nzg5", 30000) // ~1.44MB
-	respPayload := []byte(`{"data":[{"b64_json":"` + largeB64 + `","mime_type":"image/jpeg"}],"usage":{"cost_in_usd_ticks":200000000}}`)
-	b.SetBytes(int64(len(respPayload)))
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		detail := ParseOpenAIImageUsage(reqPayload, respPayload)
-		if detail.ImageCount == nil || *detail.ImageCount != 1 {
-			b.Fatal("expected image count 1")
-		}
 	}
 }

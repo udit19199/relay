@@ -2,8 +2,9 @@ package auth
 
 import (
 	"fmt"
-	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 	"testing"
+
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 func TestWeightedSelectorsShareEquivalentModelKeys(t *testing.T) {

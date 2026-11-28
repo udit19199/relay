@@ -2,11 +2,12 @@ package service
 
 import (
 	"context"
-	"github.com/udit19199/relay/internal/config"
-	"github.com/udit19199/relay/internal/kvstore"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/kvstore"
 )
 
 func TestServiceApplyKVStoreConfig_LifecycleAndHotReload(t *testing.T) {

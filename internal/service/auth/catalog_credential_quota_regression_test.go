@@ -2,10 +2,11 @@ package auth
 
 import (
 	"context"
-	"github.com/udit19199/relay/internal/registry"
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/udit19199/relay/internal/registry"
 )
 
 func TestCredentialQuotaKeepsHealthyCatalogAcrossRestart(t *testing.T) {

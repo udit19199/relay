@@ -3,9 +3,10 @@ package auth
 import (
 	"bytes"
 
-	"github.com/MoeForge/moego/ojson"
 	"strings"
 	"testing"
+
+	"github.com/MoeForge/moego/ojson"
 
 	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )

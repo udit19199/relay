@@ -9,6 +9,7 @@ import (
 
 	"github.com/udit19199/relay/internal/auth/claude"
 	"github.com/udit19199/relay/internal/browser"
+
 	// legacy client removed
 	log "github.com/sirupsen/logrus"
 	"github.com/udit19199/relay/internal/config"

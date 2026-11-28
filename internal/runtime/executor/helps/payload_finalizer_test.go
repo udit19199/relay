@@ -3,7 +3,6 @@ package helps
 import (
 	"bytes"
 	"context"
-	"mime/multipart"
 	"net/http"
 	"sync"
 	"testing"
@@ -71,38 +70,6 @@ func TestPayloadFinalizerDevinBusinessFieldsAndCredentials(t *testing.T) {
 	}
 	if !bytes.Equal(fieldOne(wire), fieldOne(final)) {
 		t.Fatal("payload rules changed credentials")
-	}
-}
-
-func TestPayloadFinalizerMultipartPreservesFiles(t *testing.T) {
-	var buffer bytes.Buffer
-	writer := multipart.NewWriter(&buffer)
-	if errWrite := writer.WriteField("model", "original"); errWrite != nil {
-		t.Fatal(errWrite)
-	}
-	file, errFile := writer.CreateFormFile("image", "input.png")
-	if errFile != nil {
-		t.Fatal(errFile)
-	}
-	if _, errWrite := file.Write([]byte{0, 255, 13, 10}); errWrite != nil {
-		t.Fatal(errWrite)
-	}
-	if errClose := writer.Close(); errClose != nil {
-		t.Fatal(errClose)
-	}
-	cfg := &config.Config{Payload: config.PayloadConfig{Override: []config.PayloadRule{{Models: []config.PayloadModelRule{{Name: "original"}}, Params: map[string]any{"model": "configured"}}}}}
-	req := coreexecutor.Request{Model: "original", Payload: buffer.Bytes()}
-	opts := coreexecutor.Options{Headers: http.Header{"Content-Type": {writer.FormDataContentType()}}}
-	body, contentType, errFinalize := ApplyMediaPayloadConfig(cfg, "openai", "original", "openai", req.Payload, writer.FormDataContentType(), req, opts)
-	if errFinalize != nil {
-		t.Fatal(errFinalize)
-	}
-	view, _, errView := mediaPayloadJSON(body, contentType)
-	if errView != nil {
-		t.Fatal(errView)
-	}
-	if ojson.GetBytes(view, "model").String() != "configured" || ojson.GetBytes(view, "image.data").String() != "AP8NCg==" {
-		t.Fatalf("unexpected multipart business payload: %s", view)
 	}
 }
 

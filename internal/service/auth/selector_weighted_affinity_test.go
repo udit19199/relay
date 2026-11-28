@@ -7,12 +7,13 @@ import (
 	"testing"
 
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/udit19199/relay/internal/registry"
 	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 	coresession "github.com/udit19199/relay/internal/service/session"
 	translatorreg "github.com/udit19199/relay/internal/translator/registry"
-	"sync"
-	"time"
 )
 
 func TestWeightedSessionAffinityCompensatesStickyRequests(t *testing.T) {

@@ -2,9 +2,10 @@ package executor
 
 import (
 	"context"
-	"github.com/MoeForge/moego/base64"
 	"strings"
 	"testing"
+
+	"github.com/MoeForge/moego/base64"
 
 	"github.com/MoeForge/moego/ojson"
 	internalcache "github.com/udit19199/relay/internal/cache"

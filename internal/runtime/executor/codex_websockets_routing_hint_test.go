@@ -73,7 +73,7 @@ func TestCodexWebsocketsFastToggleKeepsIncrementalConnection(t *testing.T) {
 	server := newCodexWebsocketHintServer(t, &rec)
 	defer server.Close()
 
-	exec := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
+	exec := NewCodexWebsocketsExecutor(&config.Config{})
 	const executionSessionID = "ws-routing-hint-toggle"
 	t.Cleanup(func() { exec.CloseExecutionSession(executionSessionID) })
 	auth := codexOAuthTestAuth(server.URL)
@@ -135,7 +135,7 @@ func TestCodexWebsocketsRoutingHintDynamicOperatorRule(t *testing.T) {
 			defer server.Close()
 
 			cfg := &config.Config{
-				SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll},
+				SDKConfig: config.SDKConfig{},
 				Codex:     config.CodexConfig{DisableCodexCloaking: true},
 			}
 			exec := NewCodexWebsocketsExecutor(cfg)
@@ -176,7 +176,7 @@ func TestCodexWebsocketsRoutingHintOverridesForwardedClientHint(t *testing.T) {
 	defer server.Close()
 
 	cfg := &config.Config{
-		SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll},
+		SDKConfig: config.SDKConfig{},
 		Codex:     config.CodexConfig{DisableCodexCloaking: true},
 		Payload: config.PayloadConfig{Override: []config.PayloadRule{{
 			Models: []config.PayloadModelRule{{Name: "gpt-5.5"}},
@@ -219,7 +219,7 @@ func TestCodexWebsocketsStreamRoutingHintMatchesBodyModel(t *testing.T) {
 	server := newCodexWebsocketHintServer(t, &rec)
 	defer server.Close()
 
-	exec := NewCodexWebsocketsExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
+	exec := NewCodexWebsocketsExecutor(&config.Config{})
 	auth := codexOAuthTestAuth(server.URL)
 	auth.ID = "codex-oauth-stream-test"
 	result, err := exec.ExecuteStream(context.Background(), auth, coreexecutor.Request{

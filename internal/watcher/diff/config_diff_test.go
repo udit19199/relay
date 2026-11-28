@@ -346,7 +346,6 @@ func TestBuildConfigChangeDetails_FlagsAndKeys(t *testing.T) {
 			APIKeys:                    []string{" key-1 ", "key-2"},
 			ForceModelPrefix:           true,
 			NonStreamKeepAliveInterval: 5,
-			DisableImageGeneration:     config.DisableImageGenerationAll,
 			ClaudeCode: config.ClaudeCodeConfig{
 				DisableCloakingModelList: true,
 			},
@@ -360,7 +359,6 @@ func TestBuildConfigChangeDetails_FlagsAndKeys(t *testing.T) {
 	expectContains(t, details, "disable-cooling: false -> true")
 	expectContains(t, details, "save-cooldown-status: false -> true")
 	expectContains(t, details, "transient-error-cooldown-seconds: 0 -> -1")
-	expectContains(t, details, "disable-image-generation: false -> true")
 	expectContains(t, details, "claude-code.disable-cloaking-model-list: false -> true")
 	expectContains(t, details, "request-log: false -> true")
 	expectContains(t, details, "request-retry: 1 -> 2")
@@ -446,10 +444,9 @@ func TestBuildConfigChangeDetails_AllBranches(t *testing.T) {
 			SecretKey:   "",
 		},
 		SDKConfig: config.SDKConfig{
-			RequestLog:             true,
-			ProxyURL:               "http://new-proxy",
-			APIKeys:                []string{"keyB"},
-			DisableImageGeneration: config.DisableImageGenerationAll,
+			RequestLog: true,
+			ProxyURL:   "http://new-proxy",
+			APIKeys:    []string{"keyB"},
 		},
 		OAuthExcludedModels: map[string][]string{"p1": {"b", "c"}, "p2": {"d"}},
 		OpenAICompatibility: []config.OpenAICompatibility{
@@ -477,7 +474,6 @@ func TestBuildConfigChangeDetails_AllBranches(t *testing.T) {
 	expectContains(t, changes, "disable-cooling: false -> true")
 	expectContains(t, changes, "save-cooldown-status: false -> true")
 	expectContains(t, changes, "transient-error-cooldown-seconds: 0 -> -1")
-	expectContains(t, changes, "disable-image-generation: false -> true")
 	expectContains(t, changes, "request-retry: 1 -> 2")
 	expectContains(t, changes, "max-retry-credentials: 1 -> 3")
 	expectContains(t, changes, "max-retry-interval: 1 -> 3")

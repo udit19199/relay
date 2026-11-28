@@ -5,9 +5,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"strings"
+
 	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/yaml.v3"
-	"strings"
 )
 
 const uploadTestPlaintextSecret = "upload-plaintext-secret"

@@ -2,12 +2,13 @@ package service
 
 import (
 	"context"
-	"github.com/udit19199/relay/internal/config"
-	"github.com/udit19199/relay/internal/registry"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/udit19199/relay/internal/config"
+	"github.com/udit19199/relay/internal/registry"
 )
 
 func TestServiceCatalogStartupAndConfigReload(t *testing.T) {

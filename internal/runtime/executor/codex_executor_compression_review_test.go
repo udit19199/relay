@@ -2,107 +2,11 @@ package executor
 
 import (
 	"bytes"
-	"context"
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
 	"testing"
-
-	"github.com/MoeForge/moego/ojson"
-	"github.com/klauspost/compress/zstd"
-	"github.com/udit19199/relay/internal/config"
-	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
-
-func TestCodexImageCompressionRejectedFallback(t *testing.T) {
-	for _, direct := range []bool{false, true} {
-		for _, stream := range []bool{false, true} {
-			for _, status := range []int{http.StatusBadRequest, http.StatusUnsupportedMediaType} {
-				name := "direct=" + strconv.FormatBool(direct) + "/stream=" + strconv.FormatBool(stream) + "/" + strconv.Itoa(status)
-				t.Run(name, func(t *testing.T) {
-					var encodings []string
-					var firstPlain []byte
-					transport := roundTripperFunc(func(req *http.Request) (*http.Response, error) {
-						encodings = append(encodings, req.Header.Get("Content-Encoding"))
-						wire := readCodexCompressionBody(t, req.Body)
-						if req.Header.Get("Content-Encoding") == "zstd" {
-							decoder, errNewReader := zstd.NewReader(nil)
-							if errNewReader != nil {
-								t.Fatal(errNewReader)
-							}
-							defer decoder.Close()
-							var errDecode error
-							firstPlain, errDecode = decoder.DecodeAll(wire, nil)
-							if errDecode != nil {
-								t.Fatal(errDecode)
-							}
-							return &http.Response{StatusCode: status, Header: make(http.Header), Body: io.NopCloser(strings.NewReader("compression rejected"))}, nil
-						}
-						if !direct && !bytes.Equal(wire, firstPlain) {
-							t.Error("retry changed the final business payload")
-						}
-						if got := ojson.GetBytes(wire, "audit").Raw; got != `["once"]` {
-							t.Errorf("payload rules must run exactly once: audit=%s", got)
-						}
-						if got := req.Header.Get("Authorization"); got != "Bearer test-oauth" {
-							t.Errorf("Authorization=%q", got)
-						}
-						output := "data: {\"type\":\"response.completed\",\"response\":{\"output\":[{\"type\":\"image_generation_call\",\"result\":\"AA==\",\"output_format\":\"png\"}]}}\n\n"
-						if direct && stream {
-							output = "event: image_generation.completed\ndata: {\"type\":\"image_generation.completed\",\"b64_json\":\"AA==\"}\n\n"
-						} else if direct {
-							output = `{"data":[{"b64_json":"AA=="}]}`
-						}
-						return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"text/event-stream"}}, Body: io.NopCloser(strings.NewReader(output))}, nil
-					})
-					ctx := context.WithValue(t.Context(), "cliproxy.roundtripper", transport)
-					cfg := codexCompressionConfig()
-					cfg.Payload.Override = []config.PayloadRule{{Models: []config.PayloadModelRule{{Name: "*"}}, Params: map[string]any{"audit.-1": "once"}}}
-					executor := NewCodexExecutor(cfg)
-					model := "custom-image"
-					if direct {
-						model = "gpt-image-2"
-					}
-					req := coreexecutor.Request{Model: model, Payload: []byte(`{"model":"` + model + `","prompt":"` + strings.Repeat("a compressible cat ", 400) + `"}`)}
-					opts := codexOpenAIImageTestOptions(codexImagesGenerationsPath, stream)
-					auth := codexCompressionAuth()
-					// Custom headers must not relabel the plaintext fallback or direct body.
-					auth.Attributes = map[string]string{"header:Content-Encoding": "zstd"}
-					var output []byte
-					if stream {
-						result, errStream := executor.ExecuteStream(ctx, auth, req, opts)
-						if errStream != nil {
-							t.Fatal(errStream)
-						}
-						for chunk := range result.Chunks {
-							if chunk.Err != nil {
-								t.Fatal(chunk.Err)
-							}
-							output = append(output, chunk.Payload...)
-						}
-					} else {
-						result, errExecute := executor.Execute(ctx, auth, req, opts)
-						if errExecute != nil {
-							t.Fatal(errExecute)
-						}
-						output = result.Payload
-					}
-					if !bytes.Contains(output, []byte("AA==")) {
-						t.Fatalf("missing image result: %s", output)
-					}
-					if direct {
-						if len(encodings) != 1 || encodings[0] != "" {
-							t.Fatalf("direct image encodings=%v, want one plaintext request", encodings)
-						}
-					} else if len(encodings) != 2 || encodings[0] != "zstd" || encodings[1] != "" {
-						t.Fatalf("image encodings=%v, want [zstd plaintext]", encodings)
-					}
-				})
-			}
-		}
-	}
-}
 
 func TestCodexCompressionContentEncodingChains(t *testing.T) {
 	for _, encodings := range [][]string{{"gzip", "gzip"}, {"zstd", "zstd"}, {"gzip", "zstd"}, {"zstd", "gzip"}} {

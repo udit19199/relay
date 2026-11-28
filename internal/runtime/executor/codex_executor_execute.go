@@ -9,7 +9,6 @@ import (
 
 	"github.com/MoeForge/moego/ojson"
 	log "github.com/sirupsen/logrus"
-	"github.com/udit19199/relay/internal/config"
 	"github.com/udit19199/relay/internal/runtime/executor/helps"
 	coreauth "github.com/udit19199/relay/internal/service/auth"
 	coreexecutor "github.com/udit19199/relay/internal/service/executor"
@@ -25,9 +24,6 @@ func (e *CodexExecutor) Execute(ctx context.Context, auth *coreauth.Auth, req co
 	}
 	if opts.Alt == "responses/compact" {
 		return e.executeCompact(ctx, auth, req, opts)
-	}
-	if isCodexOpenAIImageRequest(opts) {
-		return e.executeOpenAIImage(ctx, auth, req, opts)
 	}
 	baseModel := thinking.ParseSuffix(req.Model).ModelName
 
@@ -79,16 +75,6 @@ func (e *CodexExecutor) Execute(ctx context.Context, auth *coreauth.Auth, req co
 	ensureWebSearchToolForHistoryDoc(doc, opts.Headers)
 	if !useSIWC {
 		normalizeCodexInstructionsDoc(doc, helps.IsNativeCodexRequest(req.Payload, opts))
-		if e.cfg == nil || e.cfg.DisableImageGeneration == config.DisableImageGenerationOff {
-			checkModel := req.Model
-			if strings.TrimSpace(checkModel) == "" {
-				checkModel = baseModel
-			}
-			ensureImageGenerationToolDoc(doc, checkModel, auth, opts.Headers)
-			if !codexAuthUsesAPIKey(auth) {
-				normalizeCodexImageGenerationToolsDoc(doc)
-			}
-		}
 	} else {
 		applyCodexSIWCRequestBodyRulesDoc(doc, hasExplicitInstructions, coreexecutor.Options{KeepTopLevelEffort: thinking.HasThinkingSuffix(req.Model)})
 	}
@@ -119,9 +105,6 @@ func (e *CodexExecutor) Execute(ctx context.Context, auth *coreauth.Auth, req co
 		alignCodexContentEncoding(request)
 	}
 	prepareHeaders(httpReq)
-	if errValidate := helps.ValidateCodexHostedImageGenerationDoc(doc, httpReq.Header, e.cfg, !useSIWC && !codexAuthUsesAPIKey(auth)); errValidate != nil {
-		return resp, errValidate
-	}
 	var authID, authLabel, authType, authValue string
 	if auth != nil {
 		authID = auth.ID
@@ -228,7 +211,6 @@ func (e *CodexExecutor) Execute(ctx context.Context, auth *coreauth.Auth, req co
 		if detail, ok := helps.ParseCodexUsageWithOutputItems(completedData, outputItemsByIndex, outputItemsFallback); ok {
 			reporter.Publish(ctx, detail)
 		}
-		publishCodexImageToolUsageWithOutputItems(ctx, reporter, body, completedData, outputItemsByIndex, outputItemsFallback)
 		if responseFormat == translatorreg.FormatOpenAIResponse {
 			out = helps.EnsureResponsesUsageDetails(out)
 		}

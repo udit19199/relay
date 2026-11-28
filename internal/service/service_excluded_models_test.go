@@ -2,80 +2,13 @@ package service
 
 import (
 	"context"
+	"strings"
+	"testing"
+
 	"github.com/udit19199/relay/internal/config"
 	internalregistry "github.com/udit19199/relay/internal/registry"
 	coreauth "github.com/udit19199/relay/internal/service/auth"
-	"strings"
-	"testing"
 )
-
-func TestRegisterModelsForAuth_OpenAICompatibilityImageModelType(t *testing.T) {
-	service := &Service{
-		cfg: &config.Config{
-			OpenAICompatibility: []config.OpenAICompatibility{
-				{
-					Name:    "images",
-					BaseURL: "https://example.com/v1",
-					Models: []config.OpenAICompatibilityModel{
-						{Name: "upstream-image", Alias: "compat-image", Image: true},
-						{Name: "upstream-chat", Alias: "compat-chat"},
-					},
-				},
-			},
-		},
-	}
-	auth := &coreauth.Auth{
-		ID:       "auth-openai-compat-image",
-		Provider: "openai-compatibility",
-		Status:   coreauth.StatusActive,
-		Attributes: map[string]string{
-			"auth_kind":    "api_key",
-			"compat_name":  "images",
-			"provider_key": "images",
-		},
-	}
-
-	modelRegistry := internalregistry.GetGlobalRegistry()
-	modelRegistry.UnregisterClient(auth.ID)
-	t.Cleanup(func() {
-		modelRegistry.UnregisterClient(auth.ID)
-	})
-
-	service.registerModelsForAuth(context.Background(), auth)
-
-	models := modelRegistry.GetModelsForClient(auth.ID)
-	var imageModel *internalregistry.ModelInfo
-	var chatModel *internalregistry.ModelInfo
-	for _, model := range models {
-		if model == nil {
-			continue
-		}
-		switch strings.TrimSpace(model.ID) {
-		case "compat-image":
-			imageModel = model
-		case "compat-chat":
-			chatModel = model
-		}
-	}
-	if imageModel == nil {
-		t.Fatal("expected compat-image to be registered")
-	}
-	if imageModel.Type != internalregistry.OpenAIImageModelType {
-		t.Fatalf("image model type = %q, want %q", imageModel.Type, internalregistry.OpenAIImageModelType)
-	}
-	if imageModel.Thinking != nil {
-		t.Fatalf("image model thinking = %+v, want nil", imageModel.Thinking)
-	}
-	if chatModel == nil {
-		t.Fatal("expected compat-chat to be registered")
-	}
-	if chatModel.Type != "openai-compatibility" {
-		t.Fatalf("chat model type = %q, want openai-compatibility", chatModel.Type)
-	}
-	if chatModel.Thinking == nil {
-		t.Fatal("expected chat model to keep default thinking support")
-	}
-}
 
 func TestRegisterModelsForAuth_OpenAICompatibilityInputModalities(t *testing.T) {
 	service := &Service{
@@ -91,7 +24,6 @@ func TestRegisterModelsForAuth_OpenAICompatibilityInputModalities(t *testing.T) 
 							InputModalities:  []string{"text", "image"},
 							OutputModalities: []string{"text"},
 						},
-						{Name: "upstream-image", Alias: "compat-image", Image: true},
 					},
 				},
 			},
@@ -118,7 +50,6 @@ func TestRegisterModelsForAuth_OpenAICompatibilityInputModalities(t *testing.T) 
 
 	models := modelRegistry.GetModelsForClient(auth.ID)
 	var visionModel *internalregistry.ModelInfo
-	var imageEndpointModel *internalregistry.ModelInfo
 	for _, model := range models {
 		if model == nil {
 			continue
@@ -126,8 +57,6 @@ func TestRegisterModelsForAuth_OpenAICompatibilityInputModalities(t *testing.T) 
 		switch strings.TrimSpace(model.ID) {
 		case "mimo-v2.5-pro":
 			visionModel = model
-		case "compat-image":
-			imageEndpointModel = model
 		}
 	}
 	if visionModel == nil {
@@ -141,15 +70,6 @@ func TestRegisterModelsForAuth_OpenAICompatibilityInputModalities(t *testing.T) 
 	}
 	if got := strings.Join(visionModel.SupportedOutputModalities, ","); got != "text" {
 		t.Fatalf("SupportedOutputModalities = %q, want text", got)
-	}
-	if imageEndpointModel == nil {
-		t.Fatal("expected compat-image to be registered")
-	}
-	if imageEndpointModel.Type != internalregistry.OpenAIImageModelType {
-		t.Fatalf("image endpoint model type = %q, want %q", imageEndpointModel.Type, internalregistry.OpenAIImageModelType)
-	}
-	if len(imageEndpointModel.SupportedInputModalities) != 0 {
-		t.Fatalf("image endpoint model should not inherit chat input modalities: %+v", imageEndpointModel.SupportedInputModalities)
 	}
 }
 

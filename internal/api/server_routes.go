@@ -55,29 +55,12 @@ func (s *Server) setupRoutes() {
 		})
 		v1.POST("/chat/completions", openaiHandlers.ChatCompletions)
 		v1.POST("/completions", openaiHandlers.Completions)
-		v1.POST("/images/generations", openaiHandlers.ImagesGenerations)
-		v1.POST("/images/edits", openaiHandlers.ImagesEdits)
-		v1.POST("/videos", openaiHandlers.XAIVideosGenerations)
-		v1.POST("/videos/generations", openaiHandlers.XAIVideosGenerations)
-		v1.POST("/videos/edits", openaiHandlers.XAIVideosEdits)
-		v1.POST("/videos/extensions", openaiHandlers.XAIVideosExtensions)
-		v1.GET("/videos/:request_id", openaiHandlers.XAIVideosRetrieve)
-		v1.POST("/audio/speech", openaiHandlers.AudioSpeech)
-		v1.POST("/tts", openaiHandlers.XAITTS)
 		v1.POST("/messages", claudeCodeHandlers.ClaudeMessages)
 		v1.POST("/messages/count_tokens", claudeCodeHandlers.ClaudeCountTokens)
 		v1.GET("/responses", openaiResponsesHandlers.ResponsesWebsocket)
 		v1.POST("/responses", openaiResponsesHandlers.Responses)
 		v1.POST("/responses/compact", openaiResponsesHandlers.Compact)
 		v1.POST("/alpha/search", s.codexAlphaSearch)
-	}
-
-	openaiV1 := s.engine.Group("/openai/v1")
-	openaiV1.Use(AuthMiddleware(s.accessManager))
-	{
-		openaiV1.POST("/videos", openaiHandlers.VideosCreate)
-		openaiV1.GET("/videos/:video_id/content", openaiHandlers.VideosContent)
-		openaiV1.GET("/videos/:video_id", openaiHandlers.VideosRetrieve)
 	}
 
 	// Codex CLI direct route aliases (chatgpt_base_url compatible)

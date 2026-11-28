@@ -3,13 +3,14 @@ package auth
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"testing"
+	"time"
+
 	internalconfig "github.com/udit19199/relay/internal/config"
 	"github.com/udit19199/relay/internal/registry"
 	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 	translatorreg "github.com/udit19199/relay/internal/translator/registry"
-	"net/http"
-	"testing"
-	"time"
 )
 
 func TestManagerSessionAffinityAliasCooldownPreservesSelection(t *testing.T) {

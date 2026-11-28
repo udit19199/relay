@@ -17,9 +17,6 @@ import (
 	misc "github.com/udit19199/relay/internal/misc"
 )
 
-// OpenAIImageModelType marks models that are callable through OpenAI-compatible image endpoints.
-const OpenAIImageModelType = "openai-image"
-
 const (
 	DefaultClaudeMaxInputTokens  = 200000
 	DefaultClaudeMaxOutputTokens = 64000

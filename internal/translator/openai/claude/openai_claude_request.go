@@ -6,8 +6,9 @@
 package claude
 
 import (
-	"github.com/MoeForge/moego/base64"
 	"strings"
+
+	"github.com/MoeForge/moego/base64"
 
 	"github.com/MoeForge/moego/ojson"
 	sigcompat "github.com/udit19199/relay/internal/signature"

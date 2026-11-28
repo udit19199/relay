@@ -12,6 +12,10 @@ import (
 
 	"bytes"
 	"encoding/json"
+	"mime/multipart"
+	"net/http/httptest"
+	"strings"
+
 	"github.com/udit19199/relay/internal/api"
 	"github.com/udit19199/relay/internal/config"
 	internalregistry "github.com/udit19199/relay/internal/registry"
@@ -19,9 +23,6 @@ import (
 	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 	"github.com/udit19199/relay/internal/watcher"
 	"golang.org/x/crypto/bcrypt"
-	"mime/multipart"
-	"net/http/httptest"
-	"strings"
 )
 
 func TestRuntimeAuthSyncHook_SynchronousModelAndSchedulerRestoration(t *testing.T) {

@@ -1,13 +1,14 @@
 package thinking_test
 
 import (
+	"testing"
+
 	"github.com/MoeForge/moego/ojson"
 	"github.com/udit19199/relay/internal/registry"
 	"github.com/udit19199/relay/internal/thinking"
 	_ "github.com/udit19199/relay/internal/thinking/provider/claude"
 	_ "github.com/udit19199/relay/internal/thinking/provider/codex"
 	_ "github.com/udit19199/relay/internal/thinking/provider/openai"
-	"testing"
 )
 
 func TestApplyThinkingWithModelInfoMapsCrossFamilyHighIntent(t *testing.T) {

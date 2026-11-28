@@ -3,9 +3,10 @@ package claude
 import (
 	"context"
 	"fmt"
-	"github.com/MoeForge/moego/base64"
 	"strings"
 	"testing"
+
+	"github.com/MoeForge/moego/base64"
 
 	"github.com/MoeForge/moego/ojson"
 	translatorreg "github.com/udit19199/relay/internal/translator/registry"

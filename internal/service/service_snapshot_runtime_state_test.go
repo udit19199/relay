@@ -7,13 +7,14 @@ import (
 	"testing"
 	"time"
 
+	"net/http"
+
 	authlogin "github.com/udit19199/relay/internal/auth/login"
 	"github.com/udit19199/relay/internal/config"
 	internalconfig "github.com/udit19199/relay/internal/config"
 	coreauth "github.com/udit19199/relay/internal/service/auth"
 	"github.com/udit19199/relay/internal/watcher"
 	"github.com/udit19199/relay/internal/watcher/synthesizer"
-	"net/http"
 )
 
 // Service-level repro on dev: a file snapshot applied through handleAuthUpdates (the

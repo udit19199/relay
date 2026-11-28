@@ -11,7 +11,6 @@ import (
 	"github.com/MoeForge/moego/ojson"
 	log "github.com/sirupsen/logrus"
 	"github.com/udit19199/relay/internal/client/grokbuild"
-	"github.com/udit19199/relay/internal/config"
 	"github.com/udit19199/relay/internal/runtime/executor/helps"
 	coreauth "github.com/udit19199/relay/internal/service/auth"
 	coreexecutor "github.com/udit19199/relay/internal/service/executor"
@@ -27,9 +26,6 @@ func (e *CodexExecutor) ExecuteStream(ctx context.Context, auth *coreauth.Auth, 
 	}
 	if errExpand := helps.ExpandRecognizedResponsesCompactionCapsules(&req, &opts); errExpand != nil {
 		return nil, statusErr{code: http.StatusBadRequest, msg: errExpand.Error()}
-	}
-	if isCodexOpenAIImageRequest(opts) {
-		return e.executeOpenAIImageStream(ctx, auth, req, opts)
 	}
 	baseModel := thinking.ParseSuffix(req.Model).ModelName
 
@@ -91,16 +87,6 @@ func (e *CodexExecutor) ExecuteStream(ctx context.Context, auth *coreauth.Auth, 
 	ensureWebSearchToolForHistoryDoc(doc, opts.Headers)
 	if !useSIWC {
 		normalizeCodexInstructionsDoc(doc, preserveNativeOutput)
-		if e.cfg == nil || e.cfg.DisableImageGeneration == config.DisableImageGenerationOff {
-			checkModel := req.Model
-			if strings.TrimSpace(checkModel) == "" {
-				checkModel = baseModel
-			}
-			ensureImageGenerationToolDoc(doc, checkModel, auth, opts.Headers)
-			if !codexAuthUsesAPIKey(auth) {
-				normalizeCodexImageGenerationToolsDoc(doc)
-			}
-		}
 	} else {
 		applyCodexSIWCRequestBodyRulesDoc(doc, hasExplicitInstructions, coreexecutor.Options{KeepTopLevelEffort: thinking.HasThinkingSuffix(req.Model)})
 	}
@@ -131,9 +117,6 @@ func (e *CodexExecutor) ExecuteStream(ctx context.Context, auth *coreauth.Auth, 
 		alignCodexContentEncoding(request)
 	}
 	prepareHeaders(httpReq)
-	if errValidate := helps.ValidateCodexHostedImageGenerationDoc(doc, httpReq.Header, e.cfg, !useSIWC && !codexAuthUsesAPIKey(auth)); errValidate != nil {
-		return nil, errValidate
-	}
 	var authID, authLabel, authType, authValue string
 	if auth != nil {
 		authID = auth.ID
@@ -320,7 +303,6 @@ func (e *CodexExecutor) ExecuteStream(ctx context.Context, auth *coreauth.Auth, 
 					} else {
 						reporter.EnsurePublished(ctx)
 					}
-					publishCodexImageToolUsageWithOutputItems(ctx, reporter, body, data, outputItemsByIndex, outputItemsFallback)
 					if !preserveNativeOutput {
 						data = patchCodexCompletedOutput(data, outputItemsByIndex, outputItemsFallback)
 					}
@@ -507,7 +489,6 @@ func (e *CodexExecutor) ExecuteStream(ctx context.Context, auth *coreauth.Auth, 
 					} else {
 						reporter.EnsurePublished(ctx)
 					}
-					publishCodexImageToolUsageWithOutputItems(ctx, reporter, body, data, outputItemsByIndex, outputItemsFallback)
 					if !preserveNativeOutput {
 						data = patchCodexCompletedOutput(data, outputItemsByIndex, outputItemsFallback)
 					}

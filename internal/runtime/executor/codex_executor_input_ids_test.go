@@ -33,7 +33,7 @@ func TestCodexExecutorExecuteStreamSanitizesOverlongInputItemIDs(t *testing.T) {
 	}))
 	defer server.Close()
 
-	executor := NewCodexExecutor(&config.Config{SDKConfig: config.SDKConfig{DisableImageGeneration: config.DisableImageGenerationAll}})
+	executor := NewCodexExecutor(&config.Config{})
 	auth := &coreauth.Auth{Attributes: map[string]string{"base_url": server.URL, "api_key": "test"}}
 	result, err := executor.ExecuteStream(context.Background(), auth, coreexecutor.Request{
 		Model: "gpt-5.4",

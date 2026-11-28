@@ -118,10 +118,9 @@ func TestRegisterModelsForAuthCodexAPIKeyModels(t *testing.T) {
 		wantAbsent  []string
 	}{
 		{
-			name:        "defaults without explicit models",
-			entry:       config.CodexKey{APIKey: "default-key"},
-			wantIDs:     codexModelIDSet(defaultModels),
-			wantPresent: []string{"gpt-image-1.5", "gpt-image-2", "gpt-image-2.5-flare", "gpt-image-2.5-sunburst", "gpt-image-2.5", "gpt-image-2.6-flare", "gpt-image-2.6-sunburst", "gpt-image-2.6"},
+			name:    "defaults without explicit models",
+			entry:   config.CodexKey{APIKey: "default-key"},
+			wantIDs: codexModelIDSet(defaultModels),
 		},
 		{
 			name: "only explicitly configured models",
@@ -286,15 +285,13 @@ func TestRegisterModelsForAuthCodexAPIKeyDefaultRequiresConfigMatch(t *testing.T
 func TestRegisterConfigAPIKeyAuthsCodexModelModes(t *testing.T) {
 	defaultIDs := codexModelIDSet(internalregistry.GetCodexProModels())
 	tests := []struct {
-		name       string
-		models     []internalconfig.CodexModel
-		wantIDs    map[string]struct{}
-		wantImages bool
+		name    string
+		models  []internalconfig.CodexModel
+		wantIDs map[string]struct{}
 	}{
 		{
-			name:       "empty models uses defaults with images",
-			wantIDs:    defaultIDs,
-			wantImages: true,
+			name:    "empty models uses defaults",
+			wantIDs: defaultIDs,
 		},
 		{
 			name: "configured models replace defaults",
@@ -335,17 +332,6 @@ func TestRegisterConfigAPIKeyAuthsCodexModelModes(t *testing.T) {
 			for modelID := range testCase.wantIDs {
 				if _, ok := registeredIDs[modelID]; !ok {
 					t.Errorf("missing registered model %q", modelID)
-				}
-			}
-			for _, modelID := range []string{"gpt-image-1.5", "gpt-image-2", "gpt-image-2.5-flare", "gpt-image-2.5-sunburst", "gpt-image-2.5", "gpt-image-2.6-flare", "gpt-image-2.6-sunburst", "gpt-image-2.6"} {
-				_, registered := registeredIDs[modelID]
-				if registered != testCase.wantImages {
-					t.Errorf("registered model %q = %t, want %t", modelID, registered, testCase.wantImages)
-				}
-				if testCase.wantImages {
-					if _, available := openAIModelIDSet(modelRegistry.GetAvailableModels("openai"))[modelID]; !available {
-						t.Errorf("/v1/models source is missing %q", modelID)
-					}
 				}
 			}
 		})

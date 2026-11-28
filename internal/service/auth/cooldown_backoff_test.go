@@ -2,11 +2,12 @@ package auth
 
 import (
 	"context"
-	"github.com/udit19199/relay/internal/registry"
-	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/udit19199/relay/internal/registry"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 func withQuotaCooldownEnabled(t *testing.T) {

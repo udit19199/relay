@@ -2,13 +2,14 @@ package auth
 
 import (
 	"fmt"
-	"github.com/udit19199/relay/internal/registry"
-	coreexecutor "github.com/udit19199/relay/internal/service/executor"
-	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 	"maps"
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/udit19199/relay/internal/registry"
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
+	translatorreg "github.com/udit19199/relay/internal/translator/registry"
 )
 
 func TestManagerWeightedPinnedSessionCompensation(t *testing.T) {

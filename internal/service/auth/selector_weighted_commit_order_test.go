@@ -2,9 +2,10 @@ package auth
 
 import (
 	"fmt"
-	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 	"maps"
 	"testing"
+
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 func TestWeightedReservationFinalRollbackBoundsSettledCredits(t *testing.T) {

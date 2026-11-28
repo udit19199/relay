@@ -2,10 +2,11 @@ package auth
 
 import (
 	"context"
-	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 	"net/http"
 	"testing"
 	"time"
+
+	coreexecutor "github.com/udit19199/relay/internal/service/executor"
 )
 
 func TestCodexStructuredModelNotFound_ClassificationAndCooldown(t *testing.T) {

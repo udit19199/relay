@@ -29,10 +29,9 @@ import (
 )
 
 const (
-	codexUserAgent             = "codex-tui/0.154.0 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.154.0)"
-	codexOriginator            = "codex-tui"
-	codexDefaultImageToolModel = "gpt-image-2"
-	codexResponsesLiteHeader   = "X-OpenAI-Internal-Codex-Responses-Lite"
+	codexUserAgent           = "codex-tui/0.154.0 (Mac OS 26.5.2; arm64) iTerm.app/3.6.11 (codex-tui; 0.154.0)"
+	codexOriginator          = "codex-tui"
+	codexResponsesLiteHeader = "X-OpenAI-Internal-Codex-Responses-Lite"
 )
 
 var dataTag = []byte("data:")
@@ -377,20 +376,6 @@ func applyModelHeaderOverrides(headers http.Header, modelName string) {
 	}
 }
 
-// applyCodexDirectImageHeaders sets Codex upstream headers for direct /images/* calls.
-// Downstream client User-Agent values are not forwarded to reduce Cloudflare 1010 blocks.
-func applyCodexDirectImageHeaders(r *http.Request, auth *coreauth.Auth, token string, stream bool, cfg *config.Config, clientHeaders ...http.Header) {
-	var ginHeaders http.Header
-	if len(clientHeaders) > 0 && clientHeaders[0] != nil {
-		ginHeaders = clientHeaders[0].Clone()
-		ginHeaders.Del("User-Agent")
-	} else if ginCtx, ok := r.Context().Value("gin").(*gin.Context); ok && ginCtx != nil && ginCtx.Request != nil {
-		ginHeaders = ginCtx.Request.Header.Clone()
-		ginHeaders.Del("User-Agent")
-	}
-	applyCodexHeadersWithSIWC(r, auth, false, token, stream, cfg, ginHeaders)
-}
-
 func codexSIWCUserAgent(cfg *config.Config) string {
 	agentName := config.DefaultSignInWithChatGPTIdentifier
 	if cfg != nil {
@@ -667,12 +652,6 @@ func isCodexResponsesLiteRequestDoc(doc *ojson.Doc, headers http.Header) bool {
 	return helps.CodexResponsesLiteRequestDoc(doc, headers)
 }
 
-func isCodexResponsesLiteModel(model string) bool {
-	return helps.CodexModelUsesResponsesLite(model)
-}
-
-var imageGenToolJSON = []byte(`{"type":"image_generation","output_format":"png"}`)
-var imageGenToolArrayJSON = []byte(`[{"type":"image_generation","output_format":"png"}]`)
 var webSearchToolJSON = []byte(`{"type":"web_search"}`)
 var webSearchToolArrayJSON = []byte(`[{"type":"web_search"}]`)
 
@@ -748,151 +727,6 @@ func ensureWebSearchToolForHistoryDoc(doc *ojson.Doc, headers http.Header) bool 
 	return doc.SetRawBytes("tools.-1", webSearchToolJSON) == nil
 }
 
-func isCodexFreePlanAuth(auth *coreauth.Auth) bool {
-	if auth == nil || auth.Attributes == nil {
-		return false
-	}
-	if !strings.EqualFold(strings.TrimSpace(auth.Provider), "codex") {
-		return false
-	}
-	return strings.EqualFold(strings.TrimSpace(auth.Attributes["plan_type"]), "free")
-}
-
-func isImageGenerationFunctionTool(tool ojson.Result) bool {
-	switch tool.Get("type").String() {
-	case "function":
-		return tool.Get("name").String() == "image_gen.imagegen"
-	case "namespace":
-		if tool.Get("name").String() != "image_gen" {
-			return false
-		}
-		tools := tool.Get("tools")
-		if !tools.IsArray() {
-			return false
-		}
-		for _, nestedTool := range tools.Array() {
-			if nestedTool.Get("type").String() == "function" && nestedTool.Get("name").String() == "imagegen" {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func ensureImageGenerationTool(body []byte, baseModel string, auth *coreauth.Auth, headers http.Header) []byte {
-	doc := ojson.NewDoc(body)
-	if !ensureImageGenerationToolDoc(doc, baseModel, auth, headers) {
-		return body
-	}
-	return doc.Bytes()
-}
-
-func codexRequestHasReasoningForHostedImageDoc(doc *ojson.Doc, model string) bool {
-	return helps.CodexRequestHasReasoningForHostedImageDoc(doc, model)
-}
-
-func isCodexResponsesLiteRequestForAuthDoc(doc *ojson.Doc, modelName string, auth *coreauth.Auth, headers http.Header) bool {
-	return helps.CodexResponsesLiteRequestForAuthDoc(doc, modelName, auth, headers)
-}
-
-func codexToolsAlreadyContainImageGenDoc(doc *ojson.Doc) bool {
-	if doc == nil {
-		return false
-	}
-	tools := doc.Get("tools")
-	if !tools.Exists() || !tools.IsArray() {
-		return false
-	}
-	for _, t := range tools.Array() {
-		if t.Get("type").String() == "image_generation" || isImageGenerationFunctionTool(t) {
-			return true
-		}
-	}
-	return false
-}
-
-func appendImageGenerationToolDoc(doc *ojson.Doc) bool {
-	if doc == nil {
-		return false
-	}
-	tools := doc.Get("tools")
-	if !tools.Exists() || !tools.IsArray() {
-		return doc.SetRawBytes("tools", imageGenToolArrayJSON) == nil
-	}
-	return doc.SetRawBytes("tools.-1", imageGenToolJSON) == nil
-}
-
-func ensureImageGenerationToolDoc(doc *ojson.Doc, baseModel string, auth *coreauth.Auth, headers http.Header) bool {
-	if doc == nil || isCodexFreePlanAuth(auth) || codexToolsAlreadyContainImageGenDoc(doc) {
-		return false
-	}
-	modelName := strings.TrimSpace(thinking.ParseSuffix(baseModel).ModelName)
-	if modelName == "" {
-		modelName = strings.TrimSpace(thinking.ParseSuffix(doc.Get("model").String()).ModelName)
-	}
-	if isCodexResponsesLiteRequestForAuthDoc(doc, modelName, auth, headers) {
-		return false
-	}
-	if isCodexResponsesLiteModel(modelName) && codexRequestHasReasoningForHostedImageDoc(doc, baseModel) {
-		return false
-	}
-	if strings.HasSuffix(strings.ToLower(modelName), "spark") {
-		return false
-	}
-	return appendImageGenerationToolDoc(doc)
-}
-
-func resolveCodexGPTImage2BaseModel(cfg *config.Config) string {
-	if cfg == nil {
-		return codexOpenAIImagesMainModel
-	}
-	model := strings.TrimSpace(cfg.GPTImage2BaseModel)
-	if model == "" {
-		return codexOpenAIImagesMainModel
-	}
-	if !strings.HasPrefix(strings.ToLower(model), "gpt-") || isCodexResponsesLiteModel(model) {
-		return codexOpenAIImagesMainModel
-	}
-	return model
-}
-
-// normalizeCodexImageGenerationToolsDoc strips parameters rejected by the
-// hosted image_generation tool on Codex /responses (which binds to
-// gpt-image-2-codex and rejects the complexity parameter).
-func normalizeCodexImageGenerationToolsDoc(doc *ojson.Doc) bool {
-	if doc == nil {
-		return false
-	}
-	changed := false
-	stripAtPath := func(toolsPath string) {
-		tools := doc.Get(toolsPath)
-		if !tools.IsArray() {
-			return
-		}
-		for idx, tool := range tools.Array() {
-			if strings.TrimSpace(tool.Get("type").String()) != "image_generation" {
-				continue
-			}
-			if tool.Get("complexity").Exists() {
-				if doc.Delete(fmt.Sprintf("%s.%d.complexity", toolsPath, idx)) == nil {
-					changed = true
-				}
-			}
-		}
-	}
-	stripAtPath("tools")
-	input := doc.Get("input")
-	if input.IsArray() {
-		for idx, item := range input.Array() {
-			if strings.TrimSpace(item.Get("type").String()) != "additional_tools" {
-				continue
-			}
-			stripAtPath(fmt.Sprintf("input.%d.tools", idx))
-		}
-	}
-	return changed
-}
-
 func normalizeCodexParallelToolCalls(body []byte, headers http.Header) []byte {
 	doc := ojson.NewDoc(body)
 	if !normalizeCodexParallelToolCallsDoc(doc, headers) {
@@ -931,29 +765,4 @@ func normalizeCodexParallelToolCallsForToolsDoc(doc *ojson.Doc) bool {
 	}
 
 	return doc.Delete("parallel_tool_calls") == nil
-}
-
-func publishCodexImageToolUsageWithOutputItems(ctx context.Context, reporter *helps.UsageReporter, body []byte, completedData []byte, itemsByIndex map[int64][]byte, fallback [][]byte) {
-	detail, ok := helps.ParseCodexImageToolUsageWithOutputItems(body, completedData, itemsByIndex, fallback)
-	if !ok {
-		return
-	}
-	reporter.EnsurePublished(ctx)
-	reporter.PublishAdditionalModel(ctx, codexImageGenerationToolModel(body), detail)
-}
-
-func codexImageGenerationToolModel(body []byte) string {
-	tools := ojson.GetBytesNoCopy(body, "tools")
-	if tools.IsArray() {
-		for _, tool := range tools.Array() {
-			if tool.Get("type").String() != "image_generation" {
-				continue
-			}
-			if model := strings.TrimSpace(tool.Get("model").String()); model != "" {
-				return strings.Clone(model)
-			}
-			break
-		}
-	}
-	return codexDefaultImageToolModel
 }

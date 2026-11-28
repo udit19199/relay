@@ -5,8 +5,6 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
-	"github.com/udit19199/relay/internal/config"
-	"go.etcd.io/bbolt"
 	"math"
 	"os"
 	"path/filepath"
@@ -16,6 +14,9 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/udit19199/relay/internal/config"
+	"go.etcd.io/bbolt"
 )
 
 func TestResolvePath_DefaultRelativeTildeAndAbsolute(t *testing.T) {
