@@ -10,7 +10,6 @@ import (
 	"github.com/udit19199/relay/internal/api/handlers/openai"
 	authlogin "github.com/udit19199/relay/internal/auth/login"
 	"github.com/udit19199/relay/internal/config"
-	"github.com/udit19199/relay/internal/githubauth"
 	"github.com/udit19199/relay/internal/logging"
 	"github.com/udit19199/relay/internal/service/auth"
 	responsesclaude "github.com/udit19199/relay/internal/translator/claude/openai/responses"
@@ -153,7 +152,6 @@ func (s *Server) UpdateClientsContext(ctx context.Context, cfg *config.Config) b
 	s.cfg = cfg
 	s.cfgMu.Unlock()
 	openai.SetResponsesWebsocketCompressionEnabled(cfg.Codex.WebsocketCompressionEnabled())
-	githubauth.SetToken(cfg.GitHubToken)
 	if errContext := ctx.Err(); errContext != nil {
 		return false
 	}

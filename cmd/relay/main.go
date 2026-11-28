@@ -19,7 +19,6 @@ import (
 	"github.com/udit19199/relay/internal/buildinfo"
 	"github.com/udit19199/relay/internal/cmd"
 	"github.com/udit19199/relay/internal/config"
-	"github.com/udit19199/relay/internal/githubauth"
 	"github.com/udit19199/relay/internal/logging"
 	"github.com/udit19199/relay/internal/registry"
 	"github.com/udit19199/relay/internal/relaycli"
@@ -206,7 +205,6 @@ func main() {
 	} else {
 		cfg.AuthDir = resolvedAuthDir
 	}
-	githubauth.SetToken(cfg.GitHubToken)
 
 	// Create login options to be used in authentication flows.
 	options := &cmd.LoginOptions{

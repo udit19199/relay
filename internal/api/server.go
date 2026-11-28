@@ -25,7 +25,6 @@ import (
 	"github.com/udit19199/relay/internal/api/handlers/openai"
 	"github.com/udit19199/relay/internal/api/middleware"
 	"github.com/udit19199/relay/internal/config"
-	"github.com/udit19199/relay/internal/githubauth"
 	"github.com/udit19199/relay/internal/logging"
 	"github.com/udit19199/relay/internal/service/auth"
 	"golang.org/x/net/http2"
@@ -186,7 +185,6 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *acc
 	if authManager != nil {
 		authManager.SetRetryConfig(cfg.RequestRetry, time.Duration(cfg.MaxRetryInterval)*time.Second, cfg.MaxRetryCredentials)
 	}
-	githubauth.SetToken(cfg.GitHubToken)
 	auth.SetQuotaCooldownDisabled(cfg.DisableCooling)
 	auth.SetTransientErrorCooldownSeconds(cfg.TransientErrorCooldownSeconds)
 	auth.SetCredentialQuotaProbeIntervalSeconds(cfg.QuotaProbeIntervalSeconds)
